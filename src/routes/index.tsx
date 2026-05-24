@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, ArrowRight, Car } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import logo from "@/assets/jarvys-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,28 +15,22 @@ export const Route = createFileRoute("/")({
 function Welcome() {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-between overflow-hidden bg-background px-6 py-12">
-      <div className="bg-grid pointer-events-none absolute inset-0 opacity-40" />
+      <div className="bg-grid pointer-events-none absolute inset-0 opacity-30" />
       <div
-        className="pointer-events-none absolute -top-32 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full"
-        style={{ background: "radial-gradient(closest-side, color-mix(in oklab, var(--neon) 35%, transparent), transparent 70%)" }}
+        className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full"
+        style={{ background: "radial-gradient(closest-side, color-mix(in oklab, var(--neon) 30%, transparent), transparent 70%)" }}
       />
 
-      <div className="relative z-10 mt-10 flex flex-col items-center">
-        <div className="glow-neon flex h-20 w-20 items-center justify-center rounded-2xl bg-card">
-          <Sparkles className="h-9 w-9 text-primary" />
-        </div>
-        <h1 className="mt-6 text-5xl font-bold tracking-tight text-foreground">
-          Jarv<span className="text-primary text-glow">ys</span>
-        </h1>
-        <p className="mt-3 text-center text-base text-muted-foreground">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
+        <img
+          src={logo}
+          alt="Jarvys"
+          width={520}
+          height={520}
+          className="w-72 max-w-[80vw] drop-shadow-[0_0_40px_rgba(56,189,248,0.35)]"
+        />
+        <p className="-mt-2 text-center text-base text-muted-foreground">
           A IA do seu carro
-        </p>
-      </div>
-
-      <div className="relative z-10 flex flex-col items-center gap-3 text-center">
-        <Car className="h-24 w-24 text-primary/70" strokeWidth={1.2} />
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-          Tenha o controle total da saúde do seu veículo na palma da mão.
         </p>
       </div>
 
