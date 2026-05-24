@@ -64,9 +64,12 @@ function HomePage() {
     <div className="relative min-h-screen bg-background pb-40">
       {/* Header */}
       <header className="flex items-center justify-between px-6 pt-10">
-        <div>
-          <p className="text-xs text-muted-foreground">Olá,</p>
-          <h1 className="text-xl font-semibold">{user?.name?.split(" ")[0] || "Motorista"}</h1>
+        <div className="flex items-center gap-3">
+          <img src={logo} alt="Jarvys" width={40} height={40} className="h-10 w-10 object-contain" />
+          <div>
+            <p className="text-xs text-muted-foreground">Olá,</p>
+            <h1 className="text-lg font-semibold leading-tight">{user?.name?.split(" ")[0] || "Motorista"}</h1>
+          </div>
         </div>
         <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card">
           <Bell className="h-5 w-5 text-foreground" />
