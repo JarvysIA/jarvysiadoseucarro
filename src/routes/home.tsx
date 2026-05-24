@@ -11,6 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 import jeepImg from "@/assets/jeep-renegade.jpg";
+import logo from "@/assets/jarvys-logo.png";
 import { loadUser, type JarvysUser } from "@/lib/jarvys-store";
 import { ChatFab } from "@/components/ChatFab";
 
