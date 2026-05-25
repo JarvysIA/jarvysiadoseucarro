@@ -29,7 +29,7 @@ function Welcome() {
           height={520}
           className="w-72 max-w-[80vw] drop-shadow-[0_0_40px_rgba(56,189,248,0.35)]"
         />
-        <p className="-mt-2 text-center text-base text-muted-foreground">
+        <p className="font-tech text-neon-white mt-3 text-center text-sm font-semibold uppercase">
           A IA do seu carro
         </p>
       </div>

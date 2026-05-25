@@ -1,4 +1,5 @@
 @import "tailwindcss" source(none);
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap");
 @source "../src";
 @import "tw-animate-css";
 
@@ -90,5 +91,17 @@
       linear-gradient(color-mix(in oklab, var(--neon) 8%, transparent) 1px, transparent 1px),
       linear-gradient(90deg, color-mix(in oklab, var(--neon) 8%, transparent) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+  .font-tech {
+    font-family: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.22em;
+  }
+  .text-neon-white {
+    color: #ffffff;
+    text-shadow:
+      0 0 4px rgba(255, 255, 255, 0.9),
+      0 0 10px rgba(255, 255, 255, 0.75),
+      0 0 22px rgba(255, 255, 255, 0.55),
+      0 0 40px color-mix(in oklab, var(--neon) 55%, transparent);
   }
 }
