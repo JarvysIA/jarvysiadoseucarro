@@ -104,16 +104,9 @@ function HomePage() {
         </button>
       </header>
 
-      {/* Título + Legenda */}
+      {/* Título Minha Garagem */}
       <section className="mt-8 px-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Status do Veículo</h2>
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <Legend status="ok" />
-            <Legend status="warn" />
-            <Legend status="bad" />
-          </div>
-        </div>
+        <h2 className="text-base font-semibold">Minha Garagem</h2>
       </section>
 
       {/* Carrossel de veículos */}
@@ -173,8 +166,20 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Cabeçalho Status do Veículo + Legenda */}
+      <section className="mt-10 px-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Status do Veículo</h2>
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <Legend status="ok" />
+            <Legend status="warn" />
+            <Legend status="bad" />
+          </div>
+        </div>
+      </section>
+
       {/* Grade dinâmica de status */}
-      <section className="mt-6 px-6">
+      <section className="mt-4 px-6">
         <div className="grid grid-cols-2 gap-3">
           {ITEMS.map((it, idx) => {
             const data = selected.status[it.key];
