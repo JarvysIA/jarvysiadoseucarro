@@ -23,7 +23,7 @@ function SignupPage() {
 
   return (
     <div className="relative min-h-screen bg-background px-6 pt-10 pb-12">
-      <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+      <Link to="/welcome" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar
       </Link>
 
