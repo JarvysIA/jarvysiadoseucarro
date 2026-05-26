@@ -87,7 +87,7 @@ function HomePage() {
   );
 
   return (
-    <div className="relative min-h-screen bg-background pb-40">
+    <div className="relative min-h-screen bg-background pb-56">
       {/* Header */}
       <header className="flex items-center justify-between px-6 pt-10">
         <div className="flex items-center gap-3">
