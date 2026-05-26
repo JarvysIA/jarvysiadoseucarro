@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import logo from "@/assets/jarvys-logo.png";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -29,6 +28,3 @@ export function PlaceholderPage({ title, subtitle }: { title: string; subtitle: 
     </div>
   );
 }
-
-// re-export helper for route files
-export const Route = createFileRoute as never;
