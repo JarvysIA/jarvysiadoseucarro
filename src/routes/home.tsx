@@ -227,6 +227,8 @@ function HomePage() {
       </section>
 
       <ChatFab />
+      <BottomNav />
+
     </div>
   );
 }
