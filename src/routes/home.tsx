@@ -4,6 +4,7 @@ import { Bell, Droplet, Thermometer, Gauge } from "lucide-react";
 import logo from "@/assets/jarvys-logo.png";
 import { loadUser, type JarvysUser } from "@/lib/jarvys-store";
 import { ChatFab } from "@/components/ChatFab";
+import { BottomNav } from "@/components/BottomNav";
 import {
   AirFilterIcon,
   TireStackIcon,
