@@ -25,7 +25,7 @@ export function ChatFab() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="glow-neon fixed bottom-6 left-1/2 z-40 flex h-14 w-[88%] max-w-sm -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-card px-4 text-left transition-transform active:scale-[0.99]"
+          className="glow-neon fixed bottom-24 left-1/2 z-40 flex h-14 w-[88%] max-w-sm -translate-x-1/2 items-center gap-3 rounded-2xl border border-border bg-card px-4 text-left transition-transform active:scale-[0.99]"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <Sparkles className="h-4 w-4" />
