@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import logo from "@/assets/jarvys-logo.png";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/welcome")({
   head: () => ({
     meta: [
       { title: "Jarvys — A IA do seu carro" },
