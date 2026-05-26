@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as DespesasRouteImport } from './routes/despesas'
@@ -24,6 +25,11 @@ const WelcomeRoute = WelcomeRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShoppingRoute = ShoppingRouteImport.update({
+  id: '/shopping',
+  path: '/shopping',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RevisoesRoute = RevisoesRouteImport.update({
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/despesas': typeof DespesasRoute
   '/home': typeof HomeRoute
   '/revisoes': typeof RevisoesRoute
+  '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/despesas': typeof DespesasRoute
   '/home': typeof HomeRoute
   '/revisoes': typeof RevisoesRoute
+  '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
 }
@@ -69,20 +77,36 @@ export interface FileRoutesById {
   '/despesas': typeof DespesasRoute
   '/home': typeof HomeRoute
   '/revisoes': typeof RevisoesRoute
+  '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/welcome': typeof WelcomeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/despesas' | '/home' | '/revisoes' | '/signup' | '/welcome'
+  fullPaths:
+    | '/'
+    | '/despesas'
+    | '/home'
+    | '/revisoes'
+    | '/shopping'
+    | '/signup'
+    | '/welcome'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/despesas' | '/home' | '/revisoes' | '/signup' | '/welcome'
+  to:
+    | '/'
+    | '/despesas'
+    | '/home'
+    | '/revisoes'
+    | '/shopping'
+    | '/signup'
+    | '/welcome'
   id:
     | '__root__'
     | '/'
     | '/despesas'
     | '/home'
     | '/revisoes'
+    | '/shopping'
     | '/signup'
     | '/welcome'
   fileRoutesById: FileRoutesById
@@ -92,6 +116,7 @@ export interface RootRouteChildren {
   DespesasRoute: typeof DespesasRoute
   HomeRoute: typeof HomeRoute
   RevisoesRoute: typeof RevisoesRoute
+  ShoppingRoute: typeof ShoppingRoute
   SignupRoute: typeof SignupRoute
   WelcomeRoute: typeof WelcomeRoute
 }
@@ -110,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shopping': {
+      id: '/shopping'
+      path: '/shopping'
+      fullPath: '/shopping'
+      preLoaderRoute: typeof ShoppingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/revisoes': {
@@ -148,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   DespesasRoute: DespesasRoute,
   HomeRoute: HomeRoute,
   RevisoesRoute: RevisoesRoute,
+  ShoppingRoute: ShoppingRoute,
   SignupRoute: SignupRoute,
   WelcomeRoute: WelcomeRoute,
 }
