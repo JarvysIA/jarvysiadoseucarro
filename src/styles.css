@@ -104,4 +104,22 @@
       0 0 22px rgba(255, 255, 255, 0.55),
       0 0 40px color-mix(in oklab, var(--neon) 55%, transparent);
   }
+  @keyframes breathing-glow {
+    0%, 100% {
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.45)) drop-shadow(0 0 22px rgba(56, 189, 248, 0.25));
+    }
+    50% {
+      filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 48px rgba(56, 189, 248, 0.6));
+    }
+  }
+  .animate-breathing-glow {
+    animation: breathing-glow 2.4s ease-in-out infinite;
+  }
+  @keyframes scan-line {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+  .animate-scan-line {
+    animation: scan-line 1.6s ease-in-out infinite;
+  }
 }
