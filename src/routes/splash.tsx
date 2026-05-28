@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import logo from "@/assets/jarvys-logo.png";
 import { loadUser } from "@/lib/jarvys-store";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/splash")({
   head: () => ({
     meta: [
       { title: "Jarvys — A IA do seu carro" },
