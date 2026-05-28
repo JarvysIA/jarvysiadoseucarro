@@ -20,7 +20,7 @@ import {
   type Vehicle,
 } from "@/lib/vehicles";
 
-export const Route = createFileRoute("/home")({
+export const Route = createFileRoute("/garagem")({
   head: () => ({ meta: [{ title: "Status do Veículo — Jarvys" }] }),
   component: HomePage,
 });
