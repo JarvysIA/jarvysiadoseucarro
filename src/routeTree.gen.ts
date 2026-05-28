@@ -16,6 +16,7 @@ import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
 import { Route as GaragemRouteImport } from './routes/garagem'
 import { Route as DespesasRouteImport } from './routes/despesas'
+import { Route as IndexRouteImport } from './routes/index'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -52,8 +53,14 @@ const DespesasRoute = DespesasRouteImport.update({
   path: '/despesas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
   '/revisoes': typeof RevisoesRoute
@@ -63,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
   '/revisoes': typeof RevisoesRoute
@@ -73,6 +81,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
   '/revisoes': typeof RevisoesRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/despesas'
     | '/garagem'
     | '/revisoes'
@@ -93,6 +103,7 @@ export interface FileRouteTypes {
     | '/welcome'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/despesas'
     | '/garagem'
     | '/revisoes'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '/welcome'
   id:
     | '__root__'
+    | '/'
     | '/despesas'
     | '/garagem'
     | '/revisoes'
@@ -112,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   DespesasRoute: typeof DespesasRoute
   GaragemRoute: typeof GaragemRoute
   RevisoesRoute: typeof RevisoesRoute
@@ -172,10 +185,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DespesasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   DespesasRoute: DespesasRoute,
   GaragemRoute: GaragemRoute,
   RevisoesRoute: RevisoesRoute,
@@ -187,3 +208,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
