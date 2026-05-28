@@ -43,7 +43,7 @@ function Welcome() {
           <ArrowRight className="h-4 w-4" />
         </Link>
         <Link
-          to="/home"
+          to="/garagem"
           className="block w-full text-center text-xs text-muted-foreground hover:text-foreground"
         >
           Já tenho uma conta

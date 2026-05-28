@@ -15,7 +15,7 @@ function SignupPage() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     saveUser({ ...form, plate: form.plate.toUpperCase() });
-    navigate({ to: "/home" });
+    navigate({ to: "/garagem" });
   };
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>

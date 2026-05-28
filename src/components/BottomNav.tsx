@@ -1,10 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { House, CalendarCheck, Receipt, ShoppingBag, type LucideIcon } from "lucide-react";
 
-type NavItem = { to: "/home" | "/revisoes" | "/despesas" | "/shopping"; icon: LucideIcon; label: string };
+type NavItem = { to: "/garagem" | "/revisoes" | "/despesas" | "/shopping"; icon: LucideIcon; label: string };
 
 const ITEMS: NavItem[] = [
-  { to: "/home", icon: House, label: "Início" },
+  { to: "/garagem", icon: House, label: "Início" },
   { to: "/revisoes", icon: CalendarCheck, label: "Revisões" },
   { to: "/despesas", icon: Receipt, label: "Despesas" },
   { to: "/shopping", icon: ShoppingBag, label: "Shopping" },

@@ -37,7 +37,7 @@ function Splash() {
     const fadeTimer = setTimeout(() => setFadeOut(true), SPLASH_DURATION_MS);
     const navTimer = setTimeout(() => {
       const user = loadUser();
-      navigate({ to: user ? "/home" : "/welcome", replace: true });
+      navigate({ to: user ? "/garagem" : "/welcome", replace: true });
     }, SPLASH_DURATION_MS + FADE_DURATION_MS);
 
     return () => {
