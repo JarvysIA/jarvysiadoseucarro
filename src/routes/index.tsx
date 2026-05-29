@@ -215,20 +215,20 @@ function LandingPage() {
 function LoopStep({ n, label, highlight }: { n: string; label: string; highlight?: boolean }) {
   return (
     <div
-      className={`rounded-xl border px-2 py-3 ${
+      className={`min-w-0 rounded-xl border px-1.5 py-3 ${
         highlight
           ? "border-primary/60 bg-primary/10"
           : "border-border bg-background/40"
       }`}
     >
       <div
-        className={`font-tech text-xl font-extrabold ${
+        className={`font-tech text-lg font-extrabold leading-none ${
           highlight ? "text-primary text-glow" : "text-foreground"
         }`}
       >
         {n}
       </div>
-      <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="mt-1.5 text-[9px] leading-tight uppercase tracking-wider text-muted-foreground break-words">
         {label}
       </div>
     </div>
