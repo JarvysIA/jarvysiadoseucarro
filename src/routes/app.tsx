@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
-import { loadUser, type JarvysUser } from "@/lib/jarvys-store";
+import { supabase } from "@/integrations/supabase/client";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -20,9 +21,9 @@ import {
   type Vehicle,
 } from "@/lib/vehicles";
 
-export const Route = createFileRoute("/garagem")({
-  head: () => ({ meta: [{ title: "Status do Veículo — Jarvys" }] }),
-  component: HomePage,
+export const Route = createFileRoute("/app")({
+  head: () => ({ meta: [{ title: "Minha Garagem — Jarvys" }] }),
+  component: AppPage,
 });
 
 const STATUS_CLASS: Record<Status, string> = {
@@ -50,16 +51,38 @@ const ITEMS: ItemDef[] = [
   { key: "arrefecimento", label: "Arrefecimento", icon: (p) => <Thermometer className={p.className} /> },
 ];
 
-function HomePage() {
-  const [user, setUser] = useState<JarvysUser | null>(null);
+type Profile = {
+  id: string;
+  nome: string;
+  status_usuario: "trial" | "ativo";
+  permite_indicacao: boolean;
+  trial_inicio: string;
+};
+
+function AppPage() {
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [selectedId, setSelectedId] = useState<string>(VEHICLES[0].id);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setUser(loadUser());
-  }, []);
+    (async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        navigate({ to: "/welcome", replace: true });
+        return;
+      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("id,nome,status_usuario,permite_indicacao,trial_inicio")
+        .eq("id", session.session.user.id)
+        .maybeSingle();
+      setProfile(data as Profile | null);
+      setLoadingProfile(false);
+    })();
+  }, [navigate]);
 
-  // Detecta o card mais centralizado no scroll horizontal.
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -86,16 +109,38 @@ function HomePage() {
     [selectedId],
   );
 
+  const isTrial = profile?.status_usuario !== "ativo";
+  const daysLeft = useMemo(() => {
+    if (!profile?.trial_inicio) return 30;
+    const ms = Date.now() - new Date(profile.trial_inicio).getTime();
+    const used = Math.floor(ms / (1000 * 60 * 60 * 24));
+    return Math.max(0, 30 - used);
+  }, [profile?.trial_inicio]);
+
   return (
     <div className="relative min-h-screen bg-background pb-56">
+      {/* Banner trial */}
+      {!loadingProfile && isTrial && (
+        <div
+          className="sticky top-0 z-20 flex items-center justify-center gap-2 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary"
+          style={{
+            background: "rgba(56,189,248,0.08)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Você tem {daysLeft} dias de acesso total grátis
+        </div>
+      )}
+
       {/* Header */}
-      <header className="flex items-center justify-between px-6 pt-10">
+      <header className="flex items-center justify-between px-6 pt-8">
         <div className="flex items-center gap-3">
           <img src={logo} alt="Jarvys" width={40} height={40} className="h-10 w-10 object-contain" />
           <div>
             <p className="text-xs text-muted-foreground">Olá,</p>
             <h1 className="text-lg font-semibold leading-tight">
-              {user?.name?.split(" ")[0] || "Motorista"}
+              {profile?.nome?.split(" ")[0] || "Motorista"}
             </h1>
           </div>
         </div>
@@ -105,12 +150,10 @@ function HomePage() {
         </button>
       </header>
 
-      {/* Título Minha Garagem */}
       <section className="mt-8 px-6">
         <h2 className="text-base font-semibold">Minha Garagem</h2>
       </section>
 
-      {/* Carrossel de veículos */}
       <section className="mt-4">
         <div
           ref={scrollerRef}
@@ -154,7 +197,6 @@ function HomePage() {
             );
           })}
         </div>
-        {/* Indicadores */}
         <div className="mt-2 flex items-center justify-center gap-2">
           {VEHICLES.map((v) => (
             <span
@@ -167,7 +209,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Cabeçalho Status do Veículo + Legenda */}
       <section className="mt-10 px-6">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold">Status do Veículo</h2>
@@ -179,7 +220,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Grade dinâmica de status */}
       <section className="mt-4 px-6">
         <div className="grid grid-cols-2 gap-3">
           {ITEMS.map((it, idx) => {
@@ -226,9 +266,80 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Indicações */}
+      <section className="mt-8 px-6">
+        <h2 className="text-base font-semibold">Indicações</h2>
+        <div className="mt-3">
+          {profile?.permite_indicacao ? (
+            <ReferralUnlocked userId={profile.id} />
+          ) : (
+            <ReferralLocked />
+          )}
+        </div>
+      </section>
+
       <ChatFab />
       <BottomNav />
+    </div>
+  );
+}
 
+function ReferralLocked() {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+          <Lock className="h-5 w-5" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-medium">Seu link de indicação está bloqueado</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+            Ative sua garagem vitalícia por <span className="font-semibold text-primary">R$ 9,90</span>{" "}
+            para liberar seu link e ganhar <span className="font-semibold text-primary">R$ 5,00 no Pix</span>{" "}
+            por indicação.
+          </p>
+          <button
+            type="button"
+            onClick={() => toast.info("Em breve: ativação via Pix.")}
+            className="glow-neon mt-3 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            Ativar por R$ 9,90
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReferralUnlocked({ userId }: { userId: string }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${typeof window !== "undefined" ? window.location.origin : "https://jarvys.app"}/?ref=${userId.slice(0, 8)}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success("Link copiado!");
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error("Não foi possível copiar.");
+    }
+  };
+  return (
+    <div className="rounded-2xl border border-primary/40 bg-card p-5">
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seu link VIP</p>
+      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2">
+        <code className="flex-1 truncate text-xs text-foreground">{link}</code>
+        <button
+          onClick={copy}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+          aria-label="Copiar link"
+        >
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        </button>
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Ganhe R$ 5,00 no Pix por cada amigo que ativar pela sua indicação.
+      </p>
     </div>
   );
 }

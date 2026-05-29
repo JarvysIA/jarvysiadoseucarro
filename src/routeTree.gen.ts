@@ -14,8 +14,10 @@ import { Route as SplashRouteImport } from './routes/splash'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
-import { Route as GaragemRouteImport } from './routes/garagem'
+import { Route as MasterAdminRouteImport } from './routes/master-admin'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DespesasRouteImport } from './routes/despesas'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -43,14 +45,24 @@ const RevisoesRoute = RevisoesRouteImport.update({
   path: '/revisoes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GaragemRoute = GaragemRouteImport.update({
-  id: '/garagem',
-  path: '/garagem',
+const MasterAdminRoute = MasterAdminRouteImport.update({
+  id: '/master-admin',
+  path: '/master-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DespesasRoute = DespesasRouteImport.update({
   id: '/despesas',
   path: '/despesas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -61,8 +73,10 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/despesas': typeof DespesasRoute
-  '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
+  '/master-admin': typeof MasterAdminRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -71,8 +85,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/despesas': typeof DespesasRoute
-  '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
+  '/master-admin': typeof MasterAdminRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -82,8 +98,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRoute
   '/despesas': typeof DespesasRoute
-  '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
+  '/master-admin': typeof MasterAdminRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -94,8 +112,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/app'
     | '/despesas'
-    | '/garagem'
+    | '/login'
+    | '/master-admin'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -104,8 +124,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/app'
     | '/despesas'
-    | '/garagem'
+    | '/login'
+    | '/master-admin'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -114,8 +136,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/app'
     | '/despesas'
-    | '/garagem'
+    | '/login'
+    | '/master-admin'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -125,8 +149,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRoute
   DespesasRoute: typeof DespesasRoute
-  GaragemRoute: typeof GaragemRoute
+  LoginRoute: typeof LoginRoute
+  MasterAdminRoute: typeof MasterAdminRoute
   RevisoesRoute: typeof RevisoesRoute
   ShoppingRoute: typeof ShoppingRoute
   SignupRoute: typeof SignupRoute
@@ -171,11 +197,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RevisoesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/garagem': {
-      id: '/garagem'
-      path: '/garagem'
-      fullPath: '/garagem'
-      preLoaderRoute: typeof GaragemRouteImport
+    '/master-admin': {
+      id: '/master-admin'
+      path: '/master-admin'
+      fullPath: '/master-admin'
+      preLoaderRoute: typeof MasterAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/despesas': {
@@ -183,6 +216,13 @@ declare module '@tanstack/react-router' {
       path: '/despesas'
       fullPath: '/despesas'
       preLoaderRoute: typeof DespesasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -197,8 +237,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRoute,
   DespesasRoute: DespesasRoute,
-  GaragemRoute: GaragemRoute,
+  LoginRoute: LoginRoute,
+  MasterAdminRoute: MasterAdminRoute,
   RevisoesRoute: RevisoesRoute,
   ShoppingRoute: ShoppingRoute,
   SignupRoute: SignupRoute,
@@ -208,13 +250,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
