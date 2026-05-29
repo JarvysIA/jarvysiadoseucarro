@@ -178,7 +178,7 @@ function LandingPage() {
             <Benefit
               icon={<TrendingDown className="h-5 w-5" />}
               title="Previsibilidade"
-              desc="Saiba exatamente quando peças vão gastar — antes de quebrarem."
+              desc="Saiba exatamente o desgaste das suas peças e faça a troca antes de quebrarem."
             />
           </div>
         </section>
