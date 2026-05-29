@@ -14,6 +14,7 @@ import { Route as SplashRouteImport } from './routes/splash'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as GaragemRouteImport } from './routes/garagem'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as IndexRouteImport } from './routes/index'
@@ -43,6 +44,11 @@ const RevisoesRoute = RevisoesRouteImport.update({
   path: '/revisoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GaragemRoute = GaragemRouteImport.update({
   id: '/garagem',
   path: '/garagem',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/despesas': typeof DespesasRoute
   '/garagem': typeof GaragemRoute
+  '/login': typeof LoginRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/despesas'
     | '/garagem'
+    | '/login'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/despesas'
     | '/garagem'
+    | '/login'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/despesas'
     | '/garagem'
+    | '/login'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DespesasRoute: typeof DespesasRoute
   GaragemRoute: typeof GaragemRoute
+  LoginRoute: typeof LoginRoute
   RevisoesRoute: typeof RevisoesRoute
   ShoppingRoute: typeof ShoppingRoute
   SignupRoute: typeof SignupRoute
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RevisoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/garagem': {
       id: '/garagem'
       path: '/garagem'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DespesasRoute: DespesasRoute,
   GaragemRoute: GaragemRoute,
+  LoginRoute: LoginRoute,
   RevisoesRoute: RevisoesRoute,
   ShoppingRoute: ShoppingRoute,
   SignupRoute: SignupRoute,
