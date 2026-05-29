@@ -47,7 +47,7 @@ function LandingPage() {
         }}
       />
 
-      <main className="relative z-10 mx-auto flex max-w-md flex-col px-5 pb-14 pt-8">
+      <main className="relative z-10 mx-auto flex max-w-md flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+9rem)]">
         {/* Top bar */}
         <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
