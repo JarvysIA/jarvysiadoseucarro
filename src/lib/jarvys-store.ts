@@ -1,3 +1,6 @@
+// Lightweight local cache for the currently signed-in user's profile.
+// Real source of truth lives in Supabase (table `profiles`).
+
 export type JarvysUser = {
   name: string;
   email: string;
@@ -21,4 +24,9 @@ export function loadUser(): JarvysUser | null {
   } catch {
     return null;
   }
+}
+
+export function clearUser() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(KEY);
 }

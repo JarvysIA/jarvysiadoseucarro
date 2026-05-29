@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import logo from "@/assets/jarvys-logo.png";
-import { loadUser } from "@/lib/jarvys-store";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/splash")({
   head: () => ({
@@ -35,9 +35,9 @@ function Splash() {
     }, stepMs);
 
     const fadeTimer = setTimeout(() => setFadeOut(true), SPLASH_DURATION_MS);
-    const navTimer = setTimeout(() => {
-      const user = loadUser();
-      navigate({ to: user ? "/garagem" : "/welcome", replace: true });
+    const navTimer = setTimeout(async () => {
+      const { data } = await supabase.auth.getSession();
+      navigate({ to: data.session ? "/app" : "/welcome", replace: true });
     }, SPLASH_DURATION_MS + FADE_DURATION_MS);
 
     return () => {
@@ -55,7 +55,6 @@ function Splash() {
         transitionDuration: `${FADE_DURATION_MS}ms`,
       }}
     >
-      {/* Logo com respiração */}
       <div className="relative flex flex-col items-center">
         <img
           src={logo}
@@ -64,14 +63,11 @@ function Splash() {
           height={520}
           className="w-64 max-w-[70vw] animate-breathing-glow"
         />
-
-        {/* Scan line / barra de progresso */}
         <div className="mt-6 h-px w-48 overflow-hidden bg-[rgba(56,189,248,0.15)]">
           <div className="h-full w-1/3 animate-scan-line bg-[#38BDF8] shadow-[0_0_10px_#38BDF8]" />
         </div>
       </div>
 
-      {/* Status rotativo na base */}
       <div className="absolute bottom-12 left-0 right-0 flex justify-center">
         <p
           key={statusIdx}
