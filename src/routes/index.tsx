@@ -47,7 +47,7 @@ function LandingPage() {
         }}
       />
 
-      <main className="relative z-10 mx-auto flex max-w-md flex-col px-5 pb-14 pt-8">
+      <main className="relative z-10 mx-auto flex max-w-md flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+9rem)]">
         {/* Top bar */}
         <header className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -141,13 +141,13 @@ function LandingPage() {
               </div>
               <div>
                 <p className="text-[14px] leading-relaxed text-foreground">
-                  Cada amigo que você indicar te paga{" "}
-                  <span className="text-primary font-semibold">R$ 5,00</span> direto no seu Pix.
+                  Ganhe <span className="text-primary font-semibold">R$ 5,00</span> na hora via Pix
+                  por cada amigo que você indicar e se cadastrar!
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="mt-4 grid grid-cols-3 gap-1.5 text-center">
               <LoopStep n="1+" label="Reduz custo" />
               <LoopStep n="2" label="App de graça" highlight />
               <LoopStep n="3+" label="Você lucra" />
@@ -178,7 +178,7 @@ function LandingPage() {
             <Benefit
               icon={<TrendingDown className="h-5 w-5" />}
               title="Previsibilidade"
-              desc="Saiba exatamente quando peças vão gastar — antes de quebrarem."
+              desc="Saiba exatamente o desgaste das suas peças e faça a troca antes de quebrarem."
             />
           </div>
         </section>
@@ -215,20 +215,20 @@ function LandingPage() {
 function LoopStep({ n, label, highlight }: { n: string; label: string; highlight?: boolean }) {
   return (
     <div
-      className={`rounded-xl border px-2 py-3 ${
+      className={`min-w-0 rounded-xl border px-1.5 py-3 ${
         highlight
           ? "border-primary/60 bg-primary/10"
           : "border-border bg-background/40"
       }`}
     >
       <div
-        className={`font-tech text-xl font-extrabold ${
+        className={`font-tech text-lg font-extrabold leading-none ${
           highlight ? "text-primary text-glow" : "text-foreground"
         }`}
       >
         {n}
       </div>
-      <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="mt-1.5 text-[9px] leading-tight uppercase tracking-wider text-muted-foreground break-words">
         {label}
       </div>
     </div>
