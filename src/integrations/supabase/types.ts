@@ -14,16 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          permite_indicacao: boolean
+          placa: string | null
+          status_usuario: string
+          trial_inicio: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          nome: string
+          permite_indicacao?: boolean
+          placa?: string | null
+          status_usuario?: string
+          trial_inicio?: string
+          whatsapp: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          permite_indicacao?: boolean
+          placa?: string | null
+          status_usuario?: string
+          trial_inicio?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      veiculos: {
+        Row: {
+          ano: string | null
+          created_at: string
+          id: string
+          km_atual: number | null
+          marca: string | null
+          modelo: string | null
+          motorizacao: string | null
+          placa: string
+          user_id: string
+        }
+        Insert: {
+          ano?: string | null
+          created_at?: string
+          id?: string
+          km_atual?: number | null
+          marca?: string | null
+          modelo?: string | null
+          motorizacao?: string | null
+          placa: string
+          user_id: string
+        }
+        Update: {
+          ano?: string | null
+          created_at?: string
+          id?: string
+          km_atual?: number | null
+          marca?: string | null
+          modelo?: string | null
+          motorizacao?: string | null
+          placa?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "veiculos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +256,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
