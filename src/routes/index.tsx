@@ -141,13 +141,13 @@ function LandingPage() {
               </div>
               <div>
                 <p className="text-[14px] leading-relaxed text-foreground">
-                  Cada amigo que você indicar te paga{" "}
-                  <span className="text-primary font-semibold">R$ 5,00</span> direto no seu Pix.
+                  Ganhe <span className="text-primary font-semibold">R$ 5,00</span> na hora via Pix
+                  por cada amigo que você indicar e se cadastrar!
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="mt-4 grid grid-cols-3 gap-1.5 text-center">
               <LoopStep n="1+" label="Reduz custo" />
               <LoopStep n="2" label="App de graça" highlight />
               <LoopStep n="3+" label="Você lucra" />
