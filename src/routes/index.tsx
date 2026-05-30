@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { captureRefFromUrl } from "@/lib/referral";
 import {
   Bot,
   BarChart3,
@@ -34,6 +35,9 @@ const PIX_CODE =
 
 function LandingPage() {
   const [openPix, setOpenPix] = useState(false);
+  useEffect(() => {
+    captureRefFromUrl();
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">

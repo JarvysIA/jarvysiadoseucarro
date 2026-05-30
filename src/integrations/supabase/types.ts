@@ -22,6 +22,7 @@ export type Database = {
           nome: string
           permite_indicacao: boolean
           placa: string | null
+          referrer_id: string | null
           status_usuario: string
           trial_inicio: string
           whatsapp: string
@@ -33,6 +34,7 @@ export type Database = {
           nome: string
           permite_indicacao?: boolean
           placa?: string | null
+          referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
           whatsapp: string
@@ -44,11 +46,20 @@ export type Database = {
           nome?: string
           permite_indicacao?: boolean
           placa?: string | null
+          referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
           whatsapp?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
