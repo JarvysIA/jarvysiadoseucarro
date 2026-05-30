@@ -57,6 +57,7 @@ type Profile = {
   status_usuario: "trial" | "ativo";
   permite_indicacao: boolean;
   trial_inicio: string;
+  referrer_id: string | null;
 };
 
 function AppPage() {
@@ -75,7 +76,7 @@ function AppPage() {
       }
       const { data } = await supabase
         .from("profiles")
-        .select("id,nome,status_usuario,permite_indicacao,trial_inicio")
+        .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id")
         .eq("id", session.session.user.id)
         .maybeSingle();
       setProfile(data as Profile | null);
@@ -110,6 +111,8 @@ function AppPage() {
   );
 
   const isTrial = profile?.status_usuario !== "ativo";
+  const hasReferrer = !!profile?.referrer_id;
+  const activationPrice = hasReferrer ? "9,90" : "14,90";
   const daysLeft = useMemo(() => {
     if (!profile?.trial_inicio) return 30;
     const ms = Date.now() - new Date(profile.trial_inicio).getTime();
@@ -122,14 +125,21 @@ function AppPage() {
       {/* Banner trial */}
       {!loadingProfile && isTrial && (
         <div
-          className="sticky top-0 z-20 flex items-center justify-center gap-2 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary"
+          className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary"
           style={{
             background: "rgba(56,189,248,0.08)",
             backdropFilter: "blur(8px)",
           }}
         >
-          <Sparkles className="h-3.5 w-3.5" />
-          Você tem {daysLeft} dias de acesso total grátis
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5" />
+            {daysLeft} dias grátis · Ative vitalício por R$ {activationPrice}
+          </div>
+          {hasReferrer && (
+            <span className="text-[10px] font-semibold text-primary/90">
+              Desconto de indicado aplicado 🎉
+            </span>
+          )}
         </div>
       )}
 
@@ -273,7 +283,7 @@ function AppPage() {
           {profile?.permite_indicacao ? (
             <ReferralUnlocked userId={profile.id} />
           ) : (
-            <ReferralLocked />
+            <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} />
           )}
         </div>
       </section>
@@ -284,7 +294,7 @@ function AppPage() {
   );
 }
 
-function ReferralLocked() {
+function ReferralLocked({ price, hasReferrer }: { price: string; hasReferrer: boolean }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -294,16 +304,23 @@ function ReferralLocked() {
         <div className="flex-1">
           <p className="text-sm font-medium">Seu link de indicação está bloqueado</p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Ative sua garagem vitalícia por <span className="font-semibold text-primary">R$ 9,90</span>{" "}
-            para liberar seu link e ganhar <span className="font-semibold text-primary">R$ 5,00 no Pix</span>{" "}
-            por indicação.
+            Ative sua garagem vitalícia por{" "}
+            <span className="font-semibold text-primary">R$ {price}</span>{" "}
+            para liberar seu link exclusivo e ganhar{" "}
+            <span className="font-semibold text-primary">R$ 5,00 no Pix</span>{" "}
+            por cada amigo indicado que se cadastrar e também ativar a conta!
           </p>
+          {hasReferrer && (
+            <p className="mt-2 text-[11px] font-semibold text-primary">
+              Desconto de indicado aplicado 🎉
+            </p>
+          )}
           <button
             type="button"
             onClick={() => toast.info("Em breve: ativação via Pix.")}
             className="glow-neon mt-3 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
           >
-            Ativar por R$ 9,90
+            Ativar por R$ {price}
           </button>
         </div>
       </div>
