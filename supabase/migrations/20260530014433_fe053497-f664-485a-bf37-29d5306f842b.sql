@@ -1,0 +1,2 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referrer_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_referrer ON public.profiles(referrer_id);
