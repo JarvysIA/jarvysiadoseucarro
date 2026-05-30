@@ -1,10 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, User, Mail, Phone, Hash, Lock, Loader2 } from "lucide-react";
 import { saveUser } from "@/lib/jarvys-store";
 import { supabase } from "@/integrations/supabase/client";
 import { CarConfirmModal } from "@/components/CarConfirmModal";
 import { lookupPlate } from "@/lib/plate-lookup";
+import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
@@ -18,6 +19,11 @@ function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [hasReferrer, setHasReferrer] = useState(false);
+
+  useEffect(() => {
+    setHasReferrer(!!getStoredRef());
+  }, []);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -29,6 +35,8 @@ function SignupPage() {
     const plate = form.plate.toUpperCase();
 
     try {
+      // 1) Cria a conta no Auth primeiro e AGUARDA o user.id
+      let uid: string | null = null;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: form.email.trim(),
         password: form.password,
@@ -39,7 +47,7 @@ function SignupPage() {
       });
 
       if (signUpError) {
-        // Tenta login se já existir
+        // Email já existe → tenta login com a mesma senha
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: form.email.trim(),
           password: form.password,
@@ -49,27 +57,40 @@ function SignupPage() {
           setLoading(false);
           return;
         }
-        setUserId(signInData.user.id);
-      } else if (signUpData.user) {
-        setUserId(signUpData.user.id);
+        uid = signInData.user.id;
+      } else {
+        uid = signUpData.user?.id ?? null;
       }
 
-      const uid = signUpData?.user?.id;
-      if (uid) {
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: uid,
-          nome: form.name,
-          whatsapp: form.phone,
-          email: form.email.trim(),
-          placa: plate,
-          status_usuario: "trial",
-          permite_indicacao: false,
-        });
-        if (profileError) {
-          toast.error("Erro ao salvar perfil: " + profileError.message);
-          setLoading(false);
-          return;
-        }
+      // 2) Garante que a sessão está ativa antes de qualquer write (evita FK + RLS)
+      const { data: sess } = await supabase.auth.getSession();
+      uid = uid ?? sess.session?.user.id ?? null;
+      if (!uid) {
+        toast.error("Não foi possível iniciar sua sessão. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+      setUserId(uid);
+
+      // 3) Resolve padrinho (se houver ?ref=)
+      const refCode = getStoredRef();
+      const referrerId = refCode ? await resolveReferrerId(refCode) : null;
+
+      // 4) Cria o perfil (status_usuario='trial', permite_indicacao=false por padrão)
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: uid,
+        nome: form.name,
+        whatsapp: form.phone,
+        email: form.email.trim(),
+        placa: plate,
+        status_usuario: "trial",
+        permite_indicacao: false,
+        referrer_id: referrerId,
+      });
+      if (profileError) {
+        toast.error("Erro ao salvar perfil: " + profileError.message);
+        setLoading(false);
+        return;
       }
 
       saveUser({ name: form.name, email: form.email, phone: form.phone, plate });
@@ -89,6 +110,7 @@ function SignupPage() {
     motorizacao: string;
     km_atual: number | null;
   }) => {
+    // Garante o user.id antes de inserir o veículo (FK veiculos.user_id → auth.users.id)
     const { data: session } = await supabase.auth.getSession();
     const uid = userId ?? session.session?.user.id;
     if (!uid) {
@@ -108,6 +130,7 @@ function SignupPage() {
       toast.error("Erro ao salvar veículo: " + error.message);
       return;
     }
+    clearStoredRef();
     setModalOpen(false);
     navigate({ to: "/app" });
   };
@@ -123,6 +146,11 @@ function SignupPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Vamos conhecer você e seu carro.
         </p>
+        {hasReferrer && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
+            🎉 Desconto de indicado aplicado — ative por R$ 9,90
+          </div>
+        )}
       </div>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
