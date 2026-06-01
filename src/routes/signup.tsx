@@ -176,8 +176,20 @@ function SignupPage() {
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
         <Field icon={<Hash className="h-4 w-4" />} label="Placa do carro">
-          <input required value={form.plate} onChange={set("plate")} placeholder="ABC-1D23" maxLength={8}
-            className="w-full bg-transparent text-base uppercase tracking-widest text-foreground placeholder:text-muted-foreground placeholder:normal-case focus:outline-none" />
+          <input
+            required
+            value={form.plate}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, plate: sanitizePlate(e.target.value) }))
+            }
+            placeholder="ABC1D23"
+            maxLength={7}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full bg-transparent text-base uppercase tracking-widest text-foreground placeholder:text-muted-foreground placeholder:normal-case focus:outline-none"
+          />
         </Field>
 
         <button type="submit" disabled={loading}
