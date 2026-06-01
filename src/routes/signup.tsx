@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, User, Mail, Phone, Hash, Lock, Loader2 } from "l
 import { saveUser } from "@/lib/jarvys-store";
 import { supabase } from "@/integrations/supabase/client";
 import { CarConfirmModal } from "@/components/CarConfirmModal";
-import { lookupPlate } from "@/lib/plate-lookup";
+import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 
