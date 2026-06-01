@@ -35,14 +35,19 @@ function SignupPage() {
     const plate = form.plate.toUpperCase();
 
     try {
-      // 1) Cria a conta no Auth primeiro e AGUARDA o user.id
+      // 1) Cria a conta no Auth. O trigger do banco cria o profile automaticamente
+      // a partir dos metadados (full_name, phone) enviados em options.data.
       let uid: string | null = null;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: form.email.trim(),
         password: form.password,
         options: {
           emailRedirectTo: `${window.location.origin}/app`,
-          data: { nome: form.name, whatsapp: form.phone },
+          data: {
+            full_name: form.name,
+            phone: form.phone,
+            placa: plate,
+          },
         },
       });
 
@@ -62,7 +67,7 @@ function SignupPage() {
         uid = signUpData.user?.id ?? null;
       }
 
-      // 2) Garante que a sessão está ativa antes de qualquer write (evita FK + RLS)
+      // 2) Garante que a sessão está ativa antes de prosseguir
       const { data: sess } = await supabase.auth.getSession();
       uid = uid ?? sess.session?.user.id ?? null;
       if (!uid) {
@@ -72,25 +77,18 @@ function SignupPage() {
       }
       setUserId(uid);
 
-      // 3) Resolve padrinho (se houver ?ref=)
+      // 3) Captura referência do padrinho (se houver) para uso posterior
+      // O profile é criado automaticamente pelo trigger; referrer_id pode ser
+      // atualizado depois caso necessário.
       const refCode = getStoredRef();
-      const referrerId = refCode ? await resolveReferrerId(refCode) : null;
-
-      // 4) Cria o perfil (status_usuario='trial', permite_indicacao=false por padrão)
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: uid,
-        nome: form.name,
-        whatsapp: form.phone,
-        email: form.email.trim(),
-        placa: plate,
-        status_usuario: "trial",
-        permite_indicacao: false,
-        referrer_id: referrerId,
-      });
-      if (profileError) {
-        toast.error("Erro ao salvar perfil: " + profileError.message);
-        setLoading(false);
-        return;
+      if (refCode) {
+        const referrerId = await resolveReferrerId(refCode);
+        if (referrerId) {
+          await supabase
+            .from("profiles")
+            .update({ referrer_id: referrerId })
+            .eq("id", uid);
+        }
       }
 
       saveUser({ name: form.name, email: form.email, phone: form.phone, plate });
@@ -102,6 +100,7 @@ function SignupPage() {
       setLoading(false);
     }
   };
+
 
   const handleConfirmCar = async (data: {
     marca: string;
