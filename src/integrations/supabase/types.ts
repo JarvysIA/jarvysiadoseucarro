@@ -85,6 +85,7 @@ export type Database = {
       veiculos: {
         Row: {
           ano: string | null
+          cor: string | null
           created_at: string
           id: string
           km_atual: number | null
@@ -96,6 +97,7 @@ export type Database = {
         }
         Insert: {
           ano?: string | null
+          cor?: string | null
           created_at?: string
           id?: string
           km_atual?: number | null
@@ -107,6 +109,7 @@ export type Database = {
         }
         Update: {
           ano?: string | null
+          cor?: string | null
           created_at?: string
           id?: string
           km_atual?: number | null
