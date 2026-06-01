@@ -110,6 +110,7 @@ function SignupPage() {
     marca: string;
     modelo: string;
     ano: string;
+    cor: string;
     motorizacao: string;
     km_atual: number | null;
   }) => {
@@ -122,10 +123,11 @@ function SignupPage() {
     }
     const { error } = await supabase.from("veiculos").insert({
       user_id: uid,
-      placa: form.plate.toUpperCase(),
+      placa: sanitizePlate(form.plate),
       marca: data.marca,
       modelo: data.modelo,
       ano: data.ano,
+      cor: data.cor,
       motorizacao: data.motorizacao,
       km_atual: data.km_atual,
     });
