@@ -31,8 +31,12 @@ function SignupPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    const plate = sanitizePlate(form.plate);
+    if (!isValidPlate(plate)) {
+      toast.error("Placa inválida. Use o formato AAA0000 ou AAA0A00.");
+      return;
+    }
     setLoading(true);
-    const plate = form.plate.toUpperCase();
 
     try {
       // 1) Cria a conta no Auth. O trigger do banco cria o profile automaticamente
