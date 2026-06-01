@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, User, Mail, Phone, Hash, Lock, Loader2 } from "l
 import { saveUser } from "@/lib/jarvys-store";
 import { supabase } from "@/integrations/supabase/client";
 import { CarConfirmModal } from "@/components/CarConfirmModal";
-import { lookupPlate } from "@/lib/plate-lookup";
+import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 
@@ -31,8 +31,12 @@ function SignupPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    const plate = sanitizePlate(form.plate);
+    if (!isValidPlate(plate)) {
+      toast.error("Placa inválida. Use o formato AAA0000 ou AAA0A00.");
+      return;
+    }
     setLoading(true);
-    const plate = form.plate.toUpperCase();
 
     try {
       // 1) Cria a conta no Auth. O trigger do banco cria o profile automaticamente
@@ -106,6 +110,7 @@ function SignupPage() {
     marca: string;
     modelo: string;
     ano: string;
+    cor: string;
     motorizacao: string;
     km_atual: number | null;
   }) => {
@@ -118,10 +123,11 @@ function SignupPage() {
     }
     const { error } = await supabase.from("veiculos").insert({
       user_id: uid,
-      placa: form.plate.toUpperCase(),
+      placa: sanitizePlate(form.plate),
       marca: data.marca,
       modelo: data.modelo,
       ano: data.ano,
+      cor: data.cor,
       motorizacao: data.motorizacao,
       km_atual: data.km_atual,
     });
@@ -170,8 +176,20 @@ function SignupPage() {
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
         <Field icon={<Hash className="h-4 w-4" />} label="Placa do carro">
-          <input required value={form.plate} onChange={set("plate")} placeholder="ABC-1D23" maxLength={8}
-            className="w-full bg-transparent text-base uppercase tracking-widest text-foreground placeholder:text-muted-foreground placeholder:normal-case focus:outline-none" />
+          <input
+            required
+            value={form.plate}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, plate: sanitizePlate(e.target.value) }))
+            }
+            placeholder="ABC1D23"
+            maxLength={7}
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full bg-transparent text-base uppercase tracking-widest text-foreground placeholder:text-muted-foreground placeholder:normal-case focus:outline-none"
+          />
         </Field>
 
         <button type="submit" disabled={loading}

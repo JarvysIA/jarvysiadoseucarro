@@ -5,6 +5,7 @@ export type PlateLookupResult = {
   marca: string;
   modelo: string;
   ano: string;
+  cor: string;
   motorizacao: string;
 } | null;
 
@@ -17,6 +18,7 @@ type Props = {
     marca: string;
     modelo: string;
     ano: string;
+    cor: string;
     motorizacao: string;
     km_atual: number | null;
   }) => Promise<void> | void;
@@ -24,11 +26,12 @@ type Props = {
 
 export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
   const [loading, setLoading] = useState(true);
-  const [result, setResult] = useState<PlateLookupResult>(null);
-  const [manual, setManual] = useState(false);
+  const [autofilled, setAutofilled] = useState(false);
+  const [notFoundNotice, setNotFoundNotice] = useState(false);
   const [marca, setMarca] = useState("");
   const [modelo, setModelo] = useState("");
   const [ano, setAno] = useState("");
+  const [cor, setCor] = useState("");
   const [motorizacao, setMotorizacao] = useState("");
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -37,18 +40,24 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
     if (!open) return;
     let cancel = false;
     setLoading(true);
-    setManual(false);
-    setResult(null);
+    setAutofilled(false);
+    setNotFoundNotice(false);
+    setMarca("");
+    setModelo("");
+    setAno("");
+    setCor("");
+    setMotorizacao("");
     lookup(plate).then((r) => {
       if (cancel) return;
-      setResult(r);
       if (r) {
-        setMarca(r.marca);
-        setModelo(r.modelo);
-        setAno(r.ano);
-        setMotorizacao(r.motorizacao);
+        setMarca(r.marca || "");
+        setModelo(r.modelo || "");
+        setAno(r.ano || "");
+        setCor(r.cor || "");
+        setMotorizacao(r.motorizacao || "");
+        setAutofilled(true);
       } else {
-        setManual(true);
+        setNotFoundNotice(true);
       }
       setLoading(false);
     });
@@ -61,7 +70,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
 
   const handleConfirm = async () => {
     if (!marca.trim() || !modelo.trim()) {
-      setManual(true);
+      setNotFoundNotice(true);
       return;
     }
     setSubmitting(true);
@@ -70,6 +79,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         marca: marca.trim(),
         modelo: modelo.trim(),
         ano: ano.trim(),
+        cor: cor.trim(),
         motorizacao: motorizacao.trim(),
         km_atual: km ? Number(km.replace(/\D/g, "")) || null : null,
       });
@@ -87,7 +97,8 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
             "0 0 0 1px rgba(56,189,248,0.25), 0 20px 60px -10px rgba(56,189,248,0.35)",
         }}
       >
-        <div className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full"
+        <div
+          className="absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full"
           style={{
             background:
               "radial-gradient(closest-side, rgba(56,189,248,0.25), transparent 70%)",
@@ -113,7 +124,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
             <div className="flex flex-col items-center gap-3 py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="font-tech text-xs uppercase tracking-widest text-muted-foreground">
-                Lendo placa na base nacional...
+                Buscando veículo na base nacional...
               </p>
               <div className="mt-2 h-px w-40 overflow-hidden bg-[rgba(56,189,248,0.15)]">
                 <div className="h-full w-1/3 animate-scan-line bg-[#38BDF8] shadow-[0_0_10px_#38BDF8]" />
@@ -121,44 +132,35 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
             </div>
           ) : (
             <>
-              {!manual && result && (
-                <div className="space-y-2 rounded-2xl border border-border bg-secondary/40 p-4">
-                  <Row label="Marca" value={result.marca} />
-                  <Row label="Modelo" value={result.modelo} />
-                  <Row label="Ano" value={result.ano} />
-                  <Row label="Motorização" value={result.motorizacao} />
+              {autofilled && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-[11px] text-primary">
+                  <Check className="h-4 w-4 shrink-0" />
+                  Dados preenchidos automaticamente. Você pode editar se algo estiver errado.
+                </div>
+              )}
+              {notFoundNotice && !autofilled && (
+                <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Não conseguimos localizar a placa automaticamente. Por favor, digite os
+                  dados do veículo manualmente.
                 </div>
               )}
 
-              {manual && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    Preencha os dados do seu carro abaixo.
-                  </div>
-                  <ManualField label="Marca" value={marca} onChange={setMarca} placeholder="Ex.: Toyota" />
-                  <ManualField label="Modelo" value={modelo} onChange={setModelo} placeholder="Ex.: Corolla XEi" />
-                  <div className="grid grid-cols-2 gap-3">
-                    <ManualField label="Ano" value={ano} onChange={setAno} placeholder="2022" />
-                    <ManualField label="Motor" value={motorizacao} onChange={setMotorizacao} placeholder="2.0 Flex" />
-                  </div>
+              <div className="space-y-3">
+                <ManualField label="Marca" value={marca} onChange={setMarca} placeholder="Ex.: Toyota" />
+                <ManualField label="Modelo" value={modelo} onChange={setModelo} placeholder="Ex.: Corolla XEi" />
+                <div className="grid grid-cols-2 gap-3">
+                  <ManualField label="Ano" value={ano} onChange={setAno} placeholder="2022" />
+                  <ManualField label="Cor" value={cor} onChange={setCor} placeholder="Preto" />
                 </div>
-              )}
-
-              {!manual && (
-                <button
-                  type="button"
-                  onClick={() => setManual(true)}
-                  className="mt-3 w-full text-center text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  Dados incorretos? Preencher manualmente
-                </button>
-              )}
+                <ManualField label="Motor" value={motorizacao} onChange={setMotorizacao} placeholder="2.0 Flex" />
+              </div>
 
               <div className="mt-4">
                 <label className="block rounded-2xl border border-border bg-card px-4 py-3">
                   <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    KM Atual do Painel <span className="text-muted-foreground/60">(opcional)</span>
+                    KM Atual do Painel{" "}
+                    <span className="text-muted-foreground/60">(opcional)</span>
                   </span>
                   <input
                     inputMode="numeric"
@@ -187,15 +189,6 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-foreground">{value || "—"}</span>
     </div>
   );
 }
