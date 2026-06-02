@@ -13,12 +13,20 @@ export const Route = createFileRoute("/signup")({
   component: SignupPage,
 });
 
+type CarDraft = {
+  marca: string;
+  modelo: string;
+  ano: string;
+  cor: string;
+  motorizacao: string;
+  km_atual: number | null;
+};
+
 function SignupPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", plate: "" });
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [hasReferrer, setHasReferrer] = useState(false);
 
   useEffect(() => {
@@ -28,7 +36,9 @@ function SignupPage() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const onSubmit = async (e: React.FormEvent) => {
+  // Botão principal: valida o formulário e abre o modal do veículo.
+  // NÃO cria conta nem salva nada ainda.
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     const plate = sanitizePlate(form.plate);
@@ -36,11 +46,25 @@ function SignupPage() {
       toast.error("Placa inválida. Use o formato AAA0000 ou AAA0A00.");
       return;
     }
+    if (!form.name.trim() || !form.email.trim() || !form.password || form.password.length < 6) {
+      toast.error("Preencha todos os campos corretamente.");
+      return;
+    }
+    setModalOpen(true);
+  };
+
+  // Modal: ao confirmar o carro, executamos toda a sequência:
+  // 1) Cria conta no Auth (trigger cria profile com nome/whatsapp/placa)
+  // 2) Garante sessão / pega user_id
+  // 3) Atualiza referrer_id se houver
+  // 4) Insere veículo vinculado ao user_id
+  const handleConfirmCar = async (car: CarDraft) => {
+    if (loading) return;
     setLoading(true);
+    const plate = sanitizePlate(form.plate);
 
     try {
-      // 1) Cria a conta no Auth. O trigger do banco cria o profile automaticamente
-      // a partir dos metadados (full_name, phone) enviados em options.data.
+      // Step 1: cria a conta no Supabase Auth
       let uid: string | null = null;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: form.email.trim(),
@@ -56,14 +80,13 @@ function SignupPage() {
       });
 
       if (signUpError) {
-        // Email já existe → tenta login com a mesma senha
+        // Email já existente → tenta login com a mesma senha
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: form.email.trim(),
           password: form.password,
         });
         if (signInError || !signInData.user) {
           toast.error(signUpError.message);
-          setLoading(false);
           return;
         }
         uid = signInData.user.id;
@@ -71,91 +94,57 @@ function SignupPage() {
         uid = signUpData.user?.id ?? null;
       }
 
-      // 2) Garante que a sessão está ativa antes de prosseguir
-      const { data: sess } = await supabase.auth.getSession();
-      uid = uid ?? sess.session?.user.id ?? null;
+      // Step 2: garante a sessão e o user_id
+      const { data: userData } = await supabase.auth.getUser();
+      uid = userData?.user?.id ?? uid;
+      if (!uid) {
+        const { data: sess } = await supabase.auth.getSession();
+        uid = sess.session?.user.id ?? null;
+      }
       if (!uid) {
         toast.error("Não foi possível iniciar sua sessão. Tente novamente.");
-        setLoading(false);
         return;
       }
-      setUserId(uid);
 
-      // 3) Captura referência do padrinho (se houver) para uso posterior
-      // O profile é criado automaticamente pelo trigger; referrer_id pode ser
-      // atualizado depois caso necessário.
+      // Step 2.1: referência (padrinho), se houver
       const refCode = getStoredRef();
       if (refCode) {
         const referrerId = await resolveReferrerId(refCode);
         if (referrerId) {
-          await supabase
-            .from("profiles")
-            .update({ referrer_id: referrerId })
-            .eq("id", uid);
+          await supabase.from("profiles").update({ referrer_id: referrerId }).eq("id", uid);
         }
       }
 
+      // Step 3: insere o veículo vinculado ao user_id
+      const { error: vehErr } = await supabase.from("veiculos").insert({
+        user_id: uid,
+        placa: plate,
+        marca: car.marca,
+        modelo: car.modelo,
+        ano: car.ano,
+        cor: car.cor,
+        motorizacao: car.motorizacao,
+        km_atual: car.km_atual,
+      });
+      if (vehErr) {
+        console.error("[veiculos.insert] erro:", vehErr);
+        toast.error(`Erro ao salvar veículo: ${vehErr.message}${vehErr.code ? ` (${vehErr.code})` : ""}`);
+        return;
+      }
+
+      // Sucesso → limpa estado e segue
       saveUser({ name: form.name, email: form.email, phone: form.phone, plate });
-      setModalOpen(true);
-    } catch (err) {
-      toast.error("Falha no cadastro. Tente novamente.");
-      console.error(err);
+      clearStoredRef();
+      setModalOpen(false);
+      setForm({ name: "", email: "", phone: "", password: "", plate: "" });
+      toast.success("Conta criada e veículo salvo!");
+      navigate({ to: "/app" });
+    } catch (err: any) {
+      console.error("[signup] exceção:", err);
+      toast.error(`Falha no cadastro: ${err?.message ?? String(err)}`);
     } finally {
       setLoading(false);
     }
-  };
-
-
-  const handleConfirmCar = async (data: {
-    marca: string;
-    modelo: string;
-    ano: string;
-    cor: string;
-    motorizacao: string;
-    km_atual: number | null;
-  }) => {
-    // 1) BUSCA DO USUÁRIO: revalida no Supabase Auth (não confia só no estado local)
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const uid = userData?.user?.id ?? userId;
-
-    // 3) TRATAMENTO DE ERRO: sem sessão → alerta e manda refazer login
-    if (userError || !uid) {
-      toast.error("Sessão expirada. Faça login novamente para salvar o veículo.");
-      setModalOpen(false);
-      navigate({ to: "/login" });
-      return;
-    }
-
-    try {
-      // 2) VÍNCULO DO REGISTRO: inclui obrigatoriamente user_id
-      const { error } = await supabase.from("veiculos").insert({
-        user_id: uid,
-        placa: sanitizePlate(form.plate),
-        marca: data.marca,
-        modelo: data.modelo,
-        ano: data.ano,
-        cor: data.cor,
-        motorizacao: data.motorizacao,
-        km_atual: data.km_atual,
-      });
-      if (error) {
-        console.error("[veiculos.insert] erro:", error);
-        toast.error(`Erro ao salvar veículo: ${error.message}${error.code ? ` (${error.code})` : ""}`);
-        return;
-      }
-    } catch (err: any) {
-      console.error("[veiculos.insert] exceção:", err);
-      toast.error(`Erro ao salvar veículo: ${err?.message ?? String(err)}`);
-      return;
-    }
-
-    // 4) FEEDBACK: limpa formulário e redireciona para a próxima tela
-    clearStoredRef();
-    setModalOpen(false);
-    setForm({ name: "", email: "", phone: "", password: "", plate: "" });
-    setUserId(null);
-    toast.success("Veículo salvo com sucesso!");
-    navigate({ to: "/app" });
   };
 
   return (
