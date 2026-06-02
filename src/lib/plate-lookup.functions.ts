@@ -23,37 +23,43 @@ function pick(obj: any, keys: string[]): string {
 
 function normalize(raw: any): PlateLookupPayload {
   if (!raw || typeof raw !== "object") return null;
-  // pode vir no root, em .veiculo, .dados, .data, .resultado
-  const candidates = [raw, raw.veiculo, raw.dados, raw.data, raw.resultado].filter(Boolean);
 
-  let marca = "";
-  let modelo = "";
-  let ano = "";
-  let cor = "";
-  let motorizacao = "";
+  // Estrutura oficial PuxaPlaca: raw.basico.dados / raw.detalheTecnico.dados
+  const basico = raw?.basico?.dados ?? {};
+  const detalhe = raw?.detalheTecnico?.dados ?? {};
 
-  for (const c of candidates) {
+  // Fallbacks genéricos para outras formas de retorno
+  const fallbacks = [raw, raw?.veiculo, raw?.dados, raw?.data, raw?.resultado].filter(Boolean);
+
+  let marca = pick(basico, ["marca", "MARCA", "fabricante"]);
+  // Preferimos o modelo técnico (ex.: "Gol S 1.6"), com fallback no básico
+  let modelo =
+    pick(detalhe, ["modelo", "MODELO"]) ||
+    pick(basico, ["modelo", "MODELO"]);
+  let ano = pick(basico, [
+    "ano",
+    "ANO",
+    "ano_modelo",
+    "anoModelo",
+    "ano_fabricacao",
+    "anoFabricacao",
+  ]);
+  let cor = pick(basico, ["cor", "COR"]);
+  let motorizacao = pick(detalhe, [
+    "motorizacao",
+    "motor",
+    "cilindrada",
+    "potencia",
+    "combustivel",
+  ]);
+
+  for (const c of fallbacks) {
     if (!marca) marca = pick(c, ["marca", "MARCA", "fabricante", "manufacturer"]);
     if (!modelo) modelo = pick(c, ["modelo", "MODELO", "model", "modeloVeiculo"]);
-    if (!ano)
-      ano = pick(c, [
-        "ano",
-        "ANO",
-        "ano_modelo",
-        "anoModelo",
-        "ano_fabricacao",
-        "anoFabricacao",
-        "year",
-      ]);
+    if (!ano) ano = pick(c, ["ano", "ANO", "ano_modelo", "anoModelo", "year"]);
     if (!cor) cor = pick(c, ["cor", "COR", "color", "corVeiculo"]);
     if (!motorizacao)
-      motorizacao = pick(c, [
-        "motorizacao",
-        "motor",
-        "cilindrada",
-        "potencia",
-        "combustivel",
-      ]);
+      motorizacao = pick(c, ["motorizacao", "motor", "cilindrada", "combustivel"]);
   }
 
   if (!marca && !modelo && !ano && !cor) return null;
