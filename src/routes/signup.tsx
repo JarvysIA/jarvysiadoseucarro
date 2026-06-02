@@ -114,14 +114,20 @@ function SignupPage() {
     motorizacao: string;
     km_atual: number | null;
   }) => {
-    // Garante o user.id antes de inserir o veículo (FK veiculos.user_id → auth.users.id)
-    const { data: session } = await supabase.auth.getSession();
-    const uid = userId ?? session.session?.user.id;
-    if (!uid) {
-      toast.error("Sessão expirada. Faça login.");
+    // 1) BUSCA DO USUÁRIO: revalida no Supabase Auth (não confia só no estado local)
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const uid = userData?.user?.id ?? userId;
+
+    // 3) TRATAMENTO DE ERRO: sem sessão → alerta e manda refazer login
+    if (userError || !uid) {
+      toast.error("Sessão expirada. Faça login novamente para salvar o veículo.");
+      setModalOpen(false);
+      navigate({ to: "/login" });
       return;
     }
+
     try {
+      // 2) VÍNCULO DO REGISTRO: inclui obrigatoriamente user_id
       const { error } = await supabase.from("veiculos").insert({
         user_id: uid,
         placa: sanitizePlate(form.plate),
@@ -142,8 +148,13 @@ function SignupPage() {
       toast.error(`Erro ao salvar veículo: ${err?.message ?? String(err)}`);
       return;
     }
+
+    // 4) FEEDBACK: limpa formulário e redireciona para a próxima tela
     clearStoredRef();
     setModalOpen(false);
+    setForm({ name: "", email: "", phone: "", password: "", plate: "" });
+    setUserId(null);
+    toast.success("Veículo salvo com sucesso!");
     navigate({ to: "/app" });
   };
 
