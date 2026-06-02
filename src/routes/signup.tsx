@@ -121,18 +121,25 @@ function SignupPage() {
       toast.error("Sessão expirada. Faça login.");
       return;
     }
-    const { error } = await supabase.from("veiculos").insert({
-      user_id: uid,
-      placa: sanitizePlate(form.plate),
-      marca: data.marca,
-      modelo: data.modelo,
-      ano: data.ano,
-      cor: data.cor,
-      motorizacao: data.motorizacao,
-      km_atual: data.km_atual,
-    });
-    if (error) {
-      toast.error("Erro ao salvar veículo: " + error.message);
+    try {
+      const { error } = await supabase.from("veiculos").insert({
+        user_id: uid,
+        placa: sanitizePlate(form.plate),
+        marca: data.marca,
+        modelo: data.modelo,
+        ano: data.ano,
+        cor: data.cor,
+        motorizacao: data.motorizacao,
+        km_atual: data.km_atual,
+      });
+      if (error) {
+        console.error("[veiculos.insert] erro:", error);
+        toast.error(`Erro ao salvar veículo: ${error.message}${error.code ? ` (${error.code})` : ""}`);
+        return;
+      }
+    } catch (err: any) {
+      console.error("[veiculos.insert] exceção:", err);
+      toast.error(`Erro ao salvar veículo: ${err?.message ?? String(err)}`);
       return;
     }
     clearStoredRef();
