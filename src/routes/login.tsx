@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowLeft, ArrowRight, Mail, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { OAuthButtons } from "@/components/OAuthButtons";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — Jarvys" }] }),
@@ -38,7 +39,17 @@ function LoginPage() {
         <p className="mt-2 text-sm text-muted-foreground">Bem-vindo de volta à sua garagem.</p>
       </div>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+      <div className="mt-8">
+        <OAuthButtons />
+      </div>
+
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-4">
         <label className="block rounded-2xl border border-border bg-card px-4 py-3">
           <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             <Mail className="h-4 w-4 text-primary" /> E-mail
@@ -54,8 +65,14 @@ function LoginPage() {
             className="mt-1 w-full bg-transparent text-base text-foreground focus:outline-none" />
         </label>
 
+        <div className="text-right">
+          <Link to="/forgot-password" className="text-xs text-primary underline-offset-2 hover:underline">
+            Esqueci minha senha
+          </Link>
+        </div>
+
         <button type="submit" disabled={loading}
-          className="glow-neon mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60">
+          className="glow-neon mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           Entrar
         </button>

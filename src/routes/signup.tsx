@@ -7,6 +7,8 @@ import { CarConfirmModal } from "@/components/CarConfirmModal";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
+import { OAuthButtons } from "@/components/OAuthButtons";
+import { fireWelcomeWebhook, normalizePhoneBR } from "@/lib/welcome-webhook";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Cadastro — Jarvys" }] }),
