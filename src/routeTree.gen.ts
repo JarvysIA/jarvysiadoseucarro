@@ -14,8 +14,10 @@ import { Route as SplashRouteImport } from './routes/splash'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as MasterAdminRouteImport } from './routes/master-admin'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AppRouteImport } from './routes/app'
@@ -46,6 +48,11 @@ const RevisoesRoute = RevisoesRouteImport.update({
   path: '/revisoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MasterAdminRoute = MasterAdminRouteImport.update({
   id: '/master-admin',
   path: '/master-admin',
@@ -54,6 +61,11 @@ const MasterAdminRoute = MasterAdminRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DespesasRoute = DespesasRouteImport.update({
@@ -82,8 +94,10 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -95,8 +109,10 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -109,8 +125,10 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
@@ -124,8 +142,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/dashboard'
     | '/despesas'
+    | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -137,8 +157,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/dashboard'
     | '/despesas'
+    | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -150,8 +172,10 @@ export interface FileRouteTypes {
     | '/app'
     | '/dashboard'
     | '/despesas'
+    | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
@@ -164,8 +188,10 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   MasterAdminRoute: typeof MasterAdminRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   RevisoesRoute: typeof RevisoesRoute
   ShoppingRoute: typeof ShoppingRoute
   SignupRoute: typeof SignupRoute
@@ -210,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RevisoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/master-admin': {
       id: '/master-admin'
       path: '/master-admin'
@@ -222,6 +255,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/despesas': {
@@ -260,8 +300,10 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   MasterAdminRoute: MasterAdminRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   RevisoesRoute: RevisoesRoute,
   ShoppingRoute: ShoppingRoute,
   SignupRoute: SignupRoute,
@@ -271,3 +313,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
