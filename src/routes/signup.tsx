@@ -64,8 +64,7 @@ function SignupPage() {
     const plate = sanitizePlate(form.plate);
 
     try {
-      // Step 1: cria a conta no Supabase Auth
-      let uid: string | null = null;
+      // Step 1: cria a conta no Supabase Auth (auto-confirm ativo → sessão imediata)
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: form.email.trim(),
         password: form.password,
@@ -89,20 +88,26 @@ function SignupPage() {
           toast.error(signUpError.message);
           return;
         }
-        uid = signInData.user.id;
-      } else {
-        uid = signUpData.user?.id ?? null;
+      } else if (!signUpData.session) {
+        // Sem sessão imediata (ex.: confirmação por e-mail ligada) → faz login
+        await supabase.auth.signInWithPassword({
+          email: form.email.trim(),
+          password: form.password,
+        });
       }
 
-      // Step 2: garante a sessão e o user_id
-      const { data: userData } = await supabase.auth.getUser();
-      uid = userData?.user?.id ?? uid;
-      if (!uid) {
-        const { data: sess } = await supabase.auth.getSession();
-        uid = sess.session?.user.id ?? null;
+      // Step 2: aguarda a sessão estar realmente disponível (auth.uid() válido)
+      let uid: string | null = null;
+      for (let i = 0; i < 10; i++) {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user?.id) {
+          uid = data.user.id;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 150));
       }
       if (!uid) {
-        toast.error("Não foi possível iniciar sua sessão. Tente novamente.");
+        toast.error("Não foi possível confirmar sua sessão. Tente novamente.");
         return;
       }
 
@@ -115,7 +120,7 @@ function SignupPage() {
         }
       }
 
-      // Step 3: insere o veículo vinculado ao user_id
+      // Step 3: insere o veículo já com o user_id autenticado (= auth.uid())
       const { error: vehErr } = await supabase.from("veiculos").insert({
         user_id: uid,
         placa: plate,
@@ -132,13 +137,13 @@ function SignupPage() {
         return;
       }
 
-      // Sucesso → limpa estado e segue
+      // Step 4: sucesso → limpa estado e vai para a Dashboard
       saveUser({ name: form.name, email: form.email, phone: form.phone, plate });
       clearStoredRef();
       setModalOpen(false);
       setForm({ name: "", email: "", phone: "", password: "", plate: "" });
       toast.success("Conta criada e veículo salvo!");
-      navigate({ to: "/app" });
+      navigate({ to: "/dashboard" });
     } catch (err: any) {
       console.error("[signup] exceção:", err);
       toast.error(`Falha no cadastro: ${err?.message ?? String(err)}`);
