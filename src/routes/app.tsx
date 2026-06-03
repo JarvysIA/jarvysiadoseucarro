@@ -124,8 +124,11 @@ function AppPage() {
     <div className="relative min-h-screen bg-background pb-56">
       {/* Banner trial */}
       {!loadingProfile && isTrial && (
-        <div
-          className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary"
+        <a
+          href="https://jarvys.com.br/assinar"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary transition-colors hover:bg-primary/15"
           style={{
             background: "rgba(56,189,248,0.08)",
             backdropFilter: "blur(8px)",
@@ -140,7 +143,7 @@ function AppPage() {
               Desconto de indicado aplicado 🎉
             </span>
           )}
-        </div>
+        </a>
       )}
 
       {/* Header */}
