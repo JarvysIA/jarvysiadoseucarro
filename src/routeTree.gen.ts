@@ -17,6 +17,7 @@ import { Route as RevisoesRouteImport } from './routes/revisoes'
 import { Route as MasterAdminRouteImport } from './routes/master-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DespesasRouteImport } from './routes/despesas'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -60,6 +61,11 @@ const DespesasRoute = DespesasRouteImport.update({
   path: '/despesas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -74,6 +80,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/dashboard'
     | '/despesas'
     | '/login'
     | '/master-admin'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/dashboard'
     | '/despesas'
     | '/login'
     | '/master-admin'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/dashboard'
     | '/despesas'
     | '/login'
     | '/master-admin'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
+  DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   LoginRoute: typeof LoginRoute
   MasterAdminRoute: typeof MasterAdminRoute
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DespesasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -238,6 +258,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
+  DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   LoginRoute: LoginRoute,
   MasterAdminRoute: MasterAdminRoute,
@@ -250,3 +271,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
