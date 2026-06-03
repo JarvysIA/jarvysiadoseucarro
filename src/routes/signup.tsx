@@ -62,6 +62,42 @@ function SignupPage() {
     if (loading) return;
     setLoading(true);
     const plate = sanitizePlate(form.plate);
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const ensureProfileExists = async (user: { id: string; email?: string | null }) => {
+      const profilePayload = {
+        id: user.id,
+        nome: form.name.trim(),
+        whatsapp: form.phone.trim(),
+        email: user.email ?? form.email.trim(),
+        placa: plate,
+      };
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const { data: existingProfile, error: readError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (existingProfile?.id) {
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update(profilePayload)
+            .eq("id", user.id);
+          if (updateError) throw updateError;
+          return;
+        }
+
+        if (readError) throw readError;
+
+        const { error: insertProfileError } = await supabase.from("profiles").insert(profilePayload);
+        if (!insertProfileError || insertProfileError.code === "23505") return;
+
+        if (attempt === 5) throw insertProfileError;
+        await wait(250);
+      }
+    };
 
     try {
       // Step 1: cria a conta no Supabase Auth (auto-confirm ativo → sessão imediata)
@@ -97,32 +133,40 @@ function SignupPage() {
       }
 
       // Step 2: aguarda a sessão estar realmente disponível (auth.uid() válido)
-      let uid: string | null = null;
+      let authenticatedUser: { id: string; email?: string | null } | null = null;
       for (let i = 0; i < 10; i++) {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user?.id) {
-          uid = data.user.id;
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (!userError && user?.id) {
+          authenticatedUser = user;
           break;
         }
-        await new Promise((r) => setTimeout(r, 150));
+        await wait(150);
       }
-      if (!uid) {
-        toast.error("Não foi possível confirmar sua sessão. Tente novamente.");
-        return;
+      if (!authenticatedUser) {
+        throw new Error("Usuário não autenticado no Supabase");
       }
 
-      // Step 2.1: referência (padrinho), se houver
+      // Step 2.1: garante que o profile exista antes do veículo (FK veiculos_user_id_fkey)
+      await ensureProfileExists(authenticatedUser);
+
+      // Step 2.2: referência (padrinho), se houver
       const refCode = getStoredRef();
       if (refCode) {
         const referrerId = await resolveReferrerId(refCode);
         if (referrerId) {
-          await supabase.from("profiles").update({ referrer_id: referrerId }).eq("id", uid);
+          await supabase.from("profiles").update({ referrer_id: referrerId }).eq("id", authenticatedUser.id);
         }
       }
 
       // Step 3: insere o veículo já com o user_id autenticado (= auth.uid())
+      const { data: { user }, error: finalUserError } = await supabase.auth.getUser();
+      if (finalUserError || !user?.id) {
+        throw new Error("Usuário não autenticado no Supabase");
+      }
+      console.log("[signup] usuário autenticado antes de inserir veículo:", user);
+
       const { error: vehErr } = await supabase.from("veiculos").insert({
-        user_id: uid,
+        user_id: user.id,
         placa: plate,
         marca: car.marca,
         modelo: car.modelo,
