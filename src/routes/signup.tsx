@@ -183,8 +183,27 @@ function SignupPage() {
         return;
       }
 
-      // Step 4: sucesso → limpa estado e vai para a Dashboard
-      saveUser({ name: form.name, email: form.email, phone: form.phone, plate });
+      // Step 4: normaliza telefone (E.164) e persiste no profile
+      const whatsappE164 = normalizePhoneBR(form.phone);
+      if (whatsappE164) {
+        await supabase.from("profiles").update({ whatsapp: whatsappE164 }).eq("id", user.id);
+      }
+
+      // Step 5: dispara webhook de boas-vindas (não-bloqueante)
+      void fireWelcomeWebhook({
+        user_id: user.id,
+        nome: form.name.trim(),
+        email: form.email.trim(),
+        whatsapp: whatsappE164,
+        placa: plate,
+        marca: car.marca,
+        modelo: car.modelo,
+        ano: car.ano,
+        cor: car.cor,
+      });
+
+      // Step 6: sucesso → limpa estado e vai para a Dashboard
+      saveUser({ name: form.name, email: form.email, phone: whatsappE164, plate });
       clearStoredRef();
       setModalOpen(false);
       setForm({ name: "", email: "", phone: "", password: "", plate: "" });
@@ -216,7 +235,17 @@ function SignupPage() {
         )}
       </div>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+      <div className="mt-8">
+        <OAuthButtons />
+      </div>
+
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-4">
         <Field icon={<User className="h-4 w-4" />} label="Nome">
           <input required value={form.name} onChange={set("name")} placeholder="Seu nome completo"
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
