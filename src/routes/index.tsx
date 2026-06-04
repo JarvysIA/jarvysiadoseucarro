@@ -589,6 +589,27 @@ function TimelineMock() {
         <FileCheck2 className="h-4 w-4 text-primary" />
       </div>
 
+      <div className="relative mt-4 overflow-hidden rounded-2xl border border-border/70">
+        <img
+          src={onixImg}
+          alt="Chevrolet Onix em ângulo de estúdio"
+          loading="lazy"
+          width={1024}
+          height={1024}
+          className="aspect-[16/7] w-full object-cover"
+        />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-primary">Chevrolet Onix</p>
+              <p className="text-sm font-semibold text-white">2023 · Prata</p>
+            </div>
+            <p className="font-tech text-[11px] text-white/80">XYZ4A56</p>
+          </div>
+        </div>
+      </div>
+
+
       <div className="relative mt-5 pl-5">
         <span className="absolute left-1.5 top-2 bottom-2 w-px bg-gradient-to-b from-primary/60 via-border to-transparent" />
         <ul className="space-y-4">
