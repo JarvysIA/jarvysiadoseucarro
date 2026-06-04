@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import logo from "@/assets/jarvys-logo.png";
 import carImg from "@/assets/jeep-renegade.jpg";
+import onixImg from "@/assets/chevrolet-onix.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -150,9 +151,9 @@ function Header() {
 
 function Hero() {
   return (
-    <section className="pt-16 pb-24 text-center sm:pt-24">
+    <section className="pt-10 pb-12 text-center sm:pt-16 sm:pb-16">
       <Reveal>
-        <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-widest text-primary">
+        <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-medium uppercase tracking-widest text-primary">
           <Sparkles className="h-3.5 w-3.5" />
           1ª IA automotiva do Brasil
         </div>
@@ -167,14 +168,14 @@ function Hero() {
       </Reveal>
 
       <Reveal delay={160}>
-        <p className="mx-auto mt-6 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base">
-          Monitore a saúde do seu veículo, antecipe manutenções e valorize seu patrimônio na
-          revenda. Tudo integrado na sua tela.
+        <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+          Monitore a saúde do seu veículo, antecipe manutenções e valorize seu veículo na revenda
+          de forma 100% integrada.
         </p>
       </Reveal>
 
       <Reveal delay={240}>
-        <div className="mt-9 flex flex-col items-center gap-3">
+        <div className="mt-7 flex flex-col items-center gap-3">
           <Link
             to="/signup"
             className="glow-neon group inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-7 py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
@@ -194,7 +195,7 @@ function Hero() {
 
       {/* hero mockup peek */}
       <Reveal delay={320}>
-        <div className="mx-auto mt-16 max-w-3xl">
+        <div className="mx-auto mt-10 max-w-3xl">
           <DashboardMock />
         </div>
       </Reveal>
@@ -206,8 +207,8 @@ function Hero() {
 
 function Garagem() {
   return (
-    <section className="py-20">
-      <SectionLabel>01 · Minha Garagem</SectionLabel>
+    <section className="py-10 sm:py-14">
+      <SectionLabel>Minha Garagem</SectionLabel>
       <Reveal delay={80}>
         <h2 className="mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">
           Sua garagem digital, <span className="text-primary">inteligente desde o cadastro.</span>
@@ -221,19 +222,19 @@ function Garagem() {
         </p>
       </Reveal>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-center">
+      <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:items-center">
         <Reveal delay={120}>
           <DashboardMock />
         </Reveal>
 
         <Reveal delay={200}>
           <ul className="space-y-3">
-            <StatusLegend color="status-ok" label="Verde · Em dia" desc="Componente saudável, próximo da meta de uso." />
+            <StatusLegend color="status-ok" label="Verde · Dirija tranquilo." desc="Componente saudável." />
             <StatusLegend color="status-warn" label="Amarelo · Alerta" desc="Faltam poucos km. Hora de se programar." />
-            <StatusLegend color="status-bad" label="Vermelho · Atrasado" desc="Risco real de quebra. Aja agora." />
-            <li className="mt-5 rounded-2xl border border-border bg-card/60 p-4 text-[13px] text-muted-foreground">
+            <StatusLegend color="status-bad" label="Vermelho · Risco real de quebra." desc="Revisão imediata." />
+            <li className="mt-4 rounded-2xl border border-border bg-card/60 p-4 text-[13px] text-muted-foreground">
               <span className="text-foreground font-semibold">Antecipação inteligente.</span> O app
-              alerta antes que o problema vire conta no mecânico.
+              alerta antes que o problema vire prejuízo no seu bolso.
             </li>
           </ul>
         </Reveal>
@@ -272,11 +273,11 @@ function StatusLegend({
 
 function Timeline() {
   return (
-    <section className="py-20">
-      <SectionLabel>02 · Timeline & Certificado</SectionLabel>
+    <section className="py-10 sm:py-14">
+      <SectionLabel>Timeline & Certificado</SectionLabel>
       <Reveal delay={80}>
         <h2 className="mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-          Cada revisão vira <span className="text-primary">valor de revenda.</span>
+          Cada revisão <span className="text-primary">valoriza seu carro.</span>
         </h2>
       </Reveal>
       <Reveal delay={160}>
@@ -284,11 +285,11 @@ function Timeline() {
           Envie a foto da nota fiscal do mecânico. Nossa IA audita o serviço, valida a revisão e
           monta uma <strong className="text-foreground">linha do tempo viva</strong> do seu carro.
           Na hora de vender, você apresenta o <strong className="text-foreground">Certificado de Revisão Jarvys</strong>{" "}
-          e valoriza seu patrimônio em milhares de reais.
+          e valoriza seu veículo em milhares de reais.
         </p>
       </Reveal>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-5 lg:items-center">
+      <div className="mt-8 grid gap-6 lg:grid-cols-5 lg:items-center">
         <Reveal delay={120} className="lg:col-span-3">
           <TimelineMock />
         </Reveal>
@@ -304,8 +305,8 @@ function Timeline() {
 
 function DrJarvys() {
   return (
-    <section className="py-20">
-      <SectionLabel>03 · Dr. Jarvys</SectionLabel>
+    <section className="py-10 sm:py-14">
+      <SectionLabel>Dr. Jarvys</SectionLabel>
       <Reveal delay={80}>
         <h2 className="mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">
           Um mecânico de bolso, <span className="text-primary">24 horas por dia.</span>
@@ -319,7 +320,7 @@ function DrJarvys() {
         </p>
       </Reveal>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-center">
+      <div className="mt-8 grid gap-6 lg:grid-cols-2 lg:items-center">
         <Reveal delay={120}>
           <ChatMock />
         </Reveal>
@@ -362,16 +363,16 @@ function Feature({
 
 function Pricing() {
   return (
-    <section className="py-20">
-      <SectionLabel>04 · Preço</SectionLabel>
+    <section className="py-10 sm:py-14">
+      <SectionLabel>Preço</SectionLabel>
       <Reveal delay={80}>
         <h2 className="mx-auto mt-3 max-w-3xl text-balance text-center text-3xl font-bold tracking-tight sm:text-4xl">
-          Menos que o preço de um café por mês para{" "}
-          <span className="text-primary">proteger seu patrimônio.</span>
+          Menos que um cafezinho para{" "}
+          <span className="text-primary">proteger o seu carro para sempre.</span>
         </h2>
       </Reveal>
 
-      <div className="mx-auto mt-12 grid max-w-4xl gap-6 lg:grid-cols-5">
+      <div className="mx-auto mt-8 grid max-w-4xl gap-6 lg:grid-cols-5">
         {/* price card */}
         <Reveal delay={120} className="lg:col-span-3">
           <div className="glow-neon relative overflow-hidden rounded-3xl border border-primary/40 bg-card p-7">
@@ -446,7 +447,7 @@ function Pricing() {
                 Conta de quem assina
               </div>
               <p className="mt-3 text-[15px] leading-relaxed text-foreground/90">
-                Assinar o Jarvys =
+                Jarvys =
               </p>
               <p className="mt-1 text-3xl font-extrabold tracking-tight text-primary text-glow">
                 R$ 14,90
@@ -663,7 +664,7 @@ function CertificateMock() {
         </h3>
         <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
           Documento verificável que comprova o histórico de manutenção do seu carro. Apresente na
-          venda e valorize seu patrimônio.
+          venda e valorize seu veículo.
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2 text-center">
