@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -10,19 +10,21 @@ import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
+import { MaintenancePanel } from "@/components/MaintenancePanel";
 import {
   AirFilterIcon,
   TireStackIcon,
   BrakeDiscIcon,
 } from "@/components/automotive-icons";
 import {
-  STATUS_LABEL,
-  formatRemaining,
-  predictChangeDate,
-  type ItemKey,
-  type Status,
-  type StatusItem,
-} from "@/lib/vehicles";
+  buildMaintenanceItems,
+  computeStatus,
+  formatRemainingKm,
+  STATUS_LABEL_PT,
+  type MaintComputed,
+  type MaintItemKey,
+  type MaintStatus,
+} from "@/lib/maintenance";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Minha Garagem — Jarvys" }] }),
