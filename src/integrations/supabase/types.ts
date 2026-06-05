@@ -88,6 +88,7 @@ export type Database = {
           chassi: string | null
           cor: string | null
           created_at: string
+          foto_url: string | null
           id: string
           km_atual: number | null
           marca: string | null
@@ -101,6 +102,7 @@ export type Database = {
           chassi?: string | null
           cor?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           km_atual?: number | null
           marca?: string | null
@@ -114,6 +116,7 @@ export type Database = {
           chassi?: string | null
           cor?: string | null
           created_at?: string
+          foto_url?: string | null
           id?: string
           km_atual?: number | null
           marca?: string | null
