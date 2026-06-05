@@ -9,6 +9,7 @@ import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
+import { PaywallModal } from "@/components/PaywallModal";
 import {
   AirFilterIcon,
   TireStackIcon,
