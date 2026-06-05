@@ -526,17 +526,19 @@ function ConfirmForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 rounded-xl border border-border px-3 py-3 text-xs font-medium text-muted-foreground"
+          disabled={saving}
+          className="flex-1 rounded-xl border border-border px-3 py-3 text-xs font-medium text-muted-foreground disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           type="button"
           onClick={submit}
-          className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground"
+          disabled={saving}
+          className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
         >
-          <Check className="h-4 w-4" />
-          Confirmar e Salvar Registro
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          {saving ? "Salvando..." : "Confirmar e Salvar Registro"}
         </button>
       </div>
     </div>
