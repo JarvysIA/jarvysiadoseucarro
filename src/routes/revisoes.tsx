@@ -78,7 +78,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId]);
+  }, [activeVehicleId, reloadKey]);
 
   // Carrega o signed URL ao abrir o modal
   useEffect(() => {
