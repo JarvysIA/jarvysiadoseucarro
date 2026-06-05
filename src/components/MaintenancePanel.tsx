@@ -163,6 +163,8 @@ export function MaintenancePanel({
                   ? "Aguarde — Jarvys está lendo sua nota."
                   : flow === "confirm"
                   ? "Confirme os dados extraídos pela IA antes de salvar."
+                  : flow === "manual"
+                  ? "Preencha os dados do serviço manualmente."
                   : "Histórico, próximas trocas e registros de despesas deste item."}
               </SheetDescription>
             </SheetHeader>
