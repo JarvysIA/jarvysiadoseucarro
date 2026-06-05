@@ -8,6 +8,7 @@ export type PlateLookupPayload = {
   ano: string;
   cor: string;
   motorizacao: string;
+  chassi: string;
 } | null;
 
 /** Tenta extrair um campo do JSON em vários "shapes" possíveis. */
@@ -52,6 +53,9 @@ function normalize(raw: any): PlateLookupPayload {
     "potencia",
     "combustivel",
   ]);
+  let chassi =
+    pick(detalhe, ["chassi", "CHASSI", "chassis", "vin", "VIN"]) ||
+    pick(basico, ["chassi", "CHASSI", "chassis", "vin", "VIN"]);
 
   for (const c of fallbacks) {
     if (!marca) marca = pick(c, ["marca", "MARCA", "fabricante", "manufacturer"]);
@@ -60,10 +64,11 @@ function normalize(raw: any): PlateLookupPayload {
     if (!cor) cor = pick(c, ["cor", "COR", "color", "corVeiculo"]);
     if (!motorizacao)
       motorizacao = pick(c, ["motorizacao", "motor", "cilindrada", "combustivel"]);
+    if (!chassi) chassi = pick(c, ["chassi", "CHASSI", "chassis", "vin", "VIN"]);
   }
 
   if (!marca && !modelo && !ano && !cor) return null;
-  return { marca, modelo, ano, cor, motorizacao };
+  return { marca, modelo, ano, cor, motorizacao, chassi };
 }
 
 export const lookupPlateFn = createServerFn({ method: "POST" })
