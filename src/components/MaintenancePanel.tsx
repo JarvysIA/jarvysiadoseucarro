@@ -208,6 +208,28 @@ export function MaintenancePanel({
               />
             )}
 
+            {flow === "manual" && computed && (
+              <ManualForm
+                defaultKm={kmAtual}
+                itemName={computed.item.nome}
+                saving={saving}
+                onCancel={() => setFlow("idle")}
+                onConfirm={async (payload) => {
+                  setSaving(true);
+                  try {
+                    await onSave?.({ ...payload, file: null });
+                    toast.success("Registro salvo! Semáforo atualizado.");
+                    setFlow("idle");
+                    onClose();
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              />
+            )}
+
             {flow === "idle" && (
               <>
                 {/* Métricas resumo */}
