@@ -25,15 +25,15 @@ function pick(obj: any, keys: string[]): string {
 function normalize(raw: any): PlateLookupPayload {
   if (!raw || typeof raw !== "object") return null;
 
-  // Estrutura oficial PuxaPlaca: raw.basico.dados / raw.detalheTecnico.dados
+  // Estrutura oficial PuxaPlaca: raw.basico.dados / raw.detalheTecnico.dados / raw.chassi.dados
   const basico = raw?.basico?.dados ?? {};
   const detalhe = raw?.detalheTecnico?.dados ?? {};
+  const chassiBlock = raw?.chassi?.dados ?? {};
 
   // Fallbacks genéricos para outras formas de retorno
-  const fallbacks = [raw, raw?.veiculo, raw?.dados, raw?.data, raw?.resultado].filter(Boolean);
+  const fallbacks = [raw, raw?.veiculo, raw?.dados, raw?.data, raw?.resultado, chassiBlock].filter(Boolean);
 
   let marca = pick(basico, ["marca", "MARCA", "fabricante"]);
-  // Preferimos o modelo técnico (ex.: "Gol S 1.6"), com fallback no básico
   let modelo =
     pick(detalhe, ["modelo", "MODELO"]) ||
     pick(basico, ["modelo", "MODELO"]);
@@ -46,14 +46,11 @@ function normalize(raw: any): PlateLookupPayload {
     "anoFabricacao",
   ]);
   let cor = pick(basico, ["cor", "COR"]);
-  let motorizacao = pick(detalhe, [
-    "motorizacao",
-    "motor",
-    "cilindrada",
-    "potencia",
-    "combustivel",
-  ]);
+  let motorizacao =
+    pick(detalhe, ["motorizacao", "motor", "cilindrada", "potencia", "combustivel"]) ||
+    pick(basico, ["motor", "motorizacao", "cilindrada", "combustivel"]);
   let chassi =
+    pick(chassiBlock, ["chassi", "CHASSI", "chassis", "vin", "VIN"]) ||
     pick(detalhe, ["chassi", "CHASSI", "chassis", "vin", "VIN"]) ||
     pick(basico, ["chassi", "CHASSI", "chassis", "vin", "VIN"]);
 
