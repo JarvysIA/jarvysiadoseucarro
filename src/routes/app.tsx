@@ -112,7 +112,32 @@ function AppPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [addOpen, setAddOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleAdded = (v: AddedVehicle) => {
+    const newVehicle: UserVehicle = {
+      id: v.id,
+      marca: v.marca,
+      modelo: v.modelo,
+      year: v.ano || "—",
+      color: v.cor || "—",
+      plate: v.placa,
+      km: v.km_atual ?? 0,
+      chassi: v.chassi,
+      fotoUrl: null,
+      status: buildStatus(v.ano),
+    };
+    setVehicles((prev) => [...prev, newVehicle]);
+    setSelectedId(v.id);
+    // Rola para o novo card no próximo tick
+    setTimeout(() => {
+      const el = scrollerRef.current?.querySelector<HTMLElement>(
+        `[data-vehicle-id="${v.id}"]`,
+      );
+      el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }, 50);
+  };
 
   useEffect(() => {
     (async () => {
