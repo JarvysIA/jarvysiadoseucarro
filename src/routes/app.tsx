@@ -87,27 +87,7 @@ type UserVehicle = {
   km: number;
   chassi: string;
   fotoUrl: string | null;
-  status: Record<ItemKey, StatusItem>;
 };
-
-function buildStatus(ano: string): Record<ItemKey, StatusItem> {
-  const yearNum = parseInt(ano, 10) || 0;
-  const allOk: Record<ItemKey, StatusItem> = {
-    oleo: { status: "ok", remainingKm: 4200 },
-    filtros: { status: "ok", remainingKm: 5200 },
-    pneus: { status: "ok", remainingKm: 12000 },
-    pastilhas: { status: "ok", remainingKm: 9000 },
-    arrefecimento: { status: "ok", remainingKm: 8000 },
-  };
-  if (yearNum > 2023) return allOk;
-  const keys: ItemKey[] = ["oleo", "filtros", "pneus", "pastilhas", "arrefecimento"];
-  const pick = keys[Math.floor(Math.random() * keys.length)];
-  const bad = Math.random() < 0.5;
-  allOk[pick] = bad
-    ? { status: "bad", remainingKm: -Math.floor(300 + Math.random() * 800) }
-    : { status: "warn", remainingKm: Math.floor(500 + Math.random() * 1500) };
-  return allOk;
-}
 
 function AppPage() {
   const navigate = useNavigate();
