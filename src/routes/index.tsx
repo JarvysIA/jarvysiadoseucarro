@@ -193,12 +193,6 @@ function Hero() {
         </div>
       </Reveal>
 
-      {/* hero mockup peek */}
-      <Reveal delay={320}>
-        <div className="mx-auto mt-10 max-w-3xl">
-          <DashboardMock />
-        </div>
-      </Reveal>
     </section>
   );
 }
@@ -589,25 +583,8 @@ function TimelineMock() {
         <FileCheck2 className="h-4 w-4 text-primary" />
       </div>
 
-      <div className="relative mt-4 overflow-hidden rounded-2xl border border-border/70">
-        <img
-          src={onixImg}
-          alt="Chevrolet Onix em ângulo de estúdio"
-          loading="lazy"
-          width={1024}
-          height={1024}
-          className="aspect-[16/7] w-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-3">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-primary">Chevrolet Onix</p>
-              <p className="text-sm font-semibold text-white">2023 · Prata</p>
-            </div>
-            <p className="font-tech text-[11px] text-white/80">XYZ4A56</p>
-          </div>
-        </div>
-      </div>
+
+
 
 
       <div className="relative mt-5 pl-5">
@@ -677,15 +654,26 @@ function CertificateMock() {
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-primary/50 bg-background/60 text-primary animate-breathing-glow">
           <Award className="h-9 w-9" />
         </div>
-        <p className="mt-5 font-tech text-[11px] uppercase tracking-widest text-primary">
+        <div className="relative mx-auto mt-5 max-w-[260px] overflow-hidden rounded-2xl border border-border/70">
+          <img
+            src={onixImg}
+            alt="Chevrolet Onix em ângulo de estúdio"
+            loading="lazy"
+            className="aspect-[16/9] w-full object-cover"
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5 text-left">
+            <p className="text-[9px] uppercase tracking-widest text-primary">Chevrolet Onix</p>
+            <p className="text-[11px] font-semibold text-white">2023 · Prata</p>
+          </div>
+        </div>
+        <p className="mt-4 font-tech text-[11px] uppercase tracking-widest text-primary">
           Certificado oficial
         </p>
         <h3 className="mt-2 text-xl font-extrabold tracking-tight">
           Revisões Auditadas <span className="text-primary text-glow">Jarvys</span>
         </h3>
-        <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-          Documento verificável que comprova o histórico de manutenção do seu carro. Apresente na
-          venda e valorize seu veículo.
+        <p className="mx-auto mt-2 max-w-[34ch] text-balance text-[12px] leading-relaxed text-muted-foreground">
+          Documento verificável que comprova o histórico de manutenção e valoriza seu veículo na revenda.
         </p>
 
         <div className="mt-5 grid grid-cols-3 gap-2 text-center">
