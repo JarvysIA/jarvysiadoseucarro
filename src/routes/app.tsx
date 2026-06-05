@@ -461,7 +461,19 @@ function Legend({ status }: { status: Status }) {
   );
 }
 
-function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
+function VehicleImage({
+  marca,
+  modelo,
+  ano,
+  cor,
+  alt,
+}: {
+  marca: string;
+  modelo: string;
+  ano: string;
+  cor: string;
+  alt: string;
+}) {
   const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
   const [url, setUrl] = useState<string | null>(null);
 
@@ -469,12 +481,11 @@ function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
     let cancel = false;
     setState("loading");
     setUrl(null);
-    const vin = (chassi || "").trim();
-    if (!vin) {
+    if (!marca && !modelo) {
       setState("fallback");
       return;
     }
-    fetchAutoDevImageFn({ data: { vin } })
+    fetchVehicleImageFn({ data: { marca, modelo, ano, cor } })
       .then((res) => {
         if (cancel) return;
         if (res.ok && res.url) {
@@ -489,7 +500,8 @@ function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
     return () => {
       cancel = true;
     };
-  }, [chassi]);
+  }, [marca, modelo, ano, cor]);
+
 
   return (
     <>
