@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchVehicleImageFn } from "@/lib/vehicle-image.functions";
+import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -509,7 +509,7 @@ function VehicleImage({
       setState("fallback");
       return;
     }
-    fetchVehicleImageFn({ data: { marca, modelo, ano, cor } })
+    generateVehicleImageFn({ data: { vehicleId, marca, modelo, ano, cor } })
       .then(async (res) => {
         if (cancel) return;
         if (res.ok && res.url) {
