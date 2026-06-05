@@ -28,33 +28,43 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       return { ok: false as const, url: null };
     }
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) return { ok: false as const, url: null };
+    // Fallback inteligente:
+    // 1) Se OPENAI_API_KEY existir -> chama diretamente a OpenAI (independência total).
+    // 2) Caso contrário -> usa o Lovable AI Gateway com a LOVABLE_API_KEY.
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const lovableKey = process.env.LOVABLE_API_KEY;
 
-    const carro = [marca, modelo, ano, cor].filter(Boolean).join(" ");
+    const useOpenAI = Boolean(openaiKey);
+    const endpoint = useOpenAI
+      ? "https://api.openai.com/v1/images/generations"
+      : "https://ai.gateway.lovable.dev/v1/images/generations";
+    const authKey = useOpenAI ? openaiKey : lovableKey;
+    if (!authKey) return { ok: false as const, url: null };
+
+    // Mesmo modelo (gpt-image-2) e parâmetros idênticos nos dois caminhos
+    // para garantir o "Padrão Ouro" visual.
+    const model = useOpenAI ? "gpt-image-2" : "openai/gpt-image-2";
+
     const prompt = `A highly detailed, realistic automotive studio photography of a ${cor} ${ano} ${marca} ${modelo}. 45-degree front-three-quarter angle. Isolated on a PURE PITCH BLACK background (#000000). No floor, no shadows, no white lights on the background, strictly pure black background. Photorealistic, 8k.`;
 
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 60_000);
-      const res = await fetch(
-        "https://ai.gateway.lovable.dev/v1/images/generations",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "openai/gpt-image-2",
-            prompt,
-            size: "1024x1024",
-            quality: "low",
-            n: 1,
-          }),
-          signal: ctrl.signal,
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authKey}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          model,
+          prompt,
+          size: "1024x1024",
+          quality: "low",
+          n: 1,
+        }),
+        signal: ctrl.signal,
+      });
       clearTimeout(timeout);
 
       if (!res.ok) return { ok: false as const, url: null };
