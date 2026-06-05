@@ -82,7 +82,9 @@ export function MaintenancePanel({
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Reset ao reabrir/trocar item
@@ -90,7 +92,9 @@ export function MaintenancePanel({
     if (!open) {
       setFlow("idle");
       setParsed(null);
+      setScannedFile(null);
       setErrorMsg(null);
+      setSaving(false);
     }
   }, [open, computed?.item.key]);
 
@@ -100,6 +104,7 @@ export function MaintenancePanel({
     if (!file) return;
     setFlow("scanning");
     setErrorMsg(null);
+    setScannedFile(file);
     try {
       const { base64, mimeType } = await fileToBase64(file);
       const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
