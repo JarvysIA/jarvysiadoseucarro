@@ -141,6 +141,12 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           }))
         : [];
 
+      const categoria: DespesaCategoria = DESPESA_CATEGORIAS.includes(
+        parsed.categoria as DespesaCategoria,
+      )
+        ? (parsed.categoria as DespesaCategoria)
+        : "Manutenção";
+
       return {
         ok: true,
         receipt: {
@@ -148,6 +154,7 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           km_registrada:
             parsed.km_registrada == null ? null : Number(parsed.km_registrada) || null,
           valor_total: Number(parsed.valor_total) || itens.reduce((s, i) => s + i.valor, 0),
+          categoria,
           itens_identificados: itens,
         },
       };
