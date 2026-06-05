@@ -292,6 +292,26 @@ function RevisoesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* FAB — novo registro manual */}
+      <button
+        type="button"
+        onClick={() => setAddOpen(true)}
+        aria-label="Novo registro"
+        className="glow-neon fixed bottom-24 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.7_0.18_250)] text-primary-foreground shadow-xl transition-transform active:scale-95"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      <NewExpenseModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        defaultCategoria="Revisão"
+        onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
       <BottomNav />
     </div>
   );
