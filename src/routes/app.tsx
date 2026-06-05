@@ -9,6 +9,7 @@ import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
+import { PaywallModal } from "@/components/PaywallModal";
 import {
   AirFilterIcon,
   TireStackIcon,
@@ -113,7 +114,19 @@ function AppPage() {
   const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
+  const [paywallMode, setPaywallMode] = useState<"premium" | "enterprise" | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleAddClick = () => {
+    const count = vehicles.length;
+    if (count < 2) {
+      setAddOpen(true);
+    } else if (count >= 2 && count < 5) {
+      setPaywallMode("premium");
+    } else {
+      setPaywallMode("enterprise");
+    }
+  };
 
   const handleAdded = (v: AddedVehicle) => {
     const newVehicle: UserVehicle = {
@@ -272,7 +285,7 @@ function AppPage() {
           <div className="mx-6">
             <button
               type="button"
-              onClick={() => setAddOpen(true)}
+              onClick={handleAddClick}
               className="glow-neon flex w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-primary/40 bg-card/40 p-10 text-center transition-colors hover:border-primary/70"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -342,7 +355,7 @@ function AppPage() {
               {/* Card "+" para adicionar novo veículo */}
               <button
                 type="button"
-                onClick={() => setAddOpen(true)}
+                onClick={handleAddClick}
                 aria-label="Adicionar veículo"
                 className="group flex w-[82%] shrink-0 snap-center flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-primary/40 bg-card/40 p-6 text-center transition-colors hover:border-primary/70 hover:bg-card/60"
                 style={{ minHeight: "16rem" }}
@@ -376,6 +389,12 @@ function AppPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdded={handleAdded}
+      />
+
+      <PaywallModal
+        open={!!paywallMode}
+        onClose={() => setPaywallMode(null)}
+        mode={paywallMode ?? "premium"}
       />
 
 
