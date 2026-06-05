@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Camera, Gauge, Loader2, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/revisoes")({
 });
 
 function RevisoesPage() {
+  const activeVehicleId = useActiveVehicleId();
   const [items, setItems] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDespesa, setOpenDespesa] = useState<Despesa | null>(null);
@@ -33,9 +35,17 @@ function RevisoesPage() {
     let cancel = false;
     (async () => {
       setLoading(true);
+      if (!activeVehicleId) {
+        if (!cancel) {
+          setItems([]);
+          setLoading(false);
+        }
+        return;
+      }
       const { data, error } = await supabase
         .from("despesas")
         .select("*")
+        .eq("vehicle_id", activeVehicleId)
         .in("categoria", ["Revisão", "Manutenção"])
         .order("data", { ascending: false });
       if (!cancel) {
@@ -51,7 +61,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [activeVehicleId]);
 
   // Carrega o signed URL ao abrir o modal
   useEffect(() => {

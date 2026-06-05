@@ -25,6 +25,7 @@ import {
   type MaintItemKey,
   type MaintStatus,
 } from "@/lib/maintenance";
+import { setActiveVehicleId } from "@/lib/active-vehicle";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Minha Garagem — Jarvys" }] }),
@@ -202,6 +203,11 @@ function AppPage() {
     () => vehicles.find((v) => v.id === selectedId) ?? vehicles[0],
     [selectedId, vehicles],
   );
+
+  // Sincroniza o veículo selecionado com o store global (usado por Despesas/Revisões)
+  useEffect(() => {
+    setActiveVehicleId(selected?.id ?? null);
+  }, [selected?.id]);
 
   const isTrial = profile?.status_usuario !== "ativo";
   const hasReferrer = !!profile?.referrer_id;

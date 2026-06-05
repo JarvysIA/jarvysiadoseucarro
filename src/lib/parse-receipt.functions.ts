@@ -14,13 +14,23 @@ export type ReceiptItem = {
   valor: number;
 };
 
-export type DespesaCategoria = "Revisão" | "Manutenção" | "Lavagem" | "Combustível";
+export type DespesaCategoria =
+  | "Revisão"
+  | "Manutenção"
+  | "Lavagem"
+  | "Combustível"
+  | "IPVA"
+  | "Multas"
+  | "Seguro";
 
 export const DESPESA_CATEGORIAS: DespesaCategoria[] = [
   "Revisão",
   "Manutenção",
   "Lavagem",
   "Combustível",
+  "IPVA",
+  "Multas",
+  "Seguro",
 ];
 
 export type ParsedReceipt = {
@@ -31,16 +41,20 @@ export type ParsedReceipt = {
   itens_identificados: ReceiptItem[];
 };
 
-const SYSTEM_PROMPT = `Você é um assistente automotivo. Analise esta imagem de nota fiscal, orçamento de oficina ou cupom de posto.
+const SYSTEM_PROMPT = `Você é um assistente automotivo. Analise esta imagem de nota fiscal, orçamento de oficina, boleto, apólice ou cupom de posto.
 
-REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 4 opções:
+REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 7 opções:
 - "Revisão": manutenção preventiva programada (troca de óleo/filtros/velas/correia/fluidos, revisão de fábrica).
 - "Manutenção": conserto imprevisto/corretivo (vidro quebrado, peça estourada, embreagem, suspensão, bateria queimada, freios por desgaste, funilaria, elétrica).
 - "Lavagem": lavagem simples/completa, higienização, polimento, enceramento.
 - "Combustível": abastecimento em posto (gasolina, etanol, diesel, GNV).
+- "IPVA": boleto/guia de imposto do veículo (Detran, Secretaria da Fazenda, IPVA, DPVAT, licenciamento anual, taxa de emplacamento).
+- "Multas": infração de trânsito, auto de infração, notificação de penalidade (Detran, prefeitura, PRF, radar).
+- "Seguro": apólice de seguro auto, parcela/boleto de seguradora (Porto, Bradesco, Allianz, Azul, HDI, etc.), assistência 24h, seguro de vidros.
 
 Retorne EXATAMENTE e APENAS um objeto JSON neste formato, sem markdown:
-{ "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
+{ "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível|IPVA|Multas|Seguro", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
+
 
 function stripJsonFences(text: string): string {
   return text
