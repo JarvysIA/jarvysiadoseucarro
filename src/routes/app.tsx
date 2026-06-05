@@ -552,10 +552,16 @@ function VehicleImage({
           loading="lazy"
           onLoad={() => setState("loaded")}
           onError={() => setState("fallback")}
-          className={`relative z-[1] h-full w-full object-contain p-3 transition-opacity duration-500 ${
+          className={`relative z-[1] h-full w-full rounded-2xl object-cover transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
-          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+          style={{
+            filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+            maskImage:
+              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+          }}
         />
       )}
     </>
