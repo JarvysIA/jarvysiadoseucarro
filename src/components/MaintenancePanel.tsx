@@ -180,16 +180,26 @@ export function MaintenancePanel({
                 parsed={parsed}
                 defaultKm={kmAtual}
                 itemName={computed.item.nome}
+                saving={saving}
                 onCancel={() => {
                   setParsed(null);
+                  setScannedFile(null);
                   setFlow("idle");
                 }}
-                onConfirm={(payload) => {
-                  onSave?.(payload);
-                  toast.success("Registro salvo! Semáforo atualizado.");
-                  setParsed(null);
-                  setFlow("idle");
-                  onClose();
+                onConfirm={async (payload) => {
+                  setSaving(true);
+                  try {
+                    await onSave?.({ ...payload, file: scannedFile });
+                    toast.success("Registro salvo! Semáforo atualizado.");
+                    setParsed(null);
+                    setScannedFile(null);
+                    setFlow("idle");
+                    onClose();
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
               />
             )}
