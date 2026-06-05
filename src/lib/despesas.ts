@@ -8,6 +8,9 @@ export const CATEGORIAS: DespesaCategoria[] = [
   "Manutenção",
   "Lavagem",
   "Combustível",
+  "IPVA",
+  "Multas",
+  "Seguro",
 ];
 
 // Cores neon distintas por categoria (usadas no gráfico e badges)
@@ -16,7 +19,11 @@ export const CATEGORIA_COLOR: Record<DespesaCategoria, string> = {
   "Manutenção": "#ff3366",     // Vermelho neon
   "Lavagem": "#38bdf8",        // Azul neon
   "Combustível": "#facc15",    // Amarelo neon
+  "IPVA": "#a855f7",           // Roxo neon
+  "Multas": "#fb923c",         // Laranja neon
+  "Seguro": "#22d3ee",         // Ciano neon
 };
+
 
 export type Despesa = {
   id: string;
