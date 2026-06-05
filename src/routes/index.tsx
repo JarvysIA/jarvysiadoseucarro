@@ -193,12 +193,6 @@ function Hero() {
         </div>
       </Reveal>
 
-      {/* hero mockup peek */}
-      <Reveal delay={320}>
-        <div className="mx-auto mt-10 max-w-3xl">
-          <DashboardMock />
-        </div>
-      </Reveal>
     </section>
   );
 }
