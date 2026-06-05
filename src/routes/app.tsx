@@ -472,23 +472,37 @@ function Legend({ status }: { status: Status }) {
 }
 
 function VehicleImage({
+  vehicleId,
+  cachedUrl,
   marca,
   modelo,
   ano,
   cor,
   alt,
+  onResolved,
 }: {
+  vehicleId: string;
+  cachedUrl: string | null;
   marca: string;
   modelo: string;
   ano: string;
   cor: string;
   alt: string;
+  onResolved: (url: string) => void;
 }) {
-  const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
-  const [url, setUrl] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "loaded" | "fallback">(
+    cachedUrl ? "loading" : "loading",
+  );
+  const [url, setUrl] = useState<string | null>(cachedUrl);
 
   useEffect(() => {
     let cancel = false;
+    // Cache hit: usa imagem do banco, não chama Serper.
+    if (cachedUrl) {
+      setUrl(cachedUrl);
+      setState("loading"); // aguarda onLoad da <img>
+      return;
+    }
     setState("loading");
     setUrl(null);
     if (!marca && !modelo) {
@@ -496,10 +510,20 @@ function VehicleImage({
       return;
     }
     fetchVehicleImageFn({ data: { marca, modelo, ano, cor } })
-      .then((res) => {
+      .then(async (res) => {
         if (cancel) return;
         if (res.ok && res.url) {
           setUrl(res.url);
+          onResolved(res.url);
+          // Persiste no Supabase para não chamar a API novamente.
+          try {
+            await supabase
+              .from("veiculos")
+              .update({ foto_url: res.url })
+              .eq("id", vehicleId);
+          } catch {
+            /* falha silenciosa: a imagem ainda aparece nesta sessão */
+          }
         } else {
           setState("fallback");
         }
@@ -510,12 +534,12 @@ function VehicleImage({
     return () => {
       cancel = true;
     };
-  }, [marca, modelo, ano, cor]);
-
+    // Apenas vehicleId como dep — evita refetch ao trocar de abas/reordenar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleId]);
 
   return (
     <>
-      {/* Spotlight neon azul (pulsa durante o loading) */}
       <div
         aria-hidden
         className={`pointer-events-none absolute inset-0 ${
@@ -562,15 +586,15 @@ function VehicleImage({
           loading="lazy"
           onLoad={() => setState("loaded")}
           onError={() => setState("fallback")}
-          className={`relative z-[1] h-full w-full rounded-2xl object-cover transition-opacity duration-500 ${
+          className={`relative z-[1] h-full w-full object-contain transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
           style={{
             filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))",
             WebkitMaskImage:
-              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+              "radial-gradient(ellipse at center, black 65%, transparent 100%)",
             maskImage:
-              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+              "radial-gradient(ellipse at center, black 65%, transparent 100%)",
           }}
         />
       )}
