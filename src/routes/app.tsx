@@ -114,7 +114,19 @@ function AppPage() {
   const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
+  const [paywallMode, setPaywallMode] = useState<"premium" | "enterprise" | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleAddClick = () => {
+    const count = vehicles.length;
+    if (count < 2) {
+      setAddOpen(true);
+    } else if (count >= 2 && count < 5) {
+      setPaywallMode("premium");
+    } else {
+      setPaywallMode("enterprise");
+    }
+  };
 
   const handleAdded = (v: AddedVehicle) => {
     const newVehicle: UserVehicle = {
