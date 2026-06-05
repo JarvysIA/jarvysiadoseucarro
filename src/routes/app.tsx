@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -10,38 +10,40 @@ import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
+import { MaintenancePanel } from "@/components/MaintenancePanel";
 import {
   AirFilterIcon,
   TireStackIcon,
   BrakeDiscIcon,
 } from "@/components/automotive-icons";
 import {
-  STATUS_LABEL,
-  formatRemaining,
-  predictChangeDate,
-  type ItemKey,
-  type Status,
-  type StatusItem,
-} from "@/lib/vehicles";
+  buildMaintenanceItems,
+  computeStatus,
+  formatRemainingKm,
+  STATUS_LABEL_PT,
+  type MaintComputed,
+  type MaintItemKey,
+  type MaintStatus,
+} from "@/lib/maintenance";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Minha Garagem — Jarvys" }] }),
   component: AppPage,
 });
 
-const STATUS_CLASS: Record<Status, string> = {
+const STATUS_CLASS: Record<MaintStatus, string> = {
   ok: "bg-[var(--status-ok)]",
   warn: "bg-[var(--status-warn)]",
   bad: "bg-[var(--status-bad)]",
 };
-const STATUS_RING: Record<Status, string> = {
+const STATUS_RING: Record<MaintStatus, string> = {
   ok: "shadow-[0_0_18px_-2px_var(--status-ok)]",
   warn: "shadow-[0_0_18px_-2px_var(--status-warn)]",
   bad: "shadow-[0_0_18px_-2px_var(--status-bad)]",
 };
 
 type ItemDef = {
-  key: ItemKey;
+  key: MaintItemKey;
   label: string;
   icon: (props: { className?: string }) => React.ReactNode;
 };
@@ -85,27 +87,7 @@ type UserVehicle = {
   km: number;
   chassi: string;
   fotoUrl: string | null;
-  status: Record<ItemKey, StatusItem>;
 };
-
-function buildStatus(ano: string): Record<ItemKey, StatusItem> {
-  const yearNum = parseInt(ano, 10) || 0;
-  const allOk: Record<ItemKey, StatusItem> = {
-    oleo: { status: "ok", remainingKm: 4200 },
-    filtros: { status: "ok", remainingKm: 5200 },
-    pneus: { status: "ok", remainingKm: 12000 },
-    pastilhas: { status: "ok", remainingKm: 9000 },
-    arrefecimento: { status: "ok", remainingKm: 8000 },
-  };
-  if (yearNum > 2023) return allOk;
-  const keys: ItemKey[] = ["oleo", "filtros", "pneus", "pastilhas", "arrefecimento"];
-  const pick = keys[Math.floor(Math.random() * keys.length)];
-  const bad = Math.random() < 0.5;
-  allOk[pick] = bad
-    ? { status: "bad", remainingKm: -Math.floor(300 + Math.random() * 800) }
-    : { status: "warn", remainingKm: Math.floor(500 + Math.random() * 1500) };
-  return allOk;
-}
 
 function AppPage() {
   const navigate = useNavigate();
@@ -139,7 +121,6 @@ function AppPage() {
       km: v.km_atual ?? 0,
       chassi: v.chassi,
       fotoUrl: null,
-      status: buildStatus(v.ano),
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
@@ -188,7 +169,6 @@ function AppPage() {
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
           fotoUrl: v.foto_url || null,
-          status: buildStatus(ano),
         };
       });
       setVehicles(mapped);
@@ -399,64 +379,15 @@ function AppPage() {
 
 
       {selected && (
-        <>
-          <section className="mt-10 px-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Status do Veículo</h2>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                <Legend status="ok" />
-                <Legend status="warn" />
-                <Legend status="bad" />
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-4 px-6">
-            <div className="grid grid-cols-2 gap-3">
-              {ITEMS.map((it, idx) => {
-                const data = selected.status[it.key];
-                const isOil = it.key === "oleo";
-                const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
-                return (
-                  <div
-                    key={it.key}
-                    className={`relative rounded-2xl border border-border bg-card p-4 ${
-                      fullSpan ? "col-span-2" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
-                        {it.icon({ className: "h-5 w-5" })}
-                      </div>
-                      <span
-                        className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
-                        aria-label={STATUS_LABEL[data.status]}
-                      />
-                    </div>
-                    <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {formatRemaining(data.remainingKm)}
-                    </p>
-                    {isOil && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Previsão de troca:{" "}
-                        <span className="font-medium text-foreground">
-                          {predictChangeDate(data.remainingKm)}
-                        </span>
-                      </p>
-                    )}
-                    <p
-                      className="mt-2 text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ color: `var(--status-${data.status})` }}
-                    >
-                      {STATUS_LABEL[data.status]}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </>
+        <VehicleStatusSection
+          vehicleId={selected.id}
+          kmAtual={selected.km}
+          onKmChange={(km) =>
+            setVehicles((prev) =>
+              prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
+            )
+          }
+        />
       )}
 
       {/* Indicações */}
@@ -544,12 +475,165 @@ function ReferralUnlocked({ userId }: { userId: string }) {
   );
 }
 
-function Legend({ status }: { status: Status }) {
+function Legend({ status }: { status: MaintStatus }) {
   return (
     <span className="inline-flex items-center gap-1">
       <span className={`h-2 w-2 rounded-full ${STATUS_CLASS[status]}`} />
-      {STATUS_LABEL[status]}
+      {STATUS_LABEL_PT[status]}
     </span>
+  );
+}
+
+function VehicleStatusSection({
+  vehicleId,
+  kmAtual,
+  onKmChange,
+}: {
+  vehicleId: string;
+  kmAtual: number;
+  onKmChange: (km: number) => void;
+}) {
+  const [editingKm, setEditingKm] = useState(false);
+  const [draftKm, setDraftKm] = useState(String(kmAtual));
+  const [openItem, setOpenItem] = useState<MaintComputed | null>(null);
+
+  // Itens determinísticos por vehicleId — não mudam quando o usuário altera a KM atual.
+  const items = useMemo(
+    () => buildMaintenanceItems(vehicleId, kmAtual),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [vehicleId],
+  );
+  const computed = useMemo(
+    () => items.map((it) => computeStatus(it, kmAtual)),
+    [items, kmAtual],
+  );
+
+  const saveKm = () => {
+    const n = parseInt(draftKm.replace(/\D/g, ""), 10);
+    if (!Number.isFinite(n) || n < 0) {
+      toast.error("KM inválida");
+      return;
+    }
+    onKmChange(n);
+    setEditingKm(false);
+  };
+
+  return (
+    <>
+      <section className="mt-10 px-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">Status do Veículo</h2>
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <Legend status="ok" />
+            <Legend status="warn" />
+            <Legend status="bad" />
+          </div>
+        </div>
+
+        {/* KM atual — editável para testar o semáforo */}
+        <div className="mt-3 flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+          <Gauge className="h-4 w-4 text-primary" />
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            KM Atual
+          </span>
+          {editingKm ? (
+            <>
+              <input
+                autoFocus
+                inputMode="numeric"
+                value={draftKm}
+                onChange={(e) => setDraftKm(e.target.value.replace(/\D/g, ""))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveKm();
+                  if (e.key === "Escape") {
+                    setDraftKm(String(kmAtual));
+                    setEditingKm(false);
+                  }
+                }}
+                className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={saveKm}
+                className="rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+              >
+                Salvar
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-sm font-semibold text-foreground">
+                {kmAtual.toLocaleString("pt-BR")} km
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftKm(String(kmAtual));
+                  setEditingKm(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+                Editar
+              </button>
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-4 px-6">
+        <div className="grid grid-cols-2 gap-3">
+          {ITEMS.map((it, idx) => {
+            const data = computed.find((c) => c.item.key === it.key);
+            if (!data) return null;
+            const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
+            return (
+              <button
+                type="button"
+                key={it.key}
+                onClick={() => setOpenItem(data)}
+                className={`relative rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:scale-[0.99] ${
+                  fullSpan ? "col-span-2" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary transition-colors"
+                    style={{ color: `var(--status-${data.status})` }}
+                  >
+                    {it.icon({ className: "h-5 w-5" })}
+                  </div>
+                  <span
+                    className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
+                    aria-label={STATUS_LABEL_PT[data.status]}
+                  />
+                </div>
+                <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
+                <p
+                  className="mt-1 text-[11px]"
+                  style={{ color: `var(--status-${data.status})` }}
+                >
+                  {formatRemainingKm(data.remainingKm)}
+                </p>
+                <p
+                  className="mt-2 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ color: `var(--status-${data.status})` }}
+                >
+                  {STATUS_LABEL_PT[data.status]}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <MaintenancePanel
+        open={!!openItem}
+        onClose={() => setOpenItem(null)}
+        computed={openItem}
+        kmAtual={kmAtual}
+      />
+    </>
   );
 }
 
