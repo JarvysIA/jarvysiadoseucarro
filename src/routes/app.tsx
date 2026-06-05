@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
+import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
   TireStackIcon,
