@@ -18,7 +18,8 @@ import {
   formatRemainingMonths,
   type MaintComputed,
 } from "@/lib/maintenance";
-import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory } from "@/lib/parse-receipt.functions";
+import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
+import { CATEGORIAS, CATEGORIA_COLOR } from "@/lib/despesas";
 import { toast } from "sonner";
 
 export type MaintExpense = {
@@ -33,6 +34,8 @@ export type MaintSaveInput = {
   km_registrada: number;
   valor_total: number;
   descricao: string;
+  categoria: DespesaCategoria;
+  file: File | null;
 };
 
 type Props = {
@@ -41,7 +44,7 @@ type Props = {
   computed: MaintComputed | null;
   kmAtual: number;
   expenses?: MaintExpense[];
-  onSave?: (update: MaintSaveInput) => void;
+  onSave?: (update: MaintSaveInput) => void | Promise<void>;
 };
 
 type FlowState = "idle" | "scanning" | "confirm" | "error";
