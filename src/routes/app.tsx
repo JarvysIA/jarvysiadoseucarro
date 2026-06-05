@@ -543,14 +543,30 @@ function VehicleStatusSection({
     ? expenses[vehicleId]?.[openItemKey] ?? []
     : [];
 
-  const saveKm = () => {
+  const saveKm = async () => {
     const n = parseInt(draftKm.replace(/\D/g, ""), 10);
     if (!Number.isFinite(n) || n < 0) {
       toast.error("KM inválida");
       return;
     }
+    // Anti-fraude: nova KM não pode ser menor que a atual registrada,
+    // exceto quando o veículo ainda não tem KM (primeiro cadastro).
+    if (kmAtual > 0 && n < kmAtual) {
+      toast.error("Atenção: A nova quilometragem não pode ser menor que a atual registrada.");
+      return;
+    }
+    const { error } = await supabase
+      .from("veiculos")
+      .update({ km_atual: n })
+      .eq("id", vehicleId);
+    if (error) {
+      console.error("[saveKm]", error);
+      toast.error("Não foi possível atualizar a KM.");
+      return;
+    }
     onKmChange(n);
     setEditingKm(false);
+    toast.success("KM atualizada!");
   };
 
   const handleSaveMaintenance = async (key: MaintItemKey, payload: MaintSaveInput) => {

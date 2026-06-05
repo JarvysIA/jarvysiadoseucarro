@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Gauge, Loader2, Wrench } from "lucide-react";
+import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { NewExpenseModal } from "@/components/NewExpenseModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   Dialog,
@@ -30,6 +31,22 @@ function RevisoesPage() {
   const [openDespesa, setOpenDespesa] = useState<Despesa | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [vehicleKm, setVehicleKm] = useState(0);
+
+  useEffect(() => {
+    if (!activeVehicleId) {
+      setVehicleKm(0);
+      return;
+    }
+    supabase
+      .from("veiculos")
+      .select("km_atual")
+      .eq("id", activeVehicleId)
+      .maybeSingle()
+      .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
+  }, [activeVehicleId, reloadKey]);
 
   useEffect(() => {
     let cancel = false;
@@ -61,7 +78,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId]);
+  }, [activeVehicleId, reloadKey]);
 
   // Carrega o signed URL ao abrir o modal
   useEffect(() => {
@@ -274,6 +291,26 @@ function RevisoesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* FAB — novo registro manual */}
+      <button
+        type="button"
+        onClick={() => setAddOpen(true)}
+        aria-label="Novo registro"
+        className="glow-neon fixed bottom-24 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.7_0.18_250)] text-primary-foreground shadow-xl transition-transform active:scale-95"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
+      <NewExpenseModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        defaultCategoria="Revisão"
+        onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
 
       <BottomNav />
     </div>
