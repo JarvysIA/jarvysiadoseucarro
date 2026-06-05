@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
+import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
@@ -12,13 +13,12 @@ import {
   BrakeDiscIcon,
 } from "@/components/automotive-icons";
 import {
-  VEHICLES,
   STATUS_LABEL,
   formatRemaining,
   predictChangeDate,
   type ItemKey,
   type Status,
-  type Vehicle,
+  type StatusItem,
 } from "@/lib/vehicles";
 
 export const Route = createFileRoute("/app")({
@@ -60,11 +60,59 @@ type Profile = {
   referrer_id: string | null;
 };
 
+type DbVehicle = {
+  id: string;
+  placa: string;
+  marca: string | null;
+  modelo: string | null;
+  ano: string | null;
+  cor: string | null;
+  km_atual: number | null;
+};
+
+type UserVehicle = {
+  id: string;
+  marca: string;
+  modelo: string;
+  year: string;
+  color: string;
+  plate: string;
+  km: number;
+  imageUrl: string;
+  status: Record<ItemKey, StatusItem>;
+};
+
+function buildImageUrl(marca: string, modelo: string, ano: string): string {
+  const q = [marca, modelo, ano, "car"].filter(Boolean).join(" ").trim();
+  if (!q) return fallbackCarImg;
+  return `https://source.unsplash.com/800x600/?${encodeURIComponent(q)}`;
+}
+
+function buildStatus(ano: string): Record<ItemKey, StatusItem> {
+  const yearNum = parseInt(ano, 10) || 0;
+  const allOk: Record<ItemKey, StatusItem> = {
+    oleo: { status: "ok", remainingKm: 4200 },
+    filtros: { status: "ok", remainingKm: 5200 },
+    pneus: { status: "ok", remainingKm: 12000 },
+    pastilhas: { status: "ok", remainingKm: 9000 },
+    arrefecimento: { status: "ok", remainingKm: 8000 },
+  };
+  if (yearNum > 2023) return allOk;
+  const keys: ItemKey[] = ["oleo", "filtros", "pneus", "pastilhas", "arrefecimento"];
+  const pick = keys[Math.floor(Math.random() * keys.length)];
+  const bad = Math.random() < 0.5;
+  allOk[pick] = bad
+    ? { status: "bad", remainingKm: -Math.floor(300 + Math.random() * 800) }
+    : { status: "warn", remainingKm: Math.floor(500 + Math.random() * 1500) };
+  return allOk;
+}
+
 function AppPage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [selectedId, setSelectedId] = useState<string>(VEHICLES[0].id);
+  const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -74,22 +122,49 @@ function AppPage() {
         navigate({ to: "/welcome", replace: true });
         return;
       }
-      const { data } = await supabase
-        .from("profiles")
-        .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id")
-        .eq("id", session.session.user.id)
-        .maybeSingle();
-      setProfile(data as Profile | null);
+      const userId = session.session.user.id;
+      const [{ data: prof }, { data: veics }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id")
+          .eq("id", userId)
+          .maybeSingle(),
+        supabase
+          .from("veiculos")
+          .select("id,placa,marca,modelo,ano,cor,km_atual")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true }),
+      ]);
+      setProfile(prof as Profile | null);
+      const mapped: UserVehicle[] = ((veics ?? []) as DbVehicle[]).map((v) => {
+        const marca = v.marca?.trim() || "";
+        const modelo = v.modelo?.trim() || "";
+        const ano = v.ano?.trim() || "";
+        const cor = v.cor?.trim() || "—";
+        return {
+          id: v.id,
+          marca,
+          modelo,
+          year: ano || "—",
+          color: cor,
+          plate: v.placa,
+          km: v.km_atual ?? 0,
+          imageUrl: buildImageUrl(marca, modelo, ano),
+          status: buildStatus(ano),
+        };
+      });
+      setVehicles(mapped);
+      if (mapped.length) setSelectedId(mapped[0].id);
       setLoadingProfile(false);
     })();
   }, [navigate]);
 
   useEffect(() => {
     const el = scrollerRef.current;
-    if (!el) return;
+    if (!el || vehicles.length === 0) return;
     const onScroll = () => {
       const center = el.scrollLeft + el.clientWidth / 2;
-      let bestId = VEHICLES[0].id;
+      let bestId = vehicles[0].id;
       let bestDist = Infinity;
       el.querySelectorAll<HTMLElement>("[data-vehicle-id]").forEach((node) => {
         const cardCenter = node.offsetLeft + node.offsetWidth / 2;
@@ -103,11 +178,11 @@ function AppPage() {
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [vehicles]);
 
-  const selected: Vehicle = useMemo(
-    () => VEHICLES.find((v) => v.id === selectedId) ?? VEHICLES[0],
-    [selectedId],
+  const selected = useMemo(
+    () => vehicles.find((v) => v.id === selectedId) ?? vehicles[0],
+    [selectedId, vehicles],
   );
 
   const isTrial = profile?.status_usuario !== "ativo";
@@ -168,116 +243,155 @@ function AppPage() {
       </section>
 
       <section className="mt-4">
-        <div
-          ref={scrollerRef}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {VEHICLES.map((v) => {
-            const active = v.id === selectedId;
-            return (
-              <article
-                key={v.id}
-                data-vehicle-id={v.id}
-                onClick={() => setSelectedId(v.id)}
-                className={`w-[82%] shrink-0 snap-center overflow-hidden rounded-3xl border bg-card transition-all ${
-                  active ? "glow-neon border-primary/40" : "border-border opacity-70"
-                }`}
-              >
-                <div className="relative h-44 w-full bg-gradient-to-b from-secondary to-card">
-                  <img
-                    src={v.image}
-                    alt={`${v.model} ${v.color}`}
-                    width={1024}
-                    height={768}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                  <span className="absolute top-3 left-3 rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
-                    {v.plate}
-                  </span>
-                </div>
-                <div className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {v.year} · {v.color}
-                  </p>
-                  <h3 className="mt-1 text-lg font-semibold">{v.model}</h3>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Gauge className="h-4 w-4 text-primary" />
-                    {v.km.toLocaleString("pt-BR")} km
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-        <div className="mt-2 flex items-center justify-center gap-2">
-          {VEHICLES.map((v) => (
-            <span
-              key={v.id}
-              className={`h-1.5 rounded-full transition-all ${
-                v.id === selectedId ? "w-6 bg-primary" : "w-1.5 bg-border"
-              }`}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10 px-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Status do Veículo</h2>
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <Legend status="ok" />
-            <Legend status="warn" />
-            <Legend status="bad" />
+        {vehicles.length === 0 && !loadingProfile ? (
+          <div className="mx-6 rounded-3xl border border-dashed border-border bg-card/40 p-8 text-center">
+            <Car className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              Nenhum veículo cadastrado ainda.
+            </p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div
+              ref={scrollerRef}
+              className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {vehicles.map((v) => {
+                const active = v.id === selectedId;
+                return (
+                  <article
+                    key={v.id}
+                    data-vehicle-id={v.id}
+                    onClick={() => setSelectedId(v.id)}
+                    className={`w-[82%] shrink-0 snap-center overflow-hidden rounded-3xl border bg-card transition-all ${
+                      active ? "glow-neon border-primary/40" : "border-border opacity-70"
+                    }`}
+                  >
+                    <div className="relative h-44 w-full overflow-hidden bg-card">
+                      {/* Spotlight neon azul */}
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background:
+                            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
+                        }}
+                      />
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background:
+                            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
+                        }}
+                      />
+                      <img
+                        src={v.imageUrl}
+                        alt={`${v.marca} ${v.modelo} ${v.color}`}
+                        width={1024}
+                        height={768}
+                        loading="lazy"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.src !== fallbackCarImg) img.src = fallbackCarImg;
+                        }}
+                        className="relative z-[1] h-full w-full object-cover mix-blend-screen"
+                        style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+                      />
+                      <span className="absolute top-3 left-3 z-[2] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
+                        {v.plate}
+                      </span>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        {v.year} · {v.color}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold">
+                        {[v.marca, v.modelo].filter(Boolean).join(" ") || "Veículo"}
+                      </h3>
+                      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Gauge className="h-4 w-4 text-primary" />
+                        {v.km.toLocaleString("pt-BR")} km
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center justify-center gap-2">
+              {vehicles.map((v) => (
+                <span
+                  key={v.id}
+                  className={`h-1.5 rounded-full transition-all ${
+                    v.id === selectedId ? "w-6 bg-primary" : "w-1.5 bg-border"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
-      <section className="mt-4 px-6">
-        <div className="grid grid-cols-2 gap-3">
-          {ITEMS.map((it, idx) => {
-            const data = selected.status[it.key];
-            const isOil = it.key === "oleo";
-            const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
-            return (
-              <div
-                key={it.key}
-                className={`relative rounded-2xl border border-border bg-card p-4 ${
-                  fullSpan ? "col-span-2" : ""
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
-                    {it.icon({ className: "h-5 w-5" })}
-                  </div>
-                  <span
-                    className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
-                    aria-label={STATUS_LABEL[data.status]}
-                  />
-                </div>
-                <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {formatRemaining(data.remainingKm)}
-                </p>
-                {isOil && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Previsão de troca:{" "}
-                    <span className="font-medium text-foreground">
-                      {predictChangeDate(data.remainingKm)}
-                    </span>
-                  </p>
-                )}
-                <p
-                  className="mt-2 text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ color: `var(--status-${data.status})` }}
-                >
-                  {STATUS_LABEL[data.status]}
-                </p>
+      {selected && (
+        <>
+          <section className="mt-10 px-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Status do Veículo</h2>
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                <Legend status="ok" />
+                <Legend status="warn" />
+                <Legend status="bad" />
               </div>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          </section>
+
+          <section className="mt-4 px-6">
+            <div className="grid grid-cols-2 gap-3">
+              {ITEMS.map((it, idx) => {
+                const data = selected.status[it.key];
+                const isOil = it.key === "oleo";
+                const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
+                return (
+                  <div
+                    key={it.key}
+                    className={`relative rounded-2xl border border-border bg-card p-4 ${
+                      fullSpan ? "col-span-2" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
+                        {it.icon({ className: "h-5 w-5" })}
+                      </div>
+                      <span
+                        className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
+                        aria-label={STATUS_LABEL[data.status]}
+                      />
+                    </div>
+                    <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {formatRemaining(data.remainingKm)}
+                    </p>
+                    {isOil && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Previsão de troca:{" "}
+                        <span className="font-medium text-foreground">
+                          {predictChangeDate(data.remainingKm)}
+                        </span>
+                      </p>
+                    )}
+                    <p
+                      className="mt-2 text-[10px] font-semibold uppercase tracking-wider"
+                      style={{ color: `var(--status-${data.status})` }}
+                    >
+                      {STATUS_LABEL[data.status]}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      )}
 
       {/* Indicações */}
       <section className="mt-8 px-6">
