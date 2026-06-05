@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2, Car } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
