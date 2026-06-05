@@ -355,7 +355,7 @@ function AppPage() {
               {/* Card "+" para adicionar novo veículo */}
               <button
                 type="button"
-                onClick={() => setAddOpen(true)}
+                onClick={handleAddClick}
                 aria-label="Adicionar veículo"
                 className="group flex w-[82%] shrink-0 snap-center flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-primary/40 bg-card/40 p-6 text-center transition-colors hover:border-primary/70 hover:bg-card/60"
                 style={{ minHeight: "16rem" }}
