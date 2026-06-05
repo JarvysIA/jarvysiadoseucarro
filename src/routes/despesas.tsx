@@ -37,8 +37,23 @@ function DespesasPage() {
   const activeVehicleId = useActiveVehicleId();
   const [items, setItems] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [vehicleKm, setVehicleKm] = useState(0);
 
+  // Carrega KM atual do veículo ativo (para defaults do modal)
   useEffect(() => {
+    if (!activeVehicleId) {
+      setVehicleKm(0);
+      return;
+    }
+    supabase
+      .from("veiculos")
+      .select("km_atual")
+      .eq("id", activeVehicleId)
+      .maybeSingle()
+      .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
+  }, [activeVehicleId, reloadKey]);
     let cancel = false;
     (async () => {
       setLoading(true);
