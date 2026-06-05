@@ -33,7 +33,7 @@ export const fetchVehicleImageFn = createServerFn({ method: "POST" })
           "X-API-KEY": SERPER_API_KEY,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ q, gl: "br", hl: "pt" }),
+        body: JSON.stringify({ q, gl: "br", hl: "pt", imageSize: "large" }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
