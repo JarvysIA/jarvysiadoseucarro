@@ -35,6 +35,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
   const [ano, setAno] = useState("");
   const [cor, setCor] = useState("");
   const [motorizacao, setMotorizacao] = useState("");
+  const [chassi, setChassi] = useState("");
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,6 +50,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
     setAno("");
     setCor("");
     setMotorizacao("");
+    setChassi("");
     lookup(plate).then((r) => {
       if (cancel) return;
       if (r) {
@@ -57,6 +59,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         setAno(r.ano || "");
         setCor(r.cor || "");
         setMotorizacao(r.motorizacao || "");
+        setChassi(r.chassi || "");
         setAutofilled(true);
       } else {
         setNotFoundNotice(true);
@@ -83,6 +86,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         ano: ano.trim(),
         cor: cor.trim(),
         motorizacao: motorizacao.trim(),
+        chassi: chassi.trim(),
         km_atual: km ? Number(km.replace(/\D/g, "")) || null : null,
       });
     } finally {

@@ -175,6 +175,7 @@ function SignupPage() {
         ano: car.ano,
         cor: car.cor,
         motorizacao: car.motorizacao,
+        chassi: car.chassi || null,
         km_atual: car.km_atual,
       });
       if (vehErr) {
