@@ -383,13 +383,15 @@ function ConfirmForm({
   parsed,
   defaultKm,
   itemName,
+  saving,
   onConfirm,
   onCancel,
 }: {
   parsed: ParsedReceipt;
   defaultKm: number;
   itemName: string;
-  onConfirm: (p: MaintSaveInput) => void;
+  saving: boolean;
+  onConfirm: (p: Omit<MaintSaveInput, "file">) => void;
   onCancel: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -397,6 +399,7 @@ function ConfirmForm({
   const [km, setKm] = useState(String(parsed.km_registrada ?? defaultKm));
   const [valor, setValor] = useState(parsed.valor_total.toFixed(2));
   const [itens, setItens] = useState(parsed.itens_identificados);
+  const [categoria, setCategoria] = useState<DespesaCategoria>(parsed.categoria);
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
@@ -418,6 +421,7 @@ function ConfirmForm({
       km_registrada: kmNum,
       valor_total: valorNum,
       descricao,
+      categoria,
     });
   };
 
