@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAutoDevImageFn } from "@/lib/autodev-image.functions";
+import { fetchVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -265,9 +265,13 @@ function AppPage() {
                   >
                     <div className="relative h-44 w-full overflow-hidden bg-card">
                       <VehicleImage
-                        chassi={v.chassi}
+                        marca={v.marca}
+                        modelo={v.modelo}
+                        ano={v.year}
+                        cor={v.color}
                         alt={`${v.marca} ${v.modelo} ${v.color}`}
                       />
+
                       <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
                         {v.plate}
                       </span>
@@ -457,7 +461,19 @@ function Legend({ status }: { status: Status }) {
   );
 }
 
-function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
+function VehicleImage({
+  marca,
+  modelo,
+  ano,
+  cor,
+  alt,
+}: {
+  marca: string;
+  modelo: string;
+  ano: string;
+  cor: string;
+  alt: string;
+}) {
   const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
   const [url, setUrl] = useState<string | null>(null);
 
@@ -465,12 +481,11 @@ function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
     let cancel = false;
     setState("loading");
     setUrl(null);
-    const vin = (chassi || "").trim();
-    if (!vin) {
+    if (!marca && !modelo) {
       setState("fallback");
       return;
     }
-    fetchAutoDevImageFn({ data: { vin } })
+    fetchVehicleImageFn({ data: { marca, modelo, ano, cor } })
       .then((res) => {
         if (cancel) return;
         if (res.ok && res.url) {
@@ -485,7 +500,8 @@ function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
     return () => {
       cancel = true;
     };
-  }, [chassi]);
+  }, [marca, modelo, ano, cor]);
+
 
   return (
     <>
@@ -536,10 +552,16 @@ function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
           loading="lazy"
           onLoad={() => setState("loaded")}
           onError={() => setState("fallback")}
-          className={`relative z-[1] h-full w-full object-contain p-3 transition-opacity duration-500 ${
+          className={`relative z-[1] h-full w-full rounded-2xl object-cover transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
-          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+          style={{
+            filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))",
+            WebkitMaskImage:
+              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+            maskImage:
+              "radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, rgba(0,0,0,0.65) 75%, transparent 100%)",
+          }}
         />
       )}
     </>
