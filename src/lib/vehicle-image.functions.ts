@@ -32,7 +32,7 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
     if (!apiKey) return { ok: false as const, url: null };
 
     const carro = [marca, modelo, ano, cor].filter(Boolean).join(" ");
-    const prompt = `Studio product render of a ${carro}, perfect 3/4 front-three-quarter angle (45°), clean white seamless background, soft floor reflection, dramatic neon blue rim light, ultra-detailed automotive catalog photography, sharp focus, no text, no logos, no people, no plates, isolated subject, photoreal.`;
+    const prompt = `A highly detailed, realistic automotive studio photography of a ${cor} ${ano} ${marca} ${modelo}. 45-degree front-three-quarter angle. Isolated on a PURE PITCH BLACK background (#000000). No floor, no shadows, no white lights on the background, strictly pure black background. Photorealistic, 8k.`;
 
     try {
       const ctrl = new AbortController();
