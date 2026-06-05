@@ -379,64 +379,15 @@ function AppPage() {
 
 
       {selected && (
-        <>
-          <section className="mt-10 px-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Status do Veículo</h2>
-              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                <Legend status="ok" />
-                <Legend status="warn" />
-                <Legend status="bad" />
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-4 px-6">
-            <div className="grid grid-cols-2 gap-3">
-              {ITEMS.map((it, idx) => {
-                const data = selected.status[it.key];
-                const isOil = it.key === "oleo";
-                const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
-                return (
-                  <div
-                    key={it.key}
-                    className={`relative rounded-2xl border border-border bg-card p-4 ${
-                      fullSpan ? "col-span-2" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary">
-                        {it.icon({ className: "h-5 w-5" })}
-                      </div>
-                      <span
-                        className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
-                        aria-label={STATUS_LABEL[data.status]}
-                      />
-                    </div>
-                    <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {formatRemaining(data.remainingKm)}
-                    </p>
-                    {isOil && (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Previsão de troca:{" "}
-                        <span className="font-medium text-foreground">
-                          {predictChangeDate(data.remainingKm)}
-                        </span>
-                      </p>
-                    )}
-                    <p
-                      className="mt-2 text-[10px] font-semibold uppercase tracking-wider"
-                      style={{ color: `var(--status-${data.status})` }}
-                    >
-                      {STATUS_LABEL[data.status]}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </>
+        <VehicleStatusSection
+          vehicleId={selected.id}
+          kmAtual={selected.km}
+          onKmChange={(km) =>
+            setVehicles((prev) =>
+              prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
+            )
+          }
+        />
       )}
 
       {/* Indicações */}
