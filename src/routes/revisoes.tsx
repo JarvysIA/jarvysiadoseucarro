@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Gauge, Loader2, Wrench } from "lucide-react";
+import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { NewExpenseModal } from "@/components/NewExpenseModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   Dialog,
