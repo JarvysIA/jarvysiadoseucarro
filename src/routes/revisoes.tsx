@@ -31,6 +31,22 @@ function RevisoesPage() {
   const [openDespesa, setOpenDespesa] = useState<Despesa | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [vehicleKm, setVehicleKm] = useState(0);
+
+  useEffect(() => {
+    if (!activeVehicleId) {
+      setVehicleKm(0);
+      return;
+    }
+    supabase
+      .from("veiculos")
+      .select("km_atual")
+      .eq("id", activeVehicleId)
+      .maybeSingle()
+      .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
+  }, [activeVehicleId, reloadKey]);
 
   useEffect(() => {
     let cancel = false;
