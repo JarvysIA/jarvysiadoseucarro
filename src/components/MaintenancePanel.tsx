@@ -460,6 +460,32 @@ function ConfirmForm({
         />
       </Field>
 
+      <Field label="Categoria (classificada pela IA)">
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIAS.map((c) => {
+            const active = categoria === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategoria(c)}
+                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
+                style={{
+                  borderColor: active ? CATEGORIA_COLOR[c] : "var(--border)",
+                  color: active ? CATEGORIA_COLOR[c] : "var(--muted-foreground)",
+                  backgroundColor: active
+                    ? `color-mix(in oklab, ${CATEGORIA_COLOR[c]} 12%, transparent)`
+                    : "transparent",
+                  boxShadow: active ? `0 0 10px -3px ${CATEGORIA_COLOR[c]}` : "none",
+                }}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
       {itens.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
