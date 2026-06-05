@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
+import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import {
   AirFilterIcon,
   TireStackIcon,
