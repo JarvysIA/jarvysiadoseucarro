@@ -31,19 +31,19 @@ export const Route = createFileRoute("/app")({
   component: AppPage,
 });
 
-const STATUS_CLASS: Record<Status, string> = {
+const STATUS_CLASS: Record<MaintStatus, string> = {
   ok: "bg-[var(--status-ok)]",
   warn: "bg-[var(--status-warn)]",
   bad: "bg-[var(--status-bad)]",
 };
-const STATUS_RING: Record<Status, string> = {
+const STATUS_RING: Record<MaintStatus, string> = {
   ok: "shadow-[0_0_18px_-2px_var(--status-ok)]",
   warn: "shadow-[0_0_18px_-2px_var(--status-warn)]",
   bad: "shadow-[0_0_18px_-2px_var(--status-bad)]",
 };
 
 type ItemDef = {
-  key: ItemKey;
+  key: MaintItemKey;
   label: string;
   icon: (props: { className?: string }) => React.ReactNode;
 };
