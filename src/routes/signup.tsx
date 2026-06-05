@@ -21,6 +21,7 @@ type CarDraft = {
   ano: string;
   cor: string;
   motorizacao: string;
+  chassi: string;
   km_atual: number | null;
 };
 
