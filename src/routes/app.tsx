@@ -484,6 +484,11 @@ function Legend({ status }: { status: MaintStatus }) {
   );
 }
 
+type ItemOverride = {
+  ultima_troca_km: number;
+  ultima_troca_data: string;
+};
+
 function VehicleStatusSection({
   vehicleId,
   kmAtual,
@@ -495,18 +500,42 @@ function VehicleStatusSection({
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
-  const [openItem, setOpenItem] = useState<MaintComputed | null>(null);
+  const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
+  // Overrides e despesas por veículo + item (mock — preparado para virar tabela depois)
+  const [overrides, setOverrides] = useState<
+    Record<string, Partial<Record<MaintItemKey, ItemOverride>>>
+  >({});
+  const [expenses, setExpenses] = useState<
+    Record<string, Partial<Record<MaintItemKey, MaintExpense[]>>>
+  >({});
 
-  // Itens determinísticos por vehicleId — não mudam quando o usuário altera a KM atual.
-  const items = useMemo(
+  // Itens base determinísticos por vehicleId
+  const baseItems = useMemo(
     () => buildMaintenanceItems(vehicleId, kmAtual),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vehicleId],
   );
+
+  // Aplica overrides de IA (última troca atualizada via nota fiscal)
+  const items = useMemo(() => {
+    const ov = overrides[vehicleId] || {};
+    return baseItems.map((it) => {
+      const o = ov[it.key];
+      return o ? { ...it, ultima_troca_km: o.ultima_troca_km, ultima_troca_data: o.ultima_troca_data } : it;
+    });
+  }, [baseItems, overrides, vehicleId]);
+
   const computed = useMemo(
     () => items.map((it) => computeStatus(it, kmAtual)),
     [items, kmAtual],
   );
+
+  const openComputed = openItemKey
+    ? computed.find((c) => c.item.key === openItemKey) ?? null
+    : null;
+  const openExpenses = openItemKey
+    ? expenses[vehicleId]?.[openItemKey] ?? []
+    : [];
 
   const saveKm = () => {
     const n = parseInt(draftKm.replace(/\D/g, ""), 10);
@@ -516,6 +545,39 @@ function VehicleStatusSection({
     }
     onKmChange(n);
     setEditingKm(false);
+  };
+
+  const handleSaveMaintenance = (key: MaintItemKey, payload: MaintSaveInput) => {
+    // Atualiza última troca → reseta o semáforo
+    setOverrides((prev) => ({
+      ...prev,
+      [vehicleId]: {
+        ...(prev[vehicleId] || {}),
+        [key]: {
+          ultima_troca_km: payload.km_registrada,
+          ultima_troca_data: payload.data_servico,
+        },
+      },
+    }));
+    // Injeta a despesa no histórico do item
+    setExpenses((prev) => {
+      const veh = prev[vehicleId] || {};
+      const list = veh[key] || [];
+      const next: MaintExpense = {
+        id: `${Date.now()}`,
+        data_servico: payload.data_servico,
+        valor_total: payload.valor_total,
+        descricao: payload.descricao,
+      };
+      return {
+        ...prev,
+        [vehicleId]: { ...veh, [key]: [next, ...list] },
+      };
+    });
+    // Se a IA leu uma KM maior que a atual, atualiza a KM do veículo também
+    if (payload.km_registrada > kmAtual) {
+      onKmChange(payload.km_registrada);
+    }
   };
 
   return (
@@ -591,7 +653,7 @@ function VehicleStatusSection({
               <button
                 type="button"
                 key={it.key}
-                onClick={() => setOpenItem(data)}
+                onClick={() => setOpenItemKey(it.key)}
                 className={`relative rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:scale-[0.99] ${
                   fullSpan ? "col-span-2" : ""
                 }`}
@@ -628,10 +690,14 @@ function VehicleStatusSection({
       </section>
 
       <MaintenancePanel
-        open={!!openItem}
-        onClose={() => setOpenItem(null)}
-        computed={openItem}
+        open={!!openItemKey}
+        onClose={() => setOpenItemKey(null)}
+        computed={openComputed}
         kmAtual={kmAtual}
+        expenses={openExpenses}
+        onSave={(payload) => {
+          if (openItemKey) handleSaveMaintenance(openItemKey, payload);
+        }}
       />
     </>
   );
