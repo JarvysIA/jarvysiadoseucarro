@@ -540,24 +540,18 @@ function VehicleImage({
 
   return (
     <>
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 ${
-          state === "loading" ? "animate-pulse" : ""
-        }`}
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
-        }}
-      />
+      {state === "loading" && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 animate-pulse"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
+          }}
+        />
+      )}
+
+
 
       {state === "loading" && (
         <div className="absolute inset-0 z-[2] flex items-center justify-center">
