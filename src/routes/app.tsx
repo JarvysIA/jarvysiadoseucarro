@@ -121,7 +121,6 @@ function AppPage() {
       km: v.km_atual ?? 0,
       chassi: v.chassi,
       fotoUrl: null,
-      status: buildStatus(v.ano),
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
