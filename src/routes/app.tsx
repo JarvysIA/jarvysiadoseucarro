@@ -391,6 +391,12 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
+      <PaywallModal
+        open={!!paywallMode}
+        onClose={() => setPaywallMode(null)}
+        mode={paywallMode ?? "premium"}
+      />
+
 
       {selected && (
         <>
