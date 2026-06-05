@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2, Car } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
@@ -32,6 +33,7 @@ function DespesasPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth()); // 0..11
+  const activeVehicleId = useActiveVehicleId();
   const [items, setItems] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,10 +41,18 @@ function DespesasPage() {
     let cancel = false;
     (async () => {
       setLoading(true);
+      if (!activeVehicleId) {
+        if (!cancel) {
+          setItems([]);
+          setLoading(false);
+        }
+        return;
+      }
       const { start, end } = monthBounds(year, month);
       const { data, error } = await supabase
         .from("despesas")
         .select("*")
+        .eq("vehicle_id", activeVehicleId)
         .gte("data", start.toISOString())
         .lt("data", end.toISOString())
         .order("data", { ascending: false });
@@ -59,7 +69,7 @@ function DespesasPage() {
     return () => {
       cancel = true;
     };
-  }, [year, month]);
+  }, [year, month, activeVehicleId]);
 
   const prevMonth = () => {
     if (month === 0) {
