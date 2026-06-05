@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
+import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
   TireStackIcon,
@@ -546,8 +547,46 @@ function VehicleStatusSection({
     setEditingKm(false);
   };
 
-  const handleSaveMaintenance = (key: MaintItemKey, payload: MaintSaveInput) => {
-    // Atualiza última troca → reseta o semáforo
+  const handleSaveMaintenance = async (key: MaintItemKey, payload: MaintSaveInput) => {
+    const { data: sess } = await supabase.auth.getSession();
+    const userId = sess.session?.user.id;
+    if (!userId) {
+      toast.error("Sessão expirada.");
+      return;
+    }
+
+    // 1) Upload da nota (se houver) → bucket privado 'receipts'
+    let receiptPath: string | null = null;
+    if (payload.file) {
+      receiptPath = await uploadReceiptImage(userId, vehicleId, payload.file);
+    }
+
+    // 2) Insere a despesa no banco
+    const { error: insErr } = await supabase.from("despesas").insert({
+      user_id: userId,
+      vehicle_id: vehicleId,
+      data: payload.data_servico,
+      valor: payload.valor_total,
+      categoria: payload.categoria,
+      descricao: payload.descricao,
+      km_registro: payload.km_registrada,
+      receipt_image_url: receiptPath,
+    });
+    if (insErr) {
+      console.error("[despesas insert]", insErr);
+      throw new Error("Não foi possível salvar a despesa.");
+    }
+
+    // 3) Atualiza a KM do veículo no banco se a nota tem KM maior
+    if (payload.km_registrada > kmAtual) {
+      await supabase
+        .from("veiculos")
+        .update({ km_atual: payload.km_registrada })
+        .eq("id", vehicleId);
+      onKmChange(payload.km_registrada);
+    }
+
+    // 4) Atualiza última troca → reseta o semáforo (mock local)
     setOverrides((prev) => ({
       ...prev,
       [vehicleId]: {
@@ -558,7 +597,8 @@ function VehicleStatusSection({
         },
       },
     }));
-    // Injeta a despesa no histórico do item
+
+    // 5) Injeta a despesa no histórico do item (mock — UI imediata no painel)
     setExpenses((prev) => {
       const veh = prev[vehicleId] || {};
       const list = veh[key] || [];
@@ -573,10 +613,6 @@ function VehicleStatusSection({
         [vehicleId]: { ...veh, [key]: [next, ...list] },
       };
     });
-    // Se a IA leu uma KM maior que a atual, atualiza a KM do veículo também
-    if (payload.km_registrada > kmAtual) {
-      onKmChange(payload.km_registrada);
-    }
   };
 
   return (

@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      despesas: {
+        Row: {
+          categoria: string
+          created_at: string
+          data: string
+          descricao: string
+          id: string
+          km_registro: number | null
+          receipt_image_url: string | null
+          user_id: string
+          valor: number
+          vehicle_id: string
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          km_registro?: number | null
+          receipt_image_url?: string | null
+          user_id: string
+          valor?: number
+          vehicle_id: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          km_registro?: number | null
+          receipt_image_url?: string | null
+          user_id?: string
+          valor?: number
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "despesas_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

@@ -18,7 +18,8 @@ import {
   formatRemainingMonths,
   type MaintComputed,
 } from "@/lib/maintenance";
-import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory } from "@/lib/parse-receipt.functions";
+import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
+import { CATEGORIAS, CATEGORIA_COLOR } from "@/lib/despesas";
 import { toast } from "sonner";
 
 export type MaintExpense = {
@@ -33,6 +34,8 @@ export type MaintSaveInput = {
   km_registrada: number;
   valor_total: number;
   descricao: string;
+  categoria: DespesaCategoria;
+  file: File | null;
 };
 
 type Props = {
@@ -41,7 +44,7 @@ type Props = {
   computed: MaintComputed | null;
   kmAtual: number;
   expenses?: MaintExpense[];
-  onSave?: (update: MaintSaveInput) => void;
+  onSave?: (update: MaintSaveInput) => void | Promise<void>;
 };
 
 type FlowState = "idle" | "scanning" | "confirm" | "error";
@@ -79,7 +82,9 @@ export function MaintenancePanel({
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Reset ao reabrir/trocar item
@@ -87,7 +92,9 @@ export function MaintenancePanel({
     if (!open) {
       setFlow("idle");
       setParsed(null);
+      setScannedFile(null);
       setErrorMsg(null);
+      setSaving(false);
     }
   }, [open, computed?.item.key]);
 
@@ -97,6 +104,7 @@ export function MaintenancePanel({
     if (!file) return;
     setFlow("scanning");
     setErrorMsg(null);
+    setScannedFile(file);
     try {
       const { base64, mimeType } = await fileToBase64(file);
       const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
@@ -172,16 +180,26 @@ export function MaintenancePanel({
                 parsed={parsed}
                 defaultKm={kmAtual}
                 itemName={computed.item.nome}
+                saving={saving}
                 onCancel={() => {
                   setParsed(null);
+                  setScannedFile(null);
                   setFlow("idle");
                 }}
-                onConfirm={(payload) => {
-                  onSave?.(payload);
-                  toast.success("Registro salvo! Semáforo atualizado.");
-                  setParsed(null);
-                  setFlow("idle");
-                  onClose();
+                onConfirm={async (payload) => {
+                  setSaving(true);
+                  try {
+                    await onSave?.({ ...payload, file: scannedFile });
+                    toast.success("Registro salvo! Semáforo atualizado.");
+                    setParsed(null);
+                    setScannedFile(null);
+                    setFlow("idle");
+                    onClose();
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
               />
             )}
@@ -365,13 +383,15 @@ function ConfirmForm({
   parsed,
   defaultKm,
   itemName,
+  saving,
   onConfirm,
   onCancel,
 }: {
   parsed: ParsedReceipt;
   defaultKm: number;
   itemName: string;
-  onConfirm: (p: MaintSaveInput) => void;
+  saving: boolean;
+  onConfirm: (p: Omit<MaintSaveInput, "file">) => void;
   onCancel: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -379,6 +399,7 @@ function ConfirmForm({
   const [km, setKm] = useState(String(parsed.km_registrada ?? defaultKm));
   const [valor, setValor] = useState(parsed.valor_total.toFixed(2));
   const [itens, setItens] = useState(parsed.itens_identificados);
+  const [categoria, setCategoria] = useState<DespesaCategoria>(parsed.categoria);
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
@@ -400,6 +421,7 @@ function ConfirmForm({
       km_registrada: kmNum,
       valor_total: valorNum,
       descricao,
+      categoria,
     });
   };
 
@@ -436,6 +458,32 @@ function ConfirmForm({
           onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ""))}
           className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
         />
+      </Field>
+
+      <Field label="Categoria (classificada pela IA)">
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORIAS.map((c) => {
+            const active = categoria === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategoria(c)}
+                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
+                style={{
+                  borderColor: active ? CATEGORIA_COLOR[c] : "var(--border)",
+                  color: active ? CATEGORIA_COLOR[c] : "var(--muted-foreground)",
+                  backgroundColor: active
+                    ? `color-mix(in oklab, ${CATEGORIA_COLOR[c]} 12%, transparent)`
+                    : "transparent",
+                  boxShadow: active ? `0 0 10px -3px ${CATEGORIA_COLOR[c]}` : "none",
+                }}
+              >
+                {c}
+              </button>
+            );
+          })}
+        </div>
       </Field>
 
       {itens.length > 0 && (
@@ -478,17 +526,19 @@ function ConfirmForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 rounded-xl border border-border px-3 py-3 text-xs font-medium text-muted-foreground"
+          disabled={saving}
+          className="flex-1 rounded-xl border border-border px-3 py-3 text-xs font-medium text-muted-foreground disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           type="button"
           onClick={submit}
-          className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground"
+          disabled={saving}
+          className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
         >
-          <Check className="h-4 w-4" />
-          Confirmar e Salvar Registro
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          {saving ? "Salvando..." : "Confirmar e Salvar Registro"}
         </button>
       </div>
     </div>

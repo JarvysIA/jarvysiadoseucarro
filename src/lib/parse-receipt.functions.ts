@@ -14,14 +14,33 @@ export type ReceiptItem = {
   valor: number;
 };
 
+export type DespesaCategoria = "Revisão" | "Manutenção" | "Lavagem" | "Combustível";
+
+export const DESPESA_CATEGORIAS: DespesaCategoria[] = [
+  "Revisão",
+  "Manutenção",
+  "Lavagem",
+  "Combustível",
+];
+
 export type ParsedReceipt = {
   data_servico: string | null;
   km_registrada: number | null;
   valor_total: number;
+  categoria: DespesaCategoria;
   itens_identificados: ReceiptItem[];
 };
 
-const SYSTEM_PROMPT = `Você é um assistente automotivo. Analise esta imagem de nota fiscal ou orçamento de oficina. Extraia as informações e retorne EXATAMENTE e APENAS um objeto JSON neste formato: { "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }. Não inclua formatação markdown, apenas o JSON puro.`;
+const SYSTEM_PROMPT = `Você é um assistente automotivo. Analise esta imagem de nota fiscal, orçamento de oficina ou cupom de posto.
+
+REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 4 opções:
+- "Revisão": manutenção preventiva programada (troca de óleo/filtros/velas/correia/fluidos, revisão de fábrica).
+- "Manutenção": conserto imprevisto/corretivo (vidro quebrado, peça estourada, embreagem, suspensão, bateria queimada, freios por desgaste, funilaria, elétrica).
+- "Lavagem": lavagem simples/completa, higienização, polimento, enceramento.
+- "Combustível": abastecimento em posto (gasolina, etanol, diesel, GNV).
+
+Retorne EXATAMENTE e APENAS um objeto JSON neste formato, sem markdown:
+{ "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
 
 function stripJsonFences(text: string): string {
   return text
@@ -122,6 +141,12 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           }))
         : [];
 
+      const categoria: DespesaCategoria = DESPESA_CATEGORIAS.includes(
+        parsed.categoria as DespesaCategoria,
+      )
+        ? (parsed.categoria as DespesaCategoria)
+        : "Manutenção";
+
       return {
         ok: true,
         receipt: {
@@ -129,6 +154,7 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           km_registrada:
             parsed.km_registrada == null ? null : Number(parsed.km_registrada) || null,
           valor_total: Number(parsed.valor_total) || itens.reduce((s, i) => s + i.valor, 0),
+          categoria,
           itens_identificados: itens,
         },
       };
