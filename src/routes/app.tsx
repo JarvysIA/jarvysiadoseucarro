@@ -285,7 +285,7 @@ function AppPage() {
           <div className="mx-6">
             <button
               type="button"
-              onClick={() => setAddOpen(true)}
+              onClick={handleAddClick}
               className="glow-neon flex w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-primary/40 bg-card/40 p-10 text-center transition-colors hover:border-primary/70"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
