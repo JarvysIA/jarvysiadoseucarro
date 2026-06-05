@@ -129,7 +129,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
       ]);
