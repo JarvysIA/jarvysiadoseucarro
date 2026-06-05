@@ -18,6 +18,7 @@ export async function lookupPlate(placa: string): Promise<PlateLookupResult> {
       ano: res.data.ano,
       cor: res.data.cor,
       motorizacao: res.data.motorizacao,
+      chassi: res.data.chassi,
     };
   } catch (e) {
     // eslint-disable-next-line no-console

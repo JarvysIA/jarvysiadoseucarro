@@ -7,6 +7,7 @@ export type PlateLookupResult = {
   ano: string;
   cor: string;
   motorizacao: string;
+  chassi?: string;
 } | null;
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
     ano: string;
     cor: string;
     motorizacao: string;
+    chassi: string;
     km_atual: number | null;
   }) => Promise<void> | void;
 };
