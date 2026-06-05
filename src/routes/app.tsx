@@ -169,7 +169,6 @@ function AppPage() {
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
           fotoUrl: v.foto_url || null,
-          status: buildStatus(ano),
         };
       });
       setVehicles(mapped);
