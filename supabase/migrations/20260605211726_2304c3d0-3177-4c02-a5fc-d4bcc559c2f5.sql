@@ -1,0 +1,2 @@
+ALTER TABLE public.despesas DROP CONSTRAINT IF EXISTS despesas_categoria_check;
+ALTER TABLE public.despesas ADD CONSTRAINT despesas_categoria_check CHECK (categoria = ANY (ARRAY['Revisão'::text, 'Manutenção'::text, 'Lavagem'::text, 'Combustível'::text, 'IPVA'::text, 'Multas'::text, 'Seguro'::text]));
