@@ -10,7 +10,7 @@ import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
-import { MaintenancePanel } from "@/components/MaintenancePanel";
+import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
 import {
   AirFilterIcon,
   TireStackIcon,
