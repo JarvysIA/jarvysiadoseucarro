@@ -21,7 +21,6 @@ import {
   computeStatus,
   formatRemainingKm,
   STATUS_LABEL_PT,
-  type MaintComputed,
   type MaintItemKey,
   type MaintStatus,
 } from "@/lib/maintenance";
