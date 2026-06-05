@@ -54,6 +54,8 @@ function DespesasPage() {
       .maybeSingle()
       .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
   }, [activeVehicleId, reloadKey]);
+
+  useEffect(() => {
     let cancel = false;
     (async () => {
       setLoading(true);
@@ -85,7 +87,7 @@ function DespesasPage() {
     return () => {
       cancel = true;
     };
-  }, [year, month, activeVehicleId]);
+  }, [year, month, activeVehicleId, reloadKey]);
 
   const prevMonth = () => {
     if (month === 0) {
