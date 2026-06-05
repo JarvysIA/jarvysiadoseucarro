@@ -70,6 +70,7 @@ type DbVehicle = {
   cor: string | null;
   km_atual: number | null;
   chassi: string | null;
+  foto_url: string | null;
 };
 
 type UserVehicle = {
@@ -81,6 +82,7 @@ type UserVehicle = {
   plate: string;
   km: number;
   chassi: string;
+  fotoUrl: string | null;
   status: Record<ItemKey, StatusItem>;
 };
 
