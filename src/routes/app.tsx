@@ -127,7 +127,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
       ]);
@@ -145,7 +145,7 @@ function AppPage() {
           color: cor,
           plate: v.placa,
           km: v.km_atual ?? 0,
-          imageUrl: buildImageUrl(marca, modelo, ano),
+          chassi: (v.chassi || "").trim(),
           status: buildStatus(ano),
         };
       });
