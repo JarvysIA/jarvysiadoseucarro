@@ -49,7 +49,7 @@ type Props = {
   onSave?: (update: MaintSaveInput) => void | Promise<void>;
 };
 
-type FlowState = "idle" | "scanning" | "confirm" | "error";
+type FlowState = "idle" | "scanning" | "confirm" | "error" | "manual";
 
 // Mapeia categoria da IA para nossa chave de manutenção
 const CATEGORY_LABEL: Record<ReceiptCategory, string> = {
