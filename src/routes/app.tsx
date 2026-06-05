@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car } from "lucide-react";
+import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
+import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import {
   AirFilterIcon,
   TireStackIcon,
@@ -111,7 +112,32 @@ function AppPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [addOpen, setAddOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleAdded = (v: AddedVehicle) => {
+    const newVehicle: UserVehicle = {
+      id: v.id,
+      marca: v.marca,
+      modelo: v.modelo,
+      year: v.ano || "—",
+      color: v.cor || "—",
+      plate: v.placa,
+      km: v.km_atual ?? 0,
+      chassi: v.chassi,
+      fotoUrl: null,
+      status: buildStatus(v.ano),
+    };
+    setVehicles((prev) => [...prev, newVehicle]);
+    setSelectedId(v.id);
+    // Rola para o novo card no próximo tick
+    setTimeout(() => {
+      const el = scrollerRef.current?.querySelector<HTMLElement>(
+        `[data-vehicle-id="${v.id}"]`,
+      );
+      el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }, 50);
+  };
 
   useEffect(() => {
     (async () => {
@@ -243,11 +269,22 @@ function AppPage() {
 
       <section className="mt-4">
         {vehicles.length === 0 && !loadingProfile ? (
-          <div className="mx-6 rounded-3xl border border-dashed border-border bg-card/40 p-8 text-center">
-            <Car className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-3 text-sm text-muted-foreground">
-              Nenhum veículo cadastrado ainda.
-            </p>
+          <div className="mx-6">
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="glow-neon flex w-full flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-primary/40 bg-card/40 p-10 text-center transition-colors hover:border-primary/70"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Plus className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                Adicionar meu primeiro veículo
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Cadastre pela placa em segundos.
+              </p>
+            </button>
           </div>
         ) : (
           <>
@@ -301,6 +338,25 @@ function AppPage() {
                   </article>
                 );
               })}
+
+              {/* Card "+" para adicionar novo veículo */}
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                aria-label="Adicionar veículo"
+                className="group flex w-[82%] shrink-0 snap-center flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-primary/40 bg-card/40 p-6 text-center transition-colors hover:border-primary/70 hover:bg-card/60"
+                style={{ minHeight: "16rem" }}
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                  <Plus className="h-7 w-7" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  Adicionar Veículo
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Cadastre pela placa em segundos
+                </p>
+              </button>
             </div>
             <div className="mt-2 flex items-center justify-center gap-2">
               {vehicles.map((v) => (
@@ -315,6 +371,13 @@ function AppPage() {
           </>
         )}
       </section>
+
+      <AddVehicleModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={handleAdded}
+      />
+
 
       {selected && (
         <>
