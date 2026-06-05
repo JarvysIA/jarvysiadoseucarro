@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAutoDevImageFn } from "@/lib/autodev-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -68,6 +69,7 @@ type DbVehicle = {
   ano: string | null;
   cor: string | null;
   km_atual: number | null;
+  chassi: string | null;
 };
 
 type UserVehicle = {
@@ -78,15 +80,9 @@ type UserVehicle = {
   color: string;
   plate: string;
   km: number;
-  imageUrl: string;
+  chassi: string;
   status: Record<ItemKey, StatusItem>;
 };
-
-function buildImageUrl(marca: string, modelo: string, ano: string): string {
-  const q = [marca, modelo, ano, "car"].filter(Boolean).join(" ").trim();
-  if (!q) return fallbackCarImg;
-  return `https://source.unsplash.com/800x600/?${encodeURIComponent(q)}`;
-}
 
 function buildStatus(ano: string): Record<ItemKey, StatusItem> {
   const yearNum = parseInt(ano, 10) || 0;
