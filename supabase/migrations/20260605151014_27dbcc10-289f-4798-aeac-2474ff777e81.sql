@@ -1,0 +1,1 @@
+UPDATE public.veiculos SET foto_url = NULL;
