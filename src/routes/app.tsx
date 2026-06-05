@@ -456,3 +456,92 @@ function Legend({ status }: { status: Status }) {
     </span>
   );
 }
+
+function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    setState("loading");
+    setUrl(null);
+    const vin = (chassi || "").trim();
+    if (!vin) {
+      setState("fallback");
+      return;
+    }
+    fetchAutoDevImageFn({ data: { vin } })
+      .then((res) => {
+        if (cancel) return;
+        if (res.ok && res.url) {
+          setUrl(res.url);
+        } else {
+          setState("fallback");
+        }
+      })
+      .catch(() => {
+        if (!cancel) setState("fallback");
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [chassi]);
+
+  return (
+    <>
+      {/* Spotlight neon azul (pulsa durante o loading) */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 ${
+          state === "loading" ? "animate-pulse" : ""
+        }`}
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
+        }}
+      />
+
+      {state === "loading" && (
+        <div className="absolute inset-0 z-[2] flex items-center justify-center">
+          <div className="h-20 w-40 animate-pulse rounded-2xl bg-primary/10" />
+        </div>
+      )}
+
+      {state === "fallback" && (
+        <img
+          src={fallbackCarImg}
+          alt={alt}
+          width={1024}
+          height={768}
+          loading="lazy"
+          className="relative z-[1] h-full w-full object-cover mix-blend-screen animate-in fade-in duration-500"
+          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+        />
+      )}
+
+      {url && state !== "fallback" && (
+        <img
+          src={url}
+          alt={alt}
+          width={1024}
+          height={768}
+          loading="lazy"
+          onLoad={() => setState("loaded")}
+          onError={() => setState("fallback")}
+          className={`relative z-[1] h-full w-full object-contain p-3 transition-opacity duration-500 ${
+            state === "loaded" ? "opacity-100" : "opacity-0"
+          }`}
+          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+        />
+      )}
+    </>
+  );
+}
