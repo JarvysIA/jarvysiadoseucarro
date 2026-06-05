@@ -268,11 +268,18 @@ function AppPage() {
                   >
                     <div className="relative h-44 w-full overflow-hidden bg-card">
                       <VehicleImage
+                        vehicleId={v.id}
+                        cachedUrl={v.fotoUrl}
                         marca={v.marca}
                         modelo={v.modelo}
                         ano={v.year}
                         cor={v.color}
                         alt={`${v.marca} ${v.modelo} ${v.color}`}
+                        onResolved={(url) =>
+                          setVehicles((prev) =>
+                            prev.map((x) => (x.id === v.id ? { ...x, fotoUrl: url } : x)),
+                          )
+                        }
                       />
 
                       <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
