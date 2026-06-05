@@ -21,6 +21,7 @@ type CarDraft = {
   ano: string;
   cor: string;
   motorizacao: string;
+  chassi: string;
   km_atual: number | null;
 };
 
@@ -175,6 +176,7 @@ function SignupPage() {
         ano: car.ano,
         cor: car.cor,
         motorizacao: car.motorizacao,
+        chassi: car.chassi || null,
         km_atual: car.km_atual,
       });
       if (vehErr) {

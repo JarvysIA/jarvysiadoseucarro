@@ -85,6 +85,7 @@ export type Database = {
       veiculos: {
         Row: {
           ano: string | null
+          chassi: string | null
           cor: string | null
           created_at: string
           id: string
@@ -97,6 +98,7 @@ export type Database = {
         }
         Insert: {
           ano?: string | null
+          chassi?: string | null
           cor?: string | null
           created_at?: string
           id?: string
@@ -109,6 +111,7 @@ export type Database = {
         }
         Update: {
           ano?: string | null
+          chassi?: string | null
           cor?: string | null
           created_at?: string
           id?: string

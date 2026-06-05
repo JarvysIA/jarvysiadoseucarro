@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAutoDevImageFn } from "@/lib/autodev-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import {
@@ -68,6 +69,7 @@ type DbVehicle = {
   ano: string | null;
   cor: string | null;
   km_atual: number | null;
+  chassi: string | null;
 };
 
 type UserVehicle = {
@@ -78,15 +80,9 @@ type UserVehicle = {
   color: string;
   plate: string;
   km: number;
-  imageUrl: string;
+  chassi: string;
   status: Record<ItemKey, StatusItem>;
 };
-
-function buildImageUrl(marca: string, modelo: string, ano: string): string {
-  const q = [marca, modelo, ano, "car"].filter(Boolean).join(" ").trim();
-  if (!q) return fallbackCarImg;
-  return `https://source.unsplash.com/800x600/?${encodeURIComponent(q)}`;
-}
 
 function buildStatus(ano: string): Record<ItemKey, StatusItem> {
   const yearNum = parseInt(ano, 10) || 0;
@@ -131,7 +127,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
       ]);
@@ -149,7 +145,7 @@ function AppPage() {
           color: cor,
           plate: v.placa,
           km: v.km_atual ?? 0,
-          imageUrl: buildImageUrl(marca, modelo, ano),
+          chassi: (v.chassi || "").trim(),
           status: buildStatus(ano),
         };
       });
@@ -268,37 +264,11 @@ function AppPage() {
                     }`}
                   >
                     <div className="relative h-44 w-full overflow-hidden bg-card">
-                      {/* Spotlight neon azul */}
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
-                        }}
-                      />
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                          background:
-                            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
-                        }}
-                      />
-                      <img
-                        src={v.imageUrl}
+                      <VehicleImage
+                        chassi={v.chassi}
                         alt={`${v.marca} ${v.modelo} ${v.color}`}
-                        width={1024}
-                        height={768}
-                        loading="lazy"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.src !== fallbackCarImg) img.src = fallbackCarImg;
-                        }}
-                        className="relative z-[1] h-full w-full object-cover mix-blend-screen"
-                        style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
                       />
-                      <span className="absolute top-3 left-3 z-[2] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
+                      <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
                         {v.plate}
                       </span>
                     </div>
@@ -484,5 +454,94 @@ function Legend({ status }: { status: Status }) {
       <span className={`h-2 w-2 rounded-full ${STATUS_CLASS[status]}`} />
       {STATUS_LABEL[status]}
     </span>
+  );
+}
+
+function VehicleImage({ chassi, alt }: { chassi: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    setState("loading");
+    setUrl(null);
+    const vin = (chassi || "").trim();
+    if (!vin) {
+      setState("fallback");
+      return;
+    }
+    fetchAutoDevImageFn({ data: { vin } })
+      .then((res) => {
+        if (cancel) return;
+        if (res.ok && res.url) {
+          setUrl(res.url);
+        } else {
+          setState("fallback");
+        }
+      })
+      .catch(() => {
+        if (!cancel) setState("fallback");
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [chassi]);
+
+  return (
+    <>
+      {/* Spotlight neon azul (pulsa durante o loading) */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 ${
+          state === "loading" ? "animate-pulse" : ""
+        }`}
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
+        }}
+      />
+
+      {state === "loading" && (
+        <div className="absolute inset-0 z-[2] flex items-center justify-center">
+          <div className="h-20 w-40 animate-pulse rounded-2xl bg-primary/10" />
+        </div>
+      )}
+
+      {state === "fallback" && (
+        <img
+          src={fallbackCarImg}
+          alt={alt}
+          width={1024}
+          height={768}
+          loading="lazy"
+          className="relative z-[1] h-full w-full object-cover mix-blend-screen animate-in fade-in duration-500"
+          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+        />
+      )}
+
+      {url && state !== "fallback" && (
+        <img
+          src={url}
+          alt={alt}
+          width={1024}
+          height={768}
+          loading="lazy"
+          onLoad={() => setState("loaded")}
+          onError={() => setState("fallback")}
+          className={`relative z-[1] h-full w-full object-contain p-3 transition-opacity duration-500 ${
+            state === "loaded" ? "opacity-100" : "opacity-0"
+          }`}
+          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+        />
+      )}
+    </>
   );
 }
