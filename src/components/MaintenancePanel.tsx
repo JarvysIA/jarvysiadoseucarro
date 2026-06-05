@@ -333,6 +333,16 @@ export function MaintenancePanel({
                 <p className="-mt-3 text-center text-[11px] text-muted-foreground">
                   Tire foto da nota fiscal ou orçamento — a IA preenche tudo automaticamente.
                 </p>
+
+                {/* CTA Manual */}
+                <button
+                  type="button"
+                  onClick={() => setFlow("manual")}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card/60 px-5 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                >
+                  <PenLine className="h-4 w-4" />
+                  Preencher Manualmente
+                </button>
               </>
             )}
           </div>
