@@ -20,7 +20,7 @@ export const fetchVehicleImageFn = createServerFn({ method: "POST" })
       return { ok: false as const, url: null };
     }
 
-    const q = `${marca} ${modelo} ${ano} ${cor} carro frente lateral estúdio`
+    const q = `${marca} ${modelo} ${ano} ${cor} carro png fundo transparente ou branco -loja -mercado -olx -anuncio`
       .replace(/\s+/g, " ")
       .trim();
 
