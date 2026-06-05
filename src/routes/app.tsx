@@ -264,37 +264,11 @@ function AppPage() {
                     }`}
                   >
                     <div className="relative h-44 w-full overflow-hidden bg-card">
-                      {/* Spotlight neon azul */}
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                          background:
-                            "radial-gradient(ellipse 60% 55% at 50% 78%, rgba(56,189,248,0.45) 0%, rgba(56,189,248,0.18) 35%, transparent 70%)",
-                        }}
-                      />
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                          background:
-                            "linear-gradient(180deg, hsl(var(--card)) 0%, transparent 30%, transparent 70%, hsl(var(--card)) 100%)",
-                        }}
-                      />
-                      <img
-                        src={v.imageUrl}
+                      <VehicleImage
+                        chassi={v.chassi}
                         alt={`${v.marca} ${v.modelo} ${v.color}`}
-                        width={1024}
-                        height={768}
-                        loading="lazy"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          if (img.src !== fallbackCarImg) img.src = fallbackCarImg;
-                        }}
-                        className="relative z-[1] h-full w-full object-cover mix-blend-screen"
-                        style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
                       />
-                      <span className="absolute top-3 left-3 z-[2] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
+                      <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
                         {v.plate}
                       </span>
                     </div>
