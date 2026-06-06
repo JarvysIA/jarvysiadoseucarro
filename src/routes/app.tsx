@@ -863,16 +863,16 @@ function VehicleImage({
   alt: string;
   onResolved: (url: string) => void;
 }) {
+  const hasInitialInternalImageUrl = cachedUrl?.startsWith("/api/vehicle-image/") ?? false;
   const [state, setState] = useState<"loading" | "loaded" | "fallback">(
-    cachedUrl ? "loading" : "loading",
+    "loading",
   );
-  const [url, setUrl] = useState<string | null>(cachedUrl);
+  const [url, setUrl] = useState<string | null>(hasInitialInternalImageUrl ? cachedUrl : null);
 
   useEffect(() => {
     let cancel = false;
-    const hasInternalImageUrl = cachedUrl?.startsWith("/api/vehicle-image/") ?? false;
     // Cache hit novo: usa a imagem servida pelo nosso backend, sem Storage.
-    if (cachedUrl && hasInternalImageUrl) {
+    if (cachedUrl && hasInitialInternalImageUrl) {
       setUrl(cachedUrl);
       setState("loading"); // aguarda onLoad da <img>
       return;
