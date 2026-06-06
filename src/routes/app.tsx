@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
