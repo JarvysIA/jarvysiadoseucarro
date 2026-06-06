@@ -58,19 +58,28 @@ export function LockedHistoryBanner({
 
   if (minimized) {
     return (
-      <button
-        type="button"
-        onClick={expand}
-        aria-label="Reabrir oferta de histórico premium"
-        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
-        style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
-      >
-        <Lock className="h-3 w-3" />
-        Histórico Premium
-        <span className="text-primary/80">· R$ 49,90</span>
-      </button>
+      <>
+        <button
+          type="button"
+          onClick={expand}
+          aria-label="Reabrir oferta de histórico premium"
+          className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
+          style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
+        >
+          <Lock className="h-3 w-3" />
+          Histórico Premium
+          <span className="text-primary/80">· R$ 49,90</span>
+        </button>
+        <CheckoutPremiumModal
+          open={checkoutOpen}
+          onOpenChange={setCheckoutOpen}
+          vehicleId={vehicleId}
+          onUnlocked={onUnlocked}
+        />
+      </>
     );
   }
+
 
   return (
     <div
