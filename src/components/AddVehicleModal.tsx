@@ -99,6 +99,7 @@ export function AddVehicleModal({
           cor: res.vehicle.cor || "",
           km_atual: res.vehicle.km_atual,
           chassi: res.vehicle.chassi || "",
+          foto_url: res.vehicle.foto_url || null,
         });
         onClose();
         return;
