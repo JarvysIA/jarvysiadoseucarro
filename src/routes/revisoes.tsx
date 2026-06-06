@@ -178,7 +178,8 @@ function RevisoesPage() {
                   <ul className="flex flex-col gap-3">
                     {list.map((d) => {
                       const color = CATEGORIA_COLOR[d.categoria];
-                      const hasReceipt = !!d.receipt_image_url;
+                      const isPreClaim = !!claimedAt && new Date(d.created_at) < new Date(claimedAt);
+                      const hasReceipt = !!d.receipt_image_url && !isPreClaim;
                       return (
                         <li key={d.id} className="relative pl-12">
                           {/* Bolinha do timeline */}
