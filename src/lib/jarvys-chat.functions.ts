@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 
 export type ChatMsg = { role: "user" | "assistant"; content: string };
 
+export type JarvysPlanTier = "free" | "vip" | "super_vip";
+
 export type JarvysChatInput = {
   messages: ChatMsg[];
   vehicle: {
@@ -10,16 +12,27 @@ export type JarvysChatInput = {
     ano?: string | null;
     km?: number | null;
   } | null;
+  planTier?: JarvysPlanTier | null;
 };
 
-function buildSystemPrompt(v: JarvysChatInput["vehicle"]): string {
+function buildSystemPrompt(
+  v: JarvysChatInput["vehicle"],
+  planTier?: JarvysPlanTier | null,
+): string {
   const marca = v?.marca?.trim() || "—";
   const modelo = v?.modelo?.trim() || "—";
   const ano = v?.ano?.trim() || "—";
   const km = typeof v?.km === "number" ? `${v.km.toLocaleString("pt-BR")} km` : "—";
+  const tierLine =
+    planTier === "super_vip"
+      ? `Este usuário possui o nível 👑 SUPER VIP (cortesia máxima do CEO). Trate-o com exclusividade total, atenção VIP premium, respostas mais aprofundadas e um tom levemente mais caloroso e personalizado.`
+      : planTier === "vip"
+        ? `Este usuário possui o nível ⭐ VIP. Trate-o com cordialidade exclusiva, agradecendo brevemente quando fizer sentido pela parceria.`
+        : `Este usuário está no plano padrão.`;
   return (
     `Você é o Jarvys, uma IA automotiva avançada, atuando como o consultor e mecânico particular do usuário. ` +
     `O usuário está perguntando especificamente sobre o veículo ATUAL dele: ${marca} ${modelo} ${ano} com ${km} rodados. ` +
+    `${tierLine} ` +
     `Responda de forma direta, amigável, técnica mas acessível. Nunca dê respostas genéricas; ` +
     `baseie-se sempre nas especificações deste modelo exato de carro. ` +
     `Caso o usuário pergunte ou fale de assuntos completamente distintos do mundo automotivo, ` +
