@@ -92,10 +92,13 @@ function RevisoesPage() {
     };
   }, [activeVehicleId, reloadKey, historyLocked, claimedAt]);
 
-  // Carrega o signed URL ao abrir o modal
+  // Carrega o signed URL ao abrir o modal (bloqueado para registros do dono antigo)
   useEffect(() => {
     setReceiptUrl(null);
     if (!openDespesa?.receipt_image_url) return;
+    const isPreClaim =
+      !!claimedAt && new Date(openDespesa.created_at) < new Date(claimedAt);
+    if (isPreClaim) return;
     setReceiptLoading(true);
     let cancel = false;
     getReceiptSignedUrl(openDespesa.receipt_image_url).then((url) => {
@@ -106,7 +109,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [openDespesa]);
+  }, [openDespesa, claimedAt]);
 
   const grouped = useMemo(() => {
     // Agrupar por ano para a timeline (apenas visual)
