@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
+import { Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -262,8 +262,8 @@ function AppPage() {
 
   return (
     <div className="relative min-h-screen bg-background pb-56">
-      {/* Banner trial */}
-      {!loadingProfile && isTrial && (
+      {/* Banner trial — apenas para usuários free */}
+      {!loadingProfile && planTier === "free" && isTrial && (
         <a
           href="https://jarvys.com.br/assinar"
           target="_blank"
@@ -298,10 +298,7 @@ function AppPage() {
             </h1>
           </div>
         </div>
-        <button className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card">
-          <Bell className="h-5 w-5 text-foreground" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[var(--status-bad)]" />
-        </button>
+        <div className="h-11 w-11" />
       </header>
 
       <section className="mt-8 px-6">
@@ -446,8 +443,8 @@ function AppPage() {
       <section className="mt-8 px-6">
         <h2 className="text-base font-semibold">Indicações</h2>
         <div className="mt-3">
-          {profile?.permite_indicacao ? (
-            <ReferralUnlocked userId={profile.id} />
+          {planTier !== "free" || profile?.permite_indicacao ? (
+            <ReferralUnlocked userId={profile?.id ?? ""} />
           ) : (
             <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} />
           )}
