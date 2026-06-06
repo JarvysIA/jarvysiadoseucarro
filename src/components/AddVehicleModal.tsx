@@ -159,6 +159,17 @@ export function AddVehicleModal({
         toast.error("Não foi possível adicionar o veículo.");
         return;
       }
+      // Tenta herdar foto já gerada anteriormente para a mesma placa
+      // (qualquer dono passado), evitando uma nova chamada de IA.
+      let inheritedFoto: string | null = null;
+      try {
+        const inh = await inheritVehicleImageFn({
+          data: { vehicleId: inserted.id, placa: plate },
+        });
+        if (inh.inherited && inh.url) inheritedFoto = inh.url;
+      } catch (e) {
+        console.warn("[inheritVehicleImageFn]", e);
+      }
       toast.success("Veículo adicionado!");
       onAdded({
         id: inserted.id,
@@ -169,6 +180,7 @@ export function AddVehicleModal({
         cor: inserted.cor || "",
         km_atual: inserted.km_atual,
         chassi: inserted.chassi || "",
+        foto_url: inheritedFoto,
       });
       onClose();
     } finally {
