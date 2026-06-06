@@ -448,6 +448,17 @@ function ConfirmForm({
       toast.error("Valor inválido");
       return;
     }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (data > todayStr) {
+      toast.error("Você não pode registrar uma manutenção no futuro.");
+      return;
+    }
+    if (data < todayStr && kmNum > defaultKm) {
+      toast.error(
+        "Inconsistência: Um registro com data antiga não pode ter uma quilometragem maior que a atual do painel.",
+      );
+      return;
+    }
     const descricao =
       itens.length > 0
         ? itens.map((i) => i.descricao).slice(0, 2).join(" + ")
