@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import { claimArchivedVehicleFn } from "@/lib/vehicles.functions";
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
