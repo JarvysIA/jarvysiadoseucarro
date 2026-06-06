@@ -943,13 +943,20 @@ function VehicleImage({
           width={1024}
           height={768}
           loading="lazy"
-          onLoad={() => setState("loaded")}
-          onError={() => setState("fallback")}
+          onLoad={() => {
+            console.log("[vehicle-image] loaded:", url);
+            setState("loaded");
+          }}
+          onError={(e) => {
+            console.error("[vehicle-image] failed to load:", url, e);
+            setState("fallback");
+          }}
           className={`relative z-[1] h-full w-full object-cover mix-blend-lighten transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
         />
       )}
+
     </>
   );
 }
