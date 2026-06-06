@@ -173,7 +173,11 @@ function AppPage() {
         };
       });
       setVehicles(mapped);
-      if (mapped.length) setSelectedId(mapped[0].id);
+      if (mapped.length) {
+        const saved = getActiveVehicleId();
+        const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
+        setSelectedId(idx >= 0 ? mapped[idx].id : mapped[0].id);
+      }
       setLoadingProfile(false);
     })();
   }, [navigate]);
