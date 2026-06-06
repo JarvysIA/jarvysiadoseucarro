@@ -43,6 +43,7 @@ export const listAdminUsersFn = createServerFn({ method: "GET" })
       .select("user_id");
     const counts = new Map<string, number>();
     (veics ?? []).forEach((v) => {
+      if (!v.user_id) return;
       counts.set(v.user_id, (counts.get(v.user_id) ?? 0) + 1);
     });
 
