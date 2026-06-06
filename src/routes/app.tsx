@@ -883,20 +883,12 @@ function VehicleImage({
       return;
     }
     generateVehicleImageFn({ data: { vehicleId, marca, modelo, ano, cor } })
-      .then(async (res) => {
+      .then((res) => {
         if (cancel) return;
         if (res.ok && res.url) {
           setUrl(res.url);
           onResolved(res.url);
-          // Persiste no Supabase para não chamar a API novamente.
-          try {
-            await supabase
-              .from("veiculos")
-              .update({ foto_url: res.url })
-              .eq("id", vehicleId);
-          } catch {
-            /* falha silenciosa: a imagem ainda aparece nesta sessão */
-          }
+          // A própria server fn já persiste em veiculos.image_url (Global Cache).
         } else {
           setState("fallback");
         }
