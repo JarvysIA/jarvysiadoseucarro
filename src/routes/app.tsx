@@ -432,12 +432,25 @@ function AppPage() {
       {selected && (
         <VehicleStatusSection
           vehicleId={selected.id}
+          placa={selected.plate}
           kmAtual={selected.km}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
             )
           }
+          onDeleted={() => {
+            const removedId = selected.id;
+            setVehicles((prev) => {
+              const next = prev.filter((x) => x.id !== removedId);
+              cachedVehicles = next;
+              const nextId = next[0]?.id ?? "";
+              setSelectedId(nextId);
+              setActiveVehicleId(nextId || null);
+              return next;
+            });
+            navigate({ to: "/app", replace: true });
+          }}
         />
       )}
 
