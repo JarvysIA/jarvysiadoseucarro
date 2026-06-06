@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
-import { claimArchivedVehicleFn } from "@/lib/vehicles.functions";
+import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
@@ -25,6 +25,7 @@ export type AddedVehicle = {
   cor: string;
   km_atual: number | null;
   chassi: string;
+  foto_url?: string | null;
 };
 
 function formatPlateMask(raw: string): string {
@@ -98,6 +99,7 @@ export function AddVehicleModal({
           cor: res.vehicle.cor || "",
           km_atual: res.vehicle.km_atual,
           chassi: res.vehicle.chassi || "",
+          foto_url: res.vehicle.foto_url || null,
         });
         onClose();
         return;
@@ -157,6 +159,17 @@ export function AddVehicleModal({
         toast.error("Não foi possível adicionar o veículo.");
         return;
       }
+      // Tenta herdar foto já gerada anteriormente para a mesma placa
+      // (qualquer dono passado), evitando uma nova chamada de IA.
+      let inheritedFoto: string | null = null;
+      try {
+        const inh = await inheritVehicleImageFn({
+          data: { vehicleId: inserted.id, placa: plate },
+        });
+        if (inh.inherited && inh.url) inheritedFoto = inh.url;
+      } catch (e) {
+        console.warn("[inheritVehicleImageFn]", e);
+      }
       toast.success("Veículo adicionado!");
       onAdded({
         id: inserted.id,
@@ -167,6 +180,7 @@ export function AddVehicleModal({
         cor: inserted.cor || "",
         km_atual: inserted.km_atual,
         chassi: inserted.chassi || "",
+        foto_url: inheritedFoto,
       });
       onClose();
     } finally {

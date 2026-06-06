@@ -143,7 +143,7 @@ function AppPage() {
       plate: v.placa,
       km: v.km_atual ?? 0,
       chassi: v.chassi,
-      fotoUrl: null,
+      fotoUrl: v.foto_url ?? null,
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
