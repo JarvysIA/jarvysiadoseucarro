@@ -125,3 +125,51 @@ export const unlockHistoryFn = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
     return { ok: true };
   });
+
+/**
+ * Procura uma foto já gerada anteriormente para a MESMA placa (em qualquer
+ * registro do banco, incluindo arquivados) e, se encontrar, vincula a URL ao
+ * novo veículo recém-criado. Evita gastar uma chamada de IA quando o carro
+ * já passou pelo nosso sistema antes.
+ */
+export const inheritVehicleImageFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { vehicleId: string; placa: string }) => {
+    if (!data?.vehicleId) throw new Error("vehicleId obrigatório.");
+    const placa = sanitizePlate(data?.placa ?? "");
+    if (!placa) throw new Error("Placa obrigatória.");
+    return { vehicleId: data.vehicleId, placa };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Garante que o veículo de destino pertence ao usuário logado.
+    const { data: target, error: tErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id,user_id,foto_url")
+      .eq("id", data.vehicleId)
+      .maybeSingle();
+    if (tErr) throw new Error(tErr.message);
+    if (!target || target.user_id !== context.userId) {
+      throw new Error("Acesso negado.");
+    }
+    if (target.foto_url) return { inherited: false as const, url: target.foto_url };
+
+    const { data: prior, error } = await supabaseAdmin
+      .from("veiculos")
+      .select("foto_url")
+      .eq("placa", data.placa)
+      .neq("id", data.vehicleId)
+      .not("foto_url", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!prior?.foto_url) return { inherited: false as const, url: null };
+
+    const { error: upErr } = await supabaseAdmin
+      .from("veiculos")
+      .update({ foto_url: prior.foto_url })
+      .eq("id", data.vehicleId);
+    if (upErr) throw new Error(upErr.message);
+    return { inherited: true as const, url: prior.foto_url };
+  });
