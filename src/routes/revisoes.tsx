@@ -4,6 +4,7 @@ import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   Dialog,
