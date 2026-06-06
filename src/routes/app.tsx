@@ -863,15 +863,16 @@ function VehicleImage({
   alt: string;
   onResolved: (url: string) => void;
 }) {
+  const hasInitialInternalImageUrl = cachedUrl?.startsWith("/api/vehicle-image/") ?? false;
   const [state, setState] = useState<"loading" | "loaded" | "fallback">(
-    cachedUrl ? "loading" : "loading",
+    "loading",
   );
-  const [url, setUrl] = useState<string | null>(cachedUrl);
+  const [url, setUrl] = useState<string | null>(hasInitialInternalImageUrl ? cachedUrl : null);
 
   useEffect(() => {
     let cancel = false;
-    // Cache hit: usa imagem do banco, não chama Serper.
-    if (cachedUrl) {
+    // Cache hit novo: usa a imagem servida pelo nosso backend, sem Storage.
+    if (cachedUrl && hasInitialInternalImageUrl) {
       setUrl(cachedUrl);
       setState("loading"); // aguarda onLoad da <img>
       return;
@@ -899,9 +900,9 @@ function VehicleImage({
     return () => {
       cancel = true;
     };
-    // Apenas vehicleId como dep — evita refetch ao trocar de abas/reordenar.
+    // Reage quando a URL interna chega do banco, mas ignora URLs antigas do Storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
+  }, [vehicleId, cachedUrl]);
 
   return (
     <>
@@ -949,6 +950,18 @@ function VehicleImage({
           }}
           onError={(e) => {
             console.error("[vehicle-image] failed to load:", url, e);
+            fetch(url, { cache: "no-store" })
+              .then(async (res) => {
+                const text = res.ok ? "" : await res.text().catch(() => "");
+                console.error("[vehicle-image] diagnostic fetch:", {
+                  url,
+                  status: res.status,
+                  ok: res.ok,
+                  contentType: res.headers.get("content-type"),
+                  body: text.slice(0, 500),
+                });
+              })
+              .catch((err) => console.error("[vehicle-image] diagnostic fetch failed:", url, err));
             setState("fallback");
           }}
           className={`relative z-[1] h-full w-full object-cover mix-blend-lighten transition-opacity duration-500 ${
