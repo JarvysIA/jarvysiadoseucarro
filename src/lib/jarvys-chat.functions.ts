@@ -49,7 +49,7 @@ export const jarvysChatFn = createServerFn({ method: "POST" })
       throw new Error("LOVABLE_API_KEY não configurada.");
     }
 
-    const systemPrompt = buildSystemPrompt(data.vehicle);
+    const systemPrompt = buildSystemPrompt(data.vehicle, data.planTier ?? null);
     const history = (data.messages || []).slice(-20).map((m) => ({
       role: m.role,
       content: m.content,
