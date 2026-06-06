@@ -25,6 +25,7 @@ export type AddedVehicle = {
   cor: string;
   km_atual: number | null;
   chassi: string;
+  foto_url?: string | null;
 };
 
 function formatPlateMask(raw: string): string {
