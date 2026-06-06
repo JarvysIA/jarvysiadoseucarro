@@ -41,19 +41,28 @@ function DespesasPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [vehicleKm, setVehicleKm] = useState(0);
+  const [historyLocked, setHistoryLocked] = useState(false);
+  const [claimedAt, setClaimedAt] = useState<string | null>(null);
 
-  // Carrega KM atual do veículo ativo (para defaults do modal)
+  // Carrega metadados do veículo ativo (KM, lock e claim) para defaults do modal,
+  // banner de Carfax Reverso e filtro da timeline.
   useEffect(() => {
     if (!activeVehicleId) {
       setVehicleKm(0);
+      setHistoryLocked(false);
+      setClaimedAt(null);
       return;
     }
     supabase
       .from("veiculos")
-      .select("km_atual")
+      .select("km_atual,history_locked,claimed_at")
       .eq("id", activeVehicleId)
       .maybeSingle()
-      .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
+      .then(({ data }) => {
+        setVehicleKm(data?.km_atual ?? 0);
+        setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
+        setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
+      });
   }, [activeVehicleId, reloadKey]);
 
   useEffect(() => {
@@ -68,13 +77,17 @@ function DespesasPage() {
         return;
       }
       const { start, end } = monthBounds(year, month);
-      const { data, error } = await supabase
+      let query = supabase
         .from("despesas")
         .select("*")
         .eq("vehicle_id", activeVehicleId)
         .gte("data", start.toISOString())
-        .lt("data", end.toISOString())
-        .order("data", { ascending: false });
+        .lt("data", end.toISOString());
+      // Carfax Reverso: oculta lançamentos do antigo dono até o usuário destravar.
+      if (historyLocked && claimedAt) {
+        query = query.gte("created_at", claimedAt);
+      }
+      const { data, error } = await query.order("data", { ascending: false });
       if (!cancel) {
         if (error) {
           console.error("[despesas]", error);
@@ -88,7 +101,7 @@ function DespesasPage() {
     return () => {
       cancel = true;
     };
-  }, [year, month, activeVehicleId, reloadKey]);
+  }, [year, month, activeVehicleId, reloadKey, historyLocked, claimedAt]);
 
   const prevMonth = () => {
     if (month === 0) {
