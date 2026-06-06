@@ -900,9 +900,9 @@ function VehicleImage({
     return () => {
       cancel = true;
     };
-    // Apenas vehicleId como dep — evita refetch ao trocar de abas/reordenar.
+    // Reage quando a URL interna chega do banco, mas ignora URLs antigas do Storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
+  }, [vehicleId, cachedUrl]);
 
   return (
     <>
