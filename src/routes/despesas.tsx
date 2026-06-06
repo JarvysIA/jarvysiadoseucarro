@@ -145,6 +145,20 @@ function DespesasPage() {
         </p>
       </header>
 
+      {historyLocked && activeVehicleId && (
+        <section className="mt-4 px-6">
+          <LockedHistoryBanner
+            vehicleId={activeVehicleId}
+            onUnlocked={() => {
+              setHistoryLocked(false);
+              setReloadKey((k) => k + 1);
+            }}
+          />
+        </section>
+      )}
+
+
+
       {/* Navegação temporal */}
       <section className="mt-6 px-6">
         <div className="flex items-center justify-between rounded-2xl border border-border bg-card px-3 py-2">
