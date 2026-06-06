@@ -138,8 +138,15 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       const json: any = await res.json().catch(() => null);
       aiImageUrl = json?.data?.[0]?.url ?? null;
       aiImageB64 = json?.data?.[0]?.b64_json ?? null;
+      console.log("[vehicle-image] AI response:", {
+        status: res.status,
+        hasUrl: Boolean(aiImageUrl),
+        url: aiImageUrl,
+        hasB64: Boolean(aiImageB64),
+        firstItemKeys: json?.data?.[0] ? Object.keys(json.data[0]) : [],
+      });
       if (!aiImageUrl && !aiImageB64) {
-        console.error("[vehicle-image] AI response missing url and b64_json");
+        console.error("[vehicle-image] AI response missing url and b64_json", json);
         return { ok: false as const, url: null, cached: false as const };
       }
     } catch (e) {
@@ -147,62 +154,35 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       return { ok: false as const, url: null, cached: false as const };
     }
 
-    // --- 3+4) DOWNLOAD DA IA -> UPLOAD PRO COFRE (com fallback) -----------
-    const slug = (s: string) =>
-      s
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 40) || "x";
-
+    // --- 3+4) DOWNLOAD DA IA -> BYTEA NO BANCO ---------------------------
     try {
-      let blob: Blob;
-      let contentType = "image/png";
+      let bytes: Uint8Array;
 
       if (aiImageUrl) {
-        // Fetch da URL temporária da OpenAI -> Blob
+        console.log("[vehicle-image] fetching AI image URL:", aiImageUrl);
         const imgRes = await fetch(aiImageUrl);
-        if (!imgRes.ok) {
-          throw new Error(`Failed to fetch AI image: ${imgRes.status}`);
-        }
-        blob = await imgRes.blob();
-        contentType = blob.type || "image/png";
-      } else {
-        // Fallback: API retornou só b64_json
-        const bytes = Uint8Array.from(atob(aiImageB64!), (c) => c.charCodeAt(0));
-        blob = new Blob([bytes], { type: "image/png" });
-      }
-
-      const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "png";
-      const fileName = `${slug(marca)}_${slug(modelo)}_${slug(ano)}_${slug(cor)}_${Date.now()}.${ext}`;
-
-      // Upload via SERVICE ROLE (ignora RLS)
-      const { error: upErr } = await supabaseAdmin.storage
-        .from("vehicle-images")
-        .upload(fileName, blob, {
-          upsert: true,
-          contentType,
-          cacheControl: "31536000",
+        console.log("[vehicle-image] AI image fetch result:", {
+          url: aiImageUrl,
+          status: imgRes.status,
+          ok: imgRes.ok,
+          contentType: imgRes.headers.get("content-type"),
+          contentLength: imgRes.headers.get("content-length"),
         });
-      if (upErr) throw upErr;
-
-      const { data: pub } = supabaseAdmin.storage
-        .from("vehicle-images")
-        .getPublicUrl(fileName);
-      const url = pub?.publicUrl;
-      if (!url) throw new Error("Failed to get public URL after upload");
-
-      await persist(url);
-      return { ok: true as const, url, cached: false as const };
-    } catch (e) {
-      // --- FALLBACK DE EMERGÊNCIA -----------------------------------------
-      console.error("[vehicle-image] Storage upload failed, falling back to AI URL:", e);
-      if (aiImageUrl) {
-        await persist(aiImageUrl);
-        return { ok: true as const, url: aiImageUrl, cached: false as const };
+        if (!imgRes.ok) {
+          const body = await imgRes.text().catch(() => "");
+          throw new Error(`Failed to fetch AI image: ${imgRes.status} ${body.slice(0, 500)}`);
+        }
+        bytes = new Uint8Array(await imgRes.arrayBuffer());
+      } else {
+        bytes = Uint8Array.from(atob(aiImageB64!), (c) => c.charCodeAt(0));
       }
+
+      if (!bytes.byteLength) throw new Error("AI image payload is empty");
+      await saveBlob(bytes);
+      await persist(internalImageUrl);
+      return { ok: true as const, url: internalImageUrl, cached: false as const };
+    } catch (e) {
+      console.error("[vehicle-image] DB blob save failed:", { error: e, aiImageUrl });
       return { ok: false as const, url: null, cached: false as const };
     }
   });
