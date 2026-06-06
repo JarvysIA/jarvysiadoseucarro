@@ -283,7 +283,11 @@ function AppPage() {
       </section>
 
       <section className="mt-4">
-        {vehicles.length === 0 && !loadingProfile ? (
+        {loadingProfile ? (
+          <div className="px-6">
+            <div className="h-64 w-[82%] animate-pulse rounded-3xl border border-border bg-card/40" />
+          </div>
+        ) : vehicles.length === 0 ? (
           <div className="mx-6">
             <button
               type="button"
