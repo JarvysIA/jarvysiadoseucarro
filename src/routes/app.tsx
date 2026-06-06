@@ -203,6 +203,18 @@ function AppPage() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [vehicles]);
 
+  // Força o carrossel a centralizar o veículo ativo (corrige race condition ao voltar para Home)
+  useEffect(() => {
+    if (loadingProfile) return;
+    const el = scrollerRef.current;
+    if (!el || vehicles.length === 0 || !selectedId) return;
+    const node = el.querySelector<HTMLElement>(`[data-vehicle-id="${selectedId}"]`);
+    if (!node) return;
+    const target = node.offsetLeft - (el.clientWidth - node.offsetWidth) / 2;
+    // Salto imediato (sem animação) para o usuário não ver o carrossel rodando
+    el.scrollTo({ left: Math.max(0, target), behavior: "auto" });
+  }, [loadingProfile, vehicles, selectedId]);
+
   const selected = useMemo(
     () => vehicles.find((v) => v.id === selectedId) ?? vehicles[0],
     [selectedId, vehicles],
