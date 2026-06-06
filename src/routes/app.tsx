@@ -819,9 +819,6 @@ function VehicleStatusSection({
           <Trash2 className="h-4 w-4" />
           Excluir Veículo
         </button>
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          O histórico será preservado para revenda futura.
-        </p>
       </section>
 
       <DeleteVehicleModal
