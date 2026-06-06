@@ -9,7 +9,9 @@ import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
-import { PaywallModal } from "@/components/PaywallModal";
+import { PaywallModal, type PaywallMode } from "@/components/PaywallModal";
+import { PlanBadge } from "@/components/PlanBadge";
+import type { PlanTier } from "@/lib/admin-users.functions";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
@@ -64,6 +66,8 @@ type Profile = {
   permite_indicacao: boolean;
   trial_inicio: string;
   referrer_id: string | null;
+  plan_tier: PlanTier;
+  is_super_admin: boolean;
 };
 
 type DbVehicle = {
@@ -108,16 +112,21 @@ function AppPage() {
   }, []);
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
-  const [paywallMode, setPaywallMode] = useState<"premium" | "enterprise" | null>(null);
+  const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
+  const planTier: PlanTier = profile?.plan_tier ?? "free";
+  const vehicleLimit = planTier === "super_vip" ? Infinity : planTier === "vip" ? 2 : 1;
+
   const handleAddClick = () => {
     const count = vehicles.length;
-    if (count < 2) {
+    if (count < vehicleLimit) {
       setAddOpen(true);
-    } else if (count >= 2 && count < 5) {
-      setPaywallMode("premium");
+    } else if (planTier === "free") {
+      setPaywallMode("upgrade-vip");
+    } else if (planTier === "vip") {
+      setPaywallMode("upgrade-super_vip");
     } else {
       setPaywallMode("enterprise");
     }
@@ -157,7 +166,7 @@ function AppPage() {
       const [{ data: prof }, { data: veics }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id")
+          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,plan_tier,is_super_admin")
           .eq("id", userId)
           .maybeSingle(),
         supabase
@@ -283,8 +292,9 @@ function AppPage() {
           <img src={logo} alt="Jarvys" width={40} height={40} className="h-10 w-10 object-contain" />
           <div>
             <p className="text-xs text-muted-foreground">Olá,</p>
-            <h1 className="text-lg font-semibold leading-tight">
+            <h1 className="flex items-center gap-2 text-lg font-semibold leading-tight">
               {profile?.nome?.split(" ")[0] || "Motorista"}
+              <PlanBadge tier={planTier} />
             </h1>
           </div>
         </div>
@@ -416,7 +426,7 @@ function AppPage() {
       <PaywallModal
         open={!!paywallMode}
         onClose={() => setPaywallMode(null)}
-        mode={paywallMode ?? "premium"}
+        mode={paywallMode ?? "upgrade-vip"}
       />
 
 

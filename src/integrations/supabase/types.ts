@@ -66,9 +66,11 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_super_admin: boolean
           nome: string
           permite_indicacao: boolean
           placa: string | null
+          plan_tier: string
           referrer_id: string | null
           status_usuario: string
           trial_inicio: string
@@ -78,9 +80,11 @@ export type Database = {
           created_at?: string
           email?: string | null
           id: string
+          is_super_admin?: boolean
           nome: string
           permite_indicacao?: boolean
           placa?: string | null
+          plan_tier?: string
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
@@ -90,9 +94,11 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_super_admin?: boolean
           nome?: string
           permite_indicacao?: boolean
           placa?: string | null
+          plan_tier?: string
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
@@ -194,6 +200,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"

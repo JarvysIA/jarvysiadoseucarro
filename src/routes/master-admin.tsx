@@ -1,9 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Shield, Loader2, Check, LogOut } from "lucide-react";
+import { Search, Shield, Loader2, LogOut, Crown, Star, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/jarvys-logo.png";
+import {
+  listAdminUsersFn,
+  setPlanTierFn,
+  type AdminUserRow,
+  type PlanTier,
+} from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/master-admin")({
   head: () => ({
@@ -15,24 +22,22 @@ export const Route = createFileRoute("/master-admin")({
   component: MasterAdminPage,
 });
 
-type Profile = {
-  id: string;
-  nome: string;
-  whatsapp: string;
-  email: string | null;
-  placa: string | null;
-  status_usuario: "trial" | "ativo";
-  permite_indicacao: boolean;
-  created_at: string;
-};
+const TIER_OPTIONS: { value: PlanTier; label: string; icon: React.ReactNode }[] = [
+  { value: "free", label: "Normal", icon: <UserIcon className="h-3 w-3" /> },
+  { value: "vip", label: "VIP", icon: <Star className="h-3 w-3" /> },
+  { value: "super_vip", label: "Super VIP", icon: <Crown className="h-3 w-3" /> },
+];
 
 function MasterAdminPage() {
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<"checking" | "denied" | "ok">("checking");
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [updating, setUpdating] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const listUsers = useServerFn(listAdminUsersFn);
+  const setTier = useServerFn(setPlanTierFn);
 
   useEffect(() => {
     (async () => {
@@ -41,58 +46,60 @@ function MasterAdminPage() {
         navigate({ to: "/login", replace: true });
         return;
       }
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.session.user.id);
-      const isAdmin = (roles ?? []).some((r) => r.role === "admin");
-      if (!isAdmin) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("is_super_admin")
+        .eq("id", session.session.user.id)
+        .maybeSingle();
+      const isSuper = Boolean((prof as { is_super_admin?: boolean } | null)?.is_super_admin);
+      if (!isSuper) {
         setAuthState("denied");
+        // redireciona para Home (com pequeno delay para o usuário ver — opcional)
+        navigate({ to: "/app", replace: true });
         return;
       }
       setAuthState("ok");
       await refresh();
     })();
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id,nome,whatsapp,email,placa,status_usuario,permite_indicacao,created_at")
-      .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setProfiles((data as Profile[]) ?? []);
-    setLoading(false);
+    try {
+      const { rows } = await listUsers();
+      setRows(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar usuários.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return profiles;
-    return profiles.filter(
+    if (!q) return rows;
+    return rows.filter(
       (p) =>
         p.nome.toLowerCase().includes(q) ||
         (p.whatsapp ?? "").toLowerCase().includes(q),
     );
-  }, [profiles, query]);
+  }, [rows, query]);
 
-  const makeVip = async (id: string) => {
-    setUpdating(id);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ status_usuario: "ativo", permite_indicacao: true })
-      .eq("id", id);
-    setUpdating(null);
-    if (error) {
-      toast.error(error.message);
-      return;
+  const handleChangeTier = async (userId: string, planTier: PlanTier) => {
+    setUpdatingId(userId);
+    try {
+      await setTier({ data: { userId, planTier } });
+      setRows((prev) =>
+        prev.map((r) => (r.id === userId ? { ...r, plan_tier: planTier } : r)),
+      );
+      const label = TIER_OPTIONS.find((t) => t.value === planTier)?.label ?? planTier;
+      toast.success(`Plano atualizado para ${label}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao atualizar plano.");
+    } finally {
+      setUpdatingId(null);
     }
-    toast.success("Usuário promovido a VIP.");
-    setProfiles((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status_usuario: "ativo", permite_indicacao: true } : p,
-      ),
-    );
   };
 
   const logout = async () => {
@@ -114,14 +121,8 @@ function MasterAdminPage() {
         <Shield className="h-10 w-10 text-muted-foreground" />
         <h1 className="text-xl font-semibold">Acesso restrito</h1>
         <p className="text-sm text-muted-foreground">
-          Esta área é exclusiva para administradores.
+          Esta área é exclusiva para o CEO.
         </p>
-        <button
-          onClick={() => navigate({ to: "/app" })}
-          className="rounded-xl border border-border bg-card px-4 py-2 text-sm"
-        >
-          Voltar ao app
-        </button>
       </div>
     );
   }
@@ -169,47 +170,46 @@ function MasterAdminPage() {
         )}
         {!loading &&
           filtered.map((p) => {
-            const isVip = p.status_usuario === "ativo";
             return (
-              <li
-                key={p.id}
-                className="rounded-2xl border border-border bg-card p-4"
-              >
+              <li key={p.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{p.nome}</p>
                     <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {p.whatsapp} {p.placa ? `· ${p.placa}` : ""}
+                      {p.whatsapp}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
-                          isVip
-                            ? "bg-primary/15 text-primary"
-                            : "bg-secondary text-muted-foreground"
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {p.vehicle_count} veículo{p.vehicle_count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  {updatingId === p.id && (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {TIER_OPTIONS.map((opt) => {
+                    const active = p.plan_tier === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => !active && handleChangeTier(p.id, opt.value)}
+                        disabled={updatingId === p.id}
+                        className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-semibold transition-all disabled:opacity-50 ${
+                          active
+                            ? opt.value === "super_vip"
+                              ? "border-amber-400/60 bg-amber-400/10 text-amber-300 shadow-[0_0_16px_-4px_rgba(255,213,107,0.65)]"
+                              : opt.value === "vip"
+                                ? "glow-neon border-primary/60 bg-primary/10 text-primary"
+                                : "border-foreground/30 bg-secondary text-foreground"
+                            : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        {isVip ? "VIP" : "Trial"}
-                      </span>
-                      {p.permite_indicacao && (
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                          Indicação ON
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => makeVip(p.id)}
-                    disabled={isVip || updating === p.id}
-                    className="glow-neon flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-40"
-                  >
-                    {updating === p.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : isVip ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : null}
-                    {isVip ? "Já é VIP" : "Tornar VIP"}
-                  </button>
+                        {opt.icon}
+                        {opt.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </li>
             );
