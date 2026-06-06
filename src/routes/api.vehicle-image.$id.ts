@@ -41,7 +41,12 @@ export const Route = createFileRoute("/api/vehicle-image/$id")({
           return new Response("Image not found", { status: 404 });
         }
 
-        return new Response(bytes, {
+        const body = bytes.buffer.slice(
+          bytes.byteOffset,
+          bytes.byteOffset + bytes.byteLength,
+        ) as ArrayBuffer;
+
+        return new Response(body, {
           headers: {
             "Content-Type": "image/png",
             "Cache-Control": "public, max-age=31536000, immutable",
