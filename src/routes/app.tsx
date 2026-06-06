@@ -167,6 +167,7 @@ function AppPage() {
           .order("created_at", { ascending: true }),
       ]);
       setProfile(prof as Profile | null);
+      cachedProfile = (prof as Profile | null) ?? null;
       const mapped: UserVehicle[] = ((veics ?? []) as DbVehicle[]).map((v) => {
         const marca = v.marca?.trim() || "";
         const modelo = v.modelo?.trim() || "";
@@ -185,10 +186,11 @@ function AppPage() {
         };
       });
       setVehicles(mapped);
+      cachedVehicles = mapped;
       if (mapped.length) {
         const saved = getActiveVehicleId();
         const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
-        setSelectedId(idx >= 0 ? mapped[idx].id : mapped[0].id);
+        setSelectedId((prev) => prev || (idx >= 0 ? mapped[idx].id : mapped[0].id));
       }
       setLoadingProfile(false);
     })();
