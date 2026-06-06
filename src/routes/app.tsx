@@ -81,6 +81,7 @@ type DbVehicle = {
   km_atual: number | null;
   chassi: string | null;
   foto_url: string | null;
+  image_url: string | null;
 };
 
 type UserVehicle = {
