@@ -83,6 +83,29 @@ export function AddVehicleModal({
     }
     setStep("loading");
     setNotFound(false);
+    // 1) Antes de qualquer coisa, verifica se existe veículo arquivado com essa placa.
+    // Se existir, faz o "claim" imediato (resgate) e encerra o fluxo.
+    try {
+      const res = await claimArchivedVehicleFn({ data: { placa: plate } });
+      if (res.found) {
+        toast.success("Histórico encontrado! Veículo resgatado para sua garagem.");
+        onAdded({
+          id: res.vehicle.id,
+          placa: res.vehicle.placa,
+          marca: res.vehicle.marca || "",
+          modelo: res.vehicle.modelo || "",
+          ano: res.vehicle.ano || "",
+          cor: res.vehicle.cor || "",
+          km_atual: res.vehicle.km_atual,
+          chassi: res.vehicle.chassi || "",
+        });
+        onClose();
+        return;
+      }
+    } catch (e) {
+      console.error("[claimArchivedVehicleFn]", e);
+      // segue o fluxo normal de cadastro
+    }
     const r = await lookupPlate(plate);
     if (r) {
       setData({
