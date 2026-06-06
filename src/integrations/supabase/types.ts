@@ -145,6 +145,7 @@ export type Database = {
           foto_url: string | null
           history_locked: boolean
           id: string
+          image_url: string | null
           km_atual: number | null
           marca: string | null
           modelo: string | null
@@ -162,6 +163,7 @@ export type Database = {
           foto_url?: string | null
           history_locked?: boolean
           id?: string
+          image_url?: string | null
           km_atual?: number | null
           marca?: string | null
           modelo?: string | null
@@ -179,6 +181,7 @@ export type Database = {
           foto_url?: string | null
           history_locked?: boolean
           id?: string
+          image_url?: string | null
           km_atual?: number | null
           marca?: string | null
           modelo?: string | null
