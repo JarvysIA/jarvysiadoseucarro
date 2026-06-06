@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Bell, Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
@@ -90,15 +90,27 @@ type UserVehicle = {
   fotoUrl: string | null;
 };
 
+// Cache em memória para renderização instantânea ao voltar para a Home
+let cachedVehicles: UserVehicle[] | null = null;
+let cachedProfile: Profile | null = null;
+
 function AppPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [profile, setProfile] = useState<Profile | null>(cachedProfile);
+  const [loadingProfile, setLoadingProfile] = useState(!cachedProfile);
+  const [vehicles, setVehicles] = useState<UserVehicle[]>(cachedVehicles ?? []);
+  const initialSelectedId = useMemo(() => {
+    const list = cachedVehicles ?? [];
+    if (!list.length) return "";
+    const saved = getActiveVehicleId();
+    const found = saved ? list.find((v) => v.id === saved) : null;
+    return found?.id ?? list[0].id;
+  }, []);
+  const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<"premium" | "enterprise" | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScrollRef = useRef(false);
 
   const handleAddClick = () => {
     const count = vehicles.length;
@@ -155,6 +167,7 @@ function AppPage() {
           .order("created_at", { ascending: true }),
       ]);
       setProfile(prof as Profile | null);
+      cachedProfile = (prof as Profile | null) ?? null;
       const mapped: UserVehicle[] = ((veics ?? []) as DbVehicle[]).map((v) => {
         const marca = v.marca?.trim() || "";
         const modelo = v.modelo?.trim() || "";
@@ -173,10 +186,11 @@ function AppPage() {
         };
       });
       setVehicles(mapped);
+      cachedVehicles = mapped;
       if (mapped.length) {
         const saved = getActiveVehicleId();
         const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
-        setSelectedId(idx >= 0 ? mapped[idx].id : mapped[0].id);
+        setSelectedId((prev) => prev || (idx >= 0 ? mapped[idx].id : mapped[0].id));
       }
       setLoadingProfile(false);
     })();
@@ -203,17 +217,19 @@ function AppPage() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [vehicles]);
 
-  // Força o carrossel a centralizar o veículo ativo (corrige race condition ao voltar para Home)
-  useEffect(() => {
-    if (loadingProfile) return;
+  // Centraliza o veículo ativo ANTES do paint (zero flicker).
+  // Salto inicial usa useLayoutEffect; trocas posteriores de selectedId
+  // são geralmente disparadas pelo scroll do usuário e não precisam reposicionar.
+  useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!el || vehicles.length === 0 || !selectedId) return;
+    if (didInitialScrollRef.current) return;
     const node = el.querySelector<HTMLElement>(`[data-vehicle-id="${selectedId}"]`);
     if (!node) return;
     const target = node.offsetLeft - (el.clientWidth - node.offsetWidth) / 2;
-    // Salto imediato (sem animação) para o usuário não ver o carrossel rodando
-    el.scrollTo({ left: Math.max(0, target), behavior: "auto" });
-  }, [loadingProfile, vehicles, selectedId]);
+    el.scrollLeft = Math.max(0, target);
+    didInitialScrollRef.current = true;
+  }, [vehicles, selectedId]);
 
   const selected = useMemo(
     () => vehicles.find((v) => v.id === selectedId) ?? vehicles[0],
@@ -283,7 +299,7 @@ function AppPage() {
       </section>
 
       <section className="mt-4">
-        {loadingProfile ? (
+        {loadingProfile && vehicles.length === 0 ? (
           <div className="px-6">
             <div className="h-64 w-[82%] animate-pulse rounded-3xl border border-border bg-card/40" />
           </div>
