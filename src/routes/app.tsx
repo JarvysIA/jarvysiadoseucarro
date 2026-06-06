@@ -194,7 +194,7 @@ function AppPage() {
           plate: v.placa,
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
-          fotoUrl: v.foto_url || null,
+          fotoUrl: v.image_url || v.foto_url || null,
         };
       });
       setVehicles(mapped);
