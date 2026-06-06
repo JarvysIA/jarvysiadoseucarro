@@ -262,8 +262,8 @@ function AppPage() {
 
   return (
     <div className="relative min-h-screen bg-background pb-56">
-      {/* Banner trial */}
-      {!loadingProfile && isTrial && (
+      {/* Banner trial — apenas para usuários free */}
+      {!loadingProfile && planTier === "free" && isTrial && (
         <a
           href="https://jarvys.com.br/assinar"
           target="_blank"
