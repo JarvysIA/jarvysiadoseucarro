@@ -174,6 +174,7 @@ function AppPage() {
           .from("veiculos")
           .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
           .eq("user_id", userId)
+          .eq("status", "active")
           .order("created_at", { ascending: true }),
       ]);
       setProfile(prof as Profile | null);
