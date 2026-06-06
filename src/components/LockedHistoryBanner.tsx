@@ -6,7 +6,8 @@ import { unlockHistoryFn } from "@/lib/vehicles.functions";
 /**
  * Banner "Carfax Reverso" exibido em Revisões/Despesas quando o veículo ativo
  * foi resgatado (history_locked = true). "Destravar" libera o histórico antigo;
- * "Dispensar" oculta o banner apenas para esta sessão.
+ * "Dispensar" minimiza o banner (mini-pill) — o usuário pode reabrir clicando.
+ * O estado minimizado persiste apenas na sessão atual.
  */
 export function LockedHistoryBanner({
   vehicleId,
@@ -16,7 +17,7 @@ export function LockedHistoryBanner({
   onUnlocked: () => void;
 }) {
   const storageKey = `jarvys_dismiss_locked_${vehicleId}`;
-  const [dismissed, setDismissed] = useState<boolean>(() => {
+  const [minimized, setMinimized] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
       return sessionStorage.getItem(storageKey) === "1";
@@ -27,7 +28,7 @@ export function LockedHistoryBanner({
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setDismissed(() => {
+    setMinimized(() => {
       try {
         return sessionStorage.getItem(storageKey) === "1";
       } catch {
@@ -36,15 +37,22 @@ export function LockedHistoryBanner({
     });
   }, [storageKey]);
 
-  if (dismissed) return null;
-
-  const dismiss = () => {
+  const minimize = () => {
     try {
       sessionStorage.setItem(storageKey, "1");
     } catch {
       /* ignore */
     }
-    setDismissed(true);
+    setMinimized(true);
+  };
+
+  const expand = () => {
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {
+      /* ignore */
+    }
+    setMinimized(false);
   };
 
   const unlock = async () => {
@@ -61,6 +69,22 @@ export function LockedHistoryBanner({
       setSubmitting(false);
     }
   };
+
+  if (minimized) {
+    return (
+      <button
+        type="button"
+        onClick={expand}
+        aria-label="Reabrir oferta de histórico premium"
+        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
+        style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
+      >
+        <Lock className="h-3 w-3" />
+        Histórico Premium
+        <span className="text-primary/80">· R$ 49,90</span>
+      </button>
+    );
+  }
 
   return (
     <div
@@ -80,8 +104,8 @@ export function LockedHistoryBanner({
       />
       <button
         type="button"
-        onClick={dismiss}
-        aria-label="Dispensar"
+        onClick={minimize}
+        aria-label="Minimizar"
         className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
       >
         <X className="h-4 w-4" />
@@ -112,7 +136,7 @@ export function LockedHistoryBanner({
             </button>
             <button
               type="button"
-              onClick={dismiss}
+              onClick={minimize}
               className="rounded-xl border border-border bg-secondary px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
             >
               Dispensar
