@@ -90,15 +90,27 @@ type UserVehicle = {
   fotoUrl: string | null;
 };
 
+// Cache em memória para renderização instantânea ao voltar para a Home
+let cachedVehicles: UserVehicle[] | null = null;
+let cachedProfile: Profile | null = null;
+
 function AppPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [vehicles, setVehicles] = useState<UserVehicle[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
+  const [profile, setProfile] = useState<Profile | null>(cachedProfile);
+  const [loadingProfile, setLoadingProfile] = useState(!cachedProfile);
+  const [vehicles, setVehicles] = useState<UserVehicle[]>(cachedVehicles ?? []);
+  const initialSelectedId = useMemo(() => {
+    const list = cachedVehicles ?? [];
+    if (!list.length) return "";
+    const saved = getActiveVehicleId();
+    const found = saved ? list.find((v) => v.id === saved) : null;
+    return found?.id ?? list[0].id;
+  }, []);
+  const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<"premium" | "enterprise" | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScrollRef = useRef(false);
 
   const handleAddClick = () => {
     const count = vehicles.length;
