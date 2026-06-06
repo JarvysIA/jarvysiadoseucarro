@@ -1,4 +1,6 @@
-import { Crown, X, Building2 } from "lucide-react";
+import { Crown, X, Star } from "lucide-react";
+
+export type PaywallMode = "upgrade-vip" | "upgrade-super_vip" | "enterprise";
 
 export function PaywallModal({
   open,
@@ -7,11 +9,31 @@ export function PaywallModal({
 }: {
   open: boolean;
   onClose: () => void;
-  mode: "premium" | "enterprise";
+  mode: PaywallMode;
 }) {
   if (!open) return null;
 
-  const isPremium = mode === "premium";
+  const config =
+    mode === "upgrade-vip"
+      ? {
+          icon: <Star className="h-7 w-7" />,
+          title: "Garagem Premium",
+          desc: "Você atingiu o limite de 1 veículo do plano gratuito. Faça upgrade para o ⭐ VIP e cadastre até 2 veículos com inteligência do Jarvys.",
+          cta: "Quero ser VIP",
+        }
+      : mode === "upgrade-super_vip"
+        ? {
+            icon: <Crown className="h-7 w-7" />,
+            title: "Garagem Ilimitada",
+            desc: "Você atingiu o limite de 2 veículos do plano VIP. Eleve-se ao 👑 Super VIP e tenha veículos ilimitados, prioridade total e tratamento exclusivo da IA.",
+            cta: "Quero ser Super VIP",
+          }
+        : {
+            icon: <Crown className="h-7 w-7" />,
+            title: "Limite Atingido",
+            desc: "Limite máximo da sua conta atingido. Entre em contato com o time Jarvys para liberar mais veículos.",
+            cta: null,
+          };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center">
@@ -40,24 +62,18 @@ export function PaywallModal({
 
         <div className="relative flex flex-col items-center text-center">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            {isPremium ? (
-              <Crown className="h-7 w-7" />
-            ) : (
-              <Building2 className="h-7 w-7" />
-            )}
+            {config.icon}
           </div>
 
           <h2 className="font-tech text-lg font-bold tracking-wide text-primary">
-            {isPremium ? "Garagem Premium" : "Limite Atingido"}
+            {config.title}
           </h2>
 
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            {isPremium
-              ? "Sua garagem está crescendo! Para gerenciar até 5 veículos com inteligência artificial, assine o Jarvys Premium por apenas R$ 14,90/mês."
-              : "Limite máximo familiar atingido. O plano Jarvys Enterprise para frotas e lojistas será lançado em breve!"}
+            {config.desc}
           </p>
 
-          {isPremium && (
+          {config.cta && (
             <button
               type="button"
               onClick={() => {
@@ -66,7 +82,7 @@ export function PaywallModal({
               className="glow-neon mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
             >
               <Crown className="h-4 w-4" />
-              Assinar Premium
+              {config.cta}
             </button>
           )}
 
