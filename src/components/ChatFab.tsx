@@ -140,6 +140,7 @@ export function ChatFab() {
                 km: vehicle.km,
               }
             : null,
+          planTier,
         },
       });
       const aiMsg: ChatMsg = { role: "assistant", content: reply };
