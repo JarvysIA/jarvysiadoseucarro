@@ -448,6 +448,17 @@ function ConfirmForm({
       toast.error("Valor inválido");
       return;
     }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (data > todayStr) {
+      toast.error("Você não pode registrar uma manutenção no futuro.");
+      return;
+    }
+    if (data < todayStr && kmNum > defaultKm) {
+      toast.error(
+        "Inconsistência: Um registro com data antiga não pode ter uma quilometragem maior que a atual do painel.",
+      );
+      return;
+    }
     const descricao =
       itens.length > 0
         ? itens.map((i) => i.descricao).slice(0, 2).join(" + ")
@@ -472,6 +483,7 @@ function ConfirmForm({
         <Field label="Data do serviço">
           <input
             type="date"
+            max={today}
             value={data}
             onChange={(e) => setData(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
@@ -652,6 +664,16 @@ function ManualForm({
       toast.error("Valor inválido");
       return;
     }
+    if (data > today) {
+      toast.error("Você não pode registrar uma manutenção no futuro.");
+      return;
+    }
+    if (data < today && kmNum > defaultKm) {
+      toast.error(
+        "Inconsistência: Um registro com data antiga não pode ter uma quilometragem maior que a atual do painel.",
+      );
+      return;
+    }
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
@@ -672,6 +694,7 @@ function ManualForm({
         <Field label="Data do serviço">
           <input
             type="date"
+            max={today}
             value={data}
             onChange={(e) => setData(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"

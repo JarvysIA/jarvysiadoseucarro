@@ -69,6 +69,17 @@ export function NewExpenseModal({
       toast.error("KM inválida.");
       return;
     }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (data > todayStr) {
+      toast.error("Você não pode registrar uma manutenção no futuro.");
+      return;
+    }
+    if (data < todayStr && kmNum != null && kmNum > kmAtualVeiculo) {
+      toast.error(
+        "Inconsistência: Um registro com data antiga não pode ter uma quilometragem maior que a atual do painel.",
+      );
+      return;
+    }
     setSaving(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
@@ -157,6 +168,7 @@ export function NewExpenseModal({
             <Field label="Data">
               <input
                 type="date"
+                max={today}
                 value={data}
                 onChange={(e) => setData(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
