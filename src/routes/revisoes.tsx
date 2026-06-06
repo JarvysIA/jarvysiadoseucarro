@@ -128,6 +128,20 @@ function RevisoesPage() {
         </p>
       </header>
 
+      {historyLocked && activeVehicleId && (
+        <section className="mt-4 px-6">
+          <LockedHistoryBanner
+            vehicleId={activeVehicleId}
+            onUnlocked={() => {
+              setHistoryLocked(false);
+              setReloadKey((k) => k + 1);
+            }}
+          />
+        </section>
+      )}
+
+
+
       <section className="mt-6 px-6">
         {loading ? (
           <div className="flex h-40 items-center justify-center">
