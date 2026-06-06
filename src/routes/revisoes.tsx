@@ -283,37 +283,44 @@ function RevisoesPage() {
                 </Info>
               </div>
 
-              <div className="mt-4">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Nota fiscal
-                </p>
-                {!openDespesa.receipt_image_url ? (
-                  <div className="rounded-xl border border-dashed border-border bg-background/40 p-6 text-center text-xs text-muted-foreground">
-                    Nenhuma imagem anexada.
+              {(() => {
+                const isPreClaim =
+                  !!claimedAt && new Date(openDespesa.created_at) < new Date(claimedAt);
+                if (isPreClaim) return null;
+                return (
+                  <div className="mt-4">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Nota fiscal
+                    </p>
+                    {!openDespesa.receipt_image_url ? (
+                      <div className="rounded-xl border border-dashed border-border bg-background/40 p-6 text-center text-xs text-muted-foreground">
+                        Nenhuma imagem anexada.
+                      </div>
+                    ) : receiptLoading ? (
+                      <div className="flex h-48 items-center justify-center rounded-xl border border-border bg-background/40">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      </div>
+                    ) : receiptUrl ? (
+                      <a
+                        href={receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block overflow-hidden rounded-xl border border-border"
+                      >
+                        <img
+                          src={receiptUrl}
+                          alt="Nota fiscal"
+                          className="h-auto w-full object-contain"
+                        />
+                      </a>
+                    ) : (
+                      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center text-xs text-destructive">
+                        Não foi possível carregar a imagem.
+                      </div>
+                    )}
                   </div>
-                ) : receiptLoading ? (
-                  <div className="flex h-48 items-center justify-center rounded-xl border border-border bg-background/40">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                  </div>
-                ) : receiptUrl ? (
-                  <a
-                    href={receiptUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block overflow-hidden rounded-xl border border-border"
-                  >
-                    <img
-                      src={receiptUrl}
-                      alt="Nota fiscal"
-                      className="h-auto w-full object-contain"
-                    />
-                  </a>
-                ) : (
-                  <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center text-xs text-destructive">
-                    Não foi possível carregar a imagem.
-                  </div>
-                )}
-              </div>
+                );
+              })()}
             </>
           )}
         </DialogContent>
