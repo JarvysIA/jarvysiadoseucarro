@@ -809,6 +809,29 @@ function VehicleStatusSection({
         </div>
       </section>
 
+      {/* Zona perigosa — Soft delete do veículo */}
+      <section className="mt-8 px-6">
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/15"
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir Veículo
+        </button>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          O histórico será preservado para revenda futura.
+        </p>
+      </section>
+
+      <DeleteVehicleModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        vehicleId={vehicleId}
+        placa={placa}
+        onDeleted={onDeleted}
+      />
+
       <MaintenancePanel
         open={!!openItemKey}
         onClose={() => setOpenItemKey(null)}
