@@ -81,6 +81,7 @@ type DbVehicle = {
   km_atual: number | null;
   chassi: string | null;
   foto_url: string | null;
+  image_url: string | null;
 };
 
 type UserVehicle = {
@@ -172,7 +173,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,image_url")
           .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: true }),
@@ -193,7 +194,7 @@ function AppPage() {
           plate: v.placa,
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
-          fotoUrl: v.foto_url || null,
+          fotoUrl: v.image_url || v.foto_url || null,
         };
       });
       setVehicles(mapped);
@@ -882,20 +883,12 @@ function VehicleImage({
       return;
     }
     generateVehicleImageFn({ data: { vehicleId, marca, modelo, ano, cor } })
-      .then(async (res) => {
+      .then((res) => {
         if (cancel) return;
         if (res.ok && res.url) {
           setUrl(res.url);
           onResolved(res.url);
-          // Persiste no Supabase para não chamar a API novamente.
-          try {
-            await supabase
-              .from("veiculos")
-              .update({ foto_url: res.url })
-              .eq("id", vehicleId);
-          } catch {
-            /* falha silenciosa: a imagem ainda aparece nesta sessão */
-          }
+          // A própria server fn já persiste em veiculos.image_url (Global Cache).
         } else {
           setState("fallback");
         }
