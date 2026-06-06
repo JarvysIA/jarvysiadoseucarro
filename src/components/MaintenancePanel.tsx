@@ -664,6 +664,16 @@ function ManualForm({
       toast.error("Valor inválido");
       return;
     }
+    if (data > today) {
+      toast.error("Você não pode registrar uma manutenção no futuro.");
+      return;
+    }
+    if (data < today && kmNum > defaultKm) {
+      toast.error(
+        "Inconsistência: Um registro com data antiga não pode ter uma quilometragem maior que a atual do painel.",
+      );
+      return;
+    }
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
