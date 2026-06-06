@@ -217,17 +217,19 @@ function AppPage() {
     return () => el.removeEventListener("scroll", onScroll);
   }, [vehicles]);
 
-  // Força o carrossel a centralizar o veículo ativo (corrige race condition ao voltar para Home)
-  useEffect(() => {
-    if (loadingProfile) return;
+  // Centraliza o veículo ativo ANTES do paint (zero flicker).
+  // Salto inicial usa useLayoutEffect; trocas posteriores de selectedId
+  // são geralmente disparadas pelo scroll do usuário e não precisam reposicionar.
+  useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!el || vehicles.length === 0 || !selectedId) return;
+    if (didInitialScrollRef.current) return;
     const node = el.querySelector<HTMLElement>(`[data-vehicle-id="${selectedId}"]`);
     if (!node) return;
     const target = node.offsetLeft - (el.clientWidth - node.offsetWidth) / 2;
-    // Salto imediato (sem animação) para o usuário não ver o carrossel rodando
-    el.scrollTo({ left: Math.max(0, target), behavior: "auto" });
-  }, [loadingProfile, vehicles, selectedId]);
+    el.scrollLeft = Math.max(0, target);
+    didInitialScrollRef.current = true;
+  }, [vehicles, selectedId]);
 
   const selected = useMemo(
     () => vehicles.find((v) => v.id === selectedId) ?? vehicles[0],
