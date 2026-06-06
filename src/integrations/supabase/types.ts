@@ -139,44 +139,53 @@ export type Database = {
         Row: {
           ano: string | null
           chassi: string | null
+          claimed_at: string | null
           cor: string | null
           created_at: string
           foto_url: string | null
+          history_locked: boolean
           id: string
           km_atual: number | null
           marca: string | null
           modelo: string | null
           motorizacao: string | null
           placa: string
-          user_id: string
+          status: string
+          user_id: string | null
         }
         Insert: {
           ano?: string | null
           chassi?: string | null
+          claimed_at?: string | null
           cor?: string | null
           created_at?: string
           foto_url?: string | null
+          history_locked?: boolean
           id?: string
           km_atual?: number | null
           marca?: string | null
           modelo?: string | null
           motorizacao?: string | null
           placa: string
-          user_id: string
+          status?: string
+          user_id?: string | null
         }
         Update: {
           ano?: string | null
           chassi?: string | null
+          claimed_at?: string | null
           cor?: string | null
           created_at?: string
           foto_url?: string | null
+          history_locked?: boolean
           id?: string
           km_atual?: number | null
           marca?: string | null
           modelo?: string | null
           motorizacao?: string | null
           placa?: string
-          user_id?: string
+          status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
