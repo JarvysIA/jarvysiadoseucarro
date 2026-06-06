@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   CATEGORIAS,
