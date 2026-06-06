@@ -4,6 +4,7 @@ import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
   Dialog,
@@ -34,18 +35,26 @@ function RevisoesPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [vehicleKm, setVehicleKm] = useState(0);
+  const [historyLocked, setHistoryLocked] = useState(false);
+  const [claimedAt, setClaimedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) {
       setVehicleKm(0);
+      setHistoryLocked(false);
+      setClaimedAt(null);
       return;
     }
     supabase
       .from("veiculos")
-      .select("km_atual")
+      .select("km_atual,history_locked,claimed_at")
       .eq("id", activeVehicleId)
       .maybeSingle()
-      .then(({ data }) => setVehicleKm(data?.km_atual ?? 0));
+      .then(({ data }) => {
+        setVehicleKm(data?.km_atual ?? 0);
+        setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
+        setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
+      });
   }, [activeVehicleId, reloadKey]);
 
   useEffect(() => {
@@ -59,12 +68,15 @@ function RevisoesPage() {
         }
         return;
       }
-      const { data, error } = await supabase
+      let query = supabase
         .from("despesas")
         .select("*")
         .eq("vehicle_id", activeVehicleId)
-        .in("categoria", ["Revisão", "Manutenção"])
-        .order("data", { ascending: false });
+        .in("categoria", ["Revisão", "Manutenção"]);
+      if (historyLocked && claimedAt) {
+        query = query.gte("created_at", claimedAt);
+      }
+      const { data, error } = await query.order("data", { ascending: false });
       if (!cancel) {
         if (error) {
           console.error("[revisoes]", error);
@@ -78,7 +90,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId, reloadKey]);
+  }, [activeVehicleId, reloadKey, historyLocked, claimedAt]);
 
   // Carrega o signed URL ao abrir o modal
   useEffect(() => {
@@ -115,6 +127,20 @@ function RevisoesPage() {
           Histórico global de revisões e manutenções — seu porta-luvas digital.
         </p>
       </header>
+
+      {historyLocked && activeVehicleId && (
+        <section className="mt-4 px-6">
+          <LockedHistoryBanner
+            vehicleId={activeVehicleId}
+            onUnlocked={() => {
+              setHistoryLocked(false);
+              setReloadKey((k) => k + 1);
+            }}
+          />
+        </section>
+      )}
+
+
 
       <section className="mt-6 px-6">
         {loading ? (

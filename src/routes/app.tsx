@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil } from "lucide-react";
+import { Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
@@ -9,6 +9,7 @@ import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
+import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal, type PaywallMode } from "@/components/PaywallModal";
 import { PlanBadge } from "@/components/PlanBadge";
 import type { PlanTier } from "@/lib/admin-users.functions";
@@ -173,6 +174,7 @@ function AppPage() {
           .from("veiculos")
           .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
           .eq("user_id", userId)
+          .eq("status", "active")
           .order("created_at", { ascending: true }),
       ]);
       setProfile(prof as Profile | null);
@@ -430,12 +432,25 @@ function AppPage() {
       {selected && (
         <VehicleStatusSection
           vehicleId={selected.id}
+          placa={selected.plate}
           kmAtual={selected.km}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
             )
           }
+          onDeleted={() => {
+            const removedId = selected.id;
+            setVehicles((prev) => {
+              const next = prev.filter((x) => x.id !== removedId);
+              cachedVehicles = next;
+              const nextId = next[0]?.id ?? "";
+              setSelectedId(nextId);
+              setActiveVehicleId(nextId || null);
+              return next;
+            });
+            navigate({ to: "/app", replace: true });
+          }}
         />
       )}
 
@@ -540,16 +555,21 @@ type ItemOverride = {
 
 function VehicleStatusSection({
   vehicleId,
+  placa,
   kmAtual,
   onKmChange,
+  onDeleted,
 }: {
   vehicleId: string;
+  placa: string;
   kmAtual: number;
   onKmChange: (km: number) => void;
+  onDeleted: () => void;
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   // Overrides e despesas por veículo + item (mock — preparado para virar tabela depois)
   const [overrides, setOverrides] = useState<
     Record<string, Partial<Record<MaintItemKey, ItemOverride>>>
@@ -788,6 +808,29 @@ function VehicleStatusSection({
           })}
         </div>
       </section>
+
+      {/* Zona perigosa — Soft delete do veículo */}
+      <section className="mt-8 px-6">
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/15"
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir Veículo
+        </button>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">
+          O histórico será preservado para revenda futura.
+        </p>
+      </section>
+
+      <DeleteVehicleModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        vehicleId={vehicleId}
+        placa={placa}
+        onDeleted={onDeleted}
+      />
 
       <MaintenancePanel
         open={!!openItemKey}
