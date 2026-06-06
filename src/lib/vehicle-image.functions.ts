@@ -4,13 +4,14 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 /**
  * Gera (ou recicla via Global Image Cache) a foto do veículo.
  *
- * Fluxo:
- * 1. Lookup no banco: existe algum veículo com a MESMA marca/modelo/ano/cor
- *    (case-insensitive) já com `image_url` salva? -> cache hit, reutiliza.
- * 2. Cache miss: chama OpenAI (ou Lovable AI Gateway) -> baixa o buffer ->
- *    sobe para o bucket `vehicle-images` -> usa a URL pública permanente.
- * 3. Persiste a URL final em `veiculos.image_url` (e em `foto_url` para
- *    compatibilidade com leituras antigas).
+ * Fluxo blindado:
+ * 1. Cache lookup no banco (marca/modelo/ano/cor, case-insensitive).
+ * 2. Cache miss -> chama a IA pedindo URL (response_format: "url").
+ * 3. Faz fetch da URL temporária da OpenAI -> converte para Blob.
+ * 4. Upload via `supabaseAdmin` (Service Role, ignora RLS) para o bucket
+ *    `vehicle-images` com { upsert: true, contentType: "image/png" }.
+ * 5. Se QUALQUER passo de download/upload falhar, salva a URL temporária
+ *    da OpenAI direto no banco como fallback de emergência.
  */
 export const generateVehicleImageFn = createServerFn({ method: "POST" })
   .inputValidator(
@@ -39,8 +40,8 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
           .from("veiculos")
           .update({ image_url: url, foto_url: url })
           .eq("id", vehicleId);
-      } catch {
-        /* não bloqueia a UI */
+      } catch (e) {
+        console.error("[vehicle-image] persist failed:", e);
       }
     };
 
@@ -60,11 +61,11 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
         await persist(hit.image_url);
         return { ok: true as const, url: hit.image_url, cached: true as const };
       }
-    } catch {
-      /* segue para gerar */
+    } catch (e) {
+      console.warn("[vehicle-image] cache lookup failed:", e);
     }
 
-    // --- 2) GERA VIA IA ----------------------------------------------------
+    // --- 2) GERA VIA IA (pedindo URL) --------------------------------------
     const openaiKey = process.env.OPENAI_API_KEY;
     const lovableKey = process.env.LOVABLE_API_KEY;
     const useOpenAI = Boolean(openaiKey);
@@ -76,6 +77,9 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
     const model = useOpenAI ? "gpt-image-2" : "openai/gpt-image-2";
 
     const prompt = `A highly detailed, realistic automotive studio photography of a ${cor} ${ano} ${marca} ${modelo}. 45-degree front-three-quarter angle. Isolated on a PURE PITCH BLACK background (#000000). No floor, no shadows, no white lights on the background, strictly pure black background. Photorealistic, 8k.`;
+
+    let aiImageUrl: string | null = null;
+    let aiImageB64: string | null = null;
 
     try {
       const ctrl = new AbortController();
@@ -97,42 +101,78 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       });
       clearTimeout(timeout);
 
-      if (!res.ok) return { ok: false as const, url: null, cached: false as const };
+      if (!res.ok) {
+        console.error("[vehicle-image] AI gen failed:", res.status, await res.text().catch(() => ""));
+        return { ok: false as const, url: null, cached: false as const };
+      }
       const json: any = await res.json().catch(() => null);
-      const b64: string | undefined = json?.data?.[0]?.b64_json;
-      if (!b64) return { ok: false as const, url: null, cached: false as const };
+      aiImageUrl = json?.data?.[0]?.url ?? null;
+      aiImageB64 = json?.data?.[0]?.b64_json ?? null;
+      if (!aiImageUrl && !aiImageB64) {
+        console.error("[vehicle-image] AI response missing url and b64_json");
+        return { ok: false as const, url: null, cached: false as const };
+      }
+    } catch (e) {
+      console.error("[vehicle-image] AI gen exception:", e);
+      return { ok: false as const, url: null, cached: false as const };
+    }
 
-      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    // --- 3+4) DOWNLOAD DA IA -> UPLOAD PRO COFRE (com fallback) -----------
+    const slug = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "x";
 
-      // --- 3) UPLOAD PARA O COFRE -----------------------------------------
-      const slug = (s: string) =>
-        s
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .slice(0, 40) || "x";
-      const fileName = `${slug(marca)}_${slug(modelo)}_${slug(ano)}_${slug(cor)}_${Date.now()}.png`;
+    try {
+      let blob: Blob;
+      let contentType = "image/png";
 
-      const up = await supabaseAdmin.storage
+      if (aiImageUrl) {
+        // Fetch da URL temporária da OpenAI -> Blob
+        const imgRes = await fetch(aiImageUrl);
+        if (!imgRes.ok) {
+          throw new Error(`Failed to fetch AI image: ${imgRes.status}`);
+        }
+        blob = await imgRes.blob();
+        contentType = blob.type || "image/png";
+      } else {
+        // Fallback: API retornou só b64_json
+        const bytes = Uint8Array.from(atob(aiImageB64!), (c) => c.charCodeAt(0));
+        blob = new Blob([bytes], { type: "image/png" });
+      }
+
+      const ext = contentType.includes("jpeg") || contentType.includes("jpg") ? "jpg" : "png";
+      const fileName = `${slug(marca)}_${slug(modelo)}_${slug(ano)}_${slug(cor)}_${Date.now()}.${ext}`;
+
+      // Upload via SERVICE ROLE (ignora RLS)
+      const { error: upErr } = await supabaseAdmin.storage
         .from("vehicle-images")
-        .upload(fileName, bytes, {
-          contentType: "image/png",
-          upsert: false,
+        .upload(fileName, blob, {
+          upsert: true,
+          contentType,
           cacheControl: "31536000",
         });
-      if (up.error) return { ok: false as const, url: null, cached: false as const };
+      if (upErr) throw upErr;
 
       const { data: pub } = supabaseAdmin.storage
         .from("vehicle-images")
         .getPublicUrl(fileName);
       const url = pub?.publicUrl;
-      if (!url) return { ok: false as const, url: null, cached: false as const };
+      if (!url) throw new Error("Failed to get public URL after upload");
 
       await persist(url);
       return { ok: true as const, url, cached: false as const };
-    } catch {
+    } catch (e) {
+      // --- FALLBACK DE EMERGÊNCIA -----------------------------------------
+      console.error("[vehicle-image] Storage upload failed, falling back to AI URL:", e);
+      if (aiImageUrl) {
+        await persist(aiImageUrl);
+        return { ok: true as const, url: aiImageUrl, cached: false as const };
+      }
       return { ok: false as const, url: null, cached: false as const };
     }
   });
