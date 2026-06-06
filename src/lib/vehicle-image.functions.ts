@@ -7,11 +7,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  * Fluxo blindado:
  * 1. Cache lookup no banco (marca/modelo/ano/cor, case-insensitive).
  * 2. Cache miss -> chama a IA pedindo URL (response_format: "url").
- * 3. Faz fetch da URL temporária da OpenAI -> converte para Blob.
- * 4. Upload via `supabaseAdmin` (Service Role, ignora RLS) para o bucket
- *    `vehicle-images` com { upsert: true, contentType: "image/png" }.
- * 5. Se QUALQUER passo de download/upload falhar, salva a URL temporária
- *    da OpenAI direto no banco como fallback de emergência.
+ * 3. Faz fetch da URL temporária da OpenAI -> converte para bytea.
+ * 4. Salva o binário em `vehicle_images_blob`, sem usar Storage API.
+ * 5. Persiste `/api/vehicle-image/{vehicleId}` em image_url/foto_url.
  */
 export const generateVehicleImageFn = createServerFn({ method: "POST" })
   .inputValidator(
@@ -34,6 +32,8 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       return { ok: false as const, url: null, cached: false as const };
     }
 
+    const internalImageUrl = `/api/vehicle-image/${vehicleId}`;
+
     const persist = async (url: string) => {
       try {
         await supabaseAdmin
@@ -45,21 +45,51 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       }
     };
 
+    const bytesToByteaHex = (bytes: Uint8Array) =>
+      `\\x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+
+    const saveBlob = async (bytes: Uint8Array) => {
+      const db = supabaseAdmin as any;
+      const { error } = await db.from("vehicle_images_blob").upsert(
+        {
+          vehicle_id: vehicleId,
+          image_data: bytesToByteaHex(bytes),
+        },
+        { onConflict: "vehicle_id" },
+      );
+      if (error) throw error;
+    };
+
     // --- 1) GLOBAL CACHE LOOKUP --------------------------------------------
     try {
       const { data: hit } = await supabaseAdmin
         .from("veiculos")
-        .select("image_url")
+        .select("id,image_url")
         .ilike("marca", marca)
         .ilike("modelo", modelo)
         .ilike("ano", ano)
         .ilike("cor", cor)
-        .not("image_url", "is", null)
+        .like("image_url", "/api/vehicle-image/%")
+        .neq("id", vehicleId)
         .limit(1)
         .maybeSingle();
-      if (hit?.image_url) {
-        await persist(hit.image_url);
-        return { ok: true as const, url: hit.image_url, cached: true as const };
+      if (hit?.id && hit.image_url) {
+        const db = supabaseAdmin as any;
+        const { data: blobHit, error: blobError } = await db
+          .from("vehicle_images_blob")
+          .select("image_data")
+          .eq("vehicle_id", hit.id)
+          .maybeSingle();
+        if (blobError) throw blobError;
+        if (blobHit?.image_data) {
+          const { error: copyError } = await db.from("vehicle_images_blob").upsert(
+            { vehicle_id: vehicleId, image_data: blobHit.image_data },
+            { onConflict: "vehicle_id" },
+          );
+          if (copyError) throw copyError;
+          await persist(internalImageUrl);
+          return { ok: true as const, url: internalImageUrl, cached: true as const };
+        }
       }
     } catch (e) {
       console.warn("[vehicle-image] cache lookup failed:", e);
