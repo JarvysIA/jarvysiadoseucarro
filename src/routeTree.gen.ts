@@ -22,7 +22,6 @@ import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiVehicleImageIdRouteImport } from './routes/api.vehicle-image.$id'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -89,11 +88,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiVehicleImageIdRoute = ApiVehicleImageIdRouteImport.update({
-  id: '/api/vehicle-image/$id',
-  path: '/api/vehicle-image/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -109,7 +103,6 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
-  '/api/vehicle-image/$id': typeof ApiVehicleImageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,7 +118,6 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
-  '/api/vehicle-image/$id': typeof ApiVehicleImageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,7 +134,6 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
-  '/api/vehicle-image/$id': typeof ApiVehicleImageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,7 +151,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
-    | '/api/vehicle-image/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -176,7 +166,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
-    | '/api/vehicle-image/$id'
   id:
     | '__root__'
     | '/'
@@ -192,7 +181,6 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
-    | '/api/vehicle-image/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -209,7 +197,6 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
   WelcomeRoute: typeof WelcomeRoute
-  ApiVehicleImageIdRoute: typeof ApiVehicleImageIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -305,13 +292,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/vehicle-image/$id': {
-      id: '/api/vehicle-image/$id'
-      path: '/api/vehicle-image/$id'
-      fullPath: '/api/vehicle-image/$id'
-      preLoaderRoute: typeof ApiVehicleImageIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -329,7 +309,6 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
   WelcomeRoute: WelcomeRoute,
-  ApiVehicleImageIdRoute: ApiVehicleImageIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

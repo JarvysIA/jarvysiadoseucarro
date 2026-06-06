@@ -81,7 +81,6 @@ type DbVehicle = {
   km_atual: number | null;
   chassi: string | null;
   foto_url: string | null;
-  image_url: string | null;
 };
 
 type UserVehicle = {
@@ -173,7 +172,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,image_url")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
           .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: true }),
@@ -194,7 +193,7 @@ function AppPage() {
           plate: v.placa,
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
-          fotoUrl: v.image_url || v.foto_url || null,
+          fotoUrl: v.foto_url || null,
         };
       });
       setVehicles(mapped);
@@ -863,16 +862,15 @@ function VehicleImage({
   alt: string;
   onResolved: (url: string) => void;
 }) {
-  const hasInitialInternalImageUrl = cachedUrl?.startsWith("/api/vehicle-image/") ?? false;
   const [state, setState] = useState<"loading" | "loaded" | "fallback">(
-    "loading",
+    cachedUrl ? "loading" : "loading",
   );
-  const [url, setUrl] = useState<string | null>(hasInitialInternalImageUrl ? cachedUrl : null);
+  const [url, setUrl] = useState<string | null>(cachedUrl);
 
   useEffect(() => {
     let cancel = false;
-    // Cache hit novo: usa a imagem servida pelo nosso backend, sem Storage.
-    if (cachedUrl && hasInitialInternalImageUrl) {
+    // Cache hit: usa imagem do banco, não chama Serper.
+    if (cachedUrl) {
       setUrl(cachedUrl);
       setState("loading"); // aguarda onLoad da <img>
       return;
@@ -884,12 +882,20 @@ function VehicleImage({
       return;
     }
     generateVehicleImageFn({ data: { vehicleId, marca, modelo, ano, cor } })
-      .then((res) => {
+      .then(async (res) => {
         if (cancel) return;
         if (res.ok && res.url) {
           setUrl(res.url);
           onResolved(res.url);
-          // A própria server fn já persiste em veiculos.image_url (Global Cache).
+          // Persiste no Supabase para não chamar a API novamente.
+          try {
+            await supabase
+              .from("veiculos")
+              .update({ foto_url: res.url })
+              .eq("id", vehicleId);
+          } catch {
+            /* falha silenciosa: a imagem ainda aparece nesta sessão */
+          }
         } else {
           setState("fallback");
         }
@@ -900,9 +906,9 @@ function VehicleImage({
     return () => {
       cancel = true;
     };
-    // Reage quando a URL interna chega do banco, mas ignora URLs antigas do Storage.
+    // Apenas vehicleId como dep — evita refetch ao trocar de abas/reordenar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId, cachedUrl]);
+  }, [vehicleId]);
 
   return (
     <>
@@ -944,32 +950,13 @@ function VehicleImage({
           width={1024}
           height={768}
           loading="lazy"
-          onLoad={() => {
-            console.log("[vehicle-image] loaded:", url);
-            setState("loaded");
-          }}
-          onError={(e) => {
-            console.error("[vehicle-image] failed to load:", url, e);
-            fetch(url, { cache: "no-store" })
-              .then(async (res) => {
-                const text = res.ok ? "" : await res.text().catch(() => "");
-                console.error("[vehicle-image] diagnostic fetch:", {
-                  url,
-                  status: res.status,
-                  ok: res.ok,
-                  contentType: res.headers.get("content-type"),
-                  body: text.slice(0, 500),
-                });
-              })
-              .catch((err) => console.error("[vehicle-image] diagnostic fetch failed:", url, err));
-            setState("fallback");
-          }}
+          onLoad={() => setState("loaded")}
+          onError={() => setState("fallback")}
           className={`relative z-[1] h-full w-full object-cover mix-blend-lighten transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
         />
       )}
-
     </>
   );
 }
