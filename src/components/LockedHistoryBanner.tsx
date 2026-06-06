@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Loader2, Lock, Sparkles, X } from "lucide-react";
-import { toast } from "sonner";
-import { unlockHistoryFn } from "@/lib/vehicles.functions";
+import { Lock, Sparkles, X } from "lucide-react";
+import { CheckoutPremiumModal } from "@/components/CheckoutPremiumModal";
+
 
 /**
  * Banner "Carfax Reverso" exibido em Revisões/Despesas quando o veículo ativo
@@ -25,7 +25,7 @@ export function LockedHistoryBanner({
       return false;
     }
   });
-  const [submitting, setSubmitting] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   useEffect(() => {
     setMinimized(() => {
@@ -55,20 +55,6 @@ export function LockedHistoryBanner({
     setMinimized(false);
   };
 
-  const unlock = async () => {
-    if (submitting) return;
-    setSubmitting(true);
-    try {
-      await unlockHistoryFn({ data: { vehicleId } });
-      toast.success("Porta-Luvas Digital destravado! Histórico completo liberado.");
-      onUnlocked();
-    } catch (e) {
-      console.error("[unlockHistoryFn]", e);
-      toast.error(e instanceof Error ? e.message : "Não foi possível destravar.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (minimized) {
     return (
