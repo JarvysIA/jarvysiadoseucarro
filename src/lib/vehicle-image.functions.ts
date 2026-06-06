@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
  * Gera (ou recicla via Global Image Cache) a foto do veículo.
@@ -31,6 +30,8 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
     if (!vehicleId || (!marca && !modelo)) {
       return { ok: false as const, url: null, cached: false as const };
     }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const internalImageUrl = `/api/vehicle-image/${vehicleId}`;
 
