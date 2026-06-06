@@ -555,16 +555,21 @@ type ItemOverride = {
 
 function VehicleStatusSection({
   vehicleId,
+  placa,
   kmAtual,
   onKmChange,
+  onDeleted,
 }: {
   vehicleId: string;
+  placa: string;
   kmAtual: number;
   onKmChange: (km: number) => void;
+  onDeleted: () => void;
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   // Overrides e despesas por veículo + item (mock — preparado para virar tabela depois)
   const [overrides, setOverrides] = useState<
     Record<string, Partial<Record<MaintItemKey, ItemOverride>>>
