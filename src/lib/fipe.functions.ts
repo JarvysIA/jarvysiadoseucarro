@@ -165,10 +165,3 @@ export const seedFipeHistoryFn = createServerFn({ method: "POST" })
     console.log("[seedFipeHistoryFn] sucesso", { inserted: rows.length });
     return { ok: true, inserted: rows.length };
   });
-
-    const { error: upErr } = await supabaseAdmin
-      .from("fipe_history")
-      .upsert(rows, { onConflict: "vehicle_id,mes_referencia" });
-    if (upErr) throw new Error(upErr.message);
-    return { ok: true, inserted: rows.length };
-  });
