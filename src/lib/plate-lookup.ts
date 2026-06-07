@@ -1,12 +1,24 @@
 import type { PlateLookupResult } from "@/components/CarConfirmModal";
 import { lookupPlateFn } from "./plate-lookup.functions";
+import type { FipeHistoricoItem } from "./plate-lookup.functions";
+
+export type PlateLookupFullResult =
+  | (NonNullable<PlateLookupResult> & {
+      fipe?: {
+        codigo_fipe: string;
+        valor: number;
+        mes_referencia: string;
+        historico: FipeHistoricoItem[];
+      } | null;
+    })
+  | null;
 
 /**
  * Consulta a placa via API PuxaPlaca (através de uma server function
  * para evitar CORS e manter o token fora do bundle do cliente).
  * Retorna null em caso de falha para que o modal caia no modo manual.
  */
-export async function lookupPlate(placa: string): Promise<PlateLookupResult> {
+export async function lookupPlate(placa: string): Promise<PlateLookupFullResult> {
   try {
     const res = await lookupPlateFn({ data: { placa } });
     // eslint-disable-next-line no-console
@@ -19,6 +31,7 @@ export async function lookupPlate(placa: string): Promise<PlateLookupResult> {
       cor: res.data.cor,
       motorizacao: res.data.motorizacao,
       chassi: res.data.chassi,
+      fipe: res.data.fipe ?? null,
     };
   } catch (e) {
     // eslint-disable-next-line no-console
