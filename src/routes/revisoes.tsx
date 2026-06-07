@@ -270,13 +270,43 @@ function RevisoesPage() {
                                     month: "short",
                                     year: "numeric",
                                   })}
-                                  {d.km_registro != null && (
-                                    <>
-                                      {" · "}
-                                      <Gauge className="inline h-3 w-3 text-primary" />{" "}
-                                      {d.km_registro.toLocaleString("pt-BR")} km
-                                    </>
-                                  )}
+                                  {d.km_registro != null && (() => {
+                                    const isBad = inconsistentIds.has(d.id);
+                                    return (
+                                      <>
+                                        {" · "}
+                                        <Gauge
+                                          className={`inline h-3 w-3 ${
+                                            isBad ? "text-destructive" : "text-primary"
+                                          }`}
+                                        />{" "}
+                                        <span className={isBad ? "font-semibold text-destructive" : ""}>
+                                          {d.km_registro.toLocaleString("pt-BR")} km
+                                        </span>
+                                        {isBad && (
+                                          <TooltipProvider delayDuration={150}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-destructive/40 text-destructive"
+                                                  aria-label="Inconsistência matemática detectada em relação aos registros anteriores."
+                                                >
+                                                  <InfoIcon className="h-2.5 w-2.5" />
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent
+                                                side="top"
+                                                className="max-w-[220px] bg-destructive text-destructive-foreground"
+                                              >
+                                                Inconsistência matemática detectada em relação aos registros anteriores.
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-foreground">
