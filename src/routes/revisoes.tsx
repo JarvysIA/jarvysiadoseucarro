@@ -44,23 +44,26 @@ function RevisoesPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [placa, setPlaca] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) {
       setVehicleKm(0);
       setHistoryLocked(false);
       setClaimedAt(null);
+      setPlaca(null);
       return;
     }
     supabase
       .from("veiculos")
-      .select("km_atual,history_locked,claimed_at")
+      .select("km_atual,history_locked,claimed_at,placa")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
         setVehicleKm(data?.km_atual ?? 0);
         setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
         setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
+        setPlaca(((data as { placa?: string } | null)?.placa) ?? null);
       });
   }, [activeVehicleId, reloadKey]);
 
@@ -68,36 +71,48 @@ function RevisoesPage() {
     let cancel = false;
     (async () => {
       setLoading(true);
-      if (!activeVehicleId) {
+      if (!activeVehicleId || !placa) {
         if (!cancel) {
           setItems([]);
           setLoading(false);
         }
         return;
       }
-      let query = supabase
-        .from("despesas")
-        .select("*")
-        .eq("vehicle_id", activeVehicleId)
-        .in("categoria", ["Revisão", "Manutenção"]);
-      if (historyLocked && claimedAt) {
-        query = query.gte("created_at", claimedAt);
-      }
-      const { data, error } = await query.order("data", { ascending: false });
-      if (!cancel) {
-        if (error) {
-          console.error("[revisoes]", error);
-          setItems([]);
-        } else {
-          setItems((data || []) as Despesa[]);
+      try {
+        // Relatório unificado: todos os registros (de todos os donos passados)
+        // que compartilham a mesma placa.
+        const res = await getRevendaHistoryFn({ data: { placa } });
+        if (cancel) return;
+        let all = (res.items as RevendaItem[])
+          .filter((r) => r.categoria === "Revisão" || r.categoria === "Manutenção")
+          .map((r) => ({
+            id: r.id,
+            user_id: "",
+            vehicle_id: r.vehicle_id,
+            data: r.data,
+            valor: Number(r.valor),
+            categoria: r.categoria as Despesa["categoria"],
+            descricao: r.descricao,
+            km_registro: r.km_registro,
+            receipt_image_url: r.receipt_image_url,
+            created_at: r.created_at,
+          })) as Despesa[];
+        // Carfax Reverso: oculta lançamentos do antigo dono até destravar.
+        if (historyLocked && claimedAt) {
+          all = all.filter((d) => new Date(d.created_at) >= new Date(claimedAt));
         }
-        setLoading(false);
+        setItems(all);
+      } catch (e) {
+        console.error("[revisoes unified]", e);
+        setItems([]);
+      } finally {
+        if (!cancel) setLoading(false);
       }
     })();
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId, reloadKey, historyLocked, claimedAt]);
+  }, [activeVehicleId, placa, reloadKey, historyLocked, claimedAt]);
 
   // Carrega o signed URL ao abrir o modal (bloqueado para registros do dono antigo)
   useEffect(() => {
