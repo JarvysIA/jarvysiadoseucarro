@@ -183,6 +183,32 @@ export function AddVehicleModal({
       } catch (e) {
         console.warn("[inheritVehicleImageFn]", e);
       }
+
+      // Salva dados FIPE no veículo + seeds o gráfico de histórico
+      if (fipeLookup && fipeLookup.codigo_fipe) {
+        try {
+          await supabase
+            .from("veiculos")
+            .update({
+              codigo_fipe: fipeLookup.codigo_fipe,
+              fipe_valor: fipeLookup.valor || null,
+              fipe_mes_referencia: fipeLookup.mes_referencia || null,
+              fipe_updated_at: new Date().toISOString(),
+            })
+            .eq("id", inserted.id);
+          if (fipeLookup.historico?.length) {
+            await seedFipeHistoryFn({
+              data: {
+                vehicleId: inserted.id,
+                codigo_fipe: fipeLookup.codigo_fipe,
+                historico: fipeLookup.historico,
+              },
+            });
+          }
+        } catch (e) {
+          console.warn("[FIPE save]", e);
+        }
+      }
       toast.success("Veículo adicionado!");
       onAdded({
         id: inserted.id,
