@@ -61,6 +61,41 @@ export type Database = {
           },
         ]
       }
+      fipe_history: {
+        Row: {
+          codigo_fipe: string
+          created_at: string
+          id: string
+          mes_referencia: string
+          valor: number
+          vehicle_id: string
+        }
+        Insert: {
+          codigo_fipe: string
+          created_at?: string
+          id?: string
+          mes_referencia: string
+          valor: number
+          vehicle_id: string
+        }
+        Update: {
+          codigo_fipe?: string
+          created_at?: string
+          id?: string
+          mes_referencia?: string
+          valor?: number
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fipe_history_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -172,8 +207,12 @@ export type Database = {
           ano: string | null
           chassi: string | null
           claimed_at: string | null
+          codigo_fipe: string | null
           cor: string | null
           created_at: string
+          fipe_mes_referencia: string | null
+          fipe_updated_at: string | null
+          fipe_valor: number | null
           foto_url: string | null
           history_locked: boolean
           id: string
@@ -190,8 +229,12 @@ export type Database = {
           ano?: string | null
           chassi?: string | null
           claimed_at?: string | null
+          codigo_fipe?: string | null
           cor?: string | null
           created_at?: string
+          fipe_mes_referencia?: string | null
+          fipe_updated_at?: string | null
+          fipe_valor?: number | null
           foto_url?: string | null
           history_locked?: boolean
           id?: string
@@ -208,8 +251,12 @@ export type Database = {
           ano?: string | null
           chassi?: string | null
           claimed_at?: string | null
+          codigo_fipe?: string | null
           cor?: string | null
           created_at?: string
+          fipe_mes_referencia?: string | null
+          fipe_updated_at?: string | null
+          fipe_valor?: number | null
           foto_url?: string | null
           history_locked?: boolean
           id?: string
