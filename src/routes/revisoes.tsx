@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
+import { Camera, Gauge, Info as InfoIcon, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
@@ -14,11 +14,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   CATEGORIA_COLOR,
   formatBRL,
   getReceiptSignedUrl,
   type Despesa,
 } from "@/lib/despesas";
+import { getRevendaHistoryFn, type RevendaItem } from "@/lib/vehicles.functions";
 
 export const Route = createFileRoute("/revisoes")({
   head: () => ({ meta: [{ title: "Revisões — Jarvys" }] }),
@@ -37,23 +44,26 @@ function RevisoesPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [placa, setPlaca] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) {
       setVehicleKm(0);
       setHistoryLocked(false);
       setClaimedAt(null);
+      setPlaca(null);
       return;
     }
     supabase
       .from("veiculos")
-      .select("km_atual,history_locked,claimed_at")
+      .select("km_atual,history_locked,claimed_at,placa")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
         setVehicleKm(data?.km_atual ?? 0);
         setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
         setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
+        setPlaca(((data as { placa?: string } | null)?.placa) ?? null);
       });
   }, [activeVehicleId, reloadKey]);
 
@@ -61,36 +71,48 @@ function RevisoesPage() {
     let cancel = false;
     (async () => {
       setLoading(true);
-      if (!activeVehicleId) {
+      if (!activeVehicleId || !placa) {
         if (!cancel) {
           setItems([]);
           setLoading(false);
         }
         return;
       }
-      let query = supabase
-        .from("despesas")
-        .select("*")
-        .eq("vehicle_id", activeVehicleId)
-        .in("categoria", ["Revisão", "Manutenção"]);
-      if (historyLocked && claimedAt) {
-        query = query.gte("created_at", claimedAt);
-      }
-      const { data, error } = await query.order("data", { ascending: false });
-      if (!cancel) {
-        if (error) {
-          console.error("[revisoes]", error);
-          setItems([]);
-        } else {
-          setItems((data || []) as Despesa[]);
+      try {
+        // Relatório unificado: todos os registros (de todos os donos passados)
+        // que compartilham a mesma placa.
+        const res = await getRevendaHistoryFn({ data: { placa } });
+        if (cancel) return;
+        let all = (res.items as RevendaItem[])
+          .filter((r) => r.categoria === "Revisão" || r.categoria === "Manutenção")
+          .map((r) => ({
+            id: r.id,
+            user_id: "",
+            vehicle_id: r.vehicle_id,
+            data: r.data,
+            valor: Number(r.valor),
+            categoria: r.categoria as Despesa["categoria"],
+            descricao: r.descricao,
+            km_registro: r.km_registro,
+            receipt_image_url: r.receipt_image_url,
+            created_at: r.created_at,
+          })) as Despesa[];
+        // Carfax Reverso: oculta lançamentos do antigo dono até destravar.
+        if (historyLocked && claimedAt) {
+          all = all.filter((d) => new Date(d.created_at) >= new Date(claimedAt));
         }
-        setLoading(false);
+        setItems(all);
+      } catch (e) {
+        console.error("[revisoes unified]", e);
+        setItems([]);
+      } finally {
+        if (!cancel) setLoading(false);
       }
     })();
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId, reloadKey, historyLocked, claimedAt]);
+  }, [activeVehicleId, placa, reloadKey, historyLocked, claimedAt]);
 
   // Carrega o signed URL ao abrir o modal (bloqueado para registros do dono antigo)
   useEffect(() => {
@@ -110,6 +132,24 @@ function RevisoesPage() {
       cancel = true;
     };
   }, [openDespesa, claimedAt]);
+
+  // Auditoria de hodômetro: percorre cronologicamente (mais antigo → mais
+  // recente) e marca como inconsistente qualquer registro cuja KM seja menor
+  // que a maior KM já vista. Indica adulteração / retrocesso do hodômetro.
+  const inconsistentIds = useMemo(() => {
+    const flagged = new Set<string>();
+    const asc = [...items].sort(
+      (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+    );
+    let maxKm = -Infinity;
+    for (const d of asc) {
+      if (d.km_registro != null) {
+        if (d.km_registro < maxKm) flagged.add(d.id);
+        else if (d.km_registro > maxKm) maxKm = d.km_registro;
+      }
+    }
+    return flagged;
+  }, [items]);
 
   const grouped = useMemo(() => {
     // Agrupar por ano para a timeline (apenas visual)
@@ -230,13 +270,43 @@ function RevisoesPage() {
                                     month: "short",
                                     year: "numeric",
                                   })}
-                                  {d.km_registro != null && (
-                                    <>
-                                      {" · "}
-                                      <Gauge className="inline h-3 w-3 text-primary" />{" "}
-                                      {d.km_registro.toLocaleString("pt-BR")} km
-                                    </>
-                                  )}
+                                  {d.km_registro != null && (() => {
+                                    const isBad = inconsistentIds.has(d.id);
+                                    return (
+                                      <>
+                                        {" · "}
+                                        <Gauge
+                                          className={`inline h-3 w-3 ${
+                                            isBad ? "text-destructive" : "text-primary"
+                                          }`}
+                                        />{" "}
+                                        <span className={isBad ? "font-semibold text-destructive" : ""}>
+                                          {d.km_registro.toLocaleString("pt-BR")} km
+                                        </span>
+                                        {isBad && (
+                                          <TooltipProvider delayDuration={150}>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <span
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-destructive/40 text-destructive"
+                                                  aria-label="Inconsistência matemática detectada em relação aos registros anteriores."
+                                                >
+                                                  <InfoIcon className="h-2.5 w-2.5" />
+                                                </span>
+                                              </TooltipTrigger>
+                                              <TooltipContent
+                                                side="top"
+                                                className="max-w-[220px] bg-destructive text-destructive-foreground"
+                                              >
+                                                Inconsistência matemática detectada em relação aos registros anteriores.
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-foreground">

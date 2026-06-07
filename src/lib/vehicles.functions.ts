@@ -173,3 +173,65 @@ export const inheritVehicleImageFn = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
     return { inherited: true as const, url: prior.foto_url };
   });
+
+export type RevendaItem = {
+  id: string;
+  data: string;
+  valor: number;
+  categoria: string;
+  descricao: string;
+  km_registro: number | null;
+  receipt_image_url: string | null;
+  created_at: string;
+  vehicle_id: string;
+};
+
+/**
+ * Relatório de Revenda — varre o banco inteiro filtrando pela placa.
+ * Junta despesas de todos os donos passados que compartilham a mesma placa
+ * (mesmo que estejam em vehicle_ids diferentes). Ordena cronologicamente
+ * (mais recente primeiro). Requer que o usuário logado seja dono ATUAL de
+ * algum veículo com essa placa.
+ */
+export const getRevendaHistoryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { placa: string }) => {
+    const placa = sanitizePlate(data?.placa ?? "");
+    if (!placa) throw new Error("Placa obrigatória.");
+    return { placa };
+  })
+  .handler(async ({ data, context }): Promise<{ items: RevendaItem[] }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Confirma que o usuário é dono atual de pelo menos 1 veículo com essa placa.
+    const { data: owned, error: oErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id,claimed_at")
+      .eq("placa", data.placa)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (oErr) throw new Error(oErr.message);
+    if (!owned) throw new Error("Acesso negado.");
+
+    // Coleta TODOS os vehicle_ids que já compartilharam essa placa.
+    const { data: vs, error: vErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id")
+      .eq("placa", data.placa);
+    if (vErr) throw new Error(vErr.message);
+    const ids = (vs || []).map((v) => v.id);
+    if (ids.length === 0) return { items: [] };
+
+    const { data: rows, error: dErr } = await supabaseAdmin
+      .from("despesas")
+      .select("id,data,valor,categoria,descricao,km_registro,receipt_image_url,created_at,vehicle_id")
+      .in("vehicle_id", ids)
+      .order("data", { ascending: false });
+    if (dErr) throw new Error(dErr.message);
+    return {
+      items: ((rows || []) as RevendaItem[]).map((r) => ({
+        ...r,
+        valor: Number(r.valor),
+      })),
+    };
+  });

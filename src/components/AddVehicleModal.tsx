@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import type { FipeHistoricoItem } from "@/lib/plate-lookup.functions";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
+import { seedFipeHistoryFn } from "@/lib/fipe.functions";
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
@@ -15,6 +17,13 @@ type LookupData = {
   motorizacao: string;
   chassi?: string;
 };
+
+type FipeFromLookup = {
+  codigo_fipe: string;
+  valor: number;
+  mes_referencia: string;
+  historico: FipeHistoricoItem[];
+} | null;
 
 export type AddedVehicle = {
   id: string;
@@ -60,6 +69,7 @@ export function AddVehicleModal({
   });
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +79,7 @@ export function AddVehicleModal({
       setData({ marca: "", modelo: "", ano: "", cor: "", motorizacao: "", chassi: "" });
       setKm("");
       setSubmitting(false);
+      setFipeLookup(null);
     }
   }, [open]);
 
@@ -118,8 +129,10 @@ export function AddVehicleModal({
         motorizacao: r.motorizacao || "",
         chassi: r.chassi || "",
       });
+      setFipeLookup(r.fipe ?? null);
       setNotFound(false);
     } else {
+      setFipeLookup(null);
       setNotFound(true);
     }
     setStep("confirm");
@@ -169,6 +182,32 @@ export function AddVehicleModal({
         if (inh.inherited && inh.url) inheritedFoto = inh.url;
       } catch (e) {
         console.warn("[inheritVehicleImageFn]", e);
+      }
+
+      // Salva dados FIPE no veículo + seeds o gráfico de histórico
+      if (fipeLookup && fipeLookup.codigo_fipe) {
+        try {
+          await supabase
+            .from("veiculos")
+            .update({
+              codigo_fipe: fipeLookup.codigo_fipe,
+              fipe_valor: fipeLookup.valor || null,
+              fipe_mes_referencia: fipeLookup.mes_referencia || null,
+              fipe_updated_at: new Date().toISOString(),
+            })
+            .eq("id", inserted.id);
+          if (fipeLookup.historico?.length) {
+            await seedFipeHistoryFn({
+              data: {
+                vehicleId: inserted.id,
+                codigo_fipe: fipeLookup.codigo_fipe,
+                historico: fipeLookup.historico,
+              },
+            });
+          }
+        } catch (e) {
+          console.warn("[FIPE save]", e);
+        }
       }
       toast.success("Veículo adicionado!");
       onAdded({
