@@ -432,6 +432,7 @@ function AppPage() {
         <VehicleStatusSection
           vehicleId={selected.id}
           placa={selected.plate}
+          ano={selected.year}
           kmAtual={selected.km}
           onKmChange={(km) =>
             setVehicles((prev) =>
@@ -555,12 +556,14 @@ type ItemOverride = {
 function VehicleStatusSection({
   vehicleId,
   placa,
+  ano,
   kmAtual,
   onKmChange,
   onDeleted,
 }: {
   vehicleId: string;
   placa: string;
+  ano: string;
   kmAtual: number;
   onKmChange: (km: number) => void;
   onDeleted: () => void;
@@ -804,7 +807,7 @@ function VehicleStatusSection({
           })}
         </div>
 
-        <FipeCard vehicleId={vehicleId} placa={placa} ano="" />
+        <FipeCard vehicleId={vehicleId} placa={placa} ano={ano} />
       </section>
 
       {/* Zona perigosa — Soft delete do veículo */}
