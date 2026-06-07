@@ -133,6 +133,24 @@ function RevisoesPage() {
     };
   }, [openDespesa, claimedAt]);
 
+  // Auditoria de hodômetro: percorre cronologicamente (mais antigo → mais
+  // recente) e marca como inconsistente qualquer registro cuja KM seja menor
+  // que a maior KM já vista. Indica adulteração / retrocesso do hodômetro.
+  const inconsistentIds = useMemo(() => {
+    const flagged = new Set<string>();
+    const asc = [...items].sort(
+      (a, b) => new Date(a.data).getTime() - new Date(b.data).getTime(),
+    );
+    let maxKm = -Infinity;
+    for (const d of asc) {
+      if (d.km_registro != null) {
+        if (d.km_registro < maxKm) flagged.add(d.id);
+        else if (d.km_registro > maxKm) maxKm = d.km_registro;
+      }
+    }
+    return flagged;
+  }, [items]);
+
   const grouped = useMemo(() => {
     // Agrupar por ano para a timeline (apenas visual)
     const map = new Map<number, Despesa[]>();
