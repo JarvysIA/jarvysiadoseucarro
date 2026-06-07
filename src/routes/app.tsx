@@ -17,7 +17,6 @@ import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/comp
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
-  TireStackIcon,
   BrakeDiscIcon,
 } from "@/components/automotive-icons";
 import {
