@@ -55,7 +55,6 @@ type ItemDef = {
 const ITEMS: ItemDef[] = [
   { key: "oleo", label: "Óleo do Motor", icon: (p) => <Droplet className={p.className} /> },
   { key: "filtros", label: "Filtros", icon: (p) => <AirFilterIcon className={p.className} /> },
-  { key: "pneus", label: "Pneus", icon: (p) => <TireStackIcon className={p.className} /> },
   { key: "pastilhas", label: "Pastilhas", icon: (p) => <BrakeDiscIcon className={p.className} /> },
   { key: "arrefecimento", label: "Arrefecimento", icon: (p) => <Thermometer className={p.className} /> },
 ];
@@ -765,18 +764,15 @@ function VehicleStatusSection({
 
       <section className="mt-4 px-6">
         <div className="grid grid-cols-2 gap-3">
-          {ITEMS.map((it, idx) => {
+          {ITEMS.map((it) => {
             const data = computed.find((c) => c.item.key === it.key);
             if (!data) return null;
-            const fullSpan = idx === ITEMS.length - 1 && ITEMS.length % 2 === 1;
             return (
               <button
                 type="button"
                 key={it.key}
                 onClick={() => setOpenItemKey(it.key)}
-                className={`relative rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:scale-[0.99] ${
-                  fullSpan ? "col-span-2" : ""
-                }`}
+                className="relative rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:scale-[0.99]"
               >
                 <div className="flex items-start justify-between">
                   <div
@@ -807,6 +803,8 @@ function VehicleStatusSection({
             );
           })}
         </div>
+
+        <FipeCard vehicleId={vehicleId} placa={placa} ano="" />
       </section>
 
       {/* Zona perigosa — Soft delete do veículo */}
