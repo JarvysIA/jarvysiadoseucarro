@@ -120,14 +120,25 @@ export const seedFipeHistoryFn = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
+    console.log("[seedFipeHistoryFn] start", {
+      vehicleId: data.vehicleId,
+      codigo_fipe: data.codigo_fipe,
+      historicoLen: data.historico?.length ?? 0,
+    });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: v, error } = await supabaseAdmin
       .from("veiculos")
       .select("id,user_id")
       .eq("id", data.vehicleId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!v || v.user_id !== context.userId) throw new Error("Acesso negado.");
+    if (error) {
+      console.error("[seedFipeHistoryFn] veiculo lookup error", error);
+      throw new Error(error.message);
+    }
+    if (!v || v.user_id !== context.userId) {
+      console.error("[seedFipeHistoryFn] acesso negado", { found: !!v });
+      throw new Error("Acesso negado.");
+    }
 
     const rows = data.historico
       .map((h) => ({
@@ -138,11 +149,19 @@ export const seedFipeHistoryFn = createServerFn({ method: "POST" })
       }))
       .filter((r) => r.mes_referencia && r.valor > 0);
 
-    if (rows.length === 0) return { ok: true, inserted: 0 };
+    console.log("[seedFipeHistoryFn] rows preparadas", { count: rows.length, sample: rows[0] });
+    if (rows.length === 0) {
+      console.warn("[seedFipeHistoryFn] nenhuma linha válida no histórico recebido");
+      return { ok: true, inserted: 0 };
+    }
 
     const { error: upErr } = await supabaseAdmin
       .from("fipe_history")
       .upsert(rows, { onConflict: "vehicle_id,mes_referencia" });
-    if (upErr) throw new Error(upErr.message);
+    if (upErr) {
+      console.error("[seedFipeHistoryFn] upsert error", upErr);
+      throw new Error(upErr.message);
+    }
+    console.log("[seedFipeHistoryFn] sucesso", { inserted: rows.length });
     return { ok: true, inserted: rows.length };
   });

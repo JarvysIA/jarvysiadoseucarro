@@ -13,12 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CATEGORIA_COLOR,
   formatBRL,
@@ -284,25 +279,24 @@ function RevisoesPage() {
                                           {d.km_registro.toLocaleString("pt-BR")} km
                                         </span>
                                         {isBad && (
-                                          <TooltipProvider delayDuration={150}>
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <span
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-destructive/40 text-destructive"
-                                                  aria-label="Inconsistência matemática detectada em relação aos registros anteriores."
-                                                >
-                                                  <InfoIcon className="h-2.5 w-2.5" />
-                                                </span>
-                                              </TooltipTrigger>
-                                              <TooltipContent
-                                                side="top"
-                                                className="max-w-[220px] bg-destructive text-destructive-foreground"
+                                          <Popover>
+                                            <PopoverTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="ml-1 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-destructive/40 text-destructive"
+                                                aria-label="Inconsistência matemática detectada em relação aos registros anteriores."
                                               >
-                                                Inconsistência matemática detectada em relação aos registros anteriores.
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          </TooltipProvider>
+                                                <InfoIcon className="h-2.5 w-2.5" />
+                                              </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                              side="top"
+                                              className="max-w-[240px] bg-destructive text-destructive-foreground text-xs p-2 border-destructive"
+                                            >
+                                              Inconsistência matemática detectada em relação aos registros anteriores.
+                                            </PopoverContent>
+                                          </Popover>
                                         )}
                                       </>
                                     );
