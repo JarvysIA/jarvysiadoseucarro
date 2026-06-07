@@ -69,6 +69,7 @@ export function AddVehicleModal({
   });
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
 
   useEffect(() => {
     if (!open) {
@@ -78,6 +79,7 @@ export function AddVehicleModal({
       setData({ marca: "", modelo: "", ano: "", cor: "", motorizacao: "", chassi: "" });
       setKm("");
       setSubmitting(false);
+      setFipeLookup(null);
     }
   }, [open]);
 
@@ -127,8 +129,10 @@ export function AddVehicleModal({
         motorizacao: r.motorizacao || "",
         chassi: r.chassi || "",
       });
+      setFipeLookup(r.fipe ?? null);
       setNotFound(false);
     } else {
+      setFipeLookup(null);
       setNotFound(true);
     }
     setStep("confirm");
