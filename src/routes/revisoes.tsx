@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Gauge, Loader2, Plus, Wrench } from "lucide-react";
+import { Camera, Gauge, Info, Loader2, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
@@ -14,11 +14,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   CATEGORIA_COLOR,
   formatBRL,
   getReceiptSignedUrl,
   type Despesa,
 } from "@/lib/despesas";
+import { getRevendaHistoryFn, type RevendaItem } from "@/lib/vehicles.functions";
 
 export const Route = createFileRoute("/revisoes")({
   head: () => ({ meta: [{ title: "Revisões — Jarvys" }] }),
