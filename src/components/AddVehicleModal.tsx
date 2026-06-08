@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
 import type { FipeHistoricoItem } from "@/lib/plate-lookup.functions";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
-import { seedFipeHistoryFn } from "@/lib/fipe.functions";
+
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
@@ -184,29 +184,20 @@ export function AddVehicleModal({
         console.warn("[inheritVehicleImageFn]", e);
       }
 
-      // Salva dados FIPE no veículo + seeds o gráfico de histórico
+      // FIPE: salvamos APENAS o codigo_fipe vindo da API paga (identificação).
+      // O valor atual e o histórico vêm exclusivamente da BrasilAPI gratuita,
+      // disparada via refreshFipeFn(force=true) logo após o cadastro.
       if (fipeLookup && fipeLookup.codigo_fipe) {
         try {
           await supabase
             .from("veiculos")
-            .update({
-              codigo_fipe: fipeLookup.codigo_fipe,
-              fipe_valor: fipeLookup.valor || null,
-              fipe_mes_referencia: fipeLookup.mes_referencia || null,
-              fipe_updated_at: new Date().toISOString(),
-            })
+            .update({ codigo_fipe: fipeLookup.codigo_fipe })
             .eq("id", inserted.id);
-          if (fipeLookup.historico?.length) {
-            await seedFipeHistoryFn({
-              data: {
-                vehicleId: inserted.id,
-                codigo_fipe: fipeLookup.codigo_fipe,
-                historico: fipeLookup.historico,
-              },
-            });
-          }
+          // Importação dinâmica para não inflar bundle inicial
+          const { refreshFipeFn } = await import("@/lib/fipe.functions");
+          await refreshFipeFn({ data: { vehicleId: inserted.id, force: true } });
         } catch (e) {
-          console.warn("[FIPE save]", e);
+          console.warn("[FIPE seed via BrasilAPI]", e);
         }
       }
       toast.success("Veículo adicionado!");

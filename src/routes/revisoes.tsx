@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Gauge, Info as InfoIcon, Loader2, Plus, Wrench } from "lucide-react";
+import { Camera, ChevronRight, Gauge, Info as InfoIcon, Loader2, Pencil, Plus, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
@@ -32,6 +32,7 @@ function RevisoesPage() {
   const [items, setItems] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDespesa, setOpenDespesa] = useState<Despesa | null>(null);
+  const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -303,9 +304,12 @@ function RevisoesPage() {
                                   })()}
                                 </p>
                               </div>
-                              <p className="text-sm font-bold text-foreground">
-                                {formatBRL(Number(d.valor))}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-foreground">
+                                  {formatBRL(Number(d.valor))}
+                                </p>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
                             </div>
                           </button>
                         </li>
@@ -388,6 +392,18 @@ function RevisoesPage() {
                   </div>
                 );
               })()}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingDespesa(openDespesa);
+                  setOpenDespesa(null);
+                }}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar / Excluir Registro
+              </button>
             </>
           )}
         </DialogContent>
@@ -410,6 +426,17 @@ function RevisoesPage() {
         kmAtualVeiculo={vehicleKm}
         defaultCategoria="Revisão"
         onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <NewExpenseModal
+        open={!!editingDespesa}
+        onClose={() => setEditingDespesa(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        editing={editingDespesa}
+        onUpdated={() => setReloadKey((k) => k + 1)}
+        onDeleted={() => setReloadKey((k) => k + 1)}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 

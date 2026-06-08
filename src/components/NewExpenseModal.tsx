@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Check, Sparkles } from "lucide-react";
+import { Loader2, Check, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
+  type Despesa,
   type DespesaCategoria,
 } from "@/lib/despesas";
 
@@ -21,7 +22,11 @@ type Props = {
   vehicleId: string | null;
   kmAtualVeiculo: number;
   defaultCategoria?: DespesaCategoria;
+  /** Quando informado, o modal opera em modo EDIÇÃO da despesa existente. */
+  editing?: Despesa | null;
   onCreated?: () => void; // refetch trigger
+  onUpdated?: () => void;
+  onDeleted?: () => void;
   onVehicleKmUpdated?: (newKm: number) => void;
 };
 
@@ -31,31 +36,44 @@ export function NewExpenseModal({
   vehicleId,
   kmAtualVeiculo,
   defaultCategoria = "Manutenção",
+  editing = null,
   onCreated,
+  onUpdated,
+  onDeleted,
   onVehicleKmUpdated,
 }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  const isEdit = Boolean(editing?.id);
   const [categoria, setCategoria] = useState<DespesaCategoria>(defaultCategoria);
   const [valor, setValor] = useState("");
   const [data, setData] = useState(today);
   const [km, setKm] = useState(String(kmAtualVeiculo || ""));
   const [descricao, setDescricao] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setCategoria(editing.categoria);
+      setValor(String(editing.valor).replace(".", ","));
+      setData(new Date(editing.data).toISOString().slice(0, 10));
+      setKm(editing.km_registro != null ? String(editing.km_registro) : "");
+      setDescricao(editing.descricao || "");
+    } else {
       setCategoria(defaultCategoria);
       setValor("");
       setData(today);
       setKm(String(kmAtualVeiculo || ""));
       setDescricao("");
-      setSaving(false);
     }
+    setSaving(false);
+    setDeleting(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, editing]);
 
   const submit = async () => {
-    if (!vehicleId) {
+    if (!vehicleId && !isEdit) {
       toast.error("Selecione um veículo primeiro.");
       return;
     }
@@ -82,9 +100,35 @@ export function NewExpenseModal({
     }
     setSaving(true);
     try {
+      if (isEdit && editing) {
+        const { error: upErr } = await supabase
+          .from("despesas")
+          .update({
+            data: new Date(data).toISOString(),
+            valor: valorNum,
+            categoria,
+            descricao: descricao.trim() || categoria,
+            km_registro: kmNum,
+          })
+          .eq("id", editing.id);
+        if (upErr) throw upErr;
+        if (kmNum != null && kmNum > kmAtualVeiculo && editing.vehicle_id) {
+          await supabase
+            .from("veiculos")
+            .update({ km_atual: kmNum })
+            .eq("id", editing.vehicle_id);
+          onVehicleKmUpdated?.(kmNum);
+        }
+        toast.success("Alterações salvas!");
+        onUpdated?.();
+        onClose();
+        return;
+      }
+
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess.session?.user.id;
       if (!userId) throw new Error("Sessão expirada.");
+      if (!vehicleId) throw new Error("Veículo não selecionado.");
 
       const { error: insErr } = await supabase.from("despesas").insert({
         user_id: userId,
@@ -98,7 +142,6 @@ export function NewExpenseModal({
       });
       if (insErr) throw insErr;
 
-      // Atualiza KM do veículo se a informada for maior
       if (kmNum != null && kmNum > kmAtualVeiculo) {
         await supabase.from("veiculos").update({ km_atual: kmNum }).eq("id", vehicleId);
         onVehicleKmUpdated?.(kmNum);
@@ -115,16 +158,36 @@ export function NewExpenseModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!editing) return;
+    if (!confirm("Excluir este registro? Esta ação não pode ser desfeita.")) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("despesas").delete().eq("id", editing.id);
+      if (error) throw error;
+      toast.success("Registro excluído.");
+      onDeleted?.();
+      onClose();
+    } catch (e) {
+      console.error("[NewExpenseModal delete]", e);
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-left">
             <Sparkles className="h-4 w-4 text-primary" />
-            Novo Registro Manual
+            {isEdit ? "Editar Registro" : "Novo Registro Manual"}
           </DialogTitle>
           <DialogDescription className="text-left">
-            Adicione uma despesa diretamente — sem precisar de nota fiscal.
+            {isEdit
+              ? "Atualize os dados ou exclua este lançamento."
+              : "Adicione uma despesa diretamente — sem precisar de nota fiscal."}
           </DialogDescription>
         </DialogHeader>
 
@@ -176,7 +239,7 @@ export function NewExpenseModal({
             </Field>
           </div>
 
-          <Field label="KM atual do veículo">
+          <Field label="KM no momento do serviço">
             <input
               inputMode="numeric"
               placeholder={kmAtualVeiculo ? String(kmAtualVeiculo) : "Opcional"}
@@ -197,11 +260,23 @@ export function NewExpenseModal({
             />
           </Field>
 
-          <div className="flex gap-2 pt-2">
+          {isEdit && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={saving || deleting}
+              className="flex items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-3 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/15 disabled:opacity-50"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleting ? "Excluindo..." : "Excluir Registro"}
+            </button>
+          )}
+
+          <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || deleting}
               className="flex-1 rounded-xl border border-border px-3 py-3 text-xs font-medium text-muted-foreground disabled:opacity-50"
             >
               Cancelar
@@ -209,11 +284,11 @@ export function NewExpenseModal({
             <button
               type="button"
               onClick={submit}
-              disabled={saving || !vehicleId}
+              disabled={saving || deleting || (!vehicleId && !isEdit)}
               className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              {saving ? "Salvando..." : "Salvar Registro"}
+              {saving ? "Salvando..." : isEdit ? "Salvar Alterações" : "Salvar Registro"}
             </button>
           </div>
         </div>
