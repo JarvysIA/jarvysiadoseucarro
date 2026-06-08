@@ -429,6 +429,17 @@ function RevisoesPage() {
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 
+      <NewExpenseModal
+        open={!!editingDespesa}
+        onClose={() => setEditingDespesa(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        editing={editingDespesa}
+        onUpdated={() => setReloadKey((k) => k + 1)}
+        onDeleted={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
       <BottomNav />
     </div>
   );
