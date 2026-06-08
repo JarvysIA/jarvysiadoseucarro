@@ -863,15 +863,14 @@ function VehicleImage({
   alt: string;
   onResolved: (url: string) => void;
 }) {
-  const [state, setState] = useState<"loading" | "loaded" | "fallback">(
-    cachedUrl ? "loading" : "loading",
-  );
+  const [state, setState] = useState<"loading" | "loaded" | "fallback">("loading");
   const [url, setUrl] = useState<string | null>(cachedUrl);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancel = false;
-    // Cache hit: usa imagem do banco, não chama Serper.
-    if (cachedUrl) {
+    // Cache hit (e não é uma tentativa de retry): usa imagem do banco.
+    if (cachedUrl && retryTick === 0) {
       setUrl(cachedUrl);
       setState("loading"); // aguarda onLoad da <img>
       return;
@@ -888,14 +887,13 @@ function VehicleImage({
         if (res.ok && res.url) {
           setUrl(res.url);
           onResolved(res.url);
-          // Persiste no Supabase para não chamar a API novamente.
           try {
             await supabase
               .from("veiculos")
               .update({ foto_url: res.url })
               .eq("id", vehicleId);
           } catch {
-            /* falha silenciosa: a imagem ainda aparece nesta sessão */
+            /* falha silenciosa */
           }
         } else {
           setState("fallback");
@@ -907,9 +905,21 @@ function VehicleImage({
     return () => {
       cancel = true;
     };
-    // Apenas vehicleId como dep — evita refetch ao trocar de abas/reordenar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
+  }, [vehicleId, retryTick]);
+
+  const handleRetry = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Limpa foto_url no banco e refaz o pedido à IA.
+    try {
+      await supabase.from("veiculos").update({ foto_url: null }).eq("id", vehicleId);
+    } catch {
+      /* segue mesmo se falhar */
+    }
+    toast.info("Gerando nova imagem do veículo...");
+    onResolved("");
+    setRetryTick((t) => t + 1);
+  };
 
   return (
     <>
@@ -924,8 +934,6 @@ function VehicleImage({
         />
       )}
 
-
-
       {state === "loading" && (
         <div className="absolute inset-0 z-[2] flex items-center justify-center">
           <div className="h-20 w-40 animate-pulse rounded-2xl bg-primary/10" />
@@ -933,15 +941,27 @@ function VehicleImage({
       )}
 
       {state === "fallback" && (
-        <img
-          src={fallbackCarImg}
-          alt={alt}
-          width={1024}
-          height={768}
-          loading="lazy"
-          className="relative z-[1] h-full w-full object-cover mix-blend-screen animate-in fade-in duration-500"
-          style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
-        />
+        <>
+          <img
+            src={fallbackCarImg}
+            alt={alt}
+            width={1024}
+            height={768}
+            loading="lazy"
+            className="relative z-[1] h-full w-full object-cover mix-blend-screen animate-in fade-in duration-500"
+            style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
+          />
+          {/* Botão Inteligente de Retry: visível apenas no fallback */}
+          <button
+            type="button"
+            onClick={handleRetry}
+            aria-label="Atualizar imagem do veículo"
+            className="glow-neon absolute bottom-3 right-3 z-[3] inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-background/80 px-3 py-1.5 text-[11px] font-semibold text-primary backdrop-blur transition-colors hover:bg-background"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Atualizar Imagem
+          </button>
+        </>
       )}
 
       {url && state !== "fallback" && (
