@@ -304,9 +304,12 @@ function RevisoesPage() {
                                   })()}
                                 </p>
                               </div>
-                              <p className="text-sm font-bold text-foreground">
-                                {formatBRL(Number(d.valor))}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-foreground">
+                                  {formatBRL(Number(d.valor))}
+                                </p>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
                             </div>
                           </button>
                         </li>
