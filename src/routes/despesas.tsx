@@ -293,30 +293,34 @@ function DespesasPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {items.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
-              >
-                <span
-                  className="h-9 w-9 shrink-0 rounded-xl"
-                  style={{
-                    backgroundColor: `color-mix(in oklab, ${CATEGORIA_COLOR[d.categoria]} 15%, transparent)`,
-                    boxShadow: `inset 0 0 0 1px ${CATEGORIA_COLOR[d.categoria]}`,
-                  }}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {d.descricao || d.categoria}
+              <li key={d.id}>
+                <button
+                  type="button"
+                  onClick={() => setEditingDespesa(d)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary/50 active:scale-[0.99]"
+                >
+                  <span
+                    className="h-9 w-9 shrink-0 rounded-xl"
+                    style={{
+                      backgroundColor: `color-mix(in oklab, ${CATEGORIA_COLOR[d.categoria]} 15%, transparent)`,
+                      boxShadow: `inset 0 0 0 1px ${CATEGORIA_COLOR[d.categoria]}`,
+                    }}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {d.descricao || d.categoria}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(d.data).toLocaleDateString("pt-BR")} ·{" "}
+                      <span style={{ color: CATEGORIA_COLOR[d.categoria] }}>{d.categoria}</span>
+                    </p>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatBRL(Number(d.valor))}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {new Date(d.data).toLocaleDateString("pt-BR")} ·{" "}
-                    <span style={{ color: CATEGORIA_COLOR[d.categoria] }}>{d.categoria}</span>
-                  </p>
-                </div>
-                <p className="text-sm font-semibold text-foreground">
-                  {formatBRL(Number(d.valor))}
-                </p>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
               </li>
             ))}
           </ul>
