@@ -55,14 +55,12 @@ function normalize(raw: any): PlateLookupPayload {
   let modelo =
     pick(detalhe, ["modelo", "MODELO"]) ||
     pick(basico, ["modelo", "MODELO"]);
-  let ano = pick(basico, [
-    "ano",
-    "ANO",
-    "ano_modelo",
-    "anoModelo",
-    "ano_fabricacao",
-    "anoFabricacao",
-  ]);
+  // CRÍTICO: SEMPRE priorizar `anoModelo` sobre o ano de fabricação.
+  // O valor FIPE e a tabela inteira são vinculados ao ano-modelo.
+  let ano =
+    pick(basico, ["anoModelo", "ano_modelo", "anoModeloVeiculo"]) ||
+    pick(detalhe, ["anoModelo", "ano_modelo"]) ||
+    pick(basico, ["ano", "ANO", "ano_fabricacao", "anoFabricacao"]);
   let cor = pick(basico, ["cor", "COR"]);
   let motorizacao =
     pick(detalhe, ["motorizacao", "motor", "cilindrada", "potencia", "combustivel"]) ||
@@ -75,33 +73,27 @@ function normalize(raw: any): PlateLookupPayload {
   for (const c of fallbacks) {
     if (!marca) marca = pick(c, ["marca", "MARCA", "fabricante", "manufacturer"]);
     if (!modelo) modelo = pick(c, ["modelo", "MODELO", "model", "modeloVeiculo"]);
-    if (!ano) ano = pick(c, ["ano", "ANO", "ano_modelo", "anoModelo", "year"]);
+    if (!ano)
+      ano = pick(c, ["anoModelo", "ano_modelo", "ano", "ANO", "year"]);
     if (!cor) cor = pick(c, ["cor", "COR", "color", "corVeiculo"]);
     if (!motorizacao)
       motorizacao = pick(c, ["motorizacao", "motor", "cilindrada", "combustivel"]);
     if (!chassi) chassi = pick(c, ["chassi", "CHASSI", "chassis", "vin", "VIN"]);
   }
 
-  // FIPE: response.fipe.dados[0]
+  // FIPE: extraímos APENAS o `codigo_fipe` da API paga (identificação).
+  // O valor atual e o histórico vêm exclusivamente da BrasilAPI gratuita,
+  // filtrando pelo anoModelo salvo no veículo (ver refreshFipeFn).
   let fipe: PlateLookupPayload extends infer T ? T extends { fipe?: infer F } ? F : never : never = null as any;
   const fipeFirst = raw?.fipe?.dados?.[0];
   if (fipeFirst && typeof fipeFirst === "object") {
     const codigo = pick(fipeFirst, ["codigo_fipe", "codigoFipe", "codigo"]);
-    const valor = parseValorBR(fipeFirst.valor ?? fipeFirst.Valor);
-    const mesRef = pick(fipeFirst, ["mes_referencia", "mesReferencia"]);
-    const historicoRaw = Array.isArray(fipeFirst.historico) ? fipeFirst.historico : [];
-    const historico: FipeHistoricoItem[] = historicoRaw
-      .map((h: any) => ({
-        mes_referencia: pick(h, ["mes_referencia", "mesReferencia"]),
-        valor: parseValorBR(h?.valor ?? h?.Valor),
-      }))
-      .filter((h: FipeHistoricoItem) => h.mes_referencia && Number(h.valor) > 0);
-    if (codigo || valor > 0) {
+    if (codigo) {
       fipe = {
         codigo_fipe: codigo,
-        valor,
-        mes_referencia: mesRef,
-        historico,
+        valor: 0,
+        mes_referencia: "",
+        historico: [],
       } as any;
     }
   }
