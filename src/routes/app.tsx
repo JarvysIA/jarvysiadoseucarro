@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil, Trash2 } from "lucide-react";
+import { Droplet, Thermometer, Gauge, Lock, Copy, Check, Sparkles, Car, Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
