@@ -32,6 +32,7 @@ function RevisoesPage() {
   const [items, setItems] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [openDespesa, setOpenDespesa] = useState<Despesa | null>(null);
+  const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
