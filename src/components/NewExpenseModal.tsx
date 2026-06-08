@@ -128,6 +128,7 @@ export function NewExpenseModal({
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess.session?.user.id;
       if (!userId) throw new Error("Sessão expirada.");
+      if (!vehicleId) throw new Error("Veículo não selecionado.");
 
       const { error: insErr } = await supabase.from("despesas").insert({
         user_id: userId,
