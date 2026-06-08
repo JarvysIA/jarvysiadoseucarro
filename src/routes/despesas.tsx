@@ -40,6 +40,7 @@ function DespesasPage() {
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
+  const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
