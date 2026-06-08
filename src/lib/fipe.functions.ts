@@ -11,9 +11,9 @@ export type FipeHistoricoItem = { mes_referencia: string; valor: string | number
  */
 export const refreshFipeFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { vehicleId: string }) => {
+  .inputValidator((data: { vehicleId: string; force?: boolean }) => {
     if (!data?.vehicleId) throw new Error("vehicleId obrigatório.");
-    return { vehicleId: data.vehicleId };
+    return { vehicleId: data.vehicleId, force: Boolean(data.force) };
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -28,7 +28,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
     if (!v.codigo_fipe) return { refreshed: false as const, reason: "no_codigo_fipe" };
 
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-    if (v.fipe_updated_at) {
+    if (!data.force && v.fipe_updated_at) {
       const age = Date.now() - new Date(v.fipe_updated_at).getTime();
       if (age < THIRTY_DAYS) {
         return {
