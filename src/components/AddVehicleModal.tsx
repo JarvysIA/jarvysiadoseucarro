@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
 import type { FipeHistoricoItem } from "@/lib/plate-lookup.functions";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
-import { seedFipeHistoryFn } from "@/lib/fipe.functions";
+
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
