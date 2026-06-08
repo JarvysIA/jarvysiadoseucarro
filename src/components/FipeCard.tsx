@@ -134,15 +134,16 @@ function FipeChartModal({ vehicleId, onClose }: { vehicleId: string; onClose: ()
       const { data } = await supabase
         .from("fipe_history")
         .select("mes_referencia,valor,created_at")
-        .eq("vehicle_id", vehicleId)
-        .order("created_at", { ascending: true });
+        .eq("vehicle_id", vehicleId);
       if (cancel) return;
-      setPoints(
-        ((data ?? []) as Array<{ mes_referencia: string; valor: number }>).map((r) => ({
-          mes_referencia: r.mes_referencia,
-          valor: Number(r.valor),
-        })),
-      );
+      const raw = ((data ?? []) as Array<{ mes_referencia: string; valor: number }>).map((r) => ({
+        mes_referencia: r.mes_referencia,
+        valor: Number(r.valor),
+      }));
+      // Ordenação cronológica estrita (do mais antigo → mais recente)
+      // baseada no parser PT-BR ("abril de 2025" → 2025-04).
+      raw.sort((a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia));
+      setPoints(raw);
       setLoading(false);
     })();
     return () => {
