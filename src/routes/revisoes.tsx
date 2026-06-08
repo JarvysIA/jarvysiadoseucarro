@@ -392,6 +392,18 @@ function RevisoesPage() {
                   </div>
                 );
               })()}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingDespesa(openDespesa);
+                  setOpenDespesa(null);
+                }}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar / Excluir Registro
+              </button>
             </>
           )}
         </DialogContent>
