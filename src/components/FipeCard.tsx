@@ -17,6 +17,21 @@ function formatBRL(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
 }
 
+const MES_PT_TO_NUM: Record<string, number> = {
+  janeiro: 1, fevereiro: 2, "março": 3, marco: 3, abril: 4, maio: 5, junho: 6,
+  julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
+};
+
+/** "abril de 2025" → 202504 (number) para ordenação cronológica estrita. */
+function parseRefMonth(s: string): number {
+  if (!s) return 0;
+  const parts = s.toLowerCase().trim().split(" de ");
+  if (parts.length !== 2) return 0;
+  const mes = MES_PT_TO_NUM[parts[0].trim()] || 0;
+  const ano = parseInt(parts[1].trim(), 10) || 0;
+  return ano * 100 + mes;
+}
+
 export function FipeCard({
   vehicleId,
   placa: _placa,
