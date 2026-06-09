@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal, type PaywallMode } from "@/components/PaywallModal";
+import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { PlanBadge } from "@/components/PlanBadge";
 import type { PlanTier } from "@/lib/admin-users.functions";
