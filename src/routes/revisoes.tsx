@@ -203,6 +203,28 @@ function RevisoesPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Histórico global de revisões e manutenções — seu porta-luvas digital.
         </p>
+
+        {vehicleFull && (
+          <button
+            type="button"
+            onClick={() => setCertOpen(true)}
+            className="glow-neon mt-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3 text-left transition-colors hover:border-primary/70"
+          >
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"
+              style={{ boxShadow: "0 0 18px -4px var(--primary)" }}
+            >
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Certificado Jarvys</p>
+              <p className="text-[11px] text-muted-foreground">
+                Exporte o porta-luvas digital deste veículo em PDF.
+              </p>
+            </span>
+            <ChevronRight className="h-4 w-4 text-primary" />
+          </button>
+        )}
       </header>
 
       {historyLocked && activeVehicleId && (
