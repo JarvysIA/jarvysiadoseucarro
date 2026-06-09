@@ -12,9 +12,20 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
+  uploadReceiptImage,
   type Despesa,
   type DespesaCategoria,
 } from "@/lib/despesas";
+
+export type ExpensePrefill = {
+  valor?: number;
+  data?: string | null;
+  km?: number | null;
+  categoria?: DespesaCategoria;
+  descricao?: string;
+  /** Arquivo da nota lida pela IA — será anexado no submit. */
+  file?: File | null;
+};
 
 type Props = {
   open: boolean;
@@ -24,6 +35,8 @@ type Props = {
   defaultCategoria?: DespesaCategoria;
   /** Quando informado, o modal opera em modo EDIÇÃO da despesa existente. */
   editing?: Despesa | null;
+  /** Pré-preenche os campos (ex.: vindo da IA leitora de nota). */
+  prefill?: ExpensePrefill | null;
   onCreated?: () => void; // refetch trigger
   onUpdated?: () => void;
   onDeleted?: () => void;
@@ -37,6 +50,7 @@ export function NewExpenseModal({
   kmAtualVeiculo,
   defaultCategoria = "Manutenção",
   editing = null,
+  prefill = null,
   onCreated,
   onUpdated,
   onDeleted,
@@ -51,6 +65,7 @@ export function NewExpenseModal({
   const [descricao, setDescricao] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -60,17 +75,26 @@ export function NewExpenseModal({
       setData(new Date(editing.data).toISOString().slice(0, 10));
       setKm(editing.km_registro != null ? String(editing.km_registro) : "");
       setDescricao(editing.descricao || "");
+      setPendingFile(null);
+    } else if (prefill) {
+      setCategoria(prefill.categoria ?? defaultCategoria);
+      setValor(prefill.valor != null ? prefill.valor.toFixed(2).replace(".", ",") : "");
+      setData(prefill.data ?? today);
+      setKm(prefill.km != null ? String(prefill.km) : String(kmAtualVeiculo || ""));
+      setDescricao(prefill.descricao ?? "");
+      setPendingFile(prefill.file ?? null);
     } else {
       setCategoria(defaultCategoria);
       setValor("");
       setData(today);
       setKm(String(kmAtualVeiculo || ""));
       setDescricao("");
+      setPendingFile(null);
     }
     setSaving(false);
     setDeleting(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing]);
+  }, [open, editing, prefill]);
 
   const submit = async () => {
     if (!vehicleId && !isEdit) {
