@@ -158,7 +158,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
 
     const rows = points.map((p) => ({
       vehicle_id: v.id,
-      codigo_fipe: v.codigo_fipe,
+      codigo_fipe: v.codigo_fipe as string,
       mes_referencia: p.mes_referencia,
       valor: p.valor,
     }));
