@@ -43,6 +43,18 @@ function RevisoesPage() {
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
   const [placa, setPlaca] = useState<string | null>(null);
+  const [scannedPrefill, setScannedPrefill] = useState<ExpensePrefill | null>(null);
+  const [certOpen, setCertOpen] = useState(false);
+  const [vehicleFull, setVehicleFull] = useState<{
+    id: string;
+    marca: string | null;
+    modelo: string | null;
+    ano: string | null;
+    cor: string | null;
+    km_atual: number;
+    placa: string;
+    foto_url: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) {
