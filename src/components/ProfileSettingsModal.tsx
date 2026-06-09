@@ -102,7 +102,13 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
     setSaving(true);
     try {
       const cepDigits = cep.replace(/\D/g, "") || null;
-      const updates: Record<string, string | null> = {
+      const updates: {
+        whatsapp: string;
+        cep: string | null;
+        cidade: string | null;
+        uf: string | null;
+        email?: string;
+      } = {
         whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
