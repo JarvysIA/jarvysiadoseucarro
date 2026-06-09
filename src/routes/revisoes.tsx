@@ -479,6 +479,22 @@ function RevisoesPage() {
         <Plus className="h-6 w-6" />
       </button>
 
+      <ReceiptScanFab
+        className="bottom-44"
+        onParsed={(parsed, file) => {
+          setScannedPrefill({
+            valor: parsed.valor_total,
+            data: parsed.data_servico,
+            km: parsed.km_registrada,
+            categoria: parsed.categoria,
+            descricao:
+              parsed.itens_identificados.slice(0, 2).map((i) => i.descricao).join(" + ") ||
+              parsed.categoria,
+            file,
+          });
+        }}
+      />
+
       <NewExpenseModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -486,6 +502,20 @@ function RevisoesPage() {
         kmAtualVeiculo={vehicleKm}
         defaultCategoria="Revisão"
         onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <NewExpenseModal
+        open={!!scannedPrefill}
+        onClose={() => setScannedPrefill(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        defaultCategoria="Revisão"
+        prefill={scannedPrefill}
+        onCreated={() => {
+          setScannedPrefill(null);
+          setReloadKey((k) => k + 1);
+        }}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 
@@ -498,6 +528,14 @@ function RevisoesPage() {
         onUpdated={() => setReloadKey((k) => k + 1)}
         onDeleted={() => setReloadKey((k) => k + 1)}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <CertificadoJarvysModal
+        open={certOpen}
+        onClose={() => setCertOpen(false)}
+        vehicle={vehicleFull}
+        revisoes={items}
+        somaInvestida={items.reduce((s, d) => s + Number(d.valor || 0), 0)}
       />
 
       <BottomNav />
