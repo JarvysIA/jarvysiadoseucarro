@@ -22,6 +22,7 @@ import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
 
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
@@ -88,6 +89,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksFipeMonthlyRefreshRoute =
+  ApiPublicHooksFipeMonthlyRefreshRouteImport.update({
+    id: '/api/public/hooks/fipe-monthly-refresh',
+    path: '/api/public/hooks/fipe-monthly-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/api/public/hooks/fipe-monthly-refresh'
   id:
     | '__root__'
     | '/'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +210,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
   WelcomeRoute: typeof WelcomeRoute
+  ApiPublicHooksFipeMonthlyRefreshRoute: typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/fipe-monthly-refresh': {
+      id: '/api/public/hooks/fipe-monthly-refresh'
+      path: '/api/public/hooks/fipe-monthly-refresh'
+      fullPath: '/api/public/hooks/fipe-monthly-refresh'
+      preLoaderRoute: typeof ApiPublicHooksFipeMonthlyRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -309,6 +330,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
   WelcomeRoute: WelcomeRoute,
+  ApiPublicHooksFipeMonthlyRefreshRoute: ApiPublicHooksFipeMonthlyRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
