@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, ChevronRight, Gauge, Info as InfoIcon, Loader2, Pencil, Plus, Wrench } from "lucide-react";
+import { Camera, ChevronRight, Gauge, Info as InfoIcon, Loader2, Pencil, Plus, ShieldCheck, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
-import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseModal";
+import { ReceiptScanFab } from "@/components/ReceiptScanFab";
+import { CertificadoJarvysModal } from "@/components/CertificadoJarvysModal";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
