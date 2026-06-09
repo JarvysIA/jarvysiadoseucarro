@@ -154,6 +154,11 @@ export function NewExpenseModal({
       if (!userId) throw new Error("Sessão expirada.");
       if (!vehicleId) throw new Error("Veículo não selecionado.");
 
+      let receiptPath: string | null = null;
+      if (pendingFile) {
+        receiptPath = await uploadReceiptImage(userId, vehicleId, pendingFile);
+      }
+
       const { error: insErr } = await supabase.from("despesas").insert({
         user_id: userId,
         vehicle_id: vehicleId,
@@ -162,7 +167,7 @@ export function NewExpenseModal({
         categoria,
         descricao: descricao.trim() || categoria,
         km_registro: kmNum,
-        receipt_image_url: null,
+        receipt_image_url: receiptPath,
       });
       if (insErr) throw insErr;
 
