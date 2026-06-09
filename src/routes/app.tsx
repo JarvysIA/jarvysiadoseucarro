@@ -434,6 +434,8 @@ function AppPage() {
         mode={paywallMode ?? "upgrade-vip"}
       />
 
+      <ProfileSettingsModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+
 
       {selected && (
         <VehicleStatusSection
