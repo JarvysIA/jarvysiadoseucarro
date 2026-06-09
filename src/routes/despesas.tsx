@@ -4,7 +4,8 @@ import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2, Plus, ChevronRight
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
-import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseModal";
+import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
