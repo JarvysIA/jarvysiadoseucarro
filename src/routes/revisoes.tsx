@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, ChevronRight, Gauge, Info as InfoIcon, Loader2, Pencil, Plus, Wrench } from "lucide-react";
+import { Camera, ChevronRight, Gauge, Info as InfoIcon, Loader2, Pencil, Plus, ShieldCheck, Wrench } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
-import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseModal";
+import { ReceiptScanFab } from "@/components/ReceiptScanFab";
+import { CertificadoJarvysModal } from "@/components/CertificadoJarvysModal";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
@@ -41,6 +43,18 @@ function RevisoesPage() {
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
   const [placa, setPlaca] = useState<string | null>(null);
+  const [scannedPrefill, setScannedPrefill] = useState<ExpensePrefill | null>(null);
+  const [certOpen, setCertOpen] = useState(false);
+  const [vehicleFull, setVehicleFull] = useState<{
+    id: string;
+    marca: string | null;
+    modelo: string | null;
+    ano: string | null;
+    cor: string | null;
+    km_atual: number;
+    placa: string;
+    foto_url: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!activeVehicleId) {
@@ -52,14 +66,38 @@ function RevisoesPage() {
     }
     supabase
       .from("veiculos")
-      .select("km_atual,history_locked,claimed_at,placa")
+      .select("id,km_atual,history_locked,claimed_at,placa,marca,modelo,ano,cor,foto_url")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
-        setVehicleKm(data?.km_atual ?? 0);
-        setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
-        setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
-        setPlaca(((data as { placa?: string } | null)?.placa) ?? null);
+        const v = data as null | {
+          id: string;
+          km_atual: number | null;
+          history_locked?: boolean;
+          claimed_at?: string | null;
+          placa: string;
+          marca: string | null;
+          modelo: string | null;
+          ano: string | null;
+          cor: string | null;
+          foto_url: string | null;
+        };
+        setVehicleKm(v?.km_atual ?? 0);
+        setHistoryLocked(Boolean(v?.history_locked));
+        setClaimedAt(v?.claimed_at ?? null);
+        setPlaca(v?.placa ?? null);
+        if (v) {
+          setVehicleFull({
+            id: v.id,
+            marca: v.marca,
+            modelo: v.modelo,
+            ano: v.ano,
+            cor: v.cor,
+            km_atual: v.km_atual ?? 0,
+            placa: v.placa,
+            foto_url: v.foto_url,
+          });
+        }
       });
   }, [activeVehicleId, reloadKey]);
 
@@ -165,6 +203,28 @@ function RevisoesPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Histórico global de revisões e manutenções — seu porta-luvas digital.
         </p>
+
+        {vehicleFull && (
+          <button
+            type="button"
+            onClick={() => setCertOpen(true)}
+            className="glow-neon mt-4 flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/10 to-transparent px-4 py-3 text-left transition-colors hover:border-primary/70"
+          >
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"
+              style={{ boxShadow: "0 0 18px -4px var(--primary)" }}
+            >
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">Certificado Jarvys</p>
+              <p className="text-[11px] text-muted-foreground">
+                Exporte o porta-luvas digital deste veículo em PDF.
+              </p>
+            </span>
+            <ChevronRight className="h-4 w-4 text-primary" />
+          </button>
+        )}
       </header>
 
       {historyLocked && activeVehicleId && (
@@ -419,6 +479,22 @@ function RevisoesPage() {
         <Plus className="h-6 w-6" />
       </button>
 
+      <ReceiptScanFab
+        className="bottom-44"
+        onParsed={(parsed, file) => {
+          setScannedPrefill({
+            valor: parsed.valor_total,
+            data: parsed.data_servico,
+            km: parsed.km_registrada,
+            categoria: parsed.categoria,
+            descricao:
+              parsed.itens_identificados.slice(0, 2).map((i) => i.descricao).join(" + ") ||
+              parsed.categoria,
+            file,
+          });
+        }}
+      />
+
       <NewExpenseModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -426,6 +502,20 @@ function RevisoesPage() {
         kmAtualVeiculo={vehicleKm}
         defaultCategoria="Revisão"
         onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <NewExpenseModal
+        open={!!scannedPrefill}
+        onClose={() => setScannedPrefill(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        defaultCategoria="Revisão"
+        prefill={scannedPrefill}
+        onCreated={() => {
+          setScannedPrefill(null);
+          setReloadKey((k) => k + 1);
+        }}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 
@@ -438,6 +528,14 @@ function RevisoesPage() {
         onUpdated={() => setReloadKey((k) => k + 1)}
         onDeleted={() => setReloadKey((k) => k + 1)}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <CertificadoJarvysModal
+        open={certOpen}
+        onClose={() => setCertOpen(false)}
+        vehicle={vehicleFull}
+        revisoes={items}
+        somaInvestida={items.reduce((s, d) => s + Number(d.valor || 0), 0)}
       />
 
       <BottomNav />

@@ -4,7 +4,8 @@ import { ChevronLeft, ChevronRight, Wallet, Receipt, Loader2, Plus, ChevronRight
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
-import { NewExpenseModal } from "@/components/NewExpenseModal";
+import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseModal";
+import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import {
@@ -41,6 +42,7 @@ function DespesasPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editingDespesa, setEditingDespesa] = useState<Despesa | null>(null);
+  const [scannedPrefill, setScannedPrefill] = useState<ExpensePrefill | null>(null);
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
@@ -337,12 +339,42 @@ function DespesasPage() {
         <Plus className="h-6 w-6" />
       </button>
 
+      {/* FAB IA — Ler nota com IA */}
+      <ReceiptScanFab
+        className="bottom-44"
+        onParsed={(parsed, file) => {
+          setScannedPrefill({
+            valor: parsed.valor_total,
+            data: parsed.data_servico,
+            km: parsed.km_registrada,
+            categoria: parsed.categoria,
+            descricao:
+              parsed.itens_identificados.slice(0, 2).map((i) => i.descricao).join(" + ") ||
+              parsed.categoria,
+            file,
+          });
+        }}
+      />
+
       <NewExpenseModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
         vehicleId={activeVehicleId}
         kmAtualVeiculo={vehicleKm}
         onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <NewExpenseModal
+        open={!!scannedPrefill}
+        onClose={() => setScannedPrefill(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        prefill={scannedPrefill}
+        onCreated={() => {
+          setScannedPrefill(null);
+          setReloadKey((k) => k + 1);
+        }}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 

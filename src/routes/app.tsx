@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal, type PaywallMode } from "@/components/PaywallModal";
+import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { PlanBadge } from "@/components/PlanBadge";
 import type { PlanTier } from "@/lib/admin-users.functions";
@@ -112,6 +113,7 @@ function AppPage() {
   }, []);
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
@@ -289,7 +291,12 @@ function AppPage() {
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 pt-8">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-3 rounded-2xl text-left transition-opacity active:opacity-80"
+          aria-label="Abrir configurações do perfil"
+        >
           <img src={logo} alt="Jarvys" width={40} height={40} className="h-10 w-10 object-contain" />
           <div>
             <p className="text-xs text-muted-foreground">Olá,</p>
@@ -298,7 +305,7 @@ function AppPage() {
               <PlanBadge tier={planTier} />
             </h1>
           </div>
-        </div>
+        </button>
         <div className="h-11 w-11" />
       </header>
 
@@ -426,6 +433,8 @@ function AppPage() {
         onClose={() => setPaywallMode(null)}
         mode={paywallMode ?? "upgrade-vip"}
       />
+
+      <ProfileSettingsModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
 
       {selected && (
