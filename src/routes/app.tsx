@@ -289,7 +289,12 @@ function AppPage() {
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 pt-8">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-3 rounded-2xl text-left transition-opacity active:opacity-80"
+          aria-label="Abrir configurações do perfil"
+        >
           <img src={logo} alt="Jarvys" width={40} height={40} className="h-10 w-10 object-contain" />
           <div>
             <p className="text-xs text-muted-foreground">Olá,</p>
@@ -298,7 +303,7 @@ function AppPage() {
               <PlanBadge tier={planTier} />
             </h1>
           </div>
-        </div>
+        </button>
         <div className="h-11 w-11" />
       </header>
 
