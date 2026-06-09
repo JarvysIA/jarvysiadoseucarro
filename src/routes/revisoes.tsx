@@ -66,14 +66,38 @@ function RevisoesPage() {
     }
     supabase
       .from("veiculos")
-      .select("km_atual,history_locked,claimed_at,placa")
+      .select("id,km_atual,history_locked,claimed_at,placa,marca,modelo,ano,cor,foto_url")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
-        setVehicleKm(data?.km_atual ?? 0);
-        setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
-        setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
-        setPlaca(((data as { placa?: string } | null)?.placa) ?? null);
+        const v = data as null | {
+          id: string;
+          km_atual: number | null;
+          history_locked?: boolean;
+          claimed_at?: string | null;
+          placa: string;
+          marca: string | null;
+          modelo: string | null;
+          ano: string | null;
+          cor: string | null;
+          foto_url: string | null;
+        };
+        setVehicleKm(v?.km_atual ?? 0);
+        setHistoryLocked(Boolean(v?.history_locked));
+        setClaimedAt(v?.claimed_at ?? null);
+        setPlaca(v?.placa ?? null);
+        if (v) {
+          setVehicleFull({
+            id: v.id,
+            marca: v.marca,
+            modelo: v.modelo,
+            ano: v.ano,
+            cor: v.cor,
+            km_atual: v.km_atual ?? 0,
+            placa: v.placa,
+            foto_url: v.foto_url,
+          });
+        }
       });
   }, [activeVehicleId, reloadKey]);
 
