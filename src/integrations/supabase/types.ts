@@ -98,6 +98,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cep: string | null
+          cidade: string | null
           created_at: string
           email: string | null
           id: string
@@ -109,9 +111,12 @@ export type Database = {
           referrer_id: string | null
           status_usuario: string
           trial_inicio: string
+          uf: string | null
           whatsapp: string
         }
         Insert: {
+          cep?: string | null
+          cidade?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -123,9 +128,12 @@ export type Database = {
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
+          uf?: string | null
           whatsapp: string
         }
         Update: {
+          cep?: string | null
+          cidade?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -137,6 +145,7 @@ export type Database = {
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
+          uf?: string | null
           whatsapp?: string
         }
         Relationships: [
