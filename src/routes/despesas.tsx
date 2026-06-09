@@ -339,12 +339,42 @@ function DespesasPage() {
         <Plus className="h-6 w-6" />
       </button>
 
+      {/* FAB IA — Ler nota com IA */}
+      <ReceiptScanFab
+        className="bottom-44"
+        onParsed={(parsed, file) => {
+          setScannedPrefill({
+            valor: parsed.valor_total,
+            data: parsed.data_servico,
+            km: parsed.km_registrada,
+            categoria: parsed.categoria,
+            descricao:
+              parsed.itens_identificados.slice(0, 2).map((i) => i.descricao).join(" + ") ||
+              parsed.categoria,
+            file,
+          });
+        }}
+      />
+
       <NewExpenseModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
         vehicleId={activeVehicleId}
         kmAtualVeiculo={vehicleKm}
         onCreated={() => setReloadKey((k) => k + 1)}
+        onVehicleKmUpdated={(km) => setVehicleKm(km)}
+      />
+
+      <NewExpenseModal
+        open={!!scannedPrefill}
+        onClose={() => setScannedPrefill(null)}
+        vehicleId={activeVehicleId}
+        kmAtualVeiculo={vehicleKm}
+        prefill={scannedPrefill}
+        onCreated={() => {
+          setScannedPrefill(null);
+          setReloadKey((k) => k + 1);
+        }}
         onVehicleKmUpdated={(km) => setVehicleKm(km)}
       />
 
