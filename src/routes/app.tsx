@@ -112,6 +112,7 @@ function AppPage() {
   }, []);
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
