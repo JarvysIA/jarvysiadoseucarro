@@ -509,29 +509,18 @@ function ConfirmForm({
         />
       </Field>
 
-      <Field label="Categoria (classificada pela IA)">
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIAS.map((c) => {
-            const active = categoria === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategoria(c)}
-                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                style={{
-                  borderColor: active ? CATEGORIA_COLOR[c] : "var(--border)",
-                  color: active ? CATEGORIA_COLOR[c] : "var(--muted-foreground)",
-                  backgroundColor: active
-                    ? `color-mix(in oklab, ${CATEGORIA_COLOR[c]} 12%, transparent)`
-                    : "transparent",
-                  boxShadow: active ? `0 0 10px -3px ${CATEGORIA_COLOR[c]}` : "none",
-                }}
-              >
-                {c}
-              </button>
-            );
-          })}
+      <Field label="Categoria">
+        <div
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+          style={{
+            borderColor: CATEGORIA_COLOR[categoria],
+            color: CATEGORIA_COLOR[categoria],
+            backgroundColor: `color-mix(in oklab, ${CATEGORIA_COLOR[categoria]} 12%, transparent)`,
+          }}
+          title="Categoria travada — atalho via Card de Status"
+        >
+          <Check className="h-3 w-3" />
+          {categoria} (travado)
         </div>
       </Field>
 
