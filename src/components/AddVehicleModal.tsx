@@ -473,7 +473,7 @@ export function AddVehicleModal({
 
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || (showFipePicker && !fipeLookup)}
                 onClick={confirmAdd}
                 className="glow-neon mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
               >
