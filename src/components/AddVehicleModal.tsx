@@ -82,6 +82,8 @@ export function AddVehicleModal({
       setKm("");
       setSubmitting(false);
       setFipeLookup(null);
+      setFipeOptions([]);
+      setShowFipePicker(false);
     }
   }, [open]);
 
