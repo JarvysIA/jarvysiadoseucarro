@@ -21,7 +21,7 @@ import {
   type MaintComputed,
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
-import { CATEGORIAS, CATEGORIA_COLOR } from "@/lib/despesas";
+import { CATEGORIA_COLOR } from "@/lib/despesas";
 import { toast } from "sonner";
 
 export type MaintExpense = {
