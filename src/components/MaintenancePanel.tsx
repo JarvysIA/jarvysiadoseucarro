@@ -641,7 +641,8 @@ function ManualForm({
   const [km, setKm] = useState(String(defaultKm || ""));
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState<DespesaCategoria>("Manutenção");
+  // Atalho via Card de Status → categoria fixa em "Revisão".
+  const categoria: DespesaCategoria = "Revisão";
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
