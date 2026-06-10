@@ -436,6 +436,8 @@ function AppPage() {
         mode={paywallMode ?? "upgrade-vip"}
       />
 
+      <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} />
+
       <ProfileSettingsModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
 
