@@ -90,32 +90,60 @@ export function CertificadoJarvysModal({
 
       paintBackground();
 
-      // ---------- Header: Título ----------
-      // TODO: doc.addImage(logoBase64) — espaço reservado para o futuro logo Jarvys.
-      doc.setTextColor(...NEON);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.text("Certificado Jarvys", 40, 60);
+      // ---------- Header: Logo oficial centralizada ----------
+      const logoDataUrl = await fetchAsDataURL(jarvysLogoUrl);
+      let headerBottom = 50;
+      if (logoDataUrl) {
+        try {
+          const props = doc.getImageProperties(logoDataUrl);
+          const logoH = 38;
+          const logoW = (props.width / props.height) * logoH;
+          const logoX = (W - logoW) / 2;
+          const fmt = logoDataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+          doc.addImage(logoDataUrl, fmt, logoX, 30, logoW, logoH, undefined, "FAST");
+          headerBottom = 30 + logoH;
+        } catch (err) {
+          console.warn("[PDF logo]", err);
+        }
+      }
       doc.setTextColor(...TXT_MUTED);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text("Porta-Luvas Digital — Histórico Oficial", 40, 75);
+      doc.text(
+        "Porta-Luvas Digital — Histórico Oficial",
+        W / 2,
+        headerBottom + 14,
+        { align: "center" },
+      );
 
-      // ---------- Imagem do veículo ----------
-      let cursorY = 100;
-      const imgX = 40;
-      const imgY = cursorY;
-      const imgW = 200;
-      const imgH = 120;
+      // ---------- Imagem do veículo (mantendo aspect ratio) ----------
+      let cursorY = headerBottom + 32;
+      const boxX = 40;
+      const boxY = cursorY;
+      const boxW = 200;
+      const boxH = 120;
       doc.setDrawColor(...NEON);
       doc.setFillColor(...BG_CARD);
-      doc.roundedRect(imgX, imgY, imgW, imgH, 10, 10, "FD");
+      doc.roundedRect(boxX, boxY, boxW, boxH, 12, 12, "FD");
       if (vehicle.foto_url) {
         const dataUrl = await fetchAsDataURL(vehicle.foto_url);
         if (dataUrl) {
           try {
+            const props = doc.getImageProperties(dataUrl);
+            const ratio = props.width / props.height;
+            const padding = 6;
+            const maxW = boxW - padding * 2;
+            const maxH = boxH - padding * 2;
+            let drawW = maxW;
+            let drawH = maxW / ratio;
+            if (drawH > maxH) {
+              drawH = maxH;
+              drawW = maxH * ratio;
+            }
+            const drawX = boxX + (boxW - drawW) / 2;
+            const drawY = boxY + (boxH - drawH) / 2;
             const fmt = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-            doc.addImage(dataUrl, fmt, imgX + 4, imgY + 4, imgW - 8, imgH - 8, undefined, "FAST");
+            doc.addImage(dataUrl, fmt, drawX, drawY, drawW, drawH, undefined, "FAST");
           } catch (err) {
             console.warn("[PDF addImage]", err);
           }
@@ -123,72 +151,90 @@ export function CertificadoJarvysModal({
       }
 
       // ---------- Bloco de identificação do veículo ----------
-      const infoX = imgX + imgW + 20;
+      const infoX = boxX + boxW + 20;
       doc.setTextColor(...TXT_WHITE);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text(`${vehicle.marca ?? "—"} ${vehicle.modelo ?? ""}`.trim(), infoX, imgY + 22);
+      doc.text(`${vehicle.marca ?? "—"} ${vehicle.modelo ?? ""}`.trim(), infoX, boxY + 22);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(...TXT_MUTED);
-      doc.text(`${vehicle.ano ?? "—"} · ${vehicle.cor ?? "—"}`, infoX, imgY + 40);
+      doc.text(`${vehicle.ano ?? "—"} · ${vehicle.cor ?? "—"}`, infoX, boxY + 40);
       doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.text(`Placa ${vehicle.placa}`, infoX, imgY + 58);
+      doc.text(`Placa ${vehicle.placa}`, infoX, boxY + 58);
 
       // KM destaque
       doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
-      doc.text(`${vehicle.km_atual.toLocaleString("pt-BR")} km`, infoX, imgY + 92);
+      doc.text(`${vehicle.km_atual.toLocaleString("pt-BR")} km`, infoX, boxY + 92);
       doc.setFontSize(8);
       doc.setTextColor(...TXT_MUTED);
-      doc.text("Quilometragem atual", infoX, imgY + 106);
+      doc.text("Quilometragem atual", infoX, boxY + 106);
 
-      cursorY = imgY + imgH + 30;
+      cursorY = boxY + boxH + 30;
 
-      // ---------- Métricas (3 cards iguais ao modal) ----------
+      // ---------- Métricas (3 cards) ----------
       const cardW = (W - 80 - 30) / 3;
-      const cardH = 78;
+      const cardH = 82;
       const drawCardBox = (i: number) => {
         const x = 40 + i * (cardW + 15);
         doc.setDrawColor(...NEON);
         doc.setFillColor(...BG_CARD);
-        doc.roundedRect(x, cursorY, cardW, cardH, 10, 10, "FD");
+        doc.roundedRect(x, cursorY, cardW, cardH, 14, 14, "FD");
         return x;
       };
 
-      // Card 1: número + Registros
+      // Card 1: número + Registros (centralizado X/Y)
       let cx = drawCardBox(0);
       doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.text(String(totalRegistros), cx + cardW / 2, cursorY + 38, { align: "center" });
+      doc.setFontSize(24);
+      doc.text(String(totalRegistros), cx + cardW / 2, cursorY + cardH / 2 - 2, {
+        align: "center",
+        baseline: "middle",
+      });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(...TXT_MUTED);
-      doc.text("Registros", cx + cardW / 2, cursorY + 58, { align: "center" });
+      doc.text("Registros", cx + cardW / 2, cursorY + cardH / 2 + 20, {
+        align: "center",
+        baseline: "middle",
+      });
 
-      // Card 2: "Revisões" / "Documentadas" em DUAS linhas Y distintas
+      // Card 2: "Revisões" / "Documentadas" em duas linhas Y distintas
       cx = drawCardBox(1);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
+      doc.setFontSize(14);
       doc.setTextColor(...NEON);
-      doc.text("Revisões", cx + cardW / 2, cursorY + cardH / 2 - 2, { align: "center" });
+      doc.text("Revisões", cx + cardW / 2, cursorY + cardH / 2 - 6, {
+        align: "center",
+        baseline: "middle",
+      });
       doc.setTextColor(...TXT_WHITE);
-      doc.text("Documentadas", cx + cardW / 2, cursorY + cardH / 2 + 14, { align: "center" });
+      doc.text("Documentadas", cx + cardW / 2, cursorY + cardH / 2 + 14, {
+        align: "center",
+        baseline: "middle",
+      });
 
-      // Card 3: "+ VALOR" acima / "de revenda" abaixo (sem sobreposição)
+      // Card 3: "+ VALOR" acima / "de revenda" abaixo
       cx = drawCardBox(2);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.setTextColor(...NEON);
-      doc.text("+ VALOR", cx + cardW / 2, cursorY + cardH / 2 - 4, { align: "center" });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
+      doc.text("+ VALOR", cx + cardW / 2, cursorY + cardH / 2 - 8, {
+        align: "center",
+        baseline: "middle",
+      });
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
       doc.setTextColor(...TXT_WHITE);
-      doc.text("de revenda", cx + cardW / 2, cursorY + cardH / 2 + 16, { align: "center" });
+      doc.text("de revenda", cx + cardW / 2, cursorY + cardH / 2 + 16, {
+        align: "center",
+        baseline: "middle",
+      });
 
       cursorY += cardH + 30;
 
