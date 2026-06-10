@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
-import type { FipeHistoricoItem } from "@/lib/plate-lookup.functions";
+import type { FipeHistoricoItem, FipeOption } from "@/lib/plate-lookup.functions";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
 
 import { toast } from "sonner";
