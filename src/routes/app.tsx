@@ -472,7 +472,7 @@ function AppPage() {
           {planTier !== "free" || profile?.permite_indicacao ? (
             <ReferralUnlocked userId={profile?.id ?? ""} />
           ) : (
-            <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} />
+            <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} onActivate={() => setActivateOpen(true)} />
           )}
         </div>
       </section>
