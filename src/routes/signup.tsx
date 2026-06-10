@@ -50,8 +50,8 @@ function SignupPage() {
       toast.error("Placa inválida. Use o formato AAA0000 ou AAA0A00.");
       return;
     }
-    if (!form.name.trim() || !form.email.trim() || !form.password || form.password.length < 6) {
-      toast.error("Preencha todos os campos corretamente.");
+    if (!form.name.trim() || !form.email.trim() || !isStrongPassword(form.password)) {
+      toast.error("Preencha todos os campos e use uma senha forte.");
       return;
     }
     setModalOpen(true);
