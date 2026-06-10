@@ -219,7 +219,9 @@ export type Database = {
           codigo_fipe: string | null
           cor: string | null
           created_at: string
+          fipe_historico: Json | null
           fipe_mes_referencia: string | null
+          fipe_ultima_atualizacao: string | null
           fipe_updated_at: string | null
           fipe_valor: number | null
           foto_url: string | null
@@ -241,7 +243,9 @@ export type Database = {
           codigo_fipe?: string | null
           cor?: string | null
           created_at?: string
+          fipe_historico?: Json | null
           fipe_mes_referencia?: string | null
+          fipe_ultima_atualizacao?: string | null
           fipe_updated_at?: string | null
           fipe_valor?: number | null
           foto_url?: string | null
@@ -263,7 +267,9 @@ export type Database = {
           codigo_fipe?: string | null
           cor?: string | null
           created_at?: string
+          fipe_historico?: Json | null
           fipe_mes_referencia?: string | null
+          fipe_ultima_atualizacao?: string | null
           fipe_updated_at?: string | null
           fipe_valor?: number | null
           foto_url?: string | null
