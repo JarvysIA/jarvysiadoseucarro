@@ -29,7 +29,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Monitore a saúde do seu veículo, antecipe manutenções e valorize seu carro na revenda. 30 dias grátis.",
+          "Monitore a saúde do seu veículo, antecipe manutenções e valorize seu carro na revenda. Grátis para sempre.",
       },
       { property: "og:title", content: "Jarvys — A IA que cuida do seu carro" },
       {
@@ -180,15 +180,15 @@ function Hero() {
             to="/signup"
             className="glow-neon group inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-7 py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
           >
-            Ativar minha IA automotiva
+            Criar minha Garagem Grátis
             <span className="ml-1 rounded-full bg-primary-foreground/15 px-2 py-0.5 text-[11px] font-semibold">
-              30 dias grátis
+              Grátis para sempre
             </span>
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            Sem cartão · Cancele quando quiser
+            Brinde 30 dias de Inteligência Artificial liberada. Sem pegadinhas.
           </p>
         </div>
       </Reveal>
@@ -361,8 +361,8 @@ function Pricing() {
       <SectionLabel>Preço</SectionLabel>
       <Reveal delay={80}>
         <h2 className="mx-auto mt-3 max-w-3xl text-balance text-center text-3xl font-bold tracking-tight sm:text-4xl">
-          Menos que um cafezinho para{" "}
-          <span className="text-primary">proteger o seu carro para sempre.</span>
+          Mais barato que um lanche para{" "}
+          <span className="text-primary">proteger seu carro.</span>
         </h2>
       </Reveal>
 
@@ -380,14 +380,13 @@ function Pricing() {
             <div className="relative">
               <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-widest text-primary">
                 <Award className="h-4 w-4" />
-                Plano único · vitalício
+                LICENÇA ÚNICA • POR VEÍCULO
               </div>
               <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-5xl font-extrabold tracking-tight">R$ 14,90</span>
-                <span className="text-sm text-muted-foreground">pague uma vez</span>
+                <span className="text-5xl font-extrabold tracking-tight">R$ 29,90</span>
               </div>
               <p className="mt-2 text-[13px] text-muted-foreground">
-                Sem mensalidade. Sem pegadinha. Use para sempre.
+                Um veículo sem mensalidade. Sem pegadinha. Sem cartão.
               </p>
 
               <ul className="mt-6 space-y-2.5 text-sm">
@@ -413,7 +412,7 @@ function Pricing() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                Após o teste, ative o vitalício por R$ 14,90.
+                Após o teste, ative por R$ 29,90.
               </p>
             </div>
           </div>
@@ -444,9 +443,8 @@ function Pricing() {
                 Jarvys =
               </p>
               <p className="mt-1 text-3xl font-extrabold tracking-tight text-primary text-glow">
-                R$ 14,90
+                R$ 29,90
               </p>
-              <p className="mt-1 text-[12px] text-muted-foreground">uma vez na vida.</p>
             </div>
           </div>
         </Reveal>
