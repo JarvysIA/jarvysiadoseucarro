@@ -152,6 +152,9 @@ export function AddVehicleModal({
         return;
       }
       const km_atual = km ? Number(km.replace(/\D/g, "")) || null : null;
+      // CRÍTICO: gravamos o `codigo_fipe` JÁ no INSERT — sem ele, a automação
+      // mensal/seed de 6 meses do gráfico FIPE não tem como buscar valores.
+      const codigoFipe = fipeLookup?.codigo_fipe?.trim() || null;
       const insertPayload = {
         user_id: userId,
         placa: plate,
@@ -162,6 +165,7 @@ export function AddVehicleModal({
         motorizacao: data.motorizacao.trim(),
         chassi: (data.chassi || "").trim(),
         km_atual,
+        codigo_fipe: codigoFipe,
       };
       const { data: inserted, error } = await supabase
         .from("veiculos")
@@ -184,16 +188,9 @@ export function AddVehicleModal({
         console.warn("[inheritVehicleImageFn]", e);
       }
 
-      // FIPE: salvamos APENAS o codigo_fipe vindo da API paga (identificação).
-      // O valor atual e o histórico vêm exclusivamente da BrasilAPI gratuita,
-      // disparada via refreshFipeFn(force=true) logo após o cadastro.
-      if (fipeLookup && fipeLookup.codigo_fipe) {
+      // Dispara o seed inicial dos 6 meses na BrasilAPI (não-bloqueante crítico).
+      if (codigoFipe) {
         try {
-          await supabase
-            .from("veiculos")
-            .update({ codigo_fipe: fipeLookup.codigo_fipe })
-            .eq("id", inserted.id);
-          // Importação dinâmica para não inflar bundle inicial
           const { refreshFipeFn } = await import("@/lib/fipe.functions");
           await refreshFipeFn({ data: { vehicleId: inserted.id, force: true } });
         } catch (e) {

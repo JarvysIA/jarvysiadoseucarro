@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 
 type Props = {
   open: boolean;
@@ -126,8 +127,8 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       const authUpdates: { email?: string; password?: string } = {};
       if (email && email !== profile.email) authUpdates.email = email.trim();
       if (newPassword.trim().length > 0) {
-        if (newPassword.trim().length < 6) {
-          toast.error("A nova senha deve ter pelo menos 6 caracteres.");
+        if (!isStrongPassword(newPassword.trim())) {
+          toast.error("Senha fraca — atenda a todos os requisitos.");
           setSaving(false);
           return;
         }
@@ -185,6 +186,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 autoComplete="new-password"
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
               />
+              {newPassword.length > 0 && <PasswordChecklist password={newPassword} />}
             </Field>
 
             <Field label="WhatsApp" icon={<Phone className="h-3.5 w-3.5" />}>
@@ -244,7 +246,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               <button
                 type="button"
                 onClick={save}
-                disabled={saving}
+                disabled={saving || (newPassword.length > 0 && !isStrongPassword(newPassword))}
                 className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

@@ -21,7 +21,7 @@ import {
   type MaintComputed,
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
-import { CATEGORIAS, CATEGORIA_COLOR } from "@/lib/despesas";
+import { CATEGORIA_COLOR } from "@/lib/despesas";
 import { toast } from "sonner";
 
 export type MaintExpense = {
@@ -435,7 +435,8 @@ function ConfirmForm({
   const [km, setKm] = useState(String(parsed.km_registrada ?? defaultKm));
   const [valor, setValor] = useState(parsed.valor_total.toFixed(2));
   const [itens, setItens] = useState(parsed.itens_identificados);
-  const [categoria, setCategoria] = useState<DespesaCategoria>(parsed.categoria);
+  // Atalho via Card de Status → categoria fixa em "Revisão".
+  const categoria: DespesaCategoria = "Revisão";
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
@@ -508,29 +509,18 @@ function ConfirmForm({
         />
       </Field>
 
-      <Field label="Categoria (classificada pela IA)">
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIAS.map((c) => {
-            const active = categoria === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategoria(c)}
-                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                style={{
-                  borderColor: active ? CATEGORIA_COLOR[c] : "var(--border)",
-                  color: active ? CATEGORIA_COLOR[c] : "var(--muted-foreground)",
-                  backgroundColor: active
-                    ? `color-mix(in oklab, ${CATEGORIA_COLOR[c]} 12%, transparent)`
-                    : "transparent",
-                  boxShadow: active ? `0 0 10px -3px ${CATEGORIA_COLOR[c]}` : "none",
-                }}
-              >
-                {c}
-              </button>
-            );
-          })}
+      <Field label="Categoria">
+        <div
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+          style={{
+            borderColor: CATEGORIA_COLOR[categoria],
+            color: CATEGORIA_COLOR[categoria],
+            backgroundColor: `color-mix(in oklab, ${CATEGORIA_COLOR[categoria]} 12%, transparent)`,
+          }}
+          title="Categoria travada — atalho via Card de Status"
+        >
+          <Check className="h-3 w-3" />
+          {categoria} (travado)
         </div>
       </Field>
 
@@ -651,7 +641,8 @@ function ManualForm({
   const [km, setKm] = useState(String(defaultKm || ""));
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState<DespesaCategoria>("Manutenção");
+  // Atalho via Card de Status → categoria fixa em "Revisão".
+  const categoria: DespesaCategoria = "Revisão";
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
@@ -721,28 +712,17 @@ function ManualForm({
       </Field>
 
       <Field label="Categoria">
-        <div className="flex flex-wrap gap-1.5">
-          {CATEGORIAS.map((c) => {
-            const active = categoria === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCategoria(c)}
-                className="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors"
-                style={{
-                  borderColor: active ? CATEGORIA_COLOR[c] : "var(--border)",
-                  color: active ? CATEGORIA_COLOR[c] : "var(--muted-foreground)",
-                  backgroundColor: active
-                    ? `color-mix(in oklab, ${CATEGORIA_COLOR[c]} 12%, transparent)`
-                    : "transparent",
-                  boxShadow: active ? `0 0 10px -3px ${CATEGORIA_COLOR[c]}` : "none",
-                }}
-              >
-                {c}
-              </button>
-            );
-          })}
+        <div
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold"
+          style={{
+            borderColor: CATEGORIA_COLOR[categoria],
+            color: CATEGORIA_COLOR[categoria],
+            backgroundColor: `color-mix(in oklab, ${CATEGORIA_COLOR[categoria]} 12%, transparent)`,
+          }}
+          title="Categoria travada — atalho via Card de Status"
+        >
+          <Check className="h-3 w-3" />
+          {categoria} (travado)
         </div>
       </Field>
 

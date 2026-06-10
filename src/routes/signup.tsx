@@ -9,6 +9,7 @@ import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral"
 import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { fireWelcomeWebhook, normalizePhoneBR } from "@/lib/welcome-webhook";
+import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Cadastro — Jarvys" }] }),
@@ -49,8 +50,8 @@ function SignupPage() {
       toast.error("Placa inválida. Use o formato AAA0000 ou AAA0A00.");
       return;
     }
-    if (!form.name.trim() || !form.email.trim() || !form.password || form.password.length < 6) {
-      toast.error("Preencha todos os campos corretamente.");
+    if (!form.name.trim() || !form.email.trim() || !isStrongPassword(form.password)) {
+      toast.error("Preencha todos os campos e use uma senha forte.");
       return;
     }
     setModalOpen(true);
@@ -261,9 +262,10 @@ function SignupPage() {
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
         <Field icon={<Lock className="h-4 w-4" />} label="Senha">
-          <input required type="password" minLength={6} value={form.password} onChange={set("password")} placeholder="Mínimo 6 caracteres"
+          <input required type="password" minLength={8} value={form.password} onChange={set("password")} placeholder="Crie uma senha forte"
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
+        <PasswordChecklist password={form.password} />
         <Field icon={<Hash className="h-4 w-4" />} label="Placa do carro">
           <input
             required
@@ -281,7 +283,7 @@ function SignupPage() {
           />
         </Field>
 
-        <button type="submit" disabled={loading}
+        <button type="submit" disabled={loading || !isStrongPassword(form.password)}
           className="glow-neon mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           {loading ? "Criando conta..." : "Entrar na garagem"}
