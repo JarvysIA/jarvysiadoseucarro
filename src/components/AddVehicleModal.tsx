@@ -70,6 +70,8 @@ export function AddVehicleModal({
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
+  const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
+  const [showFipePicker, setShowFipePicker] = useState(false);
 
   useEffect(() => {
     if (!open) {
