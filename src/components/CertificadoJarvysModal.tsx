@@ -89,23 +89,16 @@ export function CertificadoJarvysModal({
 
       paintBackground();
 
-      // ---------- Header: Logo + Título ----------
-      // Logo placeholder (escudo neon "J")
-      doc.setFillColor(...NEON);
-      doc.roundedRect(40, 40, 36, 36, 8, 8, "F");
-      doc.setTextColor(...BG_DARK);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.text("J", 58, 66, { align: "center" });
-
+      // ---------- Header: Título ----------
+      // TODO: doc.addImage(logoBase64) — espaço reservado para o futuro logo Jarvys.
       doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
-      doc.text("Certificado Jarvys", 88, 60);
+      doc.text("Certificado Jarvys", 40, 60);
       doc.setTextColor(...TXT_MUTED);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text("Porta-Luvas Digital — Histórico Oficial", 88, 75);
+      doc.text("Porta-Luvas Digital — Histórico Oficial", 40, 75);
 
       // ---------- Imagem do veículo ----------
       let cursorY = 100;
@@ -176,29 +169,25 @@ export function CertificadoJarvysModal({
       doc.setTextColor(...TXT_MUTED);
       doc.text("Registros", cx + cardW / 2, cursorY + 58, { align: "center" });
 
-      // Card 2: "Revisões Documentadas" (azul + branco), sem número
+      // Card 2: "Revisões" / "Documentadas" em DUAS linhas Y distintas
       cx = drawCardBox(1);
-      const w2Blue = doc.getTextWidth("Revisões ");
-      const w2White = doc.getTextWidth("Documentadas");
-      const total2 = w2Blue + w2White;
-      const start2 = cx + (cardW - total2) / 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(...NEON);
-      doc.text("Revisões ", start2, cursorY + cardH / 2 + 4);
+      doc.text("Revisões", cx + cardW / 2, cursorY + cardH / 2 - 2, { align: "center" });
       doc.setTextColor(...TXT_WHITE);
-      doc.text("Documentadas", start2 + w2Blue, cursorY + cardH / 2 + 4);
+      doc.text("Documentadas", cx + cardW / 2, cursorY + cardH / 2 + 14, { align: "center" });
 
-      // Card 3: "+ VALOR" azul / "de revenda" branco — literal
+      // Card 3: "+ VALOR" acima / "de revenda" abaixo (sem sobreposição)
       cx = drawCardBox(2);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.setTextColor(...NEON);
-      doc.text("+ VALOR", cx + cardW / 2, cursorY + 36, { align: "center" });
+      doc.text("+ VALOR", cx + cardW / 2, cursorY + cardH / 2 - 4, { align: "center" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(...TXT_WHITE);
-      doc.text("de revenda", cx + cardW / 2, cursorY + 58, { align: "center" });
+      doc.text("de revenda", cx + cardW / 2, cursorY + cardH / 2 + 16, { align: "center" });
 
       cursorY += cardH + 30;
 

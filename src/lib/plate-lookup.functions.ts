@@ -4,6 +4,14 @@ const PUXAPLACA_TOKEN = "b792b11a-b553-411f-8d8c-0a2ceb011c5b";
 
 export type FipeHistoricoItem = { mes_referencia: string; valor: string | number };
 
+export type FipeOption = {
+  codigo_fipe: string;
+  texto_modelo: string;
+  combustivel?: string;
+  valor: number;
+  mes_referencia: string;
+};
+
 export type PlateLookupPayload = {
   marca: string;
   modelo: string;
@@ -17,7 +25,9 @@ export type PlateLookupPayload = {
     mes_referencia: string;
     historico: FipeHistoricoItem[];
   } | null;
+  fipe_options?: FipeOption[];
 } | null;
+
 
 /** Tenta extrair um campo do JSON em vários "shapes" possíveis. */
 function pick(obj: any, keys: string[]): string {
@@ -81,26 +91,39 @@ function normalize(raw: any): PlateLookupPayload {
     if (!chassi) chassi = pick(c, ["chassi", "CHASSI", "chassis", "vin", "VIN"]);
   }
 
-  // FIPE: extraímos APENAS o `codigo_fipe` da API paga (identificação).
-  // O valor atual e o histórico vêm exclusivamente da BrasilAPI gratuita,
-  // filtrando pelo anoModelo salvo no veículo (ver refreshFipeFn).
-  let fipe: PlateLookupPayload extends infer T ? T extends { fipe?: infer F } ? F : never : never = null as any;
-  const fipeFirst = raw?.fipe?.dados?.[0];
-  if (fipeFirst && typeof fipeFirst === "object") {
-    const codigo = pick(fipeFirst, ["codigo_fipe", "codigoFipe", "codigo"]);
-    if (codigo) {
-      fipe = {
+  // FIPE: extraímos TODAS as opções (multi-versão) da API paga. O valor e
+  // mes_referencia vêm aqui só como referência; o cliente decide qual usar
+  // e em seguida busca o valor "vigente" na BrasilAPI.
+  const fipeArr = Array.isArray(raw?.fipe?.dados) ? raw.fipe.dados : [];
+  const fipe_options: FipeOption[] = fipeArr
+    .map((it: any) => {
+      const codigo = pick(it, ["codigo_fipe", "codigoFipe", "codigo"]);
+      if (!codigo) return null;
+      return {
         codigo_fipe: codigo,
-        valor: 0,
-        mes_referencia: "",
-        historico: [],
-      } as any;
-    }
+        texto_modelo: pick(it, ["texto_modelo", "textoModelo", "modelo", "descricao"]),
+        combustivel: pick(it, ["combustivel", "texto_combustivel"]),
+        valor: parseValorBR(pick(it, ["valor", "preco"]) || it?.valor),
+        mes_referencia: pick(it, ["mes_referencia", "mesReferencia", "referencia"]),
+      } as FipeOption;
+    })
+    .filter((x: FipeOption | null): x is FipeOption => x !== null);
+
+  let fipe: PlateLookupPayload extends infer T ? T extends { fipe?: infer F } ? F : never : never = null as any;
+  if (fipe_options.length === 1) {
+    const f = fipe_options[0];
+    fipe = {
+      codigo_fipe: f.codigo_fipe,
+      valor: f.valor || 0,
+      mes_referencia: f.mes_referencia || "",
+      historico: [],
+    } as any;
   }
 
-  if (!marca && !modelo && !ano && !cor && !fipe) return null;
-  return { marca, modelo, ano, cor, motorizacao, chassi, fipe: fipe as any };
+  if (!marca && !modelo && !ano && !cor && fipe_options.length === 0) return null;
+  return { marca, modelo, ano, cor, motorizacao, chassi, fipe: fipe as any, fipe_options };
 }
+
 
 export const lookupPlateFn = createServerFn({ method: "POST" })
   .inputValidator((data: { placa: string }) => data)

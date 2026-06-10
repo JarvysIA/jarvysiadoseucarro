@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
-import type { FipeHistoricoItem } from "@/lib/plate-lookup.functions";
+import type { FipeHistoricoItem, FipeOption } from "@/lib/plate-lookup.functions";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
 
 import { toast } from "sonner";
@@ -70,6 +70,8 @@ export function AddVehicleModal({
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
+  const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
+  const [showFipePicker, setShowFipePicker] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -80,6 +82,8 @@ export function AddVehicleModal({
       setKm("");
       setSubmitting(false);
       setFipeLookup(null);
+      setFipeOptions([]);
+      setShowFipePicker(false);
     }
   }, [open]);
 
@@ -129,18 +133,76 @@ export function AddVehicleModal({
         motorizacao: r.motorizacao || "",
         chassi: r.chassi || "",
       });
-      setFipeLookup(r.fipe ?? null);
+      const opts = r.fipe_options ?? [];
+      setFipeOptions(opts);
+      // Cenário A: 1 opção (ou cache) → captura automática.
+      // Cenário B: múltiplas → mostra picker no step de confirmação.
+      if (opts.length <= 1) {
+        setFipeLookup(r.fipe ?? (opts[0] ? {
+          codigo_fipe: opts[0].codigo_fipe,
+          valor: opts[0].valor,
+          mes_referencia: opts[0].mes_referencia,
+          historico: [],
+        } : null));
+        setShowFipePicker(false);
+      } else {
+        setFipeLookup(null);
+        setShowFipePicker(true);
+      }
       setNotFound(false);
     } else {
       setFipeLookup(null);
+      setFipeOptions([]);
+      setShowFipePicker(false);
       setNotFound(true);
     }
     setStep("confirm");
   };
 
+  const pickFipeOption = (opt: FipeOption) => {
+    setFipeLookup({
+      codigo_fipe: opt.codigo_fipe,
+      valor: opt.valor,
+      mes_referencia: opt.mes_referencia,
+      historico: [],
+    });
+    setShowFipePicker(false);
+  };
+
+  /** BrasilAPI: valor "vigente" (índice [0]) para o codigo_fipe selecionado. */
+  const fetchBrasilApiCurrent = async (
+    codigoFipe: string,
+  ): Promise<{ valor: number; mes_referencia: string } | null> => {
+    try {
+      const res = await fetch(
+        `https://brasilapi.com.br/api/fipe/preco/v1/${encodeURIComponent(codigoFipe)}`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) return null;
+      const arr = (await res.json()) as Array<{ valor?: string; mesReferencia?: string; anoModelo?: number | string }>;
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const anoNum = Number((data.ano || "").toString().replace(/\D/g, ""));
+      const match = arr.find((p) => Number(p.anoModelo) === anoNum) ?? arr[0];
+      const clean = String(match.valor ?? "").replace(/[R$\s.]/g, "").replace(",", ".");
+      const valor = parseFloat(clean);
+      return {
+        valor: Number.isFinite(valor) ? valor : 0,
+        mes_referencia: (match.mesReferencia || "").trim(),
+      };
+    } catch (e) {
+      console.warn("[BrasilAPI preco]", e);
+      return null;
+    }
+  };
+
+
   const confirmAdd = async () => {
     if (!data.marca.trim() || !data.modelo.trim()) {
       toast.error("Preencha ao menos marca e modelo.");
+      return;
+    }
+    if (showFipePicker && !fipeLookup) {
+      toast.error("Selecione a versão FIPE do veículo.");
       return;
     }
     setSubmitting(true);
@@ -152,10 +214,20 @@ export function AddVehicleModal({
         return;
       }
       const km_atual = km ? Number(km.replace(/\D/g, "")) || null : null;
-      // CRÍTICO: gravamos o `codigo_fipe` JÁ no INSERT — sem ele, a automação
-      // mensal/seed de 6 meses do gráfico FIPE não tem como buscar valores.
       const codigoFipe = fipeLookup?.codigo_fipe?.trim() || null;
-      const insertPayload = {
+
+      // Ponte BrasilAPI: busca valor vigente para gravar de imediato.
+      let fipeValor: number | null = fipeLookup?.valor || null;
+      let fipeMesRef: string | null = fipeLookup?.mes_referencia || null;
+      if (codigoFipe) {
+        const atual = await fetchBrasilApiCurrent(codigoFipe);
+        if (atual && atual.valor > 0) {
+          fipeValor = atual.valor;
+          fipeMesRef = atual.mes_referencia || fipeMesRef;
+        }
+      }
+
+      const insertPayload: Record<string, unknown> = {
         user_id: userId,
         placa: plate,
         marca: data.marca.trim(),
@@ -165,11 +237,16 @@ export function AddVehicleModal({
         motorizacao: data.motorizacao.trim(),
         chassi: (data.chassi || "").trim(),
         km_atual,
-        codigo_fipe: codigoFipe,
       };
+      // Elimina envio de null para FIPE: só grava quando temos dado real.
+      if (codigoFipe) insertPayload.codigo_fipe = codigoFipe;
+      if (fipeValor && fipeValor > 0) insertPayload.fipe_valor = fipeValor;
+      if (fipeMesRef) insertPayload.fipe_mes_referencia = fipeMesRef;
+      if (codigoFipe) insertPayload.fipe_updated_at = new Date().toISOString();
+
       const { data: inserted, error } = await supabase
         .from("veiculos")
-        .insert(insertPayload)
+        .insert(insertPayload as never)
         .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
         .single();
       if (error || !inserted) {
@@ -334,6 +411,51 @@ export function AddVehicleModal({
                 </div>
               )}
 
+              {showFipePicker && fipeOptions.length > 1 && (
+                <div className="mb-4 rounded-2xl border border-primary/40 bg-card p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                    Selecione a versão FIPE
+                  </p>
+                  <p className="mb-3 text-[11px] text-muted-foreground">
+                    Encontramos mais de uma versão para esse veículo. Escolha a que corresponde ao seu:
+                  </p>
+                  <ul className="flex max-h-56 flex-col gap-2 overflow-y-auto pr-1">
+                    {fipeOptions.map((opt) => {
+                      const selected = fipeLookup?.codigo_fipe === opt.codigo_fipe;
+                      return (
+                        <li key={opt.codigo_fipe}>
+                          <button
+                            type="button"
+                            onClick={() => pickFipeOption(opt)}
+                            className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                              selected
+                                ? "border-primary bg-primary/15 shadow-[0_0_0_1px_rgba(56,189,248,0.5)]"
+                                : "border-border bg-background/40 hover:border-primary/50"
+                            }`}
+                          >
+                            <p className="text-xs font-semibold text-foreground">
+                              {opt.texto_modelo || "Versão"}
+                            </p>
+                            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                              <span className="font-tech tracking-wider text-primary/80">
+                                FIPE {opt.codigo_fipe}
+                                {opt.combustivel ? ` · ${opt.combustivel}` : ""}
+                              </span>
+                              {opt.valor > 0 && (
+                                <span className="font-semibold text-foreground">
+                                  R$ {opt.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
+
               <label className="block rounded-2xl border border-border bg-card px-4 py-3">
                 <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   <Gauge className="h-3.5 w-3.5" />
@@ -351,7 +473,7 @@ export function AddVehicleModal({
 
               <button
                 type="button"
-                disabled={submitting}
+                disabled={submitting || (showFipePicker && !fipeLookup)}
                 onClick={confirmAdd}
                 className="glow-neon mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
               >
