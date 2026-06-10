@@ -76,5 +76,3 @@ export const fetchFipeHistoryFn = createServerFn({ method: "POST" })
       };
     }
   });
-
-type FipeHistoricoOut = FipeHistoryPoint[];
