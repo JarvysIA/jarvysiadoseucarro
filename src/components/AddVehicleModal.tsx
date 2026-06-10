@@ -246,7 +246,7 @@ export function AddVehicleModal({
 
       const { data: inserted, error } = await supabase
         .from("veiculos")
-        .insert(insertPayload)
+        .insert(insertPayload as never)
         .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
         .single();
       if (error || !inserted) {
