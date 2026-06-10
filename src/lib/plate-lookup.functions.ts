@@ -4,6 +4,14 @@ const PUXAPLACA_TOKEN = "b792b11a-b553-411f-8d8c-0a2ceb011c5b";
 
 export type FipeHistoricoItem = { mes_referencia: string; valor: string | number };
 
+export type FipeOption = {
+  codigo_fipe: string;
+  texto_modelo: string;
+  combustivel?: string;
+  valor: number;
+  mes_referencia: string;
+};
+
 export type PlateLookupPayload = {
   marca: string;
   modelo: string;
@@ -17,7 +25,9 @@ export type PlateLookupPayload = {
     mes_referencia: string;
     historico: FipeHistoricoItem[];
   } | null;
+  fipe_options?: FipeOption[];
 } | null;
+
 
 /** Tenta extrair um campo do JSON em vários "shapes" possíveis. */
 function pick(obj: any, keys: string[]): string {
