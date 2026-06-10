@@ -380,10 +380,15 @@ export function CertificadoJarvysModal({
               {/* Métricas */}
               <div className="grid grid-cols-3 gap-2">
                 <Metric value={`${totalRegistros}`} label="Registros" />
-                <Metric value={`${totalRegistros}`} label="Revisões Documentadas" />
+                <div className="flex items-center justify-center rounded-2xl border border-primary/30 bg-card/50 p-3 text-center">
+                  <p className="text-sm font-bold leading-tight">
+                    <span className="text-primary">Revisões </span>
+                    <span className="text-foreground">Documentadas</span>
+                  </p>
+                </div>
                 <div className="rounded-2xl border border-primary/30 bg-card/50 p-3 text-center">
-                  <p className="text-base font-bold leading-tight">
-                    <span className="text-primary">+ {formatBRL(somaInvestida)}</span>
+                  <p className="text-base font-bold leading-tight text-primary">
+                    + VALOR
                   </p>
                   <p className="mt-1 text-[10px] text-muted-foreground">de revenda</p>
                 </div>
