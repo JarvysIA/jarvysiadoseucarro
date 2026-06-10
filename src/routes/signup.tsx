@@ -9,6 +9,7 @@ import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral"
 import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { fireWelcomeWebhook, normalizePhoneBR } from "@/lib/welcome-webhook";
+import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Cadastro — Jarvys" }] }),
