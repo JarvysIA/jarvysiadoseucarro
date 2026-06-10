@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, X, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { refreshFipeFn } from "@/lib/fipe.functions";
 
 type VehicleFipe = {
   fipe_valor: number | null;
@@ -13,8 +12,36 @@ type VehicleFipe = {
 
 type HistoryPoint = { mes_referencia: string; valor: number };
 
+type BrasilApiFipeItem = {
+  valor: string;
+  Valor?: string;
+  mesReferencia?: string;
+  mes_referencia?: string;
+  MesReferencia?: string;
+  codigoFipe?: string;
+  marca?: string;
+  modelo?: string;
+  anoModelo?: number;
+  combustivel?: string;
+  referencia?: string;
+};
+
 function formatBRL(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+}
+
+/** "R$ 41.095,00" → 41095.00 */
+function parseBRLToNumber(raw: string | number | null | undefined): number {
+  if (raw == null) return NaN;
+  if (typeof raw === "number") return raw;
+  const cleaned = raw
+    .toString()
+    .replace(/\s/g, "")
+    .replace(/R\$/gi, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 const MES_PT_TO_NUM: Record<string, number> = {
@@ -22,7 +49,7 @@ const MES_PT_TO_NUM: Record<string, number> = {
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
 
-/** "abril de 2025" → 202504 (number) para ordenação cronológica estrita. */
+/** "abril de 2025" → 202504 */
 function parseRefMonth(s: string): number {
   if (!s) return 0;
   const parts = s.toLowerCase().trim().split(" de ");
@@ -45,7 +72,6 @@ export function FipeCard({
   const [loading, setLoading] = useState(true);
   const [openChart, setOpenChart] = useState(false);
 
-  // Carrega cache do veículo
   useEffect(() => {
     let cancel = false;
     setLoading(true);
@@ -59,27 +85,6 @@ export function FipeCard({
       if (cancel) return;
       setData((row as VehicleFipe | null) ?? null);
       setLoading(false);
-
-      // Lazy refresh (gratuito via BrasilAPI) se cache estiver velho
-      const updated = (row as VehicleFipe | null)?.fipe_updated_at;
-      const stale =
-        !updated || Date.now() - new Date(updated).getTime() > 30 * 24 * 60 * 60 * 1000;
-      if (stale && (row as VehicleFipe | null)?.codigo_fipe) {
-        try {
-          const res = await refreshFipeFn({ data: { vehicleId } });
-          if (!cancel && "refreshed" in res && res.refreshed) {
-            setData((prev) => ({
-              ...(prev ?? { codigo_fipe: null }),
-              fipe_valor: res.valor,
-              fipe_mes_referencia: res.mes_referencia ?? null,
-              fipe_updated_at: new Date().toISOString(),
-              codigo_fipe: prev?.codigo_fipe ?? null,
-            }));
-          }
-        } catch (e) {
-          console.warn("[refreshFipeFn]", e);
-        }
-      }
     })();
     return () => {
       cancel = true;
@@ -89,13 +94,14 @@ export function FipeCard({
   const valor = data?.fipe_valor != null ? Number(data.fipe_valor) : null;
   const mes = data?.fipe_mes_referencia ?? null;
   const hasFipe = valor != null && valor > 0;
+  const codigoFipe = data?.codigo_fipe ?? null;
 
   return (
     <>
       <button
         type="button"
-        onClick={() => hasFipe && setOpenChart(true)}
-        disabled={!hasFipe}
+        onClick={() => codigoFipe && setOpenChart(true)}
+        disabled={!codigoFipe}
         className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/40 disabled:cursor-default disabled:opacity-80"
       >
         <div className="flex items-center gap-3">
@@ -127,48 +133,72 @@ export function FipeCard({
             )}
           </div>
         </div>
-        {hasFipe && (
+        {codigoFipe && (
           <span className="text-[11px] font-semibold text-primary">Ver histórico</span>
         )}
       </button>
 
       {openChart && (
-        <FipeChartModal vehicleId={vehicleId} onClose={() => setOpenChart(false)} />
+        <FipeChartModal codigoFipe={codigoFipe} onClose={() => setOpenChart(false)} />
       )}
     </>
   );
 }
 
-function FipeChartModal({ vehicleId, onClose }: { vehicleId: string; onClose: () => void }) {
+function FipeChartModal({
+  codigoFipe,
+  onClose,
+}: {
+  codigoFipe: string | null;
+  onClose: () => void;
+}) {
   const [points, setPoints] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancel = false;
-    (async () => {
-      const { data } = await supabase
-        .from("fipe_history")
-        .select("mes_referencia,valor,created_at")
-        .eq("vehicle_id", vehicleId);
-      if (cancel) return;
-      const raw = ((data ?? []) as Array<{ mes_referencia: string; valor: number }>).map((r) => ({
-        mes_referencia: r.mes_referencia,
-        valor: Number(r.valor),
-      }));
-      // Ordenação cronológica estrita (do mais antigo → mais recente)
-      // baseada no parser PT-BR ("abril de 2025" → 2025-04).
-      raw.sort((a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia));
-      setPoints(raw);
+    if (!codigoFipe) {
       setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://brasilapi.com.br/api/fipe/preco/v1/${encodeURIComponent(codigoFipe)}`,
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as BrasilApiFipeItem[];
+        if (cancel) return;
+
+        const parsed: HistoryPoint[] = (json ?? [])
+          .map((item) => {
+            const mes =
+              item.mesReferencia ?? item.mes_referencia ?? item.MesReferencia ?? "";
+            const valor = parseBRLToNumber(item.Valor ?? item.valor);
+            return { mes_referencia: mes, valor };
+          })
+          .filter((p) => p.mes_referencia && Number.isFinite(p.valor));
+
+        parsed.sort(
+          (a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia),
+        );
+        setPoints(parsed);
+      } catch (e) {
+        if (!cancel) setError((e as Error).message || "Erro ao buscar histórico");
+      } finally {
+        if (!cancel) setLoading(false);
+      }
     })();
     return () => {
       cancel = true;
     };
-  }, [vehicleId]);
+  }, [codigoFipe]);
 
   const tickFormatter = useMemo(
     () => (v: string) => {
-      // "janeiro de 2025" -> "jan/25"
       const lower = (v || "").toLowerCase();
       const parts = lower.split(" de ");
       if (parts.length === 2) {
@@ -213,13 +243,27 @@ function FipeChartModal({ vehicleId, onClose }: { vehicleId: string; onClose: ()
         </div>
 
         <div className="mt-5 h-64 w-full">
-          {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          {!codigoFipe ? (
+            <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
+              Histórico não disponível para este veículo
+            </div>
+          ) : loading ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3">
+              <Loader2
+                className="h-7 w-7 animate-spin text-primary"
+                style={{ filter: "drop-shadow(0 0 8px var(--primary))" }}
+              />
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Carregando histórico em tempo real…
+              </p>
+            </div>
+          ) : error ? (
+            <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
+              Não foi possível carregar o histórico agora.
             </div>
           ) : points.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
-              Sem histórico FIPE disponível ainda.
+              Histórico não disponível para este veículo
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
