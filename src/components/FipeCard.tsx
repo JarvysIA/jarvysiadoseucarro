@@ -2,46 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { TrendingUp, X, Loader2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchFipeHistoryFn, type FipeHistoryPoint } from "@/lib/fipe-history.functions";
 
 type VehicleFipe = {
+  placa: string | null;
   fipe_valor: number | null;
   fipe_mes_referencia: string | null;
   fipe_updated_at: string | null;
   codigo_fipe: string | null;
-};
-
-type HistoryPoint = { mes_referencia: string; valor: number };
-
-type BrasilApiFipeItem = {
-  valor: string;
-  Valor?: string;
-  mesReferencia?: string;
-  mes_referencia?: string;
-  MesReferencia?: string;
-  codigoFipe?: string;
-  marca?: string;
-  modelo?: string;
-  anoModelo?: number;
-  combustivel?: string;
-  referencia?: string;
+  fipe_historico: FipeHistoryPoint[] | null;
+  fipe_ultima_atualizacao: string | null;
 };
 
 function formatBRL(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
-}
-
-/** "R$ 41.095,00" → 41095.00 */
-function parseBRLToNumber(raw: string | number | null | undefined): number {
-  if (raw == null) return NaN;
-  if (typeof raw === "number") return raw;
-  const cleaned = raw
-    .toString()
-    .replace(/\s/g, "")
-    .replace(/R\$/gi, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : NaN;
 }
 
 const MES_PT_TO_NUM: Record<string, number> = {
@@ -57,6 +31,22 @@ function parseRefMonth(s: string): number {
   const mes = MES_PT_TO_NUM[parts[0].trim()] || 0;
   const ano = parseInt(parts[1].trim(), 10) || 0;
   return ano * 100 + mes;
+}
+
+/**
+ * Lazy update rule: refetch from external API se:
+ *  (A) histórico vazio/nulo, OU
+ *  (B) hoje >= dia 7 E (ano,mês) da última atualização < (ano,mês) atual.
+ */
+function shouldRefetch(historico: FipeHistoryPoint[] | null, lastAt: string | null): boolean {
+  if (!historico || historico.length === 0) return true;
+  if (!lastAt) return true;
+  const now = new Date();
+  if (now.getDate() < 7) return false;
+  const last = new Date(lastAt);
+  const lastKey = last.getFullYear() * 100 + (last.getMonth() + 1);
+  const nowKey = now.getFullYear() * 100 + (now.getMonth() + 1);
+  return lastKey < nowKey;
 }
 
 export function FipeCard({
@@ -79,11 +69,13 @@ export function FipeCard({
     (async () => {
       const { data: row } = await supabase
         .from("veiculos")
-        .select("fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe")
+        .select(
+          "placa,fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,fipe_historico,fipe_ultima_atualizacao",
+        )
         .eq("id", vehicleId)
         .maybeSingle();
       if (cancel) return;
-      setData((row as VehicleFipe | null) ?? null);
+      setData((row as unknown as VehicleFipe | null) ?? null);
       setLoading(false);
     })();
     return () => {
@@ -95,6 +87,7 @@ export function FipeCard({
   const mes = data?.fipe_mes_referencia ?? null;
   const hasFipe = valor != null && valor > 0;
   const codigoFipe = data?.codigo_fipe ?? null;
+  const placa = data?.placa ?? null;
 
   return (
     <>
@@ -139,53 +132,80 @@ export function FipeCard({
       </button>
 
       {openChart && (
-        <FipeChartModal codigoFipe={codigoFipe} onClose={() => setOpenChart(false)} />
+        <FipeChartModal
+          vehicleId={vehicleId}
+          placa={placa}
+          codigoFipe={codigoFipe}
+          cachedHistorico={data?.fipe_historico ?? null}
+          lastUpdate={data?.fipe_ultima_atualizacao ?? null}
+          onClose={() => setOpenChart(false)}
+          onCacheUpdated={(novoHist, novaData) =>
+            setData((d) =>
+              d ? { ...d, fipe_historico: novoHist, fipe_ultima_atualizacao: novaData } : d,
+            )
+          }
+        />
       )}
     </>
   );
 }
 
 function FipeChartModal({
+  vehicleId,
+  placa,
   codigoFipe,
+  cachedHistorico,
+  lastUpdate,
   onClose,
+  onCacheUpdated,
 }: {
+  vehicleId: string;
+  placa: string | null;
   codigoFipe: string | null;
+  cachedHistorico: FipeHistoryPoint[] | null;
+  lastUpdate: string | null;
   onClose: () => void;
+  onCacheUpdated: (h: FipeHistoryPoint[], at: string) => void;
 }) {
-  const [points, setPoints] = useState<HistoryPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [points, setPoints] = useState<FipeHistoryPoint[]>(cachedHistorico ?? []);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancel = false;
-    if (!codigoFipe) {
-      setLoading(false);
+    if (!codigoFipe || !placa) return;
+
+    const mustFetch = shouldRefetch(cachedHistorico, lastUpdate);
+    if (!mustFetch) {
+      setPoints(cachedHistorico ?? []);
       return;
     }
+
     setLoading(true);
     setError(null);
     (async () => {
       try {
-        const res = await fetch(
-          `https://brasilapi.com.br/api/fipe/preco/v1/${encodeURIComponent(codigoFipe)}`,
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as BrasilApiFipeItem[];
+        const res = await fetchFipeHistoryFn({
+          data: { placa, codigoFipe },
+        });
         if (cancel) return;
-
-        const parsed: HistoryPoint[] = (json ?? [])
-          .map((item) => {
-            const mes =
-              item.mesReferencia ?? item.mes_referencia ?? item.MesReferencia ?? "";
-            const valor = parseBRLToNumber(item.Valor ?? item.valor);
-            return { mes_referencia: mes, valor };
-          })
-          .filter((p) => p.mes_referencia && Number.isFinite(p.valor));
-
-        parsed.sort(
-          (a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia),
-        );
-        setPoints(parsed);
+        if (!res.ok || res.historico.length === 0) {
+          // mantém o que houver em cache; se nada, fica vazio
+          setPoints(cachedHistorico ?? []);
+          setError(res.ok ? null : res.error);
+          return;
+        }
+        setPoints(res.historico);
+        // Write-through cache no Supabase
+        const nowIso = new Date().toISOString();
+        const { error: upErr } = await supabase
+          .from("veiculos")
+          .update({
+            fipe_historico: res.historico as unknown as never,
+            fipe_ultima_atualizacao: nowIso,
+          } as never)
+          .eq("id", vehicleId);
+        if (!upErr) onCacheUpdated(res.historico, nowIso);
       } catch (e) {
         if (!cancel) setError((e as Error).message || "Erro ao buscar histórico");
       } finally {
@@ -195,7 +215,8 @@ function FipeChartModal({
     return () => {
       cancel = true;
     };
-  }, [codigoFipe]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigoFipe, placa, vehicleId]);
 
   const tickFormatter = useMemo(
     () => (v: string) => {
@@ -209,6 +230,14 @@ function FipeChartModal({
       return v;
     },
     [],
+  );
+
+  const sortedPoints = useMemo(
+    () =>
+      [...points].sort(
+        (a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia),
+      ),
+    [points],
   );
 
   return (
@@ -243,7 +272,7 @@ function FipeChartModal({
         </div>
 
         <div className="mt-5 h-64 w-full">
-          {!codigoFipe ? (
+          {!codigoFipe || !placa ? (
             <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
               Histórico não disponível para este veículo
             </div>
@@ -254,20 +283,18 @@ function FipeChartModal({
                 style={{ filter: "drop-shadow(0 0 8px var(--primary))" }}
               />
               <p className="text-[11px] font-medium text-muted-foreground">
-                Carregando histórico em tempo real…
+                Atualizando histórico FIPE…
               </p>
             </div>
-          ) : error ? (
+          ) : sortedPoints.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
-              Não foi possível carregar o histórico agora.
-            </div>
-          ) : points.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
-              Histórico não disponível para este veículo
+              {error
+                ? "Não foi possível carregar o histórico agora."
+                : "Histórico não disponível para este veículo"}
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={points} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+              <LineChart data={sortedPoints} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
                 <XAxis
                   dataKey="mes_referencia"
