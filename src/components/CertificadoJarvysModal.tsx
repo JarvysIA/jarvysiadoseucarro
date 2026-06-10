@@ -56,122 +56,248 @@ export function CertificadoJarvysModal({
       const W = doc.internal.pageSize.getWidth();
       const H = doc.internal.pageSize.getHeight();
 
-      // Fundo dark
-      doc.setFillColor(8, 14, 26);
-      doc.rect(0, 0, W, H, "F");
-      // Borda neon
-      doc.setDrawColor(56, 189, 248);
-      doc.setLineWidth(2);
-      doc.rect(20, 20, W - 40, H - 40);
+      // ---------- Helpers ----------
+      const NEON: [number, number, number] = [56, 189, 248];
+      const TXT_MUTED: [number, number, number] = [180, 200, 220];
+      const TXT_WHITE: [number, number, number] = [240, 245, 252];
+      const BG_DARK: [number, number, number] = [8, 14, 26];
+      const BG_CARD: [number, number, number] = [14, 22, 38];
 
-      // Header
-      doc.setTextColor(56, 189, 248);
+      const paintBackground = () => {
+        doc.setFillColor(...BG_DARK);
+        doc.rect(0, 0, W, H, "F");
+        doc.setDrawColor(...NEON);
+        doc.setLineWidth(1.2);
+        doc.rect(20, 20, W - 40, H - 40);
+      };
+
+      const fetchAsDataURL = async (url: string): Promise<string | null> => {
+        try {
+          const res = await fetch(url, { mode: "cors" });
+          if (!res.ok) return null;
+          const blob = await res.blob();
+          return await new Promise<string>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(String(r.result));
+            r.onerror = reject;
+            r.readAsDataURL(blob);
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      paintBackground();
+
+      // ---------- Header: Logo + Título ----------
+      // Logo placeholder (escudo neon "J")
+      doc.setFillColor(...NEON);
+      doc.roundedRect(40, 40, 36, 36, 8, 8, "F");
+      doc.setTextColor(...BG_DARK);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(28);
-      doc.text("Certificado Jarvys", W / 2, 70, { align: "center" });
+      doc.setFontSize(22);
+      doc.text("J", 58, 66, { align: "center" });
 
-      doc.setTextColor(180, 200, 220);
+      doc.setTextColor(...NEON);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("Certificado Jarvys", 88, 60);
+      doc.setTextColor(...TXT_MUTED);
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text("Porta-Luvas Digital — Histórico Oficial", 88, 75);
+
+      // ---------- Imagem do veículo ----------
+      let cursorY = 100;
+      const imgX = 40;
+      const imgY = cursorY;
+      const imgW = 200;
+      const imgH = 120;
+      doc.setDrawColor(...NEON);
+      doc.setFillColor(...BG_CARD);
+      doc.roundedRect(imgX, imgY, imgW, imgH, 10, 10, "FD");
+      if (vehicle.foto_url) {
+        const dataUrl = await fetchAsDataURL(vehicle.foto_url);
+        if (dataUrl) {
+          try {
+            const fmt = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+            doc.addImage(dataUrl, fmt, imgX + 4, imgY + 4, imgW - 8, imgH - 8, undefined, "FAST");
+          } catch (err) {
+            console.warn("[PDF addImage]", err);
+          }
+        }
+      }
+
+      // ---------- Bloco de identificação do veículo ----------
+      const infoX = imgX + imgW + 20;
+      doc.setTextColor(...TXT_WHITE);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text(`${vehicle.marca ?? "—"} ${vehicle.modelo ?? ""}`.trim(), infoX, imgY + 22);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...TXT_MUTED);
+      doc.text(`${vehicle.ano ?? "—"} · ${vehicle.cor ?? "—"}`, infoX, imgY + 40);
+      doc.setTextColor(...NEON);
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.text("Porta-Luvas Digital — Histórico Oficial", W / 2, 92, { align: "center" });
-
-      // Bloco veículo
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text(
-        `${vehicle.marca ?? "—"} ${vehicle.modelo ?? ""}`.trim(),
-        W / 2,
-        135,
-        { align: "center" },
-      );
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
-      doc.setTextColor(180, 200, 220);
-      doc.text(
-        `${vehicle.ano ?? "—"} · ${vehicle.cor ?? "—"} · Placa ${vehicle.placa}`,
-        W / 2,
-        155,
-        { align: "center" },
-      );
+      doc.text(`Placa ${vehicle.placa}`, infoX, imgY + 58);
 
       // KM destaque
-      doc.setTextColor(56, 189, 248);
+      doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(36);
-      doc.text(
-        `${vehicle.km_atual.toLocaleString("pt-BR")} km`,
-        W / 2,
-        205,
-        { align: "center" },
-      );
-      doc.setFontSize(10);
-      doc.setTextColor(160, 180, 200);
-      doc.text("Quilometragem atual", W / 2, 222, { align: "center" });
+      doc.setFontSize(26);
+      doc.text(`${vehicle.km_atual.toLocaleString("pt-BR")} km`, infoX, imgY + 92);
+      doc.setFontSize(8);
+      doc.setTextColor(...TXT_MUTED);
+      doc.text("Quilometragem atual", infoX, imgY + 106);
 
-      // Métricas
-      const metricsY = 260;
+      cursorY = imgY + imgH + 30;
+
+      // ---------- Métricas (3 cards iguais ao modal) ----------
       const cardW = (W - 80 - 30) / 3;
-      const cards = [
-        { v: String(totalRegistros), l: "Registros" },
-        { v: String(totalRegistros), l: "Revisões Documentadas" },
-        { v: `+ ${formatBRL(somaInvestida)}`, l: "de revenda" },
-      ];
-      cards.forEach((c, i) => {
+      const cardH = 78;
+      const drawCardBox = (i: number) => {
         const x = 40 + i * (cardW + 15);
-        doc.setDrawColor(56, 189, 248);
-        doc.setFillColor(14, 22, 38);
-        doc.roundedRect(x, metricsY, cardW, 70, 8, 8, "FD");
-        doc.setTextColor(56, 189, 248);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text(c.v, x + cardW / 2, metricsY + 30, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(180, 200, 220);
-        doc.text(c.l, x + cardW / 2, metricsY + 50, { align: "center" });
-      });
+        doc.setDrawColor(...NEON);
+        doc.setFillColor(...BG_CARD);
+        doc.roundedRect(x, cursorY, cardW, cardH, 10, 10, "FD");
+        return x;
+      };
 
-      // Linha do tempo (revisões)
-      let y = metricsY + 100;
-      doc.setTextColor(56, 189, 248);
+      // Card 1: número + Registros
+      let cx = drawCardBox(0);
+      doc.setTextColor(...NEON);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text(String(totalRegistros), cx + cardW / 2, cursorY + 38, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...TXT_MUTED);
+      doc.text("Registros", cx + cardW / 2, cursorY + 58, { align: "center" });
+
+      // Card 2: "Revisões Documentadas" (azul + branco), sem número
+      cx = drawCardBox(1);
+      const w2Blue = doc.getTextWidth("Revisões ");
+      const w2White = doc.getTextWidth("Documentadas");
+      const total2 = w2Blue + w2White;
+      const start2 = cx + (cardW - total2) / 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
-      doc.text("Linha do tempo das revisões", 40, y);
-      y += 18;
+      doc.setTextColor(...NEON);
+      doc.text("Revisões ", start2, cursorY + cardH / 2 + 4);
+      doc.setTextColor(...TXT_WHITE);
+      doc.text("Documentadas", start2 + w2Blue, cursorY + cardH / 2 + 4);
+
+      // Card 3: "+ VALOR" azul / "de revenda" branco — literal
+      cx = drawCardBox(2);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(...NEON);
+      doc.text("+ VALOR", cx + cardW / 2, cursorY + 36, { align: "center" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(220, 230, 240);
+      doc.setTextColor(...TXT_WHITE);
+      doc.text("de revenda", cx + cardW / 2, cursorY + 58, { align: "center" });
+
+      cursorY += cardH + 30;
+
+      // ---------- Linha do tempo ----------
+      doc.setTextColor(...NEON);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text("Linha do tempo das revisões", 40, cursorY);
+      cursorY += 18;
 
       const sorted = [...revisoes].sort(
         (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime(),
       );
-      for (const r of sorted) {
-        if (y > H - 80) {
-          doc.addPage();
-          doc.setFillColor(8, 14, 26);
-          doc.rect(0, 0, W, H, "F");
-          y = 50;
+
+      const timelineX = 60;
+      const rowGap = 46;
+
+      // Linha vertical contínua à esquerda
+      const drawTimelineRail = (from: number, to: number) => {
+        doc.setDrawColor(...NEON);
+        doc.setLineWidth(0.8);
+        doc.line(timelineX, from, timelineX, to);
+      };
+
+      if (sorted.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        doc.setTextColor(...TXT_MUTED);
+        doc.text("Nenhuma revisão registrada ainda.", 60, cursorY + 10);
+      } else {
+        let railStart = cursorY;
+        let railEnd = cursorY;
+
+        for (const r of sorted) {
+          if (cursorY > H - 110) {
+            drawTimelineRail(railStart, railEnd);
+            doc.addPage();
+            paintBackground();
+            cursorY = 60;
+            railStart = cursorY;
+          }
+          const dt = new Date(r.data).toLocaleDateString("pt-BR");
+          const km =
+            r.km_registro != null
+              ? `${r.km_registro.toLocaleString("pt-BR")} km`
+              : "";
+          const valor = `R$ ${Number(r.valor).toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+          })}`;
+          const titulo = r.descricao || r.categoria;
+
+          // Bullet
+          doc.setFillColor(...NEON);
+          doc.circle(timelineX, cursorY + 8, 3.2, "F");
+
+          // Data
+          doc.setTextColor(...NEON);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.text(dt, timelineX + 14, cursorY + 6);
+
+          // Título do serviço
+          doc.setTextColor(...TXT_WHITE);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          const tituloLines = doc.splitTextToSize(titulo, W - timelineX - 130);
+          doc.text(tituloLines, timelineX + 14, cursorY + 22);
+
+          // KM linha pequena
+          if (km) {
+            doc.setTextColor(...TXT_MUTED);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.text(km, timelineX + 14, cursorY + 35);
+          }
+
+          // Valor à direita
+          doc.setTextColor(...NEON);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(12);
+          doc.text(valor, W - 40, cursorY + 22, { align: "right" });
+
+          railEnd = cursorY + 8;
+          cursorY += rowGap;
         }
-        const dt = new Date(r.data).toLocaleDateString("pt-BR");
-        const km = r.km_registro != null ? ` · ${r.km_registro.toLocaleString("pt-BR")} km` : "";
-        const line = `• ${dt} — ${r.descricao || r.categoria}${km}  ·  ${formatBRL(Number(r.valor))}`;
-        const wrapped = doc.splitTextToSize(line, W - 80);
-        doc.text(wrapped, 40, y);
-        y += wrapped.length * 14 + 2;
+        drawTimelineRail(railStart, railEnd);
       }
 
-      // Footer hash
-      doc.setDrawColor(56, 189, 248);
+      // ---------- Footer hash ----------
+      doc.setDrawColor(...NEON);
       doc.setLineWidth(0.5);
       doc.line(40, H - 60, W - 40, H - 60);
-      doc.setTextColor(56, 189, 248);
+      doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.text(hash, W / 2, H - 40, { align: "center" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.setTextColor(160, 180, 200);
+      doc.setTextColor(...TXT_MUTED);
       doc.text("Autenticidade Jarvys — Porta-Luvas Digital", W / 2, H - 26, {
         align: "center",
       });
