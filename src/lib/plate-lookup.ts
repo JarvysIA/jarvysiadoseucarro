@@ -1,6 +1,6 @@
 import type { PlateLookupResult } from "@/components/CarConfirmModal";
 import { lookupPlateFn } from "./plate-lookup.functions";
-import type { FipeHistoricoItem } from "./plate-lookup.functions";
+import type { FipeHistoricoItem, FipeOption } from "./plate-lookup.functions";
 
 export type PlateLookupFullResult =
   | (NonNullable<PlateLookupResult> & {
@@ -10,18 +10,16 @@ export type PlateLookupFullResult =
         mes_referencia: string;
         historico: FipeHistoricoItem[];
       } | null;
+      fipe_options?: FipeOption[];
     })
   | null;
 
 /**
- * Consulta a placa via API PuxaPlaca (através de uma server function
- * para evitar CORS e manter o token fora do bundle do cliente).
- * Retorna null em caso de falha para que o modal caia no modo manual.
+ * Consulta a placa via API PuxaPlaca (server fn — CORS/token).
  */
 export async function lookupPlate(placa: string): Promise<PlateLookupFullResult> {
   try {
     const res = await lookupPlateFn({ data: { placa } });
-    // eslint-disable-next-line no-console
     console.log("[PuxaPlaca]", res);
     if (!res.ok || !res.data) return null;
     return {
@@ -32,9 +30,9 @@ export async function lookupPlate(placa: string): Promise<PlateLookupFullResult>
       motorizacao: res.data.motorizacao,
       chassi: res.data.chassi,
       fipe: res.data.fipe ?? null,
+      fipe_options: (res.data as any).fipe_options ?? [],
     };
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error("[PuxaPlaca] erro:", e);
     return null;
   }
