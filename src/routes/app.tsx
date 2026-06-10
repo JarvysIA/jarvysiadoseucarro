@@ -429,7 +429,7 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
-      <PaywallModal
+      <UpgradePlanModal
         open={!!paywallMode}
         onClose={() => setPaywallMode(null)}
         mode={paywallMode ?? "upgrade-vip"}
