@@ -89,23 +89,16 @@ export function CertificadoJarvysModal({
 
       paintBackground();
 
-      // ---------- Header: Logo + Título ----------
-      // Logo placeholder (escudo neon "J")
-      doc.setFillColor(...NEON);
-      doc.roundedRect(40, 40, 36, 36, 8, 8, "F");
-      doc.setTextColor(...BG_DARK);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.text("J", 58, 66, { align: "center" });
-
+      // ---------- Header: Título ----------
+      // TODO: doc.addImage(logoBase64) — espaço reservado para o futuro logo Jarvys.
       doc.setTextColor(...NEON);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
-      doc.text("Certificado Jarvys", 88, 60);
+      doc.text("Certificado Jarvys", 40, 60);
       doc.setTextColor(...TXT_MUTED);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.text("Porta-Luvas Digital — Histórico Oficial", 88, 75);
+      doc.text("Porta-Luvas Digital — Histórico Oficial", 40, 75);
 
       // ---------- Imagem do veículo ----------
       let cursorY = 100;
