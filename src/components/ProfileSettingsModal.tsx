@@ -127,8 +127,8 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       const authUpdates: { email?: string; password?: string } = {};
       if (email && email !== profile.email) authUpdates.email = email.trim();
       if (newPassword.trim().length > 0) {
-        if (newPassword.trim().length < 6) {
-          toast.error("A nova senha deve ter pelo menos 6 caracteres.");
+        if (!isStrongPassword(newPassword.trim())) {
+          toast.error("Senha fraca — atenda a todos os requisitos.");
           setSaving(false);
           return;
         }
