@@ -233,7 +233,7 @@ function SignupPage() {
         </p>
         {hasReferrer && (
           <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-            🎉 Desconto de indicado aplicado — ative por R$ 9,90
+            🎉 Desconto de indicado aplicado — ative por R$ 19,90
           </div>
         )}
       </div>
