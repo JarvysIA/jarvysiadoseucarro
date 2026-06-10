@@ -262,9 +262,10 @@ function SignupPage() {
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
         <Field icon={<Lock className="h-4 w-4" />} label="Senha">
-          <input required type="password" minLength={6} value={form.password} onChange={set("password")} placeholder="Mínimo 6 caracteres"
+          <input required type="password" minLength={8} value={form.password} onChange={set("password")} placeholder="Crie uma senha forte"
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none" />
         </Field>
+        <PasswordChecklist password={form.password} />
         <Field icon={<Hash className="h-4 w-4" />} label="Placa do carro">
           <input
             required
@@ -282,7 +283,7 @@ function SignupPage() {
           />
         </Field>
 
-        <button type="submit" disabled={loading}
+        <button type="submit" disabled={loading || !isStrongPassword(form.password)}
           className="glow-neon mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           {loading ? "Criando conta..." : "Entrar na garagem"}
