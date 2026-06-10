@@ -186,6 +186,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 autoComplete="new-password"
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
               />
+              {newPassword.length > 0 && <PasswordChecklist password={newPassword} />}
             </Field>
 
             <Field label="WhatsApp" icon={<Phone className="h-3.5 w-3.5" />}>
