@@ -435,7 +435,8 @@ function ConfirmForm({
   const [km, setKm] = useState(String(parsed.km_registrada ?? defaultKm));
   const [valor, setValor] = useState(parsed.valor_total.toFixed(2));
   const [itens, setItens] = useState(parsed.itens_identificados);
-  const [categoria, setCategoria] = useState<DespesaCategoria>(parsed.categoria);
+  // Atalho via Card de Status → categoria fixa em "Revisão".
+  const categoria: DespesaCategoria = "Revisão";
 
   const submit = () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
