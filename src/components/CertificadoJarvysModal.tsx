@@ -169,29 +169,25 @@ export function CertificadoJarvysModal({
       doc.setTextColor(...TXT_MUTED);
       doc.text("Registros", cx + cardW / 2, cursorY + 58, { align: "center" });
 
-      // Card 2: "Revisões Documentadas" (azul + branco), sem número
+      // Card 2: "Revisões" / "Documentadas" em DUAS linhas Y distintas
       cx = drawCardBox(1);
-      const w2Blue = doc.getTextWidth("Revisões ");
-      const w2White = doc.getTextWidth("Documentadas");
-      const total2 = w2Blue + w2White;
-      const start2 = cx + (cardW - total2) / 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.setTextColor(...NEON);
-      doc.text("Revisões ", start2, cursorY + cardH / 2 + 4);
+      doc.text("Revisões", cx + cardW / 2, cursorY + cardH / 2 - 2, { align: "center" });
       doc.setTextColor(...TXT_WHITE);
-      doc.text("Documentadas", start2 + w2Blue, cursorY + cardH / 2 + 4);
+      doc.text("Documentadas", cx + cardW / 2, cursorY + cardH / 2 + 14, { align: "center" });
 
-      // Card 3: "+ VALOR" azul / "de revenda" branco — literal
+      // Card 3: "+ VALOR" acima / "de revenda" abaixo (sem sobreposição)
       cx = drawCardBox(2);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.setTextColor(...NEON);
-      doc.text("+ VALOR", cx + cardW / 2, cursorY + 36, { align: "center" });
+      doc.text("+ VALOR", cx + cardW / 2, cursorY + cardH / 2 - 4, { align: "center" });
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(...TXT_WHITE);
-      doc.text("de revenda", cx + cardW / 2, cursorY + 58, { align: "center" });
+      doc.text("de revenda", cx + cardW / 2, cursorY + cardH / 2 + 16, { align: "center" });
 
       cursorY += cardH + 30;
 
