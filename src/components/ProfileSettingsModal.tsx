@@ -246,7 +246,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               <button
                 type="button"
                 onClick={save}
-                disabled={saving}
+                disabled={saving || (newPassword.length > 0 && !isStrongPassword(newPassword))}
                 className="glow-neon flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
