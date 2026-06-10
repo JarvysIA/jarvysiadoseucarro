@@ -116,6 +116,7 @@ function AppPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
