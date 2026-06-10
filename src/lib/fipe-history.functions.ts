@@ -41,7 +41,7 @@ export const fetchFipeHistoryFn = createServerFn({ method: "POST" })
         headers: { Accept: "application/json", token: PUXAPLACA_TOKEN },
       });
       if (!res.ok) {
-        return { ok: false as const, error: `HTTP ${res.status}`, historico: [] as FipeHistoricoOut };
+        return { ok: false as const, error: `HTTP ${res.status}`, historico: [] as FipeHistoryPoint[] };
       }
       const json: any = await res.json().catch(() => null);
       const arr: any[] = Array.isArray(json?.fipe?.dados) ? json.fipe.dados : [];
