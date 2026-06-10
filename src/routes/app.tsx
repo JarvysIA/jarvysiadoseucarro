@@ -10,7 +10,8 @@ import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
-import { PaywallModal, type PaywallMode } from "@/components/PaywallModal";
+import { UpgradePlanModal, type PaywallMode } from "@/components/UpgradePlanModal";
+import { PaywallModal } from "@/components/PaywallModal";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -115,6 +116,7 @@ function AppPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
@@ -428,11 +430,13 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
-      <PaywallModal
+      <UpgradePlanModal
         open={!!paywallMode}
         onClose={() => setPaywallMode(null)}
         mode={paywallMode ?? "upgrade-vip"}
       />
+
+      <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} />
 
       <ProfileSettingsModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
@@ -470,7 +474,7 @@ function AppPage() {
           {planTier !== "free" || profile?.permite_indicacao ? (
             <ReferralUnlocked userId={profile?.id ?? ""} />
           ) : (
-            <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} />
+            <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} onActivate={() => setActivateOpen(true)} />
           )}
         </div>
       </section>
@@ -481,7 +485,15 @@ function AppPage() {
   );
 }
 
-function ReferralLocked({ price, hasReferrer }: { price: string; hasReferrer: boolean }) {
+function ReferralLocked({
+  price,
+  hasReferrer,
+  onActivate,
+}: {
+  price: string;
+  hasReferrer: boolean;
+  onActivate: () => void;
+}) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -504,7 +516,7 @@ function ReferralLocked({ price, hasReferrer }: { price: string; hasReferrer: bo
           )}
           <button
             type="button"
-            onClick={() => toast.info("Em breve: ativação via Pix.")}
+            onClick={onActivate}
             className="glow-neon mt-3 inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
           >
             Ativar por R$ 29,90
