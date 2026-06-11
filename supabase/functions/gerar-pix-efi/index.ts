@@ -21,6 +21,8 @@ interface PixRequest {
   veiculo_id: string;
   valor: number;
   codigo_cupom?: string | null;
+  tipo_produto?: "ativacao" | "historico" | null;
+  produto_ref_id?: string | null;
 }
 
 function json(body: unknown, status = 200) {
@@ -136,8 +138,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { user_id, veiculo_id, valor, codigo_cupom } =
+    const { user_id, veiculo_id, valor, codigo_cupom, tipo_produto, produto_ref_id } =
       (await req.json()) as PixRequest;
+    const tipo = tipo_produto === "historico" ? "historico" : "ativacao";
 
     if (!user_id || !veiculo_id || typeof valor !== "number" || valor <= 0) {
       return json({ error: "Parâmetros inválidos" }, 400);
@@ -194,6 +197,8 @@ Deno.serve(async (req) => {
           veiculo_id,
           valor,
           codigo_cupom: codigo_cupom ?? null,
+          tipo_produto: tipo,
+          produto_ref_id: produto_ref_id ?? null,
           status: "pendente",
           txid_efi: txid,
           pix_copia_cola: pixCopiaECola,

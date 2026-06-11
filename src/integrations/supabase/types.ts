@@ -153,7 +153,9 @@ export type Database = {
           created_at: string
           id: string
           pix_copia_cola: string | null
+          produto_ref_id: string | null
           status: string
+          tipo_produto: string
           txid_efi: string | null
           user_id: string
           valor: number
@@ -164,7 +166,9 @@ export type Database = {
           created_at?: string
           id?: string
           pix_copia_cola?: string | null
+          produto_ref_id?: string | null
           status?: string
+          tipo_produto?: string
           txid_efi?: string | null
           user_id: string
           valor: number
@@ -175,7 +179,9 @@ export type Database = {
           created_at?: string
           id?: string
           pix_copia_cola?: string | null
+          produto_ref_id?: string | null
           status?: string
+          tipo_produto?: string
           txid_efi?: string | null
           user_id?: string
           valor?: number

@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     // 2. Busca pendentes da última 1h
     const { data: pendentes, error: errPend } = await supabase
       .from("pagamentos_pix")
-      .select("id, user_id, veiculo_id, valor, codigo_cupom, txid_efi, created_at")
+      .select("id, user_id, veiculo_id, valor, codigo_cupom, txid_efi, created_at, tipo_produto, produto_ref_id")
       .eq("status", "pendente")
       .gte("created_at", umaHoraAtras)
       .not("txid_efi", "is", null);
@@ -184,25 +184,40 @@ Deno.serve(async (req) => {
           det.efiStatus = status;
 
           if (status === "CONCLUIDA") {
-            // a) Marca pago + ativa veículo (status="active" — nomenclatura EN exigida pelo frontend)
+            const tipo = (pag as { tipo_produto?: string }).tipo_produto ?? "ativacao";
+            const refId = (pag as { produto_ref_id?: string | null }).produto_ref_id ?? null;
+            det.tipo_produto = tipo;
+
+            // a) Marca pagamento como pago
             await supabase
               .from("pagamentos_pix")
               .update({ status: "pago" })
               .eq("id", pag.id);
-            await supabase
-              .from("veiculos")
-              .update({ status: "active" })
-              .eq("id", pag.veiculo_id);
-            // Libera flags do perfil: remove tarja de trial e destrava link de indicação
-            await supabase
-              .from("profiles")
-              .update({ status_usuario: "ativo", permite_indicacao: true })
-              .eq("id", pag.user_id);
+
+            if (tipo === "historico") {
+              // Libera histórico do veículo (history_locked = false)
+              const alvoVeiculo = refId ?? pag.veiculo_id;
+              await supabase
+                .from("veiculos")
+                .update({ history_locked: false })
+                .eq("id", alvoVeiculo);
+              det.historico_liberado = alvoVeiculo;
+            } else {
+              // Ativação Premium do veículo + flags do perfil
+              await supabase
+                .from("veiculos")
+                .update({ status: "active" })
+                .eq("id", pag.veiculo_id);
+              await supabase
+                .from("profiles")
+                .update({ status_usuario: "ativo", permite_indicacao: true })
+                .eq("id", pag.user_id);
+            }
             resumo.pagos++;
             det.atualizado = true;
 
             // b/c) Bonificação ao padrinho (se cupom)
-            if (pag.codigo_cupom) {
+            if (tipo === "ativacao" && pag.codigo_cupom) {
               const cupom = pag.codigo_cupom.trim();
               const cupomLower = cupom.toLowerCase();
               const isUuid =
