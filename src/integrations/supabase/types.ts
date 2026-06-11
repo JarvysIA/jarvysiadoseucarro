@@ -96,6 +96,50 @@ export type Database = {
           },
         ]
       }
+      pagamentos_pix: {
+        Row: {
+          codigo_cupom: string | null
+          created_at: string
+          id: string
+          pix_copia_cola: string | null
+          status: string
+          txid_efi: string | null
+          user_id: string
+          valor: number
+          veiculo_id: string
+        }
+        Insert: {
+          codigo_cupom?: string | null
+          created_at?: string
+          id?: string
+          pix_copia_cola?: string | null
+          status?: string
+          txid_efi?: string | null
+          user_id: string
+          valor: number
+          veiculo_id: string
+        }
+        Update: {
+          codigo_cupom?: string | null
+          created_at?: string
+          id?: string
+          pix_copia_cola?: string | null
+          status?: string
+          txid_efi?: string | null
+          user_id?: string
+          valor?: number
+          veiculo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_pix_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           cep: string | null
@@ -107,7 +151,6 @@ export type Database = {
           nome: string
           permite_indicacao: boolean
           placa: string | null
-          plan_tier: string
           referrer_id: string | null
           status_usuario: string
           trial_inicio: string
@@ -124,7 +167,6 @@ export type Database = {
           nome: string
           permite_indicacao?: boolean
           placa?: string | null
-          plan_tier?: string
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
@@ -141,7 +183,6 @@ export type Database = {
           nome?: string
           permite_indicacao?: boolean
           placa?: string | null
-          plan_tier?: string
           referrer_id?: string | null
           status_usuario?: string
           trial_inicio?: string
