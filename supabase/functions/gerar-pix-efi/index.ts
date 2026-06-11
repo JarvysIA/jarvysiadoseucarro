@@ -21,6 +21,8 @@ interface PixRequest {
   veiculo_id: string;
   valor: number;
   codigo_cupom?: string | null;
+  tipo_produto?: "ativacao" | "historico" | null;
+  produto_ref_id?: string | null;
 }
 
 function json(body: unknown, status = 200) {
