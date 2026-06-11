@@ -184,20 +184,35 @@ Deno.serve(async (req) => {
           det.efiStatus = status;
 
           if (status === "CONCLUIDA") {
-            // a) Marca pago + ativa veículo (status="active" — nomenclatura EN exigida pelo frontend)
+            const tipo = (pag as { tipo_produto?: string }).tipo_produto ?? "ativacao";
+            const refId = (pag as { produto_ref_id?: string | null }).produto_ref_id ?? null;
+            det.tipo_produto = tipo;
+
+            // a) Marca pagamento como pago
             await supabase
               .from("pagamentos_pix")
               .update({ status: "pago" })
               .eq("id", pag.id);
-            await supabase
-              .from("veiculos")
-              .update({ status: "active" })
-              .eq("id", pag.veiculo_id);
-            // Libera flags do perfil: remove tarja de trial e destrava link de indicação
-            await supabase
-              .from("profiles")
-              .update({ status_usuario: "ativo", permite_indicacao: true })
-              .eq("id", pag.user_id);
+
+            if (tipo === "historico") {
+              // Libera histórico do veículo (history_locked = false)
+              const alvoVeiculo = refId ?? pag.veiculo_id;
+              await supabase
+                .from("veiculos")
+                .update({ history_locked: false })
+                .eq("id", alvoVeiculo);
+              det.historico_liberado = alvoVeiculo;
+            } else {
+              // Ativação Premium do veículo + flags do perfil
+              await supabase
+                .from("veiculos")
+                .update({ status: "active" })
+                .eq("id", pag.veiculo_id);
+              await supabase
+                .from("profiles")
+                .update({ status_usuario: "ativo", permite_indicacao: true })
+                .eq("id", pag.user_id);
+            }
             resumo.pagos++;
             det.atualizado = true;
 
