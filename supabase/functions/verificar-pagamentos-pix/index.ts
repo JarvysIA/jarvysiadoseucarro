@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
             det.atualizado = true;
 
             // b/c) Bonificação ao padrinho (se cupom)
-            if (pag.codigo_cupom) {
+            if (tipo === "ativacao" && pag.codigo_cupom) {
               const cupom = pag.codigo_cupom.trim();
               const cupomLower = cupom.toLowerCase();
               const isUuid =
