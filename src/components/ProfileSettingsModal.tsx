@@ -43,6 +43,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [pixRecebimento, setPixRecebimento] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
 
   useEffect(() => {
