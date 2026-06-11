@@ -184,15 +184,20 @@ Deno.serve(async (req) => {
           det.efiStatus = status;
 
           if (status === "CONCLUIDA") {
-            // a) Marca pago + ativa veículo
+            // a) Marca pago + ativa veículo (status="active" — nomenclatura EN exigida pelo frontend)
             await supabase
               .from("pagamentos_pix")
               .update({ status: "pago" })
               .eq("id", pag.id);
             await supabase
               .from("veiculos")
-              .update({ status: "ativo" })
+              .update({ status: "active" })
               .eq("id", pag.veiculo_id);
+            // Libera flags do perfil: remove tarja de trial e destrava link de indicação
+            await supabase
+              .from("profiles")
+              .update({ status_usuario: "ativo", permite_indicacao: true })
+              .eq("id", pag.user_id);
             resumo.pagos++;
             det.atualizado = true;
 
