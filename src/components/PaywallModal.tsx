@@ -10,20 +10,28 @@ import {
   TrendingUp,
   ShieldCheck,
   MessageCircle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export function PaywallModal({
   open,
   onClose,
+  vehicleId,
 }: {
   open: boolean;
   onClose: () => void;
+  vehicleId?: string;
 }) {
   const [price, setPrice] = useState(29.9);
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [showCouponInput, setShowCouponInput] = useState(false);
+
+  const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [txid, setTxid] = useState("");
+  const [isLoadingPix, setIsLoadingPix] = useState(false);
 
   const applyCoupon = () => {
     if (couponCode.trim().length > 0) {
@@ -32,33 +40,79 @@ export function PaywallModal({
     }
   };
 
-  const copyPix = () => {
-    toast.success("Código copiado!");
+  const handleClose = () => {
+    // Reset PIX state ao fechar para permitir nova geração na próxima abertura
+    setPixCopiaCola("");
+    setTxid("");
+    setIsLoadingPix(false);
+    onClose();
+  };
+
+  const gerarPix = async () => {
+    if (isLoadingPix) return;
+
+    if (!vehicleId) {
+      toast.error("Selecione um veículo antes de gerar o PIX.");
+      return;
+    }
+
+    setIsLoadingPix(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getUser();
+      const userId = sessionData.user?.id;
+      if (!userId) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        setIsLoadingPix(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
+        body: {
+          user_id: userId,
+          veiculo_id: vehicleId,
+          valor: price,
+          codigo_cupom: couponApplied ? couponCode.trim() : null,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
+
+      setPixCopiaCola(data.pix_copia_cola);
+      setTxid(data.txid_efi ?? "");
+      toast.success("PIX gerado! Copie o código abaixo.");
+    } catch (e) {
+      console.error("[gerar-pix-efi]", e);
+      toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
+      setPixCopiaCola("");
+      setTxid("");
+    } finally {
+      setIsLoadingPix(false);
+    }
+  };
+
+  const copyPix = async () => {
+    try {
+      await navigator.clipboard.writeText(pixCopiaCola);
+      toast.success("Código PIX copiado!");
+    } catch {
+      toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+    }
+  };
+
+  const handlePrimaryClick = () => {
+    if (pixCopiaCola) copyPix();
+    else gerarPix();
   };
 
   if (!open) return null;
 
   const benefits = [
-    {
-      icon: <Car className="h-4 w-4" />,
-      text: "Garagem inteligente com status de saúde",
-    },
-    {
-      icon: <Wrench className="h-4 w-4" />,
-      text: "Timeline das revisões",
-    },
-    {
-      icon: <TrendingUp className="h-4 w-4" />,
-      text: "Histórico FIPE",
-    },
-    {
-      icon: <ShieldCheck className="h-4 w-4" />,
-      text: "Certificado Jarvys para Revenda",
-    },
-    {
-      icon: <MessageCircle className="h-4 w-4" />,
-      text: "Dr. Jarvys no WhatsApp",
-    },
+    { icon: <Car className="h-4 w-4" />, text: "Garagem inteligente com status de saúde" },
+    { icon: <Wrench className="h-4 w-4" />, text: "Timeline das revisões" },
+    { icon: <TrendingUp className="h-4 w-4" />, text: "Histórico FIPE" },
+    { icon: <ShieldCheck className="h-4 w-4" />, text: "Certificado Jarvys para Revenda" },
+    { icon: <MessageCircle className="h-4 w-4" />, text: "Dr. Jarvys no WhatsApp" },
   ];
 
   return (
@@ -70,7 +124,6 @@ export function PaywallModal({
             "0 0 0 1px rgba(56,189,248,0.25), 0 20px 60px -10px rgba(56,189,248,0.35)",
         }}
       >
-        {/* Ambient glow */}
         <div
           className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full"
           style={{
@@ -79,9 +132,8 @@ export function PaywallModal({
           }}
         />
 
-        {/* Close */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Fechar"
           className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:text-foreground"
         >
@@ -92,16 +144,12 @@ export function PaywallModal({
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Sparkles className="h-7 w-7" />
           </div>
-
           <h2 className="font-tech text-lg font-bold tracking-wide text-primary">
             Ativar minha IA automotiva
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Licença única por veículo
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Licença única por veículo</p>
         </div>
 
-        {/* Benefits */}
         <ul className="mt-6 space-y-3">
           {benefits.map((b, i) => (
             <li key={i} className="flex items-center gap-3 text-sm text-foreground">
@@ -116,25 +164,20 @@ export function PaywallModal({
           ))}
         </ul>
 
-        {/* Price & Coupon */}
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center gap-3">
             {couponApplied && (
-              <span className="text-lg text-muted-foreground line-through">
-                R$ 29,90
-              </span>
+              <span className="text-lg text-muted-foreground line-through">R$ 29,90</span>
             )}
             <span className="text-3xl font-bold text-foreground">
               R$ {price.toFixed(2).replace(".", ",")}
             </span>
           </div>
           {couponApplied && (
-            <p className="mt-1 text-xs font-semibold text-status-ok">
-              Cupom aplicado!
-            </p>
+            <p className="mt-1 text-xs font-semibold text-status-ok">Cupom aplicado!</p>
           )}
 
-          {!couponApplied && (
+          {!couponApplied && !pixCopiaCola && (
             <div className="mt-4">
               {!showCouponInput ? (
                 <button
@@ -170,24 +213,44 @@ export function PaywallModal({
           )}
         </div>
 
-        {/* PIX Container */}
         <div
           className="mt-6 rounded-2xl border border-primary/30 bg-background/40 p-5"
-          style={{
-            boxShadow: "0 0 0 1px rgba(56,189,248,0.15)",
-          }}
+          style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
         >
           <div className="flex flex-col items-center">
-            <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
-              <QrCode className="h-16 w-16 text-primary/40" />
-            </div>
+            {pixCopiaCola && (
+              <>
+                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
+                  <QrCode className="h-16 w-16 text-primary/70" />
+                </div>
+                <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
+                  {pixCopiaCola.slice(0, 40)}…
+                </p>
+              </>
+            )}
+
             <button
               type="button"
-              onClick={copyPix}
-              className="glow-neon mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+              onClick={handlePrimaryClick}
+              disabled={isLoadingPix}
+              className="glow-neon mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
             >
-              <Copy className="h-4 w-4" />
-              Copiar Código PIX
+              {isLoadingPix ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Gerando PIX...
+                </>
+              ) : pixCopiaCola ? (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copiar Código PIX
+                </>
+              ) : (
+                <>
+                  <QrCode className="h-4 w-4" />
+                  Gerar Pagamento PIX
+                </>
+              )}
             </button>
             <p className="mt-2 text-center text-[10px] text-muted-foreground">
               Pagamento processado via Efí Bank. Liberação imediata.
@@ -195,10 +258,9 @@ export function PaywallModal({
           </div>
         </div>
 
-        {/* Back */}
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClose}
           className="mt-4 w-full text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           Voltar para a garagem
