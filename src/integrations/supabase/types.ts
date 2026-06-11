@@ -195,6 +195,7 @@ export type Database = {
         Row: {
           cep: string | null
           cidade: string | null
+          codigo_indicacao: string | null
           created_at: string
           email: string | null
           id: string
@@ -212,6 +213,7 @@ export type Database = {
         Insert: {
           cep?: string | null
           cidade?: string | null
+          codigo_indicacao?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -229,6 +231,7 @@ export type Database = {
         Update: {
           cep?: string | null
           cidade?: string | null
+          codigo_indicacao?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -394,6 +397,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -402,6 +406,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
