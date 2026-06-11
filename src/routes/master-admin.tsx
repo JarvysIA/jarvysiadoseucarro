@@ -1,15 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Shield, Loader2, LogOut, Crown, Star, User as UserIcon } from "lucide-react";
+import { Search, Shield, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/jarvys-logo.png";
 import {
   listAdminUsersFn,
-  setPlanTierFn,
   type AdminUserRow,
-  type PlanTier,
 } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/master-admin")({
@@ -22,22 +20,14 @@ export const Route = createFileRoute("/master-admin")({
   component: MasterAdminPage,
 });
 
-const TIER_OPTIONS: { value: PlanTier; label: string; icon: React.ReactNode }[] = [
-  { value: "free", label: "Normal", icon: <UserIcon className="h-3 w-3" /> },
-  { value: "vip", label: "VIP", icon: <Star className="h-3 w-3" /> },
-  { value: "super_vip", label: "Super VIP", icon: <Crown className="h-3 w-3" /> },
-];
-
 function MasterAdminPage() {
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<"checking" | "denied" | "ok">("checking");
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const listUsers = useServerFn(listAdminUsersFn);
-  const setTier = useServerFn(setPlanTierFn);
 
   useEffect(() => {
     (async () => {
@@ -54,7 +44,6 @@ function MasterAdminPage() {
       const isSuper = Boolean((prof as { is_super_admin?: boolean } | null)?.is_super_admin);
       if (!isSuper) {
         setAuthState("denied");
-        // redireciona para Home (com pequeno delay para o usuário ver — opcional)
         navigate({ to: "/app", replace: true });
         return;
       }
@@ -86,21 +75,6 @@ function MasterAdminPage() {
     );
   }, [rows, query]);
 
-  const handleChangeTier = async (userId: string, planTier: PlanTier) => {
-    setUpdatingId(userId);
-    try {
-      await setTier({ data: { userId, planTier } });
-      setRows((prev) =>
-        prev.map((r) => (r.id === userId ? { ...r, plan_tier: planTier } : r)),
-      );
-      const label = TIER_OPTIONS.find((t) => t.value === planTier)?.label ?? planTier;
-      toast.success(`Plano atualizado para ${label}.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Falha ao atualizar plano.");
-    } finally {
-      setUpdatingId(null);
-    }
-  };
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -182,38 +156,11 @@ function MasterAdminPage() {
                       {p.vehicle_count} veículo{p.vehicle_count === 1 ? "" : "s"}
                     </p>
                   </div>
-                  {updatingId === p.id && (
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-                  )}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {TIER_OPTIONS.map((opt) => {
-                    const active = p.plan_tier === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => !active && handleChangeTier(p.id, opt.value)}
-                        disabled={updatingId === p.id}
-                        className={`flex items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-[11px] font-semibold transition-all disabled:opacity-50 ${
-                          active
-                            ? opt.value === "super_vip"
-                              ? "border-amber-400/60 bg-amber-400/10 text-amber-300 shadow-[0_0_16px_-4px_rgba(255,213,107,0.65)]"
-                              : opt.value === "vip"
-                                ? "glow-neon border-primary/60 bg-primary/10 text-primary"
-                                : "border-foreground/30 bg-secondary text-foreground"
-                            : "border-border bg-background/40 text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {opt.icon}
-                        {opt.label}
-                      </button>
-                    );
-                  })}
                 </div>
               </li>
             );
           })}
+
         {!loading && filtered.length === 0 && (
           <li className="rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
             Nenhum usuário encontrado.
