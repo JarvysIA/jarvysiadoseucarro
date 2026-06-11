@@ -10,12 +10,9 @@ import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
-import { UpgradePlanModal, type PaywallMode } from "@/components/UpgradePlanModal";
 import { PaywallModal } from "@/components/PaywallModal";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
-import { PlanBadge } from "@/components/PlanBadge";
-import type { PlanTier } from "@/lib/admin-users.functions";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
@@ -68,7 +65,6 @@ type Profile = {
   permite_indicacao: boolean;
   trial_inicio: string;
   referrer_id: string | null;
-  plan_tier: PlanTier;
   is_super_admin: boolean;
 };
 
@@ -115,25 +111,14 @@ function AppPage() {
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [paywallMode, setPaywallMode] = useState<PaywallMode | null>(null);
   const [activateOpen, setActivateOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
-  const planTier: PlanTier = profile?.plan_tier ?? "free";
-  const vehicleLimit = planTier === "super_vip" ? Infinity : planTier === "vip" ? 2 : 1;
-
   const handleAddClick = () => {
-    const count = vehicles.length;
-    if (count < vehicleLimit) {
-      setAddOpen(true);
-    } else if (planTier === "free") {
-      setPaywallMode("upgrade-vip");
-    } else if (planTier === "vip") {
-      setPaywallMode("upgrade-super_vip");
-    } else {
-      setPaywallMode("enterprise");
-    }
+    // App é gratuito. O usuário pode cadastrar quantos veículos quiser;
+    // o status VIP/ativação é por placa via PaywallModal.
+    setAddOpen(true);
   };
 
   const handleAdded = (v: AddedVehicle) => {
@@ -170,7 +155,7 @@ function AppPage() {
       const [{ data: prof }, { data: veics }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,plan_tier,is_super_admin")
+          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
           .eq("id", userId)
           .maybeSingle(),
         supabase
