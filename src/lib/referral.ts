@@ -8,7 +8,8 @@ export function captureRefFromUrl() {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   const ref = url.searchParams.get("ref");
-  if (ref && /^[a-z0-9-]{4,}$/i.test(ref)) {
+  // Aceita códigos amigáveis (NOME-JARVYS-1234) e legados (uuid curto)
+  if (ref && /^[A-Za-z0-9-]{4,}$/.test(ref)) {
     sessionStorage.setItem(KEY, ref);
   }
 }
@@ -26,18 +27,32 @@ export function clearStoredRef() {
 }
 
 /**
- * Resolve um código curto (8 chars do uuid) para o id completo do perfil padrinho.
- * Retorna null quando ninguém é encontrado.
+ * Resolve um código amigável de indicação (ex.: JOAO-JARVYS-1234) para o id
+ * do perfil padrinho. Mantém compatibilidade com o formato antigo (8 chars do uuid).
  */
 export async function resolveReferrerId(refCode: string): Promise<string | null> {
-  const code = refCode.trim().toLowerCase();
+  const code = refCode.trim();
   if (!code) return null;
-  const { data, error } = await supabase
+
+  // 1) Tenta pelo codigo_indicacao (case-insensitive)
+  const byCode = await supabase
     .from("profiles")
     .select("id")
-    .ilike("id", `${code}%`)
+    .ilike("codigo_indicacao", code)
     .limit(1)
     .maybeSingle();
-  if (error || !data) return null;
-  return data.id;
+  if (byCode.data?.id) return byCode.data.id;
+
+  // 2) Fallback legado: prefixo do uuid
+  const legacy = code.toLowerCase();
+  if (/^[a-f0-9-]{4,}$/i.test(legacy)) {
+    const byUuid = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("id", `${legacy}%`)
+      .limit(1)
+      .maybeSingle();
+    if (byUuid.data?.id) return byUuid.data.id;
+  }
+  return null;
 }
