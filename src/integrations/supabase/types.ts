@@ -96,6 +96,57 @@ export type Database = {
           },
         ]
       }
+      logs_erro_bonificacao: {
+        Row: {
+          chave_pix: string | null
+          codigo_cupom: string | null
+          created_at: string
+          efi_response: Json | null
+          erro: string | null
+          id: string
+          padrinho_id: string | null
+          pagamento_id: string | null
+          valor: number | null
+        }
+        Insert: {
+          chave_pix?: string | null
+          codigo_cupom?: string | null
+          created_at?: string
+          efi_response?: Json | null
+          erro?: string | null
+          id?: string
+          padrinho_id?: string | null
+          pagamento_id?: string | null
+          valor?: number | null
+        }
+        Update: {
+          chave_pix?: string | null
+          codigo_cupom?: string | null
+          created_at?: string
+          efi_response?: Json | null
+          erro?: string | null
+          id?: string
+          padrinho_id?: string | null
+          pagamento_id?: string | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logs_erro_bonificacao_padrinho_id_fkey"
+            columns: ["padrinho_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logs_erro_bonificacao_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos_pix"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagamentos_pix: {
         Row: {
           codigo_cupom: string | null
@@ -150,6 +201,7 @@ export type Database = {
           is_super_admin: boolean
           nome: string
           permite_indicacao: boolean
+          pix_recebimento: string | null
           placa: string | null
           referrer_id: string | null
           status_usuario: string
@@ -166,6 +218,7 @@ export type Database = {
           is_super_admin?: boolean
           nome: string
           permite_indicacao?: boolean
+          pix_recebimento?: string | null
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string
@@ -182,6 +235,7 @@ export type Database = {
           is_super_admin?: boolean
           nome?: string
           permite_indicacao?: boolean
+          pix_recebimento?: string | null
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string

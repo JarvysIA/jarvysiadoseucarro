@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -24,6 +24,7 @@ type ProfileRow = {
   cep: string | null;
   cidade: string | null;
   uf: string | null;
+  pix_recebimento: string | null;
 };
 
 function maskCep(v: string): string {
@@ -42,6 +43,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [pixRecebimento, setPixRecebimento] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       }
       const { data } = await supabase
         .from("profiles")
-        .select("id,nome,email,whatsapp,cep,cidade,uf")
+        .select("id,nome,email,whatsapp,cep,cidade,uf,pix_recebimento")
         .eq("id", userId)
         .maybeSingle();
       if (cancel) return;
@@ -68,6 +70,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       setCep(p?.cep ? maskCep(p.cep) : "");
       setCidade(p?.cidade || "");
       setUf(p?.uf || "");
+      setPixRecebimento(p?.pix_recebimento || "");
       setNewPassword("");
       setLoading(false);
     })();
@@ -109,11 +112,13 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         cidade: string | null;
         uf: string | null;
         email?: string;
+        pix_recebimento: string | null;
       } = {
         whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
         uf: uf.trim().toUpperCase().slice(0, 2) || null,
+        pix_recebimento: pixRecebimento.trim() || null,
       };
       if (email && email !== profile.email) updates.email = email.trim();
 
@@ -198,6 +203,20 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
               />
             </Field>
+
+            <Field label="Chave PIX para Recebimento de Indicação" icon={<KeyRound className="h-3.5 w-3.5" />}>
+              <input
+                type="text"
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                value={pixRecebimento}
+                onChange={(e) => setPixRecebimento(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+              />
+              <span className="mt-1 text-[10px] text-muted-foreground">
+                Obrigatória para receber R$ 5,00 por indicação confirmada.
+              </span>
+            </Field>
+
 
             <Field label="CEP" icon={<MapPin className="h-3.5 w-3.5" />}>
               <div className="flex items-center gap-2">

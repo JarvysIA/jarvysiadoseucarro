@@ -252,8 +252,10 @@ export function PaywallModal({
                 </>
               )}
             </button>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">
-              Pagamento processado via Efí Bank. Liberação imediata.
+            <p className="mt-2 text-center text-[10px] leading-relaxed text-muted-foreground">
+              Liberação do acesso em até 10 minutos.
+              <br />
+              Código válido para pagamento em até 60 minutos.
             </p>
           </div>
         </div>
