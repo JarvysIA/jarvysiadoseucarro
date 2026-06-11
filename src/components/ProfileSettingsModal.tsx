@@ -24,6 +24,7 @@ type ProfileRow = {
   cep: string | null;
   cidade: string | null;
   uf: string | null;
+  pix_recebimento: string | null;
 };
 
 function maskCep(v: string): string {
