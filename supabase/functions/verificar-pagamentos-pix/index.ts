@@ -203,35 +203,51 @@ Deno.serve(async (req) => {
 
             // b/c) Bonificação ao padrinho (se cupom)
             if (pag.codigo_cupom) {
-              const cupom = pag.codigo_cupom.trim().toLowerCase();
+              const cupom = pag.codigo_cupom.trim();
+              const cupomLower = cupom.toLowerCase();
               const isUuid =
                 /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-                  cupom,
+                  cupomLower,
                 );
-              console.log("[bonificacao] Buscando padrinho para o cupom:", cupom, "isUuid:", isUuid);
+              console.log("[bonificacao] Buscando padrinho para o cupom:", cupom);
 
               let padrinho:
                 | { id: string; pix_recebimento: string | null }
                 | null = null;
               let padrinhoErro: unknown = null;
 
-              if (isUuid) {
+              // 1) Match primário: codigo_indicacao (case-insensitive)
+              {
                 const r = await supabase
                   .from("profiles")
                   .select("id, pix_recebimento")
-                  .eq("id", cupom)
-                  .maybeSingle();
-                padrinho = r.data as typeof padrinho;
-                padrinhoErro = r.error;
-              } else {
-                const r = await supabase
-                  .from("profiles")
-                  .select("id, pix_recebimento")
-                  .ilike("id", `${cupom}%`)
+                  .ilike("codigo_indicacao", cupom)
                   .limit(1)
                   .maybeSingle();
                 padrinho = r.data as typeof padrinho;
                 padrinhoErro = r.error;
+              }
+
+              // 2) Fallback legado: por id (uuid completo ou prefixo)
+              if (!padrinho) {
+                if (isUuid) {
+                  const r = await supabase
+                    .from("profiles")
+                    .select("id, pix_recebimento")
+                    .eq("id", cupomLower)
+                    .maybeSingle();
+                  padrinho = r.data as typeof padrinho;
+                  padrinhoErro = r.error ?? padrinhoErro;
+                } else if (/^[a-f0-9-]{4,}$/i.test(cupomLower)) {
+                  const r = await supabase
+                    .from("profiles")
+                    .select("id, pix_recebimento")
+                    .ilike("id", `${cupomLower}%`)
+                    .limit(1)
+                    .maybeSingle();
+                  padrinho = r.data as typeof padrinho;
+                  padrinhoErro = r.error ?? padrinhoErro;
+                }
               }
 
               console.log("[bonificacao] Resultado da busca do padrinho:", {

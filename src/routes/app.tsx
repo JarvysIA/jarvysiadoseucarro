@@ -525,29 +525,81 @@ function ReferralLocked({
 }
 
 function ReferralUnlocked({ userId }: { userId: string }) {
-  const [copied, setCopied] = useState(false);
-  const link = `${typeof window !== "undefined" ? window.location.origin : "https://jarvys.app"}/?ref=${userId.slice(0, 8)}`;
-  const copy = async () => {
+  const [codigo, setCodigo] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!userId) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("codigo_indicacao")
+        .eq("id", userId)
+        .maybeSingle();
+      if (!cancel) setCodigo((data?.codigo_indicacao as string | null) ?? null);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [userId]);
+
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://jarvys.app";
+  const link = codigo ? `${origin}/?ref=${codigo}` : "";
+
+  const copy = async (text: string, which: "code" | "link") => {
     try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      toast.success("Link copiado!");
-      setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(text);
+      if (which === "code") {
+        setCopiedCode(true);
+        toast.success("Código copiado!");
+        setTimeout(() => setCopiedCode(false), 1800);
+      } else {
+        setCopiedLink(true);
+        toast.success("Link copiado!");
+        setTimeout(() => setCopiedLink(false), 1800);
+      }
     } catch {
       toast.error("Não foi possível copiar.");
     }
   };
+
   return (
     <div className="rounded-2xl border border-primary/40 bg-card p-5">
-      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seu link VIP</p>
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2">
-        <code className="flex-1 truncate text-xs text-foreground">{link}</code>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        Seu código de indicação
+      </p>
+      <div className="mt-2 rounded-xl border border-primary/50 bg-gradient-to-br from-primary/10 to-transparent p-4">
+        <div className="flex items-center justify-between gap-3">
+          <code className="flex-1 truncate text-lg font-bold tracking-wider text-primary">
+            {codigo ?? "..."}
+          </code>
+          <button
+            type="button"
+            onClick={() => codigo && copy(codigo, "code")}
+            disabled={!codigo}
+            className="glow-neon inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {copiedCode ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copiedCode ? "Copiado" : "Copiar Código"}
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+        Ou compartilhe o link
+      </p>
+      <div className="mt-1.5 flex items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2">
+        <code className="flex-1 truncate text-xs text-foreground">{link || "..."}</code>
         <button
-          onClick={copy}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
+          onClick={() => link && copy(link, "link")}
+          disabled={!link}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-foreground disabled:opacity-50"
           aria-label="Copiar link"
         >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
