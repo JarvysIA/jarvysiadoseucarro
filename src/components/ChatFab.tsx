@@ -4,7 +4,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
-import { jarvysChatFn, type ChatMsg, type JarvysPlanTier } from "@/lib/jarvys-chat.functions";
+import { jarvysChatFn, type ChatMsg } from "@/lib/jarvys-chat.functions";
 
 type VehicleCtx = {
   marca: string | null;
@@ -40,36 +40,11 @@ export function ChatFab() {
   const [open, setOpen] = useState(false);
   const activeVehicleId = useActiveVehicleId();
   const [vehicle, setVehicle] = useState<VehicleCtx | null>(null);
-  const [planTier, setPlanTier] = useState<JarvysPlanTier | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const chat = useServerFn(jarvysChatFn);
-
-  // Fetch current user's plan tier
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      const { data: sess } = await supabase.auth.getSession();
-      const uid = sess.session?.user.id;
-      if (!uid) {
-        if (!cancel) setPlanTier(null);
-        return;
-      }
-      const { data } = await supabase
-        .from("profiles")
-        .select("plan_tier")
-        .eq("id", uid)
-        .maybeSingle();
-      if (cancel) return;
-      const tier = (data as { plan_tier?: JarvysPlanTier } | null)?.plan_tier ?? "free";
-      setPlanTier(tier);
-    })();
-    return () => {
-      cancel = true;
-    };
-  }, []);
 
   // Fetch active vehicle context
   useEffect(() => {
@@ -140,7 +115,7 @@ export function ChatFab() {
                 km: vehicle.km,
               }
             : null,
-          planTier,
+          
         },
       });
       const aiMsg: ChatMsg = { role: "assistant", content: reply };

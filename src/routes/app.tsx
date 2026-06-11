@@ -252,8 +252,8 @@ function AppPage() {
 
   return (
     <div className="relative min-h-screen bg-background pb-56">
-      {/* Banner trial — apenas para usuários free */}
-      {!loadingProfile && planTier === "free" && isTrial && (() => {
+      {/* Banner trial */}
+      {!loadingProfile && isTrial && (() => {
         const expired = daysLeft <= 0;
         return (
           <button
@@ -307,7 +307,6 @@ function AppPage() {
             <p className="text-xs text-muted-foreground">Olá,</p>
             <h1 className="flex items-center gap-2 text-lg font-semibold leading-tight">
               {profile?.nome?.split(" ")[0] || "Motorista"}
-              <PlanBadge tier={planTier} />
             </h1>
           </div>
         </button>
@@ -433,11 +432,6 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
-      <UpgradePlanModal
-        open={!!paywallMode}
-        onClose={() => setPaywallMode(null)}
-        mode={paywallMode ?? "upgrade-vip"}
-      />
 
       <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} />
 
@@ -474,7 +468,7 @@ function AppPage() {
       <section className="mt-8 px-6">
         <h2 className="text-base font-semibold">Indicações</h2>
         <div className="mt-3">
-          {planTier !== "free" || profile?.permite_indicacao ? (
+          {profile?.permite_indicacao ? (
             <ReferralUnlocked userId={profile?.id ?? ""} />
           ) : (
             <ReferralLocked price={activationPrice} hasReferrer={hasReferrer} onActivate={() => setActivateOpen(true)} />
