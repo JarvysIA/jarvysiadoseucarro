@@ -197,6 +197,8 @@ Deno.serve(async (req) => {
           veiculo_id,
           valor,
           codigo_cupom: codigo_cupom ?? null,
+          tipo_produto: tipo,
+          produto_ref_id: produto_ref_id ?? null,
           status: "pendente",
           txid_efi: txid,
           pix_copia_cola: pixCopiaECola,
