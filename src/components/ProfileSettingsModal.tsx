@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
