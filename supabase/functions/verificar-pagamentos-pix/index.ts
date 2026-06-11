@@ -204,14 +204,59 @@ Deno.serve(async (req) => {
             // b/c) Bonificação ao padrinho (se cupom)
             if (pag.codigo_cupom) {
               const cupom = pag.codigo_cupom.trim().toLowerCase();
-              const { data: padrinho } = await supabase
-                .from("profiles")
-                .select("id, pix_recebimento")
-                .ilike("id", `${cupom}%`)
-                .limit(1)
-                .maybeSingle();
+              const isUuid =
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                  cupom,
+                );
+              console.log("[bonificacao] Buscando padrinho para o cupom:", cupom, "isUuid:", isUuid);
 
-              if (padrinho?.pix_recebimento) {
+              let padrinho:
+                | { id: string; pix_recebimento: string | null }
+                | null = null;
+              let padrinhoErro: unknown = null;
+
+              if (isUuid) {
+                const r = await supabase
+                  .from("profiles")
+                  .select("id, pix_recebimento")
+                  .eq("id", cupom)
+                  .maybeSingle();
+                padrinho = r.data as typeof padrinho;
+                padrinhoErro = r.error;
+              } else {
+                const r = await supabase
+                  .from("profiles")
+                  .select("id, pix_recebimento")
+                  .ilike("id", `${cupom}%`)
+                  .limit(1)
+                  .maybeSingle();
+                padrinho = r.data as typeof padrinho;
+                padrinhoErro = r.error;
+              }
+
+              console.log("[bonificacao] Resultado da busca do padrinho:", {
+                cupom,
+                padrinho,
+                padrinhoErro,
+              });
+
+              if (!padrinho) {
+                // Cupom existente mas padrinho não encontrado — sempre registrar
+                resumo.bonificacoes_falha++;
+                det.bonificacao = "padrinho_nao_encontrado";
+                const { error: logErr } = await supabase
+                  .from("logs_erro_bonificacao")
+                  .insert({
+                    pagamento_id: pag.id,
+                    codigo_cupom: pag.codigo_cupom,
+                    valor: BONIFICACAO_VALOR,
+                    erro: "Cupom existente mas padrinho nao encontrado no banco",
+                    efi_response: padrinhoErro
+                      ? ({ supabase_error: String(padrinhoErro) } as Record<string, unknown>)
+                      : null,
+                  });
+                if (logErr) console.error("[bonificacao] Falha ao gravar log:", logErr);
+              } else if (padrinho.pix_recebimento) {
                 const envio = await enviarPixBonificacao(
                   baseUrl,
                   token,
@@ -236,7 +281,7 @@ Deno.serve(async (req) => {
                     efi_response: envio.raw as Record<string, unknown>,
                   });
                 }
-              } else if (padrinho) {
+              } else {
                 resumo.bonificacoes_falha++;
                 det.bonificacao = "sem_chave_pix";
                 await supabase.from("logs_erro_bonificacao").insert({
