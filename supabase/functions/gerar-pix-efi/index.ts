@@ -138,8 +138,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { user_id, veiculo_id, valor, codigo_cupom } =
+    const { user_id, veiculo_id, valor, codigo_cupom, tipo_produto, produto_ref_id } =
       (await req.json()) as PixRequest;
+    const tipo = tipo_produto === "historico" ? "historico" : "ativacao";
 
     if (!user_id || !veiculo_id || typeof valor !== "number" || valor <= 0) {
       return json({ error: "Parâmetros inválidos" }, 400);
