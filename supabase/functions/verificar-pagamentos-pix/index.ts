@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     // 2. Busca pendentes da última 1h
     const { data: pendentes, error: errPend } = await supabase
       .from("pagamentos_pix")
-      .select("id, user_id, veiculo_id, valor, codigo_cupom, txid_efi, created_at")
+      .select("id, user_id, veiculo_id, valor, codigo_cupom, txid_efi, created_at, tipo_produto, produto_ref_id")
       .eq("status", "pendente")
       .gte("created_at", umaHoraAtras)
       .not("txid_efi", "is", null);
