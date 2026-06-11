@@ -433,7 +433,7 @@ function AppPage() {
       />
 
 
-      <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} />
+      <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} vehicleId={selectedId} />
 
       <ProfileSettingsModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
