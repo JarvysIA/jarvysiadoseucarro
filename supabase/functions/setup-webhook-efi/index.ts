@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           // Header recomendado pela Efí para pular o handshake (mTLS já garante).
-          "x-skip-mtls-checking": "false",
+          "x-skip-mtls-checking": "true",
         },
         body: JSON.stringify({ webhookUrl }),
       });
