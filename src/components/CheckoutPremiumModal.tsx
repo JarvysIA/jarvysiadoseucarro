@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CreditCard, Loader2, Lock, QrCode, ShieldCheck, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, Loader2, Lock, QrCode, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -8,13 +8,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { unlockHistoryFn } from "@/lib/vehicles.functions";
+import { supabase } from "@/integrations/supabase/client";
 
-type PayMethod = "pix" | "card";
+const VALOR_HISTORICO = 49.9;
 
 /**
- * Modal de checkout (simulado) para destravar o "Porta-Luvas Digital" — R$ 49,90.
- * Ao finalizar, dispara `unlockHistoryFn` e notifica o caller para recarregar a timeline.
+ * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Efí).
+ * Cartão temporariamente desabilitado (operação 100% PIX para evitar chargebacks).
+ * Quando o pagamento é confirmado pela Edge Function `verificar-pagamentos-pix`,
+ * o `history_locked` do veículo é setado para `false` automaticamente.
  */
 export function CheckoutPremiumModal({
   open,
@@ -27,27 +29,92 @@ export function CheckoutPremiumModal({
   vehicleId: string;
   onUnlocked: () => void;
 }) {
-  const [method, setMethod] = useState<PayMethod>("pix");
-  const [submitting, setSubmitting] = useState(false);
+  const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [pagamentoId, setPagamentoId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
 
-  const handleFinish = async () => {
-    if (submitting) return;
-    setSubmitting(true);
+  // Reset ao fechar
+  useEffect(() => {
+    if (!open) {
+      setPixCopiaCola("");
+      setPagamentoId(null);
+      setStatusPoll(null);
+      setIsLoading(false);
+    }
+  }, [open]);
+
+  // Polling do status enquanto aguardando
+  useEffect(() => {
+    if (!pagamentoId || statusPoll === "pago") return;
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("pagamentos_pix")
+        .select("status")
+        .eq("id", pagamentoId)
+        .maybeSingle();
+      if (data?.status === "pago") {
+        setStatusPoll("pago");
+        toast.success("Pagamento confirmado! Histórico liberado.");
+        onOpenChange(false);
+        onUnlocked();
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [pagamentoId, statusPoll, onOpenChange, onUnlocked]);
+
+  const gerarPix = async () => {
+    if (isLoading) return;
+    setIsLoading(true);
     try {
-      await unlockHistoryFn({ data: { vehicleId } });
-      toast.success("Pagamento confirmado! Porta-Luvas Digital destravado.");
-      onOpenChange(false);
-      onUnlocked();
+      const { data: sessionData } = await supabase.auth.getUser();
+      const userId = sessionData.user?.id;
+      if (!userId) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
+        body: {
+          user_id: userId,
+          veiculo_id: vehicleId,
+          valor: VALOR_HISTORICO,
+          tipo_produto: "historico",
+          produto_ref_id: vehicleId,
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
+
+      setPixCopiaCola(data.pix_copia_cola);
+      setPagamentoId(data.id ?? null);
+      setStatusPoll("aguardando");
+      toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
-      console.error("[checkout unlock]", e);
-      toast.error(e instanceof Error ? e.message : "Não foi possível concluir o pagamento.");
+      console.error("[checkout historico pix]", e);
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX.");
     } finally {
-      setSubmitting(false);
+      setIsLoading(false);
     }
   };
 
+  const copyPix = async () => {
+    try {
+      await navigator.clipboard.writeText(pixCopiaCola);
+      toast.success("Código PIX copiado!");
+    } catch {
+      toast.error("Não foi possível copiar. Selecione manualmente.");
+    }
+  };
+
+  const handlePrimary = () => {
+    if (pixCopiaCola) copyPix();
+    else gerarPix();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
+    <Dialog open={open} onOpenChange={(v) => !isLoading && onOpenChange(v)}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2">
@@ -99,79 +166,74 @@ export function CheckoutPremiumModal({
           </div>
         </div>
 
-        {/* Métodos de pagamento */}
+        {/* Forma de pagamento — apenas PIX nesta versão */}
         <div className="mt-1">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Forma de pagamento
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            <MethodButton
-              active={method === "pix"}
-              onClick={() => setMethod("pix")}
-              icon={<QrCode className="h-4 w-4" />}
-              label="Pix"
-              hint="Aprovação imediata"
-            />
-            <MethodButton
-              active={method === "card"}
-              onClick={() => setMethod("card")}
-              icon={<CreditCard className="h-4 w-4" />}
-              label="Cartão"
-              hint="Crédito à vista"
-            />
+          <div className="flex items-center gap-2 rounded-xl border border-primary/60 bg-primary/10 px-3 py-2.5">
+            <QrCode className="h-4 w-4 text-primary" />
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-foreground">Pix</span>
+              <span className="text-[10px] text-muted-foreground">
+                Aprovação automática em até 10 minutos
+              </span>
+            </div>
           </div>
         </div>
 
+        {pixCopiaCola && (
+          <div
+            className="mt-2 rounded-2xl border border-primary/30 bg-background/40 p-4"
+            style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
+                <QrCode className="h-14 w-14 text-primary/70" />
+              </div>
+              <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
+                {pixCopiaCola.slice(0, 40)}…
+              </p>
+              {statusPoll === "aguardando" && (
+                <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Aguardando confirmação do pagamento…
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
-          onClick={handleFinish}
-          disabled={submitting}
+          onClick={handlePrimary}
+          disabled={isLoading}
           className="glow-neon mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
         >
-          {submitting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Gerando PIX…
+            </>
+          ) : pixCopiaCola ? (
+            <>
+              <Copy className="h-4 w-4" />
+              Copiar Código PIX
+            </>
           ) : (
-            <Lock className="h-4 w-4" />
+            <>
+              <Lock className="h-4 w-4" />
+              Gerar Pagamento PIX · R$ 49,90
+            </>
           )}
-          Finalizar pagamento · R$ 49,90
         </button>
 
-        <p className="text-center text-[10px] text-muted-foreground">
-          Pagamento simulado · ambiente de demonstração
+        <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
+          Liberação do acesso em até 10 minutos.
+          <br />
+          Código válido para pagamento em até 60 minutos.
         </p>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function MethodButton({
-  active,
-  onClick,
-  icon,
-  label,
-  hint,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors ${
-        active
-          ? "border-primary/60 bg-primary/10"
-          : "border-border bg-background/40 hover:border-primary/30"
-      }`}
-    >
-      <div className="flex items-center gap-2 text-foreground">
-        <span className={active ? "text-primary" : "text-muted-foreground"}>{icon}</span>
-        <span className="text-sm font-semibold">{label}</span>
-      </div>
-      <span className="text-[10px] text-muted-foreground">{hint}</span>
-    </button>
   );
 }
