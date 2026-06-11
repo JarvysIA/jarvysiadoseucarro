@@ -204,6 +204,20 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               />
             </Field>
 
+            <Field label="Chave PIX para Recebimento de Indicação" icon={<KeyRound className="h-3.5 w-3.5" />}>
+              <input
+                type="text"
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                value={pixRecebimento}
+                onChange={(e) => setPixRecebimento(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+              />
+              <span className="mt-1 text-[10px] text-muted-foreground">
+                Obrigatória para receber R$ 5,00 por indicação confirmada.
+              </span>
+            </Field>
+
+
             <Field label="CEP" icon={<MapPin className="h-3.5 w-3.5" />}>
               <div className="flex items-center gap-2">
                 <input
