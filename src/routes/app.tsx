@@ -268,28 +268,46 @@ function AppPage() {
   return (
     <div className="relative min-h-screen bg-background pb-56">
       {/* Banner trial — apenas para usuários free */}
-      {!loadingProfile && planTier === "free" && isTrial && (
-        <a
-          href="https://jarvys.com.br/assinar"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="sticky top-0 z-20 flex flex-col items-center justify-center gap-0.5 border-b border-primary/30 px-4 py-2 text-center text-[11px] font-medium text-primary transition-colors hover:bg-primary/15"
-          style={{
-            background: "rgba(56,189,248,0.08)",
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5" />
-            {daysLeft} dias grátis · Ative a Inteligência por R$ 29,90
-          </div>
-          {hasReferrer && (
-            <span className="text-[10px] font-semibold text-primary/90">
-              Desconto de indicado aplicado 🎉
-            </span>
-          )}
-        </a>
-      )}
+      {!loadingProfile && planTier === "free" && isTrial && (() => {
+        const expired = daysLeft <= 0;
+        return (
+          <button
+            type="button"
+            onClick={() => setActivateOpen(true)}
+            className={
+              "sticky top-0 z-20 flex w-full flex-col items-center justify-center gap-0.5 border-b px-4 py-2 text-center text-[11px] font-medium transition-colors " +
+              (expired
+                ? "border-destructive/50 text-destructive hover:bg-destructive/15"
+                : "border-primary/30 text-primary hover:bg-primary/15")
+            }
+            style={{
+              background: expired
+                ? "rgba(220,38,38,0.12)"
+                : "rgba(56,189,248,0.08)",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              {expired ? (
+                <>
+                  <span aria-hidden>🤖</span>
+                  Reative sua IA por apenas R$ 29,90 (Pagamento Único)
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  ✨ {daysLeft} dias grátis · Ative por apenas R$ 29,90 (Pagamento Único)
+                </>
+              )}
+            </div>
+            {!expired && hasReferrer && (
+              <span className="text-[10px] font-semibold text-primary/90">
+                Desconto de indicado aplicado 🎉
+              </span>
+            )}
+          </button>
+        );
+      })()}
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 pt-8">
