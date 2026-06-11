@@ -59,7 +59,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       }
       const { data } = await supabase
         .from("profiles")
-        .select("id,nome,email,whatsapp,cep,cidade,uf")
+        .select("id,nome,email,whatsapp,cep,cidade,uf,pix_recebimento")
         .eq("id", userId)
         .maybeSingle();
       if (cancel) return;
@@ -70,6 +70,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       setCep(p?.cep ? maskCep(p.cep) : "");
       setCidade(p?.cidade || "");
       setUf(p?.uf || "");
+      setPixRecebimento(p?.pix_recebimento || "");
       setNewPassword("");
       setLoading(false);
     })();
