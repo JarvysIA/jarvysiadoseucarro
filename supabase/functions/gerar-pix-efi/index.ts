@@ -69,6 +69,13 @@ async function authEfi(
   client: Deno.HttpClient,
 ): Promise<string> {
   const basic = btoa(`${clientId}:${clientSecret}`);
+  // Escopos necessários para criar/consultar cobranças PIX na Efí.
+  // Passar explicitamente evita 403 insufficient_scope quando o token
+  // default vem sem permissões de cob.
+  const scope =
+    Deno.env.get("EFI_OAUTH_SCOPE") ??
+    "cob.write cob.read pix.write pix.read";
+
   const res = await fetch(`${baseUrl}/oauth/token`, {
     method: "POST",
     // @ts-ignore - Deno fetch aceita `client`
@@ -77,7 +84,10 @@ async function authEfi(
       Authorization: `Basic ${basic}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ grant_type: "client_credentials" }),
+    body: JSON.stringify({
+      grant_type: "client_credentials",
+      scope,
+    }),
   });
   if (!res.ok) {
     const t = await res.text();
