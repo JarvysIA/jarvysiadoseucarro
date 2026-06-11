@@ -112,11 +112,13 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         cidade: string | null;
         uf: string | null;
         email?: string;
+        pix_recebimento: string | null;
       } = {
         whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
         uf: uf.trim().toUpperCase().slice(0, 2) || null,
+        pix_recebimento: pixRecebimento.trim() || null,
       };
       if (email && email !== profile.email) updates.email = email.trim();
 
