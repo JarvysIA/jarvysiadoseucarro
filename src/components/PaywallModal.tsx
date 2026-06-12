@@ -220,10 +220,10 @@ export function PaywallModal({
                   <button
                     type="button"
                     onClick={applyCoupon}
-                    disabled={!couponCode.trim()}
+                    disabled={!couponCode.trim() || isValidatingCoupon}
                     className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                   >
-                    Aplicar
+                    {isValidatingCoupon ? "Validando…" : "Aplicar"}
                   </button>
                 </div>
               )}
