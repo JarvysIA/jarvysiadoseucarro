@@ -105,8 +105,10 @@ export function LockedHistoryBanner({
               </p>
               <p className="mt-1 text-[13px] leading-relaxed text-foreground">
                 🔒 O antigo dono usava o Jarvys! Descobrimos um histórico de manutenções
-                oculto. Destrave o Porta-Luvas Digital por{" "}
-                <span className="font-semibold text-primary">R$ 49,90</span>.
+                oculto. Destrave o Porta-Luvas Digital por
+                <span className="block text-center font-semibold text-primary">
+                  APENAS R$ 49,90
+                </span>
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <button
