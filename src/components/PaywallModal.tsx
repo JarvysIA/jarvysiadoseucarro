@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveReferrerId } from "@/lib/referral";
 
 export function PaywallModal({
   open,
@@ -28,15 +29,32 @@ export function PaywallModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [showCouponInput, setShowCouponInput] = useState(false);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
 
-  const applyCoupon = () => {
-    if (couponCode.trim().length > 0) {
+  const applyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) return;
+    setIsValidatingCoupon(true);
+    try {
+      const padrinhoId = await resolveReferrerId(code);
+      if (!padrinhoId) {
+        toast.error("Cupom inválido");
+        setCouponApplied(false);
+        setPrice(29.9);
+        return;
+      }
       setPrice(19.9);
       setCouponApplied(true);
+      toast.success("Cupom aplicado!");
+    } catch (e) {
+      console.error("[applyCoupon]", e);
+      toast.error("Não foi possível validar o cupom.");
+    } finally {
+      setIsValidatingCoupon(false);
     }
   };
 
@@ -202,10 +220,10 @@ export function PaywallModal({
                   <button
                     type="button"
                     onClick={applyCoupon}
-                    disabled={!couponCode.trim()}
+                    disabled={!couponCode.trim() || isValidatingCoupon}
                     className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                   >
-                    Aplicar
+                    {isValidatingCoupon ? "Validando…" : "Aplicar"}
                   </button>
                 </div>
               )}
