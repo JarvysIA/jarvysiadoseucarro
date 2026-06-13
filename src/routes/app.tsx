@@ -240,7 +240,8 @@ function AppPage() {
     setActiveVehicleId(selected?.id ?? null);
   }, [selected?.id]);
 
-  const isTrial = profile?.status_usuario !== "ativo";
+  // Trial = único status bloqueado; ativo/vip/enterprise têm acesso liberado.
+  const isTrial = !profile || profile.status_usuario === "trial";
   const hasReferrer = !!profile?.referrer_id;
   const activationPrice = hasReferrer ? "9,90" : "14,90";
   const daysLeft = useMemo(() => {
