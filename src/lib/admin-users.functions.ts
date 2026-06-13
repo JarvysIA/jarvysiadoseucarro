@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PROFILE_STATUS_VALUES, type ProfileStatus } from "@/lib/profile-status";
 
 export type AdminVehicle = {
   id: string;
@@ -8,7 +9,7 @@ export type AdminVehicle = {
   placa: string;
 };
 
-export type PlanStatus = "trial" | "ativo" | "vip" | "enterprise";
+export type PlanStatus = ProfileStatus;
 
 export type AdminUserRow = {
   id: string;
@@ -75,8 +76,7 @@ export const listAdminUsersFn = createServerFn({ method: "GET" })
 export const updateUserStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { userId: string; status: PlanStatus }) => {
-    const allowed: PlanStatus[] = ["trial", "ativo", "vip", "enterprise"];
-    if (!input?.userId || !allowed.includes(input.status)) {
+    if (!input?.userId || !PROFILE_STATUS_VALUES.includes(input.status)) {
       throw new Error("Parâmetros inválidos.");
     }
     return input;
