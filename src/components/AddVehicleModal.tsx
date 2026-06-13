@@ -130,27 +130,35 @@ export function AddVehicleModal({
       console.error("[claimArchivedVehicleFn]", e);
       // segue o fluxo normal de cadastro
     }
-    const r = await lookupPlate(plate);
-    if (r) {
+    const r = await lookupPlacaFipe(plate);
+    if (r.ok && (r.fipe.length > 0 || r.informacoes_veiculo)) {
+      const info = r.informacoes_veiculo || {};
       setData({
-        marca: r.marca || "",
-        modelo: r.modelo || "",
-        ano: r.ano || "",
-        cor: r.cor || "",
-        motorizacao: r.motorizacao || "",
-        chassi: r.chassi || "",
+        marca: info.marca || "",
+        modelo: info.modelo || "",
+        ano: info.ano_modelo || info.ano || "",
+        cor: info.cor || "",
+        motorizacao: info.motor || info.combustivel || "",
+        chassi: info.chassi || "",
       });
-      const opts = r.fipe_options ?? [];
-      setFipeOptions(opts);
-      // Cenário A: 1 opção (ou cache) → captura automática.
-      // Cenário B: múltiplas → mostra picker no step de confirmação.
+      const opts = r.fipe;
+      // Mapeia para compat. com a UI existente (texto_modelo).
+      const mapped: FipeOption[] = opts.map((o) => ({ ...o, texto_modelo: o.modelo }));
+      setFipeOptions(mapped);
+      // Desempate automático: 1 opção → seleciona em background.
+      // 2+ opções → abre o modal "Selecione a Versão Fipe".
       if (opts.length <= 1) {
-        setFipeLookup(r.fipe ?? (opts[0] ? {
-          codigo_fipe: opts[0].codigo_fipe,
-          valor: opts[0].valor,
-          mes_referencia: opts[0].mes_referencia,
-          historico: [],
-        } : null));
+        const first = opts[0];
+        setFipeLookup(
+          first
+            ? {
+                codigo_fipe: first.codigo_fipe,
+                valor: first.valor,
+                mes_referencia: first.mes_referencia || "",
+                desvalorizometro: first.desvalorizometro,
+              }
+            : null,
+        );
         setShowFipePicker(false);
       } else {
         setFipeLookup(null);
@@ -170,8 +178,8 @@ export function AddVehicleModal({
     setFipeLookup({
       codigo_fipe: opt.codigo_fipe,
       valor: opt.valor,
-      mes_referencia: opt.mes_referencia,
-      historico: [],
+      mes_referencia: opt.mes_referencia || "",
+      desvalorizometro: opt.desvalorizometro,
     });
     setShowFipePicker(false);
   };
