@@ -329,6 +329,7 @@ export type Database = {
           fipe_updated_at: string | null
           fipe_valor: number | null
           foto_url: string | null
+          historico_fipe: Json | null
           history_locked: boolean
           id: string
           image_url: string | null
@@ -353,6 +354,7 @@ export type Database = {
           fipe_updated_at?: string | null
           fipe_valor?: number | null
           foto_url?: string | null
+          historico_fipe?: Json | null
           history_locked?: boolean
           id?: string
           image_url?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           fipe_updated_at?: string | null
           fipe_valor?: number | null
           foto_url?: string | null
+          historico_fipe?: Json | null
           history_locked?: boolean
           id?: string
           image_url?: string | null

@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
-import type { FipeHistoricoItem, FipeOption } from "@/lib/plate-lookup.functions";
+import { sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import {
+  lookupPlacaFipe,
+  consultarHistoricoFipe,
+  type PlacaFipeOption,
+} from "@/lib/placafipe";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
 
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
+
+// Alias para manter o restante do componente legível sem refatorar tudo.
+type FipeOption = PlacaFipeOption & { texto_modelo?: string };
 
 type LookupData = {
   marca: string;
@@ -22,7 +29,7 @@ type FipeFromLookup = {
   codigo_fipe: string;
   valor: number;
   mes_referencia: string;
-  historico: FipeHistoricoItem[];
+  desvalorizometro: string;
 } | null;
 
 export type AddedVehicle = {
@@ -123,27 +130,35 @@ export function AddVehicleModal({
       console.error("[claimArchivedVehicleFn]", e);
       // segue o fluxo normal de cadastro
     }
-    const r = await lookupPlate(plate);
-    if (r) {
+    const r = await lookupPlacaFipe(plate);
+    if (r.ok && (r.fipe.length > 0 || r.informacoes_veiculo)) {
+      const info = r.informacoes_veiculo || {};
       setData({
-        marca: r.marca || "",
-        modelo: r.modelo || "",
-        ano: r.ano || "",
-        cor: r.cor || "",
-        motorizacao: r.motorizacao || "",
-        chassi: r.chassi || "",
+        marca: info.marca || "",
+        modelo: info.modelo || "",
+        ano: info.ano_modelo || info.ano || "",
+        cor: info.cor || "",
+        motorizacao: info.motor || info.combustivel || "",
+        chassi: info.chassi || "",
       });
-      const opts = r.fipe_options ?? [];
-      setFipeOptions(opts);
-      // Cenário A: 1 opção (ou cache) → captura automática.
-      // Cenário B: múltiplas → mostra picker no step de confirmação.
+      const opts = r.fipe;
+      // Mapeia para compat. com a UI existente (texto_modelo).
+      const mapped: FipeOption[] = opts.map((o) => ({ ...o, texto_modelo: o.modelo }));
+      setFipeOptions(mapped);
+      // Desempate automático: 1 opção → seleciona em background.
+      // 2+ opções → abre o modal "Selecione a Versão Fipe".
       if (opts.length <= 1) {
-        setFipeLookup(r.fipe ?? (opts[0] ? {
-          codigo_fipe: opts[0].codigo_fipe,
-          valor: opts[0].valor,
-          mes_referencia: opts[0].mes_referencia,
-          historico: [],
-        } : null));
+        const first = opts[0];
+        setFipeLookup(
+          first
+            ? {
+                codigo_fipe: first.codigo_fipe,
+                valor: first.valor,
+                mes_referencia: first.mes_referencia || "",
+                desvalorizometro: first.desvalorizometro,
+              }
+            : null,
+        );
         setShowFipePicker(false);
       } else {
         setFipeLookup(null);
@@ -163,8 +178,8 @@ export function AddVehicleModal({
     setFipeLookup({
       codigo_fipe: opt.codigo_fipe,
       valor: opt.valor,
-      mes_referencia: opt.mes_referencia,
-      historico: [],
+      mes_referencia: opt.mes_referencia || "",
+      desvalorizometro: opt.desvalorizometro,
     });
     setShowFipePicker(false);
   };
@@ -272,6 +287,22 @@ export function AddVehicleModal({
           await refreshFipeFn({ data: { vehicleId: inserted.id, force: true } });
         } catch (e) {
           console.warn("[FIPE seed via BrasilAPI]", e);
+        }
+      }
+
+      // Histórico completo via placafipe.com.br (desvalorizômetro).
+      const hash = fipeLookup?.desvalorizometro?.trim() || "";
+      if (hash) {
+        try {
+          const historico = await consultarHistoricoFipe(hash);
+          if (historico.length > 0) {
+            await supabase
+              .from("veiculos")
+              .update({ historico_fipe: historico as never } as never)
+              .eq("id", inserted.id);
+          }
+        } catch (e) {
+          console.warn("[consultarHistoricoFipe]", e);
         }
       }
       toast.success("Veículo adicionado!");

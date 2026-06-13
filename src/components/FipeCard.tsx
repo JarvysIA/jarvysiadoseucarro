@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, X, Loader2 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { TrendingUp, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchFipeHistoryFn, type FipeHistoryPoint } from "@/lib/fipe-history.functions";
+
+type HistPoint = {
+  mes_ano_extenso: string;
+  mes?: string | number | null;
+  ano?: number | null;
+  valor: number;
+};
 
 type VehicleFipe = {
-  placa: string | null;
   fipe_valor: number | null;
   fipe_mes_referencia: string | null;
   fipe_updated_at: string | null;
   codigo_fipe: string | null;
-  fipe_historico: FipeHistoryPoint[] | null;
-  fipe_ultima_atualizacao: string | null;
+  historico_fipe: HistPoint[] | null;
 };
 
 function formatBRL(n: number): string {
@@ -23,40 +35,23 @@ const MES_PT_TO_NUM: Record<string, number> = {
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
 
-/** "abril de 2025" → 202504 */
-function parseRefMonth(s: string): number {
-  if (!s) return 0;
-  const parts = s.toLowerCase().trim().split(" de ");
-  if (parts.length !== 2) return 0;
+/** "Janeiro/2024" ou "abril de 2025" → { mes: 1..12, ano: 2024 } */
+function parseMesAno(raw: string): { mes: number; ano: number } {
+  const s = String(raw || "").toLowerCase().trim();
+  // separa pelo primeiro / ou " de "
+  const parts = s.includes("/") ? s.split("/") : s.split(" de ");
+  if (parts.length !== 2) return { mes: 0, ano: 0 };
   const mes = MES_PT_TO_NUM[parts[0].trim()] || 0;
   const ano = parseInt(parts[1].trim(), 10) || 0;
-  return ano * 100 + mes;
-}
-
-/**
- * Lazy update rule: refetch from external API se:
- *  (A) histórico vazio/nulo, OU
- *  (B) hoje >= dia 7 E (ano,mês) da última atualização < (ano,mês) atual.
- */
-function shouldRefetch(historico: FipeHistoryPoint[] | null, lastAt: string | null): boolean {
-  if (!historico || historico.length === 0) return true;
-  if (!lastAt) return true;
-  const now = new Date();
-  if (now.getDate() < 7) return false;
-  const last = new Date(lastAt);
-  const lastKey = last.getFullYear() * 100 + (last.getMonth() + 1);
-  const nowKey = now.getFullYear() * 100 + (now.getMonth() + 1);
-  return lastKey < nowKey;
+  return { mes, ano };
 }
 
 export function FipeCard({
   vehicleId,
-  placa: _placa,
-  ano: _ano,
 }: {
   vehicleId: string;
-  placa: string;
-  ano: string;
+  placa?: string;
+  ano?: string;
 }) {
   const [data, setData] = useState<VehicleFipe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,9 +64,7 @@ export function FipeCard({
     (async () => {
       const { data: row } = await supabase
         .from("veiculos")
-        .select(
-          "placa,fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,fipe_historico,fipe_ultima_atualizacao",
-        )
+        .select("fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,historico_fipe")
         .eq("id", vehicleId)
         .maybeSingle();
       if (cancel) return;
@@ -86,15 +79,15 @@ export function FipeCard({
   const valor = data?.fipe_valor != null ? Number(data.fipe_valor) : null;
   const mes = data?.fipe_mes_referencia ?? null;
   const hasFipe = valor != null && valor > 0;
-  const codigoFipe = data?.codigo_fipe ?? null;
-  const placa = data?.placa ?? null;
+  const hist = Array.isArray(data?.historico_fipe) ? data!.historico_fipe! : [];
+  const hasHistorico = hist.length > 0;
 
   return (
     <>
       <button
         type="button"
-        onClick={() => codigoFipe && setOpenChart(true)}
-        disabled={!codigoFipe}
+        onClick={() => hasHistorico && setOpenChart(true)}
+        disabled={!hasHistorico}
         className="mt-3 flex w-full items-center justify-between rounded-2xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/40 disabled:cursor-default disabled:opacity-80"
       >
         <div className="flex items-center gap-3">
@@ -112,12 +105,8 @@ export function FipeCard({
               <p className="mt-1 text-sm text-muted-foreground">Carregando…</p>
             ) : hasFipe ? (
               <>
-                <p className="mt-0.5 text-xl font-semibold text-foreground">
-                  {formatBRL(valor!)}
-                </p>
-                {mes && (
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">Ref.: {mes}</p>
-                )}
+                <p className="mt-0.5 text-xl font-semibold text-foreground">{formatBRL(valor!)}</p>
+                {mes && <p className="mt-0.5 text-[10px] text-muted-foreground">Ref.: {mes}</p>}
               </>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -126,119 +115,67 @@ export function FipeCard({
             )}
           </div>
         </div>
-        {codigoFipe && (
+        {hasHistorico && (
           <span className="text-[11px] font-semibold text-primary">Ver histórico</span>
         )}
       </button>
 
       {openChart && (
-        <FipeChartModal
-          vehicleId={vehicleId}
-          placa={placa}
-          codigoFipe={codigoFipe}
-          cachedHistorico={data?.fipe_historico ?? null}
-          lastUpdate={data?.fipe_ultima_atualizacao ?? null}
-          onClose={() => setOpenChart(false)}
-          onCacheUpdated={(novoHist, novaData) =>
-            setData((d) =>
-              d ? { ...d, fipe_historico: novoHist, fipe_ultima_atualizacao: novaData } : d,
-            )
-          }
-        />
+        <FipeChartModal historico={hist} onClose={() => setOpenChart(false)} />
       )}
     </>
   );
 }
 
 function FipeChartModal({
-  vehicleId,
-  placa,
-  codigoFipe,
-  cachedHistorico,
-  lastUpdate,
+  historico,
   onClose,
-  onCacheUpdated,
 }: {
-  vehicleId: string;
-  placa: string | null;
-  codigoFipe: string | null;
-  cachedHistorico: FipeHistoryPoint[] | null;
-  lastUpdate: string | null;
+  historico: HistPoint[];
   onClose: () => void;
-  onCacheUpdated: (h: FipeHistoryPoint[], at: string) => void;
 }) {
-  const [points, setPoints] = useState<FipeHistoryPoint[]>(cachedHistorico ?? []);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Normaliza pontos com (mes, ano) parseados.
+  const allPoints = useMemo(() => {
+    return historico
+      .map((h) => {
+        const p = parseMesAno(h.mes_ano_extenso);
+        return {
+          mes_ano_extenso: h.mes_ano_extenso,
+          mes: typeof h.mes === "number" ? h.mes : p.mes,
+          ano: typeof h.ano === "number" && h.ano > 0 ? h.ano : p.ano,
+          valor: typeof h.valor === "number" ? h.valor : Number(h.valor) || 0,
+        };
+      })
+      .filter((p) => p.ano > 0 && p.mes > 0 && p.valor > 0);
+  }, [historico]);
 
-  useEffect(() => {
-    let cancel = false;
-    if (!codigoFipe || !placa) return;
+  // Lista de anos disponíveis, ordenada asc.
+  const anosDisponiveis = useMemo(() => {
+    const set = new Set<number>();
+    allPoints.forEach((p) => set.add(p.ano));
+    return Array.from(set).sort((a, b) => a - b);
+  }, [allPoints]);
 
-    const mustFetch = shouldRefetch(cachedHistorico, lastUpdate);
-    if (!mustFetch) {
-      setPoints(cachedHistorico ?? []);
-      return;
-    }
+  const [anoIdx, setAnoIdx] = useState(() => Math.max(0, anosDisponiveis.length - 1));
 
-    setLoading(true);
-    setError(null);
-    (async () => {
-      try {
-        const res = await fetchFipeHistoryFn({
-          data: { placa, codigoFipe },
-        });
-        if (cancel) return;
-        if (!res.ok || res.historico.length === 0) {
-          // mantém o que houver em cache; se nada, fica vazio
-          setPoints(cachedHistorico ?? []);
-          setError(res.ok ? null : res.error);
-          return;
-        }
-        setPoints(res.historico);
-        // Write-through cache no Supabase
-        const nowIso = new Date().toISOString();
-        const { error: upErr } = await supabase
-          .from("veiculos")
-          .update({
-            fipe_historico: res.historico as unknown as never,
-            fipe_ultima_atualizacao: nowIso,
-          } as never)
-          .eq("id", vehicleId);
-        if (!upErr) onCacheUpdated(res.historico, nowIso);
-      } catch (e) {
-        if (!cancel) setError((e as Error).message || "Erro ao buscar histórico");
-      } finally {
-        if (!cancel) setLoading(false);
-      }
-    })();
-    return () => {
-      cancel = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codigoFipe, placa, vehicleId]);
+  const anoAtual = anosDisponiveis[anoIdx] ?? null;
 
-  const tickFormatter = useMemo(
-    () => (v: string) => {
-      const lower = (v || "").toLowerCase();
-      const parts = lower.split(" de ");
-      if (parts.length === 2) {
-        const m = parts[0].slice(0, 3);
-        const y = parts[1].slice(-2);
-        return `${m}/${y}`;
-      }
-      return v;
-    },
-    [],
-  );
+  const pontosDoAno = useMemo(() => {
+    if (!anoAtual) return [];
+    return allPoints
+      .filter((p) => p.ano === anoAtual)
+      .sort((a, b) => a.mes - b.mes);
+  }, [allPoints, anoAtual]);
 
-  const sortedPoints = useMemo(
-    () =>
-      [...points].sort(
-        (a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia),
-      ),
-    [points],
-  );
+  const tickFormatter = (v: string) => {
+    const lower = String(v || "").toLowerCase();
+    const parts = lower.includes("/") ? lower.split("/") : lower.split(" de ");
+    if (parts.length === 2) return parts[0].slice(0, 3);
+    return v;
+  };
+
+  const goPrev = () => setAnoIdx((i) => Math.max(0, i - 1));
+  const goNext = () => setAnoIdx((i) => Math.min(anosDisponiveis.length - 1, i + 1));
 
   return (
     <div
@@ -272,32 +209,23 @@ function FipeChartModal({
         </div>
 
         <div className="mt-5 h-64 w-full">
-          {!codigoFipe || !placa ? (
+          {pontosDoAno.length === 0 ? (
             <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
-              Histórico não disponível para este veículo
-            </div>
-          ) : loading ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3">
-              <Loader2
-                className="h-7 w-7 animate-spin text-primary"
-                style={{ filter: "drop-shadow(0 0 8px var(--primary))" }}
-              />
-              <p className="text-[11px] font-medium text-muted-foreground">
-                Atualizando histórico FIPE…
-              </p>
-            </div>
-          ) : sortedPoints.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-center text-xs text-muted-foreground">
-              {error
-                ? "Não foi possível carregar o histórico agora."
-                : "Histórico não disponível para este veículo"}
+              {anosDisponiveis.length === 0 ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Histórico não disponível
+                </span>
+              ) : (
+                "Sem pontos para este ano."
+              )}
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sortedPoints} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+              <LineChart data={pontosDoAno} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
                 <XAxis
-                  dataKey="mes_referencia"
+                  dataKey="mes_ano_extenso"
                   tickFormatter={tickFormatter}
                   tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                   axisLine={false}
@@ -334,6 +262,32 @@ function FipeChartModal({
             </ResponsiveContainer>
           )}
         </div>
+
+        {anosDisponiveis.length > 0 && (
+          <div className="mt-3 flex items-center justify-center gap-4">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={anoIdx <= 0}
+              aria-label="Ano anterior"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:text-primary disabled:opacity-30"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="font-tech min-w-[80px] text-center text-base font-semibold tracking-wider text-primary">
+              {anoAtual ?? "—"}
+            </span>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={anoIdx >= anosDisponiveis.length - 1}
+              aria-label="Próximo ano"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background/60 text-muted-foreground transition-colors hover:text-primary disabled:opacity-30"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
