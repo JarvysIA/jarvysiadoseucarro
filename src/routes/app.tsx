@@ -61,7 +61,7 @@ const ITEMS: ItemDef[] = [
 type Profile = {
   id: string;
   nome: string;
-  status_usuario: "trial" | "ativo";
+  status_usuario: "trial" | "ativo" | "vip" | "enterprise";
   permite_indicacao: boolean;
   trial_inicio: string;
   referrer_id: string | null;
