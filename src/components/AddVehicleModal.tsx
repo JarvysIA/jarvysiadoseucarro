@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
-import type { FipeHistoricoItem, FipeOption } from "@/lib/plate-lookup.functions";
+import { sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import {
+  lookupPlacaFipe,
+  consultarHistoricoFipe,
+  type PlacaFipeOption,
+} from "@/lib/placafipe";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
 
 import { toast } from "sonner";
 
 type Step = "plate" | "loading" | "confirm";
+
+// Alias para manter o restante do componente legível sem refatorar tudo.
+type FipeOption = PlacaFipeOption & { texto_modelo?: string };
 
 type LookupData = {
   marca: string;
