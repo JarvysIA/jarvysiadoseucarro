@@ -289,6 +289,22 @@ export function AddVehicleModal({
           console.warn("[FIPE seed via BrasilAPI]", e);
         }
       }
+
+      // Histórico completo via placafipe.com.br (desvalorizômetro).
+      const hash = fipeLookup?.desvalorizometro?.trim() || "";
+      if (hash) {
+        try {
+          const historico = await consultarHistoricoFipe(hash);
+          if (historico.length > 0) {
+            await supabase
+              .from("veiculos")
+              .update({ historico_fipe: historico as never } as never)
+              .eq("id", inserted.id);
+          }
+        } catch (e) {
+          console.warn("[consultarHistoricoFipe]", e);
+        }
+      }
       toast.success("Veículo adicionado!");
       onAdded({
         id: inserted.id,
