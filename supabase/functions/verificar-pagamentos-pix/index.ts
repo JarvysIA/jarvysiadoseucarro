@@ -271,6 +271,23 @@ Deno.serve(async (req) => {
                 padrinhoErro,
               });
 
+              // Vincula referrer_id no perfil do indicado de forma definitiva
+              if (padrinho?.id && pag.user_id && padrinho.id !== pag.user_id) {
+                const { error: linkErr } = await supabase
+                  .from("profiles")
+                  .update({ referrer_id: padrinho.id })
+                  .eq("id", pag.user_id);
+                if (linkErr) {
+                  console.error("[bonificacao] Falha ao vincular referrer_id:", linkErr);
+                } else {
+                  console.log("[bonificacao] referrer_id vinculado:", {
+                    indicado: pag.user_id,
+                    padrinho: padrinho.id,
+                  });
+                }
+              }
+
+
               if (!padrinho) {
                 // Cupom existente mas padrinho não encontrado — sempre registrar
                 resumo.bonificacoes_falha++;
