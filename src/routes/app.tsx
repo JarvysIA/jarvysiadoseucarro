@@ -28,6 +28,7 @@ import {
   type MaintStatus,
 } from "@/lib/maintenance";
 import { getActiveVehicleId, setActiveVehicleId } from "@/lib/active-vehicle";
+import type { ProfileStatus } from "@/lib/profile-status";
 
 export const Route = createFileRoute("/app")({
   head: () => ({ meta: [{ title: "Minha Garagem — Jarvys" }] }),
@@ -61,7 +62,7 @@ const ITEMS: ItemDef[] = [
 type Profile = {
   id: string;
   nome: string;
-  status_usuario: "trial" | "ativo" | "vip" | "enterprise";
+  status_usuario: ProfileStatus;
   permite_indicacao: boolean;
   trial_inicio: string;
   referrer_id: string | null;
