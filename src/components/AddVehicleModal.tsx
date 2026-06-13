@@ -29,7 +29,7 @@ type FipeFromLookup = {
   codigo_fipe: string;
   valor: number;
   mes_referencia: string;
-  historico: FipeHistoricoItem[];
+  desvalorizometro: string;
 } | null;
 
 export type AddedVehicle = {
