@@ -355,7 +355,7 @@ function AppPage() {
                     key={v.id}
                     data-vehicle-id={v.id}
                     onClick={() => setSelectedId(v.id)}
-                    className={`w-[82%] shrink-0 snap-center overflow-hidden rounded-3xl border bg-card transition-all ${
+                    className={`w-[82%] shrink-0 snap-center flex flex-col md:flex-row overflow-hidden rounded-3xl border bg-card transition-all ${
                       active ? "glow-neon border-primary/40" : "border-border opacity-70"
                     }`}
                   >
