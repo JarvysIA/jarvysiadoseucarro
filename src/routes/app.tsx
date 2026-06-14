@@ -656,10 +656,6 @@ function Legend({ status }: { status: MaintStatus }) {
   );
 }
 
-type ItemOverride = {
-  ultima_troca_km: number;
-  ultima_troca_data: string;
-};
 
 function VehicleStatusSection({
   vehicleId,
