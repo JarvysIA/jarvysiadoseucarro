@@ -1020,7 +1020,7 @@ function VehicleImage({
             width={1024}
             height={768}
             loading="lazy"
-            className="relative z-[1] h-full w-full object-contain p-4 mix-blend-screen animate-in fade-in duration-500"
+            className="relative z-[1] w-full h-full object-cover md:object-contain p-0 md:p-4 mix-blend-screen animate-in fade-in duration-500"
             style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
           />
           {/* Botão Inteligente de Retry: visível apenas no fallback */}
