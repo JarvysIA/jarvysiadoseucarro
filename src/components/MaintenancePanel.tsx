@@ -87,7 +87,7 @@ export function MaintenancePanel({
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   // Reset ao reabrir/trocar item
   useEffect(() => {
