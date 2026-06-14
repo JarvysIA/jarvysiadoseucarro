@@ -334,6 +334,10 @@ export type Database = {
           id: string
           image_url: string | null
           km_atual: number | null
+          km_ultima_troca_arrefecimento: number | null
+          km_ultima_troca_filtros: number | null
+          km_ultima_troca_oleo: number | null
+          km_ultima_troca_pastilhas: number | null
           marca: string | null
           modelo: string | null
           motorizacao: string | null
@@ -359,6 +363,10 @@ export type Database = {
           id?: string
           image_url?: string | null
           km_atual?: number | null
+          km_ultima_troca_arrefecimento?: number | null
+          km_ultima_troca_filtros?: number | null
+          km_ultima_troca_oleo?: number | null
+          km_ultima_troca_pastilhas?: number | null
           marca?: string | null
           modelo?: string | null
           motorizacao?: string | null
@@ -384,6 +392,10 @@ export type Database = {
           id?: string
           image_url?: string | null
           km_atual?: number | null
+          km_ultima_troca_arrefecimento?: number | null
+          km_ultima_troca_filtros?: number | null
+          km_ultima_troca_oleo?: number | null
+          km_ultima_troca_pastilhas?: number | null
           marca?: string | null
           modelo?: string | null
           motorizacao?: string | null
