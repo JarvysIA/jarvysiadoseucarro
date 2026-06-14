@@ -129,14 +129,12 @@ export function MaintenancePanel({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto rounded-t-3xl border-border bg-card p-0"
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*,application/pdf"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => handleFile(e.target.files?.[0])}
+        <ScannerSourceSheet
+          open={sourceOpen}
+          onClose={() => setSourceOpen(false)}
+          onFileSelected={handleFile}
         />
+
 
         {computed && (
           <div className="flex flex-col gap-6 p-6">
