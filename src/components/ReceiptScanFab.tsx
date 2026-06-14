@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Camera, Loader2, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { parseReceiptFn, type ParsedReceipt } from "@/lib/parse-receipt.functions";
+import { ScannerSourceSheet } from "@/components/ScannerSourceSheet";
 
 type Props = {
   /** Disparado quando a IA termina de ler a nota. */
@@ -25,11 +26,10 @@ function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }>
 
 /** FAB secundário (acima do "+") para ler nota fiscal com IA. */
 export function ReceiptScanFab({ onParsed, className }: Props) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
+  const handleFile = async (file: File) => {
     setScanning(true);
     try {
       const { base64, mimeType } = await fileToBase64(file);
@@ -45,23 +45,19 @@ export function ReceiptScanFab({ onParsed, className }: Props) {
       toast.error(e instanceof Error ? e.message : "Erro ao analisar a nota.");
     } finally {
       setScanning(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   };
 
   return (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0])}
+      <ScannerSourceSheet
+        open={sourceOpen}
+        onClose={() => setSourceOpen(false)}
+        onFileSelected={handleFile}
       />
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => setSourceOpen(true)}
         disabled={scanning}
         aria-label="Ler nota fiscal com IA"
         className={`glow-neon fixed right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full border border-primary/40 bg-card text-primary shadow-xl transition-transform active:scale-95 disabled:opacity-70 ${

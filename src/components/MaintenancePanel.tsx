@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScannerSourceSheet } from "@/components/ScannerSourceSheet";
 import {
   Sparkles,
   History,
@@ -87,7 +88,7 @@ export function MaintenancePanel({
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   // Reset ao reabrir/trocar item
   useEffect(() => {
@@ -100,7 +101,7 @@ export function MaintenancePanel({
     }
   }, [open, computed?.item.key]);
 
-  const triggerUpload = () => inputRef.current?.click();
+  const triggerUpload = () => setSourceOpen(true);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -129,14 +130,12 @@ export function MaintenancePanel({
         side="bottom"
         className="max-h-[92vh] overflow-y-auto rounded-t-3xl border-border bg-card p-0"
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*,application/pdf"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => handleFile(e.target.files?.[0])}
+        <ScannerSourceSheet
+          open={sourceOpen}
+          onClose={() => setSourceOpen(false)}
+          onFileSelected={handleFile}
         />
+
 
         {computed && (
           <div className="flex flex-col gap-6 p-6">
