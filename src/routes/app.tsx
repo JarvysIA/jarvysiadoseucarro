@@ -355,11 +355,11 @@ function AppPage() {
                     key={v.id}
                     data-vehicle-id={v.id}
                     onClick={() => setSelectedId(v.id)}
-                    className={`w-[82%] shrink-0 snap-center flex flex-col md:flex-row overflow-hidden rounded-3xl border bg-card transition-all ${
+                    className={`w-full w-[82%] shrink-0 snap-center flex flex-col md:flex-row overflow-hidden rounded-3xl border bg-card transition-all ${
                       active ? "glow-neon border-primary/40" : "border-border opacity-70"
                     }`}
                   >
-                    <div className="w-full md:w-[45%] h-56 md:h-auto relative bg-transparent flex-shrink-0">
+                    <div className="relative w-full h-56 md:w-[45%] md:h-full bg-transparent flex-shrink-0">
                       <VehicleImage
                         vehicleId={v.id}
                         cachedUrl={v.fotoUrl}
@@ -1020,7 +1020,7 @@ function VehicleImage({
             width={1024}
             height={768}
             loading="lazy"
-            className="relative z-[1] h-full w-full object-contain p-4 mix-blend-screen animate-in fade-in duration-500"
+            className="relative z-[1] w-full h-full object-cover md:object-contain p-0 md:p-4 mix-blend-screen animate-in fade-in duration-500"
             style={{ filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.6))" }}
           />
           {/* Botão Inteligente de Retry: visível apenas no fallback */}
@@ -1045,7 +1045,7 @@ function VehicleImage({
           loading="lazy"
           onLoad={() => setState("loaded")}
           onError={() => setState("fallback")}
-          className={`relative z-[1] h-full w-full object-contain p-4 mix-blend-lighten transition-opacity duration-500 ${
+          className={`relative z-[1] w-full h-full object-cover md:object-contain p-0 md:p-4 mix-blend-lighten transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
         />
