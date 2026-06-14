@@ -23,9 +23,11 @@ import {
   buildMaintenanceItems,
   computeStatus,
   formatRemainingKm,
+  ITEM_TO_CATEGORIA,
   STATUS_LABEL_PT,
   type MaintItemKey,
   type MaintStatus,
+  type VehicleMaintOverrides,
 } from "@/lib/maintenance";
 import { getActiveVehicleId, setActiveVehicleId } from "@/lib/active-vehicle";
 import type { ProfileStatus } from "@/lib/profile-status";
@@ -79,6 +81,10 @@ type DbVehicle = {
   km_atual: number | null;
   chassi: string | null;
   foto_url: string | null;
+  km_ultima_troca_oleo: number | null;
+  km_ultima_troca_filtros: number | null;
+  km_ultima_troca_pastilhas: number | null;
+  km_ultima_troca_arrefecimento: number | null;
 };
 
 type UserVehicle = {
@@ -91,6 +97,10 @@ type UserVehicle = {
   km: number;
   chassi: string;
   fotoUrl: string | null;
+  kmUltimaTrocaOleo: number | null;
+  kmUltimaTrocaFiltros: number | null;
+  kmUltimaTrocaPastilhas: number | null;
+  kmUltimaTrocaArrefecimento: number | null;
 };
 
 // Cache em memória para renderização instantânea ao voltar para a Home
@@ -133,6 +143,10 @@ function AppPage() {
       km: v.km_atual ?? 0,
       chassi: v.chassi,
       fotoUrl: v.foto_url ?? null,
+      kmUltimaTrocaOleo: null,
+      kmUltimaTrocaFiltros: null,
+      kmUltimaTrocaPastilhas: null,
+      kmUltimaTrocaArrefecimento: null,
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
@@ -161,7 +175,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento")
           .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: true }),
@@ -183,6 +197,10 @@ function AppPage() {
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
           fotoUrl: v.foto_url || null,
+          kmUltimaTrocaOleo: v.km_ultima_troca_oleo,
+          kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
+          kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
+          kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
         };
       });
       setVehicles(mapped);
@@ -446,9 +464,27 @@ function AppPage() {
           placa={selected.plate}
           ano={selected.year}
           kmAtual={selected.km}
+          overrides={{
+            km_ultima_troca_oleo: selected.kmUltimaTrocaOleo,
+            km_ultima_troca_filtros: selected.kmUltimaTrocaFiltros,
+            km_ultima_troca_pastilhas: selected.kmUltimaTrocaPastilhas,
+            km_ultima_troca_arrefecimento: selected.kmUltimaTrocaArrefecimento,
+          }}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
+            )
+          }
+          onMaintenanceSaved={(key, kmRegistrada) =>
+            setVehicles((prev) =>
+              prev.map((x) => {
+                if (x.id !== selected.id) return x;
+                if (key === "oleo") return { ...x, kmUltimaTrocaOleo: kmRegistrada };
+                if (key === "filtros") return { ...x, kmUltimaTrocaFiltros: kmRegistrada };
+                if (key === "pastilhas") return { ...x, kmUltimaTrocaPastilhas: kmRegistrada };
+                if (key === "arrefecimento") return { ...x, kmUltimaTrocaArrefecimento: kmRegistrada };
+                return x;
+              }),
             )
           }
           onDeleted={() => {
@@ -620,53 +656,40 @@ function Legend({ status }: { status: MaintStatus }) {
   );
 }
 
-type ItemOverride = {
-  ultima_troca_km: number;
-  ultima_troca_data: string;
-};
 
 function VehicleStatusSection({
   vehicleId,
   placa,
   ano,
   kmAtual,
+  overrides: dbOverrides,
   onKmChange,
+  onMaintenanceSaved,
   onDeleted,
 }: {
   vehicleId: string;
   placa: string;
   ano: string;
   kmAtual: number;
+  overrides: VehicleMaintOverrides;
   onKmChange: (km: number) => void;
+  onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
   onDeleted: () => void;
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  // Overrides e despesas por veículo + item (mock — preparado para virar tabela depois)
-  const [overrides, setOverrides] = useState<
-    Record<string, Partial<Record<MaintItemKey, ItemOverride>>>
-  >({});
+  // Histórico de despesas por veículo + item — preenchido após salvar.
   const [expenses, setExpenses] = useState<
     Record<string, Partial<Record<MaintItemKey, MaintExpense[]>>>
   >({});
 
-  // Itens base determinísticos por vehicleId
-  const baseItems = useMemo(
-    () => buildMaintenanceItems(vehicleId, kmAtual),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vehicleId],
+  // Itens reais — consomem as colunas km_ultima_troca_* da tabela veiculos.
+  const items = useMemo(
+    () => buildMaintenanceItems(vehicleId, kmAtual, dbOverrides),
+    [vehicleId, kmAtual, dbOverrides],
   );
-
-  // Aplica overrides de IA (última troca atualizada via nota fiscal)
-  const items = useMemo(() => {
-    const ov = overrides[vehicleId] || {};
-    return baseItems.map((it) => {
-      const o = ov[it.key];
-      return o ? { ...it, ultima_troca_km: o.ultima_troca_km, ultima_troca_data: o.ultima_troca_data } : it;
-    });
-  }, [baseItems, overrides, vehicleId]);
 
   const computed = useMemo(
     () => items.map((it) => computeStatus(it, kmAtual)),
@@ -720,13 +743,19 @@ function VehicleStatusSection({
       receiptPath = await uploadReceiptImage(userId, vehicleId, payload.file);
     }
 
+    // Sobrescreve a categoria de acordo com o item selecionado para que a
+    // trigger `atualizar_revisao_veiculo` no banco consiga identificar e
+    // atualizar a coluna km_ultima_troca_* correspondente.
+    const categoriaFinal =
+      (ITEM_TO_CATEGORIA[key] as typeof payload.categoria | undefined) ?? payload.categoria;
+
     // 2) Insere a despesa no banco
     const { error: insErr } = await supabase.from("despesas").insert({
       user_id: userId,
       vehicle_id: vehicleId,
       data: payload.data_servico,
       valor: payload.valor_total,
-      categoria: payload.categoria,
+      categoria: categoriaFinal,
       descricao: payload.descricao,
       km_registro: payload.km_registrada,
       receipt_image_url: receiptPath,
@@ -745,19 +774,11 @@ function VehicleStatusSection({
       onKmChange(payload.km_registrada);
     }
 
-    // 4) Atualiza última troca → reseta o semáforo (mock local)
-    setOverrides((prev) => ({
-      ...prev,
-      [vehicleId]: {
-        ...(prev[vehicleId] || {}),
-        [key]: {
-          ultima_troca_km: payload.km_registrada,
-          ultima_troca_data: payload.data_servico,
-        },
-      },
-    }));
+    // 4) Notifica o pai para atualizar o estado do veículo (km_ultima_troca_*)
+    //    — a trigger no banco já persistiu o valor; aqui só refletimos na UI.
+    onMaintenanceSaved(key, payload.km_registrada);
 
-    // 5) Injeta a despesa no histórico do item (mock — UI imediata no painel)
+    // 5) Injeta a despesa no histórico do item — UI imediata no painel.
     setExpenses((prev) => {
       const veh = prev[vehicleId] || {};
       const list = veh[key] || [];

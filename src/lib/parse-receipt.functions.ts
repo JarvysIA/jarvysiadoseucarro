@@ -22,7 +22,11 @@ export type DespesaCategoria =
   | "IPVA"
   | "Multas"
   | "Seguro"
-  | "Acessórios";
+  | "Acessórios"
+  | "Óleo"
+  | "Filtros"
+  | "Pastilhas"
+  | "Arrefecimento";
 
 export const DESPESA_CATEGORIAS: DespesaCategoria[] = [
   "Revisão",
@@ -33,6 +37,10 @@ export const DESPESA_CATEGORIAS: DespesaCategoria[] = [
   "Multas",
   "Seguro",
   "Acessórios",
+  "Óleo",
+  "Filtros",
+  "Pastilhas",
+  "Arrefecimento",
 ];
 
 export type ParsedReceipt = {
