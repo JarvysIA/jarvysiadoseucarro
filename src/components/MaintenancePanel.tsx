@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { ScannerSourceSheet } from "@/components/ScannerSourceSheet";
 import {
   Sparkles,
   History,
