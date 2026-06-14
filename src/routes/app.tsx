@@ -141,6 +141,10 @@ function AppPage() {
       km: v.km_atual ?? 0,
       chassi: v.chassi,
       fotoUrl: v.foto_url ?? null,
+      kmUltimaTrocaOleo: null,
+      kmUltimaTrocaFiltros: null,
+      kmUltimaTrocaPastilhas: null,
+      kmUltimaTrocaArrefecimento: null,
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
