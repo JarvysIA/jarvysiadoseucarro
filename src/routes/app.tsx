@@ -173,7 +173,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento")
           .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: true }),
@@ -195,6 +195,10 @@ function AppPage() {
           km: v.km_atual ?? 0,
           chassi: (v.chassi || "").trim(),
           fotoUrl: v.foto_url || null,
+          kmUltimaTrocaOleo: v.km_ultima_troca_oleo,
+          kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
+          kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
+          kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
         };
       });
       setVehicles(mapped);
