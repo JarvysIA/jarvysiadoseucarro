@@ -359,7 +359,7 @@ function AppPage() {
                       active ? "glow-neon border-primary/40" : "border-border opacity-70"
                     }`}
                   >
-                    <div className="relative w-full h-56 md:w-[45%] md:h-full bg-transparent flex-shrink-0">
+                    <div className="relative w-full h-56 md:w-[45%] md:h-full overflow-hidden bg-card md:bg-transparent flex-shrink-0">
                       <VehicleImage
                         vehicleId={v.id}
                         cachedUrl={v.fotoUrl}
