@@ -1045,7 +1045,7 @@ function VehicleImage({
           loading="lazy"
           onLoad={() => setState("loaded")}
           onError={() => setState("fallback")}
-          className={`relative z-[1] h-full w-full object-contain p-4 mix-blend-lighten transition-opacity duration-500 ${
+          className={`relative z-[1] w-full h-full object-cover md:object-contain p-0 md:p-4 mix-blend-lighten transition-opacity duration-500 ${
             state === "loaded" ? "opacity-100" : "opacity-0"
           }`}
         />
