@@ -79,6 +79,10 @@ type DbVehicle = {
   km_atual: number | null;
   chassi: string | null;
   foto_url: string | null;
+  km_ultima_troca_oleo: number | null;
+  km_ultima_troca_filtros: number | null;
+  km_ultima_troca_pastilhas: number | null;
+  km_ultima_troca_arrefecimento: number | null;
 };
 
 type UserVehicle = {
@@ -91,6 +95,10 @@ type UserVehicle = {
   km: number;
   chassi: string;
   fotoUrl: string | null;
+  kmUltimaTrocaOleo: number | null;
+  kmUltimaTrocaFiltros: number | null;
+  kmUltimaTrocaPastilhas: number | null;
+  kmUltimaTrocaArrefecimento: number | null;
 };
 
 // Cache em memória para renderização instantânea ao voltar para a Home
