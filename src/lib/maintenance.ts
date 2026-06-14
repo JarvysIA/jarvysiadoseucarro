@@ -55,25 +55,73 @@ function seedFromString(s: string): number {
 }
 
 /**
- * Gera itens de manutenção mockados para um veículo, de forma determinística
- * (mesmo vehicleId = mesmos valores), para o usuário poder testar alterando a KM.
+ * Overrides reais vindos do banco (tabela `veiculos`) — quando presentes,
+ * substituem o valor mockado de "última troca" do item correspondente.
+ * O campo é o KM da última troca (a trigger `atualizar_revisao_veiculo`
+ * mantém essas colunas em dia a cada nova despesa registrada).
+ */
+export type VehicleMaintOverrides = {
+  km_ultima_troca_oleo?: number | null;
+  km_ultima_troca_filtros?: number | null;
+  km_ultima_troca_pastilhas?: number | null;
+  km_ultima_troca_arrefecimento?: number | null;
+};
+
+const OVERRIDE_KEY_MAP: Partial<Record<MaintItemKey, keyof VehicleMaintOverrides>> = {
+  oleo: "km_ultima_troca_oleo",
+  filtros: "km_ultima_troca_filtros",
+  pastilhas: "km_ultima_troca_pastilhas",
+  arrefecimento: "km_ultima_troca_arrefecimento",
+};
+
+/** Mapeia uma chave de item ao nome de categoria usado nas despesas. */
+export const ITEM_TO_CATEGORIA: Partial<Record<MaintItemKey, string>> = {
+  oleo: "Óleo",
+  filtros: "Filtros",
+  pastilhas: "Pastilhas",
+  arrefecimento: "Arrefecimento",
+};
+
+/**
+ * Gera itens de manutenção para um veículo.
+ * - Quando há `overrides` reais (colunas km_ultima_troca_* da tabela veiculos),
+ *   usa esses valores como "última troca".
+ * - Caso contrário, mantém o mock determinístico para que o usuário ainda
+ *   tenha algo na tela enquanto não há histórico de despesas.
  */
 export function buildMaintenanceItems(
   vehicleId: string,
   kmAtual: number,
+  overrides?: VehicleMaintOverrides,
 ): MaintItem[] {
   const keys = Object.keys(ITEM_DEFAULTS) as MaintItemKey[];
   return keys.map((key, idx) => {
     const def = ITEM_DEFAULTS[key];
+    const overrideKey = OVERRIDE_KEY_MAP[key];
+    const overrideKm =
+      overrideKey && overrides ? overrides[overrideKey] : null;
+
+    if (overrideKm != null && Number.isFinite(overrideKm)) {
+      // Dado real do banco — usa KM da última troca registrada.
+      // Sem data real disponível, marcamos a troca como "hoje" para que
+      // a dimensão "tempo" não acuse atraso indevido (km dirige o status).
+      return {
+        key,
+        nome: def.nome,
+        ultima_troca_km: Math.max(0, overrideKm),
+        validade_km: def.validade_km,
+        ultima_troca_data: new Date().toISOString(),
+        validade_meses: def.validade_meses,
+      };
+    }
+
+    // Fallback determinístico (mock) — somente quando ainda não há registro real.
     const seed = seedFromString(`${vehicleId}:${key}`);
-    // Distribui "última troca" entre 30% e 110% da validade — gera mix de cores.
     const used = Math.round(def.validade_km * (0.3 + seed * 0.85));
     const ultima_troca_km = Math.max(0, kmAtual - used);
-    // Espalha datas de troca entre 1 e validade_meses + 20%
     const monthsAgo = 1 + Math.floor(seed * (def.validade_meses * 1.1));
     const d = new Date();
     d.setMonth(d.getMonth() - monthsAgo);
-    // Pequeno offset por idx para evitar colisões idênticas
     d.setDate(d.getDate() - idx);
     return {
       key,
