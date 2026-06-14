@@ -747,13 +747,19 @@ function VehicleStatusSection({
       receiptPath = await uploadReceiptImage(userId, vehicleId, payload.file);
     }
 
+    // Sobrescreve a categoria de acordo com o item selecionado para que a
+    // trigger `atualizar_revisao_veiculo` no banco consiga identificar e
+    // atualizar a coluna km_ultima_troca_* correspondente.
+    const categoriaFinal =
+      (ITEM_TO_CATEGORIA[key] as typeof payload.categoria | undefined) ?? payload.categoria;
+
     // 2) Insere a despesa no banco
     const { error: insErr } = await supabase.from("despesas").insert({
       user_id: userId,
       vehicle_id: vehicleId,
       data: payload.data_servico,
       valor: payload.valor_total,
-      categoria: payload.categoria,
+      categoria: categoriaFinal,
       descricao: payload.descricao,
       km_registro: payload.km_registrada,
       receipt_image_url: receiptPath,
@@ -772,19 +778,11 @@ function VehicleStatusSection({
       onKmChange(payload.km_registrada);
     }
 
-    // 4) Atualiza última troca → reseta o semáforo (mock local)
-    setOverrides((prev) => ({
-      ...prev,
-      [vehicleId]: {
-        ...(prev[vehicleId] || {}),
-        [key]: {
-          ultima_troca_km: payload.km_registrada,
-          ultima_troca_data: payload.data_servico,
-        },
-      },
-    }));
+    // 4) Notifica o pai para atualizar o estado do veículo (km_ultima_troca_*)
+    //    — a trigger no banco já persistiu o valor; aqui só refletimos na UI.
+    onMaintenanceSaved(key, payload.km_registrada);
 
-    // 5) Injeta a despesa no histórico do item (mock — UI imediata no painel)
+    // 5) Injeta a despesa no histórico do item — UI imediata no painel.
     setExpenses((prev) => {
       const veh = prev[vehicleId] || {};
       const list = veh[key] || [];
