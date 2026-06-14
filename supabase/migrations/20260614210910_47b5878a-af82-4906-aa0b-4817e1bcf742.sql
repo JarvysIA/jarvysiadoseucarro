@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.atualizar_revisao_veiculo() FROM PUBLIC, anon, authenticated;
