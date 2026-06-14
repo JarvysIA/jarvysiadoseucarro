@@ -23,9 +23,11 @@ import {
   buildMaintenanceItems,
   computeStatus,
   formatRemainingKm,
+  ITEM_TO_CATEGORIA,
   STATUS_LABEL_PT,
   type MaintItemKey,
   type MaintStatus,
+  type VehicleMaintOverrides,
 } from "@/lib/maintenance";
 import { getActiveVehicleId, setActiveVehicleId } from "@/lib/active-vehicle";
 import type { ProfileStatus } from "@/lib/profile-status";
