@@ -100,7 +100,7 @@ export function MaintenancePanel({
     }
   }, [open, computed?.item.key]);
 
-  const triggerUpload = () => inputRef.current?.click();
+  const triggerUpload = () => setSourceOpen(true);
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
