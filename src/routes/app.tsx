@@ -462,9 +462,27 @@ function AppPage() {
           placa={selected.plate}
           ano={selected.year}
           kmAtual={selected.km}
+          overrides={{
+            km_ultima_troca_oleo: selected.kmUltimaTrocaOleo,
+            km_ultima_troca_filtros: selected.kmUltimaTrocaFiltros,
+            km_ultima_troca_pastilhas: selected.kmUltimaTrocaPastilhas,
+            km_ultima_troca_arrefecimento: selected.kmUltimaTrocaArrefecimento,
+          }}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
+            )
+          }
+          onMaintenanceSaved={(key, kmRegistrada) =>
+            setVehicles((prev) =>
+              prev.map((x) => {
+                if (x.id !== selected.id) return x;
+                if (key === "oleo") return { ...x, kmUltimaTrocaOleo: kmRegistrada };
+                if (key === "filtros") return { ...x, kmUltimaTrocaFiltros: kmRegistrada };
+                if (key === "pastilhas") return { ...x, kmUltimaTrocaPastilhas: kmRegistrada };
+                if (key === "arrefecimento") return { ...x, kmUltimaTrocaArrefecimento: kmRegistrada };
+                return x;
+              }),
             )
           }
           onDeleted={() => {
