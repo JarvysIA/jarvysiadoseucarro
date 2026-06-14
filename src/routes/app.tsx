@@ -664,43 +664,34 @@ function VehicleStatusSection({
   placa,
   ano,
   kmAtual,
+  overrides: dbOverrides,
   onKmChange,
+  onMaintenanceSaved,
   onDeleted,
 }: {
   vehicleId: string;
   placa: string;
   ano: string;
   kmAtual: number;
+  overrides: VehicleMaintOverrides;
   onKmChange: (km: number) => void;
+  onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
   onDeleted: () => void;
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  // Overrides e despesas por veículo + item (mock — preparado para virar tabela depois)
-  const [overrides, setOverrides] = useState<
-    Record<string, Partial<Record<MaintItemKey, ItemOverride>>>
-  >({});
+  // Histórico de despesas por veículo + item — preenchido após salvar.
   const [expenses, setExpenses] = useState<
     Record<string, Partial<Record<MaintItemKey, MaintExpense[]>>>
   >({});
 
-  // Itens base determinísticos por vehicleId
-  const baseItems = useMemo(
-    () => buildMaintenanceItems(vehicleId, kmAtual),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vehicleId],
+  // Itens reais — consomem as colunas km_ultima_troca_* da tabela veiculos.
+  const items = useMemo(
+    () => buildMaintenanceItems(vehicleId, kmAtual, dbOverrides),
+    [vehicleId, kmAtual, dbOverrides],
   );
-
-  // Aplica overrides de IA (última troca atualizada via nota fiscal)
-  const items = useMemo(() => {
-    const ov = overrides[vehicleId] || {};
-    return baseItems.map((it) => {
-      const o = ov[it.key];
-      return o ? { ...it, ultima_troca_km: o.ultima_troca_km, ultima_troca_data: o.ultima_troca_data } : it;
-    });
-  }, [baseItems, overrides, vehicleId]);
 
   const computed = useMemo(
     () => items.map((it) => computeStatus(it, kmAtual)),
