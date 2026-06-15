@@ -55,8 +55,8 @@ type ItemDef = {
 };
 
 const ITEMS: ItemDef[] = [
-  { key: "oleo", label: "Óleo do Motor", icon: (p) => <Droplet className={p.className} /> },
-  { key: "filtros", label: "Filtros", icon: (p) => <AirFilterIcon className={p.className} /> },
+  { key: "oleo", label: "Óleo e Filtro do Motor", icon: (p) => <Droplet className={p.className} /> },
+  { key: "filtros", label: "Filtros (Ar/Cabine/Combustível)", icon: (p) => <AirFilterIcon className={p.className} /> },
   { key: "pastilhas", label: "Pastilhas", icon: (p) => <BrakeDiscIcon className={p.className} /> },
   { key: "arrefecimento", label: "Arrefecimento", icon: (p) => <Thermometer className={p.className} /> },
 ];
