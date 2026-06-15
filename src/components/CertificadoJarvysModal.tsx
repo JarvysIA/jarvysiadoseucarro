@@ -458,7 +458,7 @@ export function CertificadoJarvysModal({
                               style={{ backgroundColor: CATEGORIA_COLOR[r.categoria] }}
                             />
                             {new Date(r.data).toLocaleDateString("pt-BR")} ·{" "}
-                            {r.descricao || r.categoria}
+                            {formatItemName(r.descricao) || r.categoria}
                           </span>
                           <span className="ml-2 shrink-0 font-semibold text-foreground">
                             {formatBRL(Number(r.valor))}
