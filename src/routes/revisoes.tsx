@@ -391,7 +391,7 @@ function RevisoesPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="text-left">
-                  {openDespesa.descricao || openDespesa.categoria}
+                  {formatItemName(openDespesa.descricao) || openDespesa.categoria}
                 </DialogTitle>
                 <DialogDescription className="text-left">
                   Conferência do "papel original" — dados extraídos e imagem da nota.
