@@ -55,8 +55,8 @@ type ItemDef = {
 };
 
 const ITEMS: ItemDef[] = [
-  { key: "oleo", label: "Óleo do Motor", icon: (p) => <Droplet className={p.className} /> },
-  { key: "filtros", label: "Filtros", icon: (p) => <AirFilterIcon className={p.className} /> },
+  { key: "oleo", label: "Óleo e Filtro do Motor", icon: (p) => <Droplet className={p.className} /> },
+  { key: "filtros", label: "Filtros (Ar/Cabine/Combustível)", icon: (p) => <AirFilterIcon className={p.className} /> },
   { key: "pastilhas", label: "Pastilhas", icon: (p) => <BrakeDiscIcon className={p.className} /> },
   { key: "arrefecimento", label: "Arrefecimento", icon: (p) => <Thermometer className={p.className} /> },
 ];
@@ -882,7 +882,7 @@ function VehicleStatusSection({
                     aria-label={STATUS_LABEL_PT[data.status]}
                   />
                 </div>
-                <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
+                <p className="mt-4 text-[12px] font-medium leading-tight text-foreground min-h-[28px]">{it.label}</p>
                 <p
                   className="mt-1 text-[11px]"
                   style={{ color: `var(--status-${data.status})` }}

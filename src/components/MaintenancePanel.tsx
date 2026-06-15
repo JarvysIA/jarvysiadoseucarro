@@ -23,6 +23,7 @@ import {
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
 import { CATEGORIA_COLOR } from "@/lib/despesas";
+import { formatItemName } from "@/lib/format-item-name";
 import { toast } from "sonner";
 
 export type MaintExpense = {
@@ -304,7 +305,7 @@ export function MaintenancePanel({
                           <Receipt className="h-4 w-4 text-primary" />
                           <div>
                             <p className="text-xs font-medium text-foreground">
-                              {e.descricao}
+                              {formatItemName(e.descricao)}
                             </p>
                             <p className="text-[10px] text-muted-foreground">
                               {new Date(e.data_servico).toLocaleDateString("pt-BR")}
@@ -536,7 +537,7 @@ function ConfirmForm({
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium text-foreground">
-                    {it.descricao}
+                    {formatItemName(it.descricao)}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {CATEGORY_LABEL[it.categoria]}

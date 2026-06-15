@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { Award, Download, Loader2, ShieldCheck } from "lucide-react";
 import jarvysLogoUrl from "@/assets/jarvys-logo.png";
 import { toast } from "sonner";
+import { formatItemName } from "@/lib/format-item-name";
 import {
   Dialog,
   DialogContent,
@@ -284,7 +285,7 @@ export function CertificadoJarvysModal({
           const valor = `R$ ${Number(r.valor).toLocaleString("pt-BR", {
             minimumFractionDigits: 2,
           })}`;
-          const titulo = r.descricao || r.categoria;
+          const titulo = formatItemName(r.descricao) || r.categoria;
 
           // Bullet
           doc.setFillColor(...NEON);
@@ -457,7 +458,7 @@ export function CertificadoJarvysModal({
                               style={{ backgroundColor: CATEGORIA_COLOR[r.categoria] }}
                             />
                             {new Date(r.data).toLocaleDateString("pt-BR")} ·{" "}
-                            {r.descricao || r.categoria}
+                            {formatItemName(r.descricao) || r.categoria}
                           </span>
                           <span className="ml-2 shrink-0 font-semibold text-foreground">
                             {formatBRL(Number(r.valor))}

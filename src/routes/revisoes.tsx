@@ -23,6 +23,7 @@ import {
   type Despesa,
 } from "@/lib/despesas";
 import { getRevendaHistoryFn, type RevendaItem } from "@/lib/vehicles.functions";
+import { formatItemName } from "@/lib/format-item-name";
 
 export const Route = createFileRoute("/revisoes")({
   head: () => ({ meta: [{ title: "Revisões — Jarvys" }] }),
@@ -318,7 +319,7 @@ function RevisoesPage() {
                                   )}
                                 </div>
                                 <p className="mt-2 truncate text-sm font-semibold text-foreground">
-                                  {d.descricao || d.categoria}
+                                  {formatItemName(d.descricao) || d.categoria}
                                 </p>
                                 <p className="mt-1 text-[11px] text-muted-foreground">
                                   {new Date(d.data).toLocaleDateString("pt-BR", {
@@ -390,7 +391,7 @@ function RevisoesPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="text-left">
-                  {openDespesa.descricao || openDespesa.categoria}
+                  {formatItemName(openDespesa.descricao) || openDespesa.categoria}
                 </DialogTitle>
                 <DialogDescription className="text-left">
                   Conferência do "papel original" — dados extraídos e imagem da nota.

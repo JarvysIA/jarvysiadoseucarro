@@ -8,6 +8,7 @@ import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseMod
 import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
+import { formatItemName } from "@/lib/format-item-name";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
@@ -311,7 +312,7 @@ function DespesasPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {d.descricao || d.categoria}
+                      {formatItemName(d.descricao) || d.categoria}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {new Date(d.data).toLocaleDateString("pt-BR")} ·{" "}
