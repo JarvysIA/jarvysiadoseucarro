@@ -312,7 +312,7 @@ function DespesasPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {d.descricao || d.categoria}
+                      {formatItemName(d.descricao) || d.categoria}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       {new Date(d.data).toLocaleDateString("pt-BR")} ·{" "}
