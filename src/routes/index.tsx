@@ -516,7 +516,7 @@ function DashboardMock() {
         {/* status cards */}
         <div className="mt-4 grid grid-cols-3 gap-2">
           <StatusCard label="Óleo" status="ok" sub="4.200 km" />
-          <StatusCard label="Filtros" status="warn" sub="1.500 km" />
+          <StatusCard label="Filtros (Ar/Cabine/Combustível)" status="warn" sub="1.500 km" />
           <StatusCard label="Pastilhas" status="bad" sub="-300 km" />
         </div>
 
