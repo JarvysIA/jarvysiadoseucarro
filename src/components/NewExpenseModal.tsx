@@ -136,7 +136,6 @@ export function NewExpenseModal({
       return;
     }
     setSaving(true);
-    setSaving(true);
     try {
       const descricaoBase = descricao.trim() || categoria;
       const descricaoFinal = await classifyDescricao(descricaoBase);
