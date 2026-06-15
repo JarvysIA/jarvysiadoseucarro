@@ -285,7 +285,7 @@ export function CertificadoJarvysModal({
           const valor = `R$ ${Number(r.valor).toLocaleString("pt-BR", {
             minimumFractionDigits: 2,
           })}`;
-          const titulo = r.descricao || r.categoria;
+          const titulo = formatItemName(r.descricao) || r.categoria;
 
           // Bullet
           doc.setFillColor(...NEON);
