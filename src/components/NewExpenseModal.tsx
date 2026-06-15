@@ -136,17 +136,6 @@ export function NewExpenseModal({
       return;
     }
     setSaving(true);
-    try {
-      if (isEdit && editing) {
-        const { error: upErr } = await supabase
-          .from("despesas")
-          .update({
-            data: new Date(data).toISOString(),
-            valor: valorNum,
-            categoria,
-            descricao: descricao.trim() || categoria,
-            km_registro: kmNum,
-          })
     setSaving(true);
     try {
       const descricaoBase = descricao.trim() || categoria;
