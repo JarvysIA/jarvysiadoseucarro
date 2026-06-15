@@ -882,7 +882,7 @@ function VehicleStatusSection({
                     aria-label={STATUS_LABEL_PT[data.status]}
                   />
                 </div>
-                <p className="mt-4 text-sm font-medium text-foreground">{it.label}</p>
+                <p className="mt-4 text-[12px] font-medium leading-tight text-foreground min-h-[28px]">{it.label}</p>
                 <p
                   className="mt-1 text-[11px]"
                   style={{ color: `var(--status-${data.status})` }}
