@@ -23,6 +23,7 @@ import {
   type Despesa,
 } from "@/lib/despesas";
 import { getRevendaHistoryFn, type RevendaItem } from "@/lib/vehicles.functions";
+import { formatItemName } from "@/lib/format-item-name";
 
 export const Route = createFileRoute("/revisoes")({
   head: () => ({ meta: [{ title: "Revisões — Jarvys" }] }),
