@@ -319,7 +319,7 @@ function RevisoesPage() {
                                   )}
                                 </div>
                                 <p className="mt-2 truncate text-sm font-semibold text-foreground">
-                                  {d.descricao || d.categoria}
+                                  {formatItemName(d.descricao) || d.categoria}
                                 </p>
                                 <p className="mt-1 text-[11px] text-muted-foreground">
                                   {new Date(d.data).toLocaleDateString("pt-BR", {
