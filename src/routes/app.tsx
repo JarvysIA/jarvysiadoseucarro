@@ -699,8 +699,62 @@ function VehicleStatusSection({
   const openComputed = openItemKey
     ? computed.find((c) => c.item.key === openItemKey) ?? null
     : null;
+
+  // Histórico real do banco para o item aberto — filtra pela tag estrutural
+  // injetada na descrição da despesa (compatível com a Trigger do Supabase).
+  const [remoteExpenses, setRemoteExpenses] = useState<MaintExpense[]>([]);
+  useEffect(() => {
+    if (!openItemKey || !vehicleId) {
+      setRemoteExpenses([]);
+      return;
+    }
+    const TAG_BY_KEY: Partial<Record<MaintItemKey, string>> = {
+      oleo: "[oleo]",
+      filtros: "[filtro]",
+      pastilhas: "[pastilha]",
+      arrefecimento: "[arrefecimento]",
+    };
+    const tag = TAG_BY_KEY[openItemKey];
+    if (!tag) {
+      setRemoteExpenses([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("despesas")
+        .select("id, data, valor, descricao")
+        .eq("vehicle_id", vehicleId)
+        .ilike("descricao", `%${tag}%`)
+        .order("data", { ascending: false });
+      if (cancelled) return;
+      if (error) {
+        console.error("[maint history]", error);
+        setRemoteExpenses([]);
+        return;
+      }
+      setRemoteExpenses(
+        (data ?? []).map((d) => ({
+          id: String(d.id),
+          data_servico: d.data as string,
+          valor_total: Number(d.valor) || 0,
+          descricao: (d.descricao as string) ?? "",
+        })),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [openItemKey, vehicleId, expenses]);
+
   const openExpenses = openItemKey
-    ? expenses[vehicleId]?.[openItemKey] ?? []
+    ? [
+        ...(expenses[vehicleId]?.[openItemKey] ?? []),
+        ...remoteExpenses,
+      ].filter(
+        // dedup por id
+        (e, i, arr) => arr.findIndex((x) => x.id === e.id) === i,
+      )
     : [];
 
   const saveKm = async () => {
