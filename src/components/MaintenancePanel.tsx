@@ -305,7 +305,7 @@ export function MaintenancePanel({
                           <Receipt className="h-4 w-4 text-primary" />
                           <div>
                             <p className="text-xs font-medium text-foreground">
-                              {e.descricao}
+                              {formatItemName(e.descricao)}
                             </p>
                             <p className="text-[10px] text-muted-foreground">
                               {new Date(e.data_servico).toLocaleDateString("pt-BR")}
