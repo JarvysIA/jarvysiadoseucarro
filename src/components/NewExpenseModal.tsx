@@ -16,6 +16,19 @@ import {
   type Despesa,
   type DespesaCategoria,
 } from "@/lib/despesas";
+import { classifyExpenseTextFn } from "@/lib/classify-expense-text.functions";
+
+async function classifyDescricao(raw: string): Promise<string> {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  try {
+    const res = await classifyExpenseTextFn({ data: { text: trimmed } });
+    return (res as { text?: string }).text || trimmed;
+  } catch (e) {
+    console.warn("[classifyDescricao] fallback", e);
+    return trimmed;
+  }
+}
 
 export type ExpensePrefill = {
   valor?: number;
