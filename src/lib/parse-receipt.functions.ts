@@ -54,20 +54,20 @@ REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 7 op
 - "Multas": infração de trânsito, auto de infração, notificação de penalidade (Detran, prefeitura, PRF, radar).
 - "Seguro": apólice de seguro auto, parcela/boleto de seguradora (Porto, Bradesco, Allianz, Azul, HDI, etc.), assistência 24h, seguro de vidros.
 
-RECONHECIMENTO DE MARCAS E CONTEXTO AUTOMOTIVO BRASILEIRO:
-Ao gerar a descrição, você DEVE OBRIGATORIAMENTE incluir as seguintes palavras-chave mestres se identificar os itens:
+REGRA DE CLASSIFICAÇÃO E FORMATAÇÃO OBRIGATÓRIA:
+Você é um mecânico chefe validando notas fiscais. Ao preencher a descrição dos itens, você NÃO DEVE apenas transcrever o que está no papel. Você DEVE OBRIGATORIAMENTE classificar o item anexando a palavra-chave mestre entre colchetes ao final do nome, seguindo esta regra estrita:
 
-- Óleo: Se identificar qualquer viscosidade (0w20, 5w30, etc.), jargão (sintético, mineral) ou QUALQUER MARCAS de lubrificantes (ex: Selenia, Castrol, Motul, Petronas, Mobil, Elaion, Havoline) -> Sempre escreva a palavra-chave 'óleo'.
+Itens de lubrificante, viscosidades ou marcas (Motul, Selenia, Castrol, etc) -> Adicione [óleo]. Ex: '4x Motul 5w30 [óleo]'
 
-- Filtros: Se identificar elementos filtrantes, ar condicionado, ou QUALQUER MARCAS de filtros (ex: Tecfil, Mann, Fram, Wega, Mahle) -> Sempre escreva a palavra-chave 'filtro'.
+Itens de filtragem, ar condicionado ou marcas (Tecfil, Mann, Fram, etc) -> Adicione [filtro]. Ex: '1x Filtro Tecfil [filtro]'
 
-- Pastilhas: Se identificar itens de fricção, fluido DOT, ou QUALQUER MARCAS de freio (ex: Cobreq, Fras-le, Nakata, TRW, Bosch) -> Sempre escreva a palavra-chave 'pastilha'.
+Itens de freio, fluido DOT ou marcas (Cobreq, Nakata, Fras-le, TRW, etc) -> Adicione [pastilha]. Ex: '1x Cobreq N9313 [pastilha]'
 
-- Arrefecimento: Se identificar fluido rosa/verde, água desmineralizada, ou MARCAS de aditivos/radiador (ex: Paraflu, Radiex, Koube, Tirreno, Valeo, Wurth) -> Sempre escreva a palavra-chave 'arrefecimento'.
+Itens de radiador, aditivos, água ou marcas (Paraflu, Radiex, Koube, etc) -> Adicione [arrefecimento]. Ex: '6x Paraflu [arrefecimento]'
+
+Regra Absoluta: Se o item pertence a uma dessas 4 famílias, o texto da descrição final no JSON DEVE conter a palavra-chave correspondente entre colchetes. Isso é vital para o sistema de gatilhos do banco de dados.
 
 Regra de Falha (Fallback): Se a imagem estiver completamente ilegível, não invente dados. Preencha a descrição com 'Documento ilegível, por favor preencha manualmente'.
-
-Regra de Ouro: Se a nota disser apenas '2x Paraflu', reconheça como aditivo e retorne 'arrefecimento'. Cruze os dados do que está escrito com as nossas 4 caixas principais.
 
 Retorne EXATAMENTE e APENAS um objeto JSON neste formato, sem markdown:
 { "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível|IPVA|Multas|Seguro", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
