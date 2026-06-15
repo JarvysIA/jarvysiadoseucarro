@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { Award, Download, Loader2, ShieldCheck } from "lucide-react";
 import jarvysLogoUrl from "@/assets/jarvys-logo.png";
 import { toast } from "sonner";
+import { formatItemName } from "@/lib/format-item-name";
 import {
   Dialog,
   DialogContent,
