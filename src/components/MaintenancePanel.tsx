@@ -662,7 +662,7 @@ function ManualForm({
   // Atalho via Card de Status → categoria fixa em "Revisão".
   const categoria: DespesaCategoria = "Revisão";
 
-  const submit = () => {
+  const submit = async () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!Number.isFinite(kmNum) || kmNum < 0) {
@@ -683,11 +683,14 @@ function ManualForm({
       );
       return;
     }
+    // Interceptor IA: classifica antes de salvar
+    const descricaoBase = descricao.trim() || `Serviço — ${itemName}`;
+    const descricaoFinal = await classifyText(descricaoBase);
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
       valor_total: valorNum,
-      descricao: descricao.trim() || `Serviço — ${itemName}`,
+      descricao: descricaoFinal,
       categoria,
     });
   };
