@@ -537,7 +537,7 @@ function ConfirmForm({
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-medium text-foreground">
-                    {it.descricao}
+                    {formatItemName(it.descricao)}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
                     {CATEGORY_LABEL[it.categoria]}
