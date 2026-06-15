@@ -23,6 +23,7 @@ import {
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
 import { CATEGORIA_COLOR } from "@/lib/despesas";
+import { formatItemName } from "@/lib/format-item-name";
 import { toast } from "sonner";
 
 export type MaintExpense = {
