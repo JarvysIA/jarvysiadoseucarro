@@ -8,6 +8,7 @@ import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseMod
 import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
+import { formatItemName } from "@/lib/format-item-name";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
