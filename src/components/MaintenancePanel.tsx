@@ -451,7 +451,7 @@ function ConfirmForm({
   // Atalho via Card de Status → categoria fixa em "Revisão".
   const categoria: DespesaCategoria = "Revisão";
 
-  const submit = () => {
+  const submit = async () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!Number.isFinite(kmNum) || kmNum < 0) {
@@ -473,10 +473,15 @@ function ConfirmForm({
       );
       return;
     }
-    const descricao =
+    // Interceptor IA: classifica cada item antes de salvar
+    const classifiedItens =
       itens.length > 0
-        ? itens.map((i) => i.descricao).slice(0, 2).join(" + ")
-        : `Serviço — ${itemName}`;
+        ? await Promise.all(itens.map(async (i) => await classifyText(i.descricao)))
+        : [];
+    const descricao =
+      classifiedItens.length > 0
+        ? classifiedItens.slice(0, 2).join(" + ")
+        : await classifyText(`Serviço — ${itemName}`);
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
