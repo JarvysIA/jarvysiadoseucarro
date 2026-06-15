@@ -16,6 +16,19 @@ import {
   type Despesa,
   type DespesaCategoria,
 } from "@/lib/despesas";
+import { classifyExpenseTextFn } from "@/lib/classify-expense-text.functions";
+
+async function classifyDescricao(raw: string): Promise<string> {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  try {
+    const res = await classifyExpenseTextFn({ data: { text: trimmed } });
+    return (res as { text?: string }).text || trimmed;
+  } catch (e) {
+    console.warn("[classifyDescricao] fallback", e);
+    return trimmed;
+  }
+}
 
 export type ExpensePrefill = {
   valor?: number;
@@ -124,6 +137,9 @@ export function NewExpenseModal({
     }
     setSaving(true);
     try {
+      const descricaoBase = descricao.trim() || categoria;
+      const descricaoFinal = await classifyDescricao(descricaoBase);
+
       if (isEdit && editing) {
         const { error: upErr } = await supabase
           .from("despesas")
@@ -131,7 +147,7 @@ export function NewExpenseModal({
             data: new Date(data).toISOString(),
             valor: valorNum,
             categoria,
-            descricao: descricao.trim() || categoria,
+            descricao: descricaoFinal,
             km_registro: kmNum,
           })
           .eq("id", editing.id);
@@ -165,7 +181,7 @@ export function NewExpenseModal({
         data: new Date(data).toISOString(),
         valor: valorNum,
         categoria,
-        descricao: descricao.trim() || categoria,
+        descricao: descricaoFinal,
         km_registro: kmNum,
         receipt_image_url: receiptPath,
       });

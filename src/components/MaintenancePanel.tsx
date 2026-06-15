@@ -22,9 +22,22 @@ import {
   type MaintComputed,
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
+import { classifyExpenseTextFn } from "@/lib/classify-expense-text.functions";
 import { CATEGORIA_COLOR } from "@/lib/despesas";
 import { formatItemName } from "@/lib/format-item-name";
 import { toast } from "sonner";
+
+async function classifyText(raw: string): Promise<string> {
+  const t = raw.trim();
+  if (!t) return t;
+  try {
+    const res = await classifyExpenseTextFn({ data: { text: t } });
+    return (res as { text?: string }).text || t;
+  } catch (e) {
+    console.warn("[classifyText] fallback", e);
+    return t;
+  }
+}
 
 export type MaintExpense = {
   id: string;
@@ -438,7 +451,7 @@ function ConfirmForm({
   // Atalho via Card de Status → categoria fixa em "Revisão".
   const categoria: DespesaCategoria = "Revisão";
 
-  const submit = () => {
+  const submit = async () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!Number.isFinite(kmNum) || kmNum < 0) {
@@ -460,10 +473,15 @@ function ConfirmForm({
       );
       return;
     }
-    const descricao =
+    // Interceptor IA: classifica cada item antes de salvar
+    const classifiedItens =
       itens.length > 0
-        ? itens.map((i) => i.descricao).slice(0, 2).join(" + ")
-        : `Serviço — ${itemName}`;
+        ? await Promise.all(itens.map(async (i) => await classifyText(i.descricao)))
+        : [];
+    const descricao =
+      classifiedItens.length > 0
+        ? classifiedItens.slice(0, 2).join(" + ")
+        : await classifyText(`Serviço — ${itemName}`);
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
@@ -644,7 +662,7 @@ function ManualForm({
   // Atalho via Card de Status → categoria fixa em "Revisão".
   const categoria: DespesaCategoria = "Revisão";
 
-  const submit = () => {
+  const submit = async () => {
     const kmNum = parseInt(km.replace(/\D/g, ""), 10);
     const valorNum = parseFloat(valor.replace(",", "."));
     if (!Number.isFinite(kmNum) || kmNum < 0) {
@@ -665,11 +683,14 @@ function ManualForm({
       );
       return;
     }
+    // Interceptor IA: classifica antes de salvar
+    const descricaoBase = descricao.trim() || `Serviço — ${itemName}`;
+    const descricaoFinal = await classifyText(descricaoBase);
     onConfirm({
       data_servico: new Date(data).toISOString(),
       km_registrada: kmNum,
       valor_total: valorNum,
-      descricao: descricao.trim() || `Serviço — ${itemName}`,
+      descricao: descricaoFinal,
       categoria,
     });
   };
