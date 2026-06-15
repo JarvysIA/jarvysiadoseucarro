@@ -147,6 +147,21 @@ export function NewExpenseModal({
             descricao: descricao.trim() || categoria,
             km_registro: kmNum,
           })
+    setSaving(true);
+    try {
+      const descricaoBase = descricao.trim() || categoria;
+      const descricaoFinal = await classifyDescricao(descricaoBase);
+
+      if (isEdit && editing) {
+        const { error: upErr } = await supabase
+          .from("despesas")
+          .update({
+            data: new Date(data).toISOString(),
+            valor: valorNum,
+            categoria,
+            descricao: descricaoFinal,
+            km_registro: kmNum,
+          })
           .eq("id", editing.id);
         if (upErr) throw upErr;
         if (kmNum != null && kmNum > kmAtualVeiculo && editing.vehicle_id) {
@@ -178,7 +193,7 @@ export function NewExpenseModal({
         data: new Date(data).toISOString(),
         valor: valorNum,
         categoria,
-        descricao: descricao.trim() || categoria,
+        descricao: descricaoFinal,
         km_registro: kmNum,
         receipt_image_url: receiptPath,
       });
