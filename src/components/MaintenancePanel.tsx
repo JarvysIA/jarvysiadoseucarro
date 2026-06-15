@@ -22,9 +22,22 @@ import {
   type MaintComputed,
 } from "@/lib/maintenance";
 import { parseReceiptFn, type ParsedReceipt, type ReceiptCategory, type DespesaCategoria } from "@/lib/parse-receipt.functions";
+import { classifyExpenseTextFn } from "@/lib/classify-expense-text.functions";
 import { CATEGORIA_COLOR } from "@/lib/despesas";
 import { formatItemName } from "@/lib/format-item-name";
 import { toast } from "sonner";
+
+async function classifyText(raw: string): Promise<string> {
+  const t = raw.trim();
+  if (!t) return t;
+  try {
+    const res = await classifyExpenseTextFn({ data: { text: t } });
+    return (res as { text?: string }).text || t;
+  } catch (e) {
+    console.warn("[classifyText] fallback", e);
+    return t;
+  }
+}
 
 export type MaintExpense = {
   id: string;
