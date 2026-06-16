@@ -59,6 +59,16 @@ Deno.serve(async (req) => {
       return json({ error: "Parâmetros inválidos (user_id e valor obrigatórios)" }, 400);
     }
 
+    // Preço fixo por produto — blindagem anti price spoofing.
+    const PRECOS_FIXOS: Record<string, number> = {
+      mensalidade_carro: 9.9,
+      historico: 49.9,
+    };
+    const valorFinal =
+      tipo_produto && PRECOS_FIXOS[tipo_produto] !== undefined
+        ? PRECOS_FIXOS[tipo_produto]
+        : Number(valor.toFixed(2));
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -80,7 +90,7 @@ Deno.serve(async (req) => {
         "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify({
-        transaction_amount: Number(valor.toFixed(2)),
+        transaction_amount: valorFinal,
         description: descricao,
         payment_method_id: "pix",
         payer: { email },
@@ -105,7 +115,7 @@ Deno.serve(async (req) => {
       .insert({
         user_id,
         veiculo_id,
-        valor,
+        valor: valorFinal,
         codigo_cupom,
         status: "pendente",
         txid_efi: mpPaymentId, // nome genérico — guarda id MP
