@@ -30,6 +30,8 @@ export function MensalidadeVeiculoModal({
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfInput, setCpfInput] = useState("");
+  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
 
   useEffect(() => {
     if (!open) {
@@ -38,6 +40,7 @@ export function MensalidadeVeiculoModal({
       setPagamentoId(null);
       setStatus(null);
       setIsLoading(false);
+      setCpfInput("");
     }
   }, [open]);
 
