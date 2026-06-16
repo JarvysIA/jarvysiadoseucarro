@@ -33,6 +33,8 @@ export function CheckoutPremiumModal({
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfInput, setCpfInput] = useState("");
+  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
 
   // Reset ao fechar
   useEffect(() => {
