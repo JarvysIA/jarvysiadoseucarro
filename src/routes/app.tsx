@@ -468,6 +468,19 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
+      <MensalidadeVeiculoModal
+        open={mensalidadeOpen}
+        onOpenChange={(v) => {
+          setMensalidadeOpen(v);
+          if (!v) return;
+        }}
+        onPaid={() => {
+          setMensalidadeOpen(false);
+          setAddOpen(true);
+        }}
+      />
+
+      <FrotaModal open={frotaOpen} onOpenChange={setFrotaOpen} />
 
       <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} vehicleId={selectedId} />
 
