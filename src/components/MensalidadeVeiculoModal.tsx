@@ -174,6 +174,12 @@ export function MensalidadeVeiculoModal({
           </div>
         )}
 
+        {!qrCode && !loadingCpf && !cpfSalvo && (
+          <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoading} />
+        )}
+
+
+
         <button
           type="button"
           onClick={qrCode ? copyPix : gerarPix}
