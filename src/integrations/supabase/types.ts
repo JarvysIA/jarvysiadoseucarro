@@ -247,9 +247,11 @@ export type Database = {
       }
       profiles: {
         Row: {
+          asaas_customer_id: string | null
           cep: string | null
           cidade: string | null
           codigo_indicacao: string | null
+          cpf: string | null
           created_at: string
           email: string | null
           id: string
@@ -265,9 +267,11 @@ export type Database = {
           whatsapp: string
         }
         Insert: {
+          asaas_customer_id?: string | null
           cep?: string | null
           cidade?: string | null
           codigo_indicacao?: string | null
+          cpf?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -283,9 +287,11 @@ export type Database = {
           whatsapp: string
         }
         Update: {
+          asaas_customer_id?: string | null
           cep?: string | null
           cidade?: string | null
           codigo_indicacao?: string | null
+          cpf?: string | null
           created_at?: string
           email?: string | null
           id?: string
