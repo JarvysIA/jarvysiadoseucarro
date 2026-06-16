@@ -476,6 +476,7 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       unaccent: { Args: { "": string }; Returns: string }
+      validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
