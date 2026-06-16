@@ -81,7 +81,10 @@ export function PaywallModal({
   const handleClose = () => {
     // Reset PIX state ao fechar para permitir nova geração na próxima abertura
     setPixCopiaCola("");
+    setQrBase64(null);
     setTxid("");
+    setPagamentoId(null);
+    setStatusPoll(null);
     setIsLoadingPix(false);
     onClose();
   };
@@ -104,7 +107,7 @@ export function PaywallModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -116,20 +119,26 @@ export function PaywallModal({
       });
 
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
 
-      setPixCopiaCola(data.qr_code);
-      setTxid(data.mp_payment_id ?? "");
+      setPixCopiaCola(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setTxid(data?.asaas_payment_id ?? "");
+      setPagamentoId(data?.pagamento_id ?? null);
+      setStatusPoll("aguardando");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
-      console.error("[gerar-pix-mp]", e);
-      toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
+      console.error("[gerar-pix-asaas]", e);
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX. Tente novamente.");
       setPixCopiaCola("");
+      setQrBase64(null);
       setTxid("");
     } finally {
       setIsLoadingPix(false);
     }
   };
+
 
   const copyPix = async () => {
     try {
