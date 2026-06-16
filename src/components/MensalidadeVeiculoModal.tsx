@@ -26,6 +26,7 @@ export function MensalidadeVeiculoModal({
   onPaid: () => void;
 }) {
   const [qrCode, setQrCode] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<"aguardando" | "pago" | null>(null);
@@ -33,6 +34,7 @@ export function MensalidadeVeiculoModal({
   useEffect(() => {
     if (!open) {
       setQrCode("");
+      setQrBase64(null);
       setPagamentoId(null);
       setStatus(null);
       setIsLoading(false);
