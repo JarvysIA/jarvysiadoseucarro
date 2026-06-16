@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Check, CreditCard, KeyRound, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -252,6 +253,18 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 />
               </Field>
             </div>
+
+            <Link
+              to="/assinaturas"
+              onClick={onClose}
+              className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary/60 hover:text-primary"
+            >
+              <span className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" />
+                Minhas assinaturas
+              </span>
+              <span className="text-xs text-muted-foreground">Gerenciar →</span>
+            </Link>
 
             <div className="flex gap-2 pt-1">
               <button
