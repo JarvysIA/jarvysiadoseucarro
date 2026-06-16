@@ -9,8 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-
-const VALOR_HISTORICO = 49.9;
+import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
+import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 /**
  * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Asaas).
