@@ -9,8 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-
-const VALOR_HISTORICO = 49.9;
+import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
+import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 /**
  * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Asaas).
@@ -33,6 +33,8 @@ export function CheckoutPremiumModal({
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfInput, setCpfInput] = useState("");
+  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
 
   // Reset ao fechar
   useEffect(() => {
@@ -42,6 +44,7 @@ export function CheckoutPremiumModal({
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
+      setCpfInput("");
     }
   }, [open]);
 
@@ -66,6 +69,15 @@ export function CheckoutPremiumModal({
 
   const gerarPix = async () => {
     if (isLoading) return;
+
+    // CPF Just-in-Time: se o usuário ainda não tem CPF salvo, exigimos input válido
+    if (!cpfSalvo) {
+      if (!isValidCpf(cpfInput)) {
+        toast.error("Informe um CPF válido para gerar o PIX.");
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getUser();
@@ -79,21 +91,22 @@ export function CheckoutPremiumModal({
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
-          valor: VALOR_HISTORICO,
-          tipo_produto: "historico",
-          produto_ref_id: vehicleId,
+          tipo: "historico",
+          cpf: cpfSalvo ?? cpfDigits(cpfInput),
           descricao: "Jarvys — Porta-Luvas Digital",
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
 
       setPixCopiaCola(payload);
       setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
       setPagamentoId(data?.pagamento_id ?? null);
       setStatusPoll("aguardando");
+      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
       console.error("[checkout historico pix]", e);
@@ -215,6 +228,11 @@ export function CheckoutPremiumModal({
             </div>
           </div>
         )}
+
+        {!pixCopiaCola && !loadingCpf && !cpfSalvo && (
+          <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoading} />
+        )}
+
 
         <button
           type="button"

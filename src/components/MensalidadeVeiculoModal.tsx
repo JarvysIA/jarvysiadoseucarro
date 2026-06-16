@@ -9,8 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-
-const VALOR_MENSALIDADE = 9.9;
+import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
+import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 /**
  * Cobrança mensal (R$ 9,90) para adicionar um veículo extra a uma conta já ativa.
@@ -30,6 +30,8 @@ export function MensalidadeVeiculoModal({
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfInput, setCpfInput] = useState("");
+  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
 
   useEffect(() => {
     if (!open) {
@@ -38,6 +40,7 @@ export function MensalidadeVeiculoModal({
       setPagamentoId(null);
       setStatus(null);
       setIsLoading(false);
+      setCpfInput("");
     }
   }, [open]);
 
@@ -61,6 +64,10 @@ export function MensalidadeVeiculoModal({
 
   const gerarPix = async () => {
     if (isLoading) return;
+    if (!cpfSalvo && !isValidCpf(cpfInput)) {
+      toast.error("Informe um CPF válido para gerar o PIX.");
+      return;
+    }
     setIsLoading(true);
     try {
       const { data: sess } = await supabase.auth.getUser();
@@ -73,18 +80,20 @@ export function MensalidadeVeiculoModal({
         body: {
           user_id: uid,
           veiculo_id: null,
-          valor: VALOR_MENSALIDADE,
-          tipo_produto: "mensalidade_carro",
+          tipo: "mensalidade",
+          cpf: cpfSalvo ?? cpfDigits(cpfInput),
           descricao: "Jarvys — Mensalidade veículo adicional",
         },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
       setQrCode(payload);
       setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
       setPagamentoId(data?.pagamento_id ?? null);
       setStatus("aguardando");
+      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado!");
     } catch (e) {
       console.error("[mensalidade pix]", e);
@@ -164,6 +173,12 @@ export function MensalidadeVeiculoModal({
             </div>
           </div>
         )}
+
+        {!qrCode && !loadingCpf && !cpfSalvo && (
+          <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoading} />
+        )}
+
+
 
         <button
           type="button"
