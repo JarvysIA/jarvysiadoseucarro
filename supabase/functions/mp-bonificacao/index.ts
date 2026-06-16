@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     // Localiza padrinho pelo código
     const { data: padrinho } = await supabase
       .from("profiles")
-      .select("id, permite_indicacao, chave_pix, codigo_indicacao")
+      .select("id, permite_indicacao, pix_recebimento, codigo_indicacao")
       .filter("codigo_indicacao", "ilike", pag.codigo_cupom)
       .maybeSingle();
 
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         padrinho_id: padrinho?.id ?? null,
         codigo_cupom: pag.codigo_cupom,
         valor: VALOR_BONIFICACAO,
-        chave_pix: (padrinho as { chave_pix?: string } | null)?.chave_pix ?? null,
+        pix_recebimento: (padrinho as { pix_recebimento?: string } | null)?.pix_recebimento ?? null,
         erro,
         efi_response: efi_response as never,
       });
@@ -89,10 +89,10 @@ Deno.serve(async (req) => {
       return json({ error: "padrinho sem permissão" }, 403);
     }
 
-    const chavePix = (padrinho as { chave_pix?: string }).chave_pix;
+    const chavePix = (padrinho as { pix_recebimento?: string }).pix_recebimento;
     if (!chavePix) {
-      await logErro("padrinho sem chave_pix cadastrada");
-      return json({ error: "padrinho sem chave_pix" }, 400);
+      await logErro("padrinho sem pix_recebimento cadastrada");
+      return json({ error: "padrinho sem pix_recebimento" }, 400);
     }
 
     // Idempotency-Key derivada do pagamento + padrinho
