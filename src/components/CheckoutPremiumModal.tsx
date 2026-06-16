@@ -29,6 +29,7 @@ export function CheckoutPremiumModal({
   onUnlocked: () => void;
 }) {
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
