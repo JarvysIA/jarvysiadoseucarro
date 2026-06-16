@@ -131,10 +131,16 @@ function AppPage() {
   const didInitialScrollRef = useRef(false);
 
   const handleAddClick = () => {
-    // Trial: livre. Ativo: 1º veículo grátis, do 2º ao 5º cobra mensalidade,
-    // 6º+ vai para plano de frota.
+    // Regras:
+    // - Trial: apenas 1 veículo. Para múltiplos, precisa ativar o plano principal.
+    // - Ativo: 1º grátis; 2º ao 5º cobra mensalidade (R$ 9,90); 6º+ vira plano de frota.
     const status = profile?.status_usuario;
     const count = vehicles.length;
+    if (status === "trial" && count >= 1) {
+      toast.error("Para gerenciar múltiplos veículos, ative o plano principal primeiro.");
+      setActivateOpen(true);
+      return;
+    }
     if (status === "ativo") {
       if (count >= 5) {
         setFrotaOpen(true);
