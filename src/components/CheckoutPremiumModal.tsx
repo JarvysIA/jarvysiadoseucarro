@@ -44,6 +44,7 @@ export function CheckoutPremiumModal({
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
+      setCpfInput("");
     }
   }, [open]);
 
