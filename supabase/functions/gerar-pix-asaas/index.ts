@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     if (!user_id || !tipo) {
       return json({ error: "Parâmetros inválidos (user_id e tipo obrigatórios)" }, 400);
     }
-    if ((tipo === "historico" || tipo === "mensalidade") && !veiculo_id) {
+    if ((tipo === "historico") && !veiculo_id) {
       return json({ error: "veiculo_id obrigatório para este tipo de pagamento" }, 400);
     }
 
