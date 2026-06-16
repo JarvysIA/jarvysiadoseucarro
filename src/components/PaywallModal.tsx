@@ -269,12 +269,22 @@ export function PaywallModal({
           <div className="flex flex-col items-center">
             {pixCopiaCola && (
               <>
-                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
-                  <QrCode className="h-16 w-16 text-primary/70" />
+                <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
+                  {qrBase64 ? (
+                    <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code PIX" className="h-full w-full object-contain" />
+                  ) : (
+                    <QrCode className="h-16 w-16 text-primary/70" />
+                  )}
                 </div>
                 <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                   {pixCopiaCola.slice(0, 40)}…
                 </p>
+                {statusPoll === "aguardando" && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Aguardando confirmação do pagamento…
+                  </p>
+                )}
               </>
             )}
 
