@@ -69,7 +69,7 @@ export function MensalidadeVeiculoModal({
         toast.error("Sessão expirada.");
         return;
       }
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: uid,
           veiculo_id: null,
@@ -79,9 +79,11 @@ export function MensalidadeVeiculoModal({
         },
       });
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
-      setQrCode(data.qr_code);
-      setPagamentoId(data.pagamento_id ?? null);
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      setQrCode(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setPagamentoId(data?.pagamento_id ?? null);
       setStatus("aguardando");
       toast.success("PIX gerado!");
     } catch (e) {
