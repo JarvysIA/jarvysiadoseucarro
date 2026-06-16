@@ -14,7 +14,7 @@ const VALOR_MENSALIDADE = 9.9;
 
 /**
  * Cobrança mensal (R$ 9,90) para adicionar um veículo extra a uma conta já ativa.
- * Gera PIX via Mercado Pago, polla o status e libera o cadastro quando pago.
+ * Gera PIX via Asaas, polla o status e libera o cadastro quando pago.
  */
 export function MensalidadeVeiculoModal({
   open,
