@@ -14,7 +14,7 @@ const VALOR_MENSALIDADE = 9.9;
 
 /**
  * Cobrança mensal (R$ 9,90) para adicionar um veículo extra a uma conta já ativa.
- * Gera PIX via Mercado Pago, polla o status e libera o cadastro quando pago.
+ * Gera PIX via Asaas, polla o status e libera o cadastro quando pago.
  */
 export function MensalidadeVeiculoModal({
   open,
@@ -26,6 +26,7 @@ export function MensalidadeVeiculoModal({
   onPaid: () => void;
 }) {
   const [qrCode, setQrCode] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<"aguardando" | "pago" | null>(null);
@@ -33,6 +34,7 @@ export function MensalidadeVeiculoModal({
   useEffect(() => {
     if (!open) {
       setQrCode("");
+      setQrBase64(null);
       setPagamentoId(null);
       setStatus(null);
       setIsLoading(false);
@@ -67,7 +69,7 @@ export function MensalidadeVeiculoModal({
         toast.error("Sessão expirada.");
         return;
       }
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: uid,
           veiculo_id: null,
@@ -77,9 +79,11 @@ export function MensalidadeVeiculoModal({
         },
       });
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
-      setQrCode(data.qr_code);
-      setPagamentoId(data.pagamento_id ?? null);
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      setQrCode(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setPagamentoId(data?.pagamento_id ?? null);
       setStatus("aguardando");
       toast.success("PIX gerado!");
     } catch (e) {
@@ -141,8 +145,12 @@ export function MensalidadeVeiculoModal({
         {qrCode && (
           <div className="rounded-2xl border border-primary/30 bg-background/40 p-4">
             <div className="flex flex-col items-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
-                <QrCode className="h-14 w-14 text-primary/70" />
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-xl bg-white p-1">
+                {qrBase64 ? (
+                  <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code PIX" className="h-full w-full object-contain" />
+                ) : (
+                  <QrCode className="h-14 w-14 text-primary/70" />
+                )}
               </div>
               <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                 {qrCode.slice(0, 40)}…

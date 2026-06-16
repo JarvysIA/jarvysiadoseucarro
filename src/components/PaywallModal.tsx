@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Check,
@@ -32,8 +32,28 @@ export function PaywallModal({
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
+  const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
+  const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+
+  useEffect(() => {
+    if (!pagamentoId || statusPoll === "pago") return;
+    const t = setInterval(async () => {
+      const { data } = await supabase
+        .from("pagamentos_pix")
+        .select("status")
+        .eq("id", pagamentoId)
+        .maybeSingle();
+      if (data?.status === "pago") {
+        setStatusPoll("pago");
+        toast.success("Pagamento confirmado! Acesso liberado.");
+        onClose();
+      }
+    }, 8000);
+    return () => clearInterval(t);
+  }, [pagamentoId, statusPoll, onClose]);
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -61,7 +81,10 @@ export function PaywallModal({
   const handleClose = () => {
     // Reset PIX state ao fechar para permitir nova geração na próxima abertura
     setPixCopiaCola("");
+    setQrBase64(null);
     setTxid("");
+    setPagamentoId(null);
+    setStatusPoll(null);
     setIsLoadingPix(false);
     onClose();
   };
@@ -84,7 +107,7 @@ export function PaywallModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -96,20 +119,26 @@ export function PaywallModal({
       });
 
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
 
-      setPixCopiaCola(data.qr_code);
-      setTxid(data.mp_payment_id ?? "");
+      setPixCopiaCola(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setTxid(data?.asaas_payment_id ?? "");
+      setPagamentoId(data?.pagamento_id ?? null);
+      setStatusPoll("aguardando");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
-      console.error("[gerar-pix-mp]", e);
-      toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
+      console.error("[gerar-pix-asaas]", e);
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX. Tente novamente.");
       setPixCopiaCola("");
+      setQrBase64(null);
       setTxid("");
     } finally {
       setIsLoadingPix(false);
     }
   };
+
 
   const copyPix = async () => {
     try {
@@ -240,12 +269,22 @@ export function PaywallModal({
           <div className="flex flex-col items-center">
             {pixCopiaCola && (
               <>
-                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
-                  <QrCode className="h-16 w-16 text-primary/70" />
+                <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
+                  {qrBase64 ? (
+                    <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code PIX" className="h-full w-full object-contain" />
+                  ) : (
+                    <QrCode className="h-16 w-16 text-primary/70" />
+                  )}
                 </div>
                 <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                   {pixCopiaCola.slice(0, 40)}…
                 </p>
+                {statusPoll === "aguardando" && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Aguardando confirmação do pagamento…
+                  </p>
+                )}
               </>
             )}
 

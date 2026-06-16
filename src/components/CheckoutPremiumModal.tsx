@@ -13,10 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 const VALOR_HISTORICO = 49.9;
 
 /**
- * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Efí).
- * Cartão temporariamente desabilitado (operação 100% PIX para evitar chargebacks).
- * Quando o pagamento é confirmado pela Edge Function `verificar-pagamentos-pix`,
- * o `history_locked` do veículo é setado para `false` automaticamente.
+ * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Asaas).
+ * Quando o webhook `asaas-webhook` confirma o pagamento, o pagamento_pix vira "pago"
+ * e o histórico do veículo é liberado.
  */
 export function CheckoutPremiumModal({
   open,
@@ -30,6 +29,7 @@ export function CheckoutPremiumModal({
   onUnlocked: () => void;
 }) {
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
@@ -38,6 +38,7 @@ export function CheckoutPremiumModal({
   useEffect(() => {
     if (!open) {
       setPixCopiaCola("");
+      setQrBase64(null);
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
@@ -74,7 +75,7 @@ export function CheckoutPremiumModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -86,10 +87,12 @@ export function CheckoutPremiumModal({
       });
 
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
 
-      setPixCopiaCola(data.qr_code);
-      setPagamentoId(data.pagamento_id ?? null);
+      setPixCopiaCola(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setPagamentoId(data?.pagamento_id ?? null);
       setStatusPoll("aguardando");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
@@ -189,8 +192,16 @@ export function CheckoutPremiumModal({
             style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
-                <QrCode className="h-14 w-14 text-primary/70" />
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-xl bg-white p-1">
+                {qrBase64 ? (
+                  <img
+                    src={`data:image/png;base64,${qrBase64}`}
+                    alt="QR Code PIX"
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <QrCode className="h-14 w-14 text-primary/70" />
+                )}
               </div>
               <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                 {pixCopiaCola.slice(0, 40)}…
