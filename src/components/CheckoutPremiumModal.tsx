@@ -229,6 +229,11 @@ export function CheckoutPremiumModal({
           </div>
         )}
 
+        {!pixCopiaCola && !loadingCpf && !cpfSalvo && (
+          <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoading} />
+        )}
+
+
         <button
           type="button"
           onClick={handlePrimary}
