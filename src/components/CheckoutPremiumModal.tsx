@@ -75,7 +75,7 @@ export function CheckoutPremiumModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -87,10 +87,12 @@ export function CheckoutPremiumModal({
       });
 
       if (error) throw error;
-      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
+      const payload = data?.payload ?? data?.qr_code;
+      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
 
-      setPixCopiaCola(data.qr_code);
-      setPagamentoId(data.pagamento_id ?? null);
+      setPixCopiaCola(payload);
+      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
+      setPagamentoId(data?.pagamento_id ?? null);
       setStatusPoll("aguardando");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
