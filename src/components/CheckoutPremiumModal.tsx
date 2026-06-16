@@ -74,21 +74,22 @@ export function CheckoutPremiumModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-mp", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
           valor: VALOR_HISTORICO,
           tipo_produto: "historico",
           produto_ref_id: vehicleId,
+          descricao: "Jarvys — Porta-Luvas Digital",
         },
       });
 
       if (error) throw error;
-      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
+      if (!data?.qr_code) throw new Error("Resposta inválida do Mercado Pago");
 
-      setPixCopiaCola(data.pix_copia_cola);
-      setPagamentoId(data.id ?? null);
+      setPixCopiaCola(data.qr_code);
+      setPagamentoId(data.pagamento_id ?? null);
       setStatusPoll("aguardando");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
