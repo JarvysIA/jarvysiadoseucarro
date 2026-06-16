@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      assinaturas: {
+        Row: {
+          created_at: string
+          data_vencimento: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+          veiculo_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_vencimento: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          veiculo_id: string
+        }
+        Update: {
+          created_at?: string
+          data_vencimento?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          veiculo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       despesas: {
         Row: {
           categoria: string
@@ -152,6 +197,7 @@ export type Database = {
           codigo_cupom: string | null
           created_at: string
           id: string
+          metadata: Json | null
           pix_copia_cola: string | null
           produto_ref_id: string | null
           status: string
@@ -159,12 +205,13 @@ export type Database = {
           txid_efi: string | null
           user_id: string
           valor: number
-          veiculo_id: string
+          veiculo_id: string | null
         }
         Insert: {
           codigo_cupom?: string | null
           created_at?: string
           id?: string
+          metadata?: Json | null
           pix_copia_cola?: string | null
           produto_ref_id?: string | null
           status?: string
@@ -172,12 +219,13 @@ export type Database = {
           txid_efi?: string | null
           user_id: string
           valor: number
-          veiculo_id: string
+          veiculo_id?: string | null
         }
         Update: {
           codigo_cupom?: string | null
           created_at?: string
           id?: string
+          metadata?: Json | null
           pix_copia_cola?: string | null
           produto_ref_id?: string | null
           status?: string
@@ -185,7 +233,7 @@ export type Database = {
           txid_efi?: string | null
           user_id?: string
           valor?: number
-          veiculo_id?: string
+          veiculo_id?: string | null
         }
         Relationships: [
           {
