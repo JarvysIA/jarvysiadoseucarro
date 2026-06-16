@@ -132,20 +132,31 @@ Deno.serve(async (req) => {
         .eq("id", pagamento.veiculo_id);
     }
 
-    if (pagamento.tipo_produto === "mensalidade_carro" && pagamento.veiculo_id) {
+    if (pagamento.tipo_produto === "mensalidade_carro") {
       const vencimento = new Date();
       vencimento.setDate(vencimento.getDate() + 30);
-      await supabase
-        .from("assinaturas")
-        .upsert(
-          {
-            user_id: pagamento.user_id,
-            veiculo_id: pagamento.veiculo_id,
-            status: "ativo",
-            data_vencimento: vencimento.toISOString(),
-          },
-          { onConflict: "user_id,veiculo_id" },
-        );
+      if (pagamento.veiculo_id) {
+        await supabase
+          .from("assinaturas")
+          .upsert(
+            {
+              user_id: pagamento.user_id,
+              veiculo_id: pagamento.veiculo_id,
+              status: "ativo",
+              data_vencimento: vencimento.toISOString(),
+            },
+            { onConflict: "user_id,veiculo_id" },
+          );
+      } else {
+        // mensalidade pré-cadastro do veículo: cria assinatura "solta"
+        // que será consumida pelo trigger proteger_cadastro_veiculo
+        await supabase.from("assinaturas").insert({
+          user_id: pagamento.user_id,
+          veiculo_id: null,
+          status: "ativo",
+          data_vencimento: vencimento.toISOString(),
+        });
+      }
     }
 
     if (pagamento.tipo_produto === "ativacao") {
