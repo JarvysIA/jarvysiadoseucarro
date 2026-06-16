@@ -64,6 +64,10 @@ export function MensalidadeVeiculoModal({
 
   const gerarPix = async () => {
     if (isLoading) return;
+    if (!cpfSalvo && !isValidCpf(cpfInput)) {
+      toast.error("Informe um CPF válido para gerar o PIX.");
+      return;
+    }
     setIsLoading(true);
     try {
       const { data: sess } = await supabase.auth.getUser();
@@ -76,18 +80,20 @@ export function MensalidadeVeiculoModal({
         body: {
           user_id: uid,
           veiculo_id: null,
-          valor: VALOR_MENSALIDADE,
-          tipo_produto: "mensalidade_carro",
+          tipo: "mensalidade",
+          cpf: cpfSalvo ?? cpfDigits(cpfInput),
           descricao: "Jarvys — Mensalidade veículo adicional",
         },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
       setQrCode(payload);
       setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
       setPagamentoId(data?.pagamento_id ?? null);
       setStatus("aguardando");
+      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado!");
     } catch (e) {
       console.error("[mensalidade pix]", e);
