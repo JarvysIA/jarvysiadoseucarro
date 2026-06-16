@@ -9,8 +9,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-
-const VALOR_MENSALIDADE = 9.9;
+import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
+import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 /**
  * Cobrança mensal (R$ 9,90) para adicionar um veículo extra a uma conta já ativa.
