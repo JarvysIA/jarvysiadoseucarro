@@ -34,16 +34,11 @@ export async function resolveReferrerId(refCode: string): Promise<string | null>
   const code = refCode.trim();
   if (!code) return null;
 
-  // 1) Tenta pelo codigo_indicacao (case-insensitive)
-  const byCode = await supabase
-    .from("profiles")
-    .select("id")
-    .ilike("codigo_indicacao", code)
-    .limit(1)
-    .maybeSingle();
-  if (byCode.data?.id) return byCode.data.id;
+  // 1) RPC SECURITY DEFINER — valida cupom de QUALQUER conta (ignora RLS de profiles)
+  const rpc = await supabase.rpc("validar_cupom_indicacao", { _codigo: code });
+  if (!rpc.error && rpc.data) return rpc.data as string;
 
-  // 2) Fallback legado: prefixo do uuid
+  // 2) Fallback legado: prefixo do uuid (apenas se o usuário consegue ler o profile alvo)
   const legacy = code.toLowerCase();
   if (/^[a-f0-9-]{4,}$/i.test(legacy)) {
     const byUuid = await supabase
