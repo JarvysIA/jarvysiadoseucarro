@@ -10,10 +10,10 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 
-const VALOR_MENSALIDADE = 14.9;
+const VALOR_MENSALIDADE = 9.9;
 
 /**
- * Cobrança mensal (R$ 14,90) para adicionar um veículo extra a uma conta já ativa.
+ * Cobrança mensal (R$ 9,90) para adicionar um veículo extra a uma conta já ativa.
  * Gera PIX via Mercado Pago, polla o status e libera o cadastro quando pago.
  */
 export function MensalidadeVeiculoModal({
@@ -110,7 +110,7 @@ export function MensalidadeVeiculoModal({
             <div>
               <DialogTitle className="text-left">Veículo adicional</DialogTitle>
               <DialogDescription className="text-left">
-                Cada veículo extra na sua garagem custa R$ 14,90/mês.
+                Cada veículo extra na sua garagem custa R$ 9,90/mês.
               </DialogDescription>
             </div>
           </div>
@@ -133,7 +133,7 @@ export function MensalidadeVeiculoModal({
           <div className="mt-3 flex items-end justify-between border-t border-border pt-3">
             <span className="text-xs text-muted-foreground">Total mensal</span>
             <span className="text-2xl font-bold text-foreground">
-              R$ 14<span className="text-base">,90</span>
+              R$ 9<span className="text-base">,90</span>
             </span>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function MensalidadeVeiculoModal({
           ) : (
             <>
               <QrCode className="h-4 w-4" />
-              Gerar PIX · R$ 14,90/mês
+              Gerar PIX · R$ 9,90/mês
             </>
           )}
         </button>
