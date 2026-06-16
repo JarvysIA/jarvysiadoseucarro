@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveReferrerId } from "@/lib/referral";
+import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
+import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 export function PaywallModal({
   open,
