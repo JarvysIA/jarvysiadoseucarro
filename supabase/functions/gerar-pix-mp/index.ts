@@ -59,20 +59,36 @@ Deno.serve(async (req) => {
       return json({ error: "Parâmetros inválidos (user_id e valor obrigatórios)" }, 400);
     }
 
-    // Preço fixo por produto — blindagem anti price spoofing.
-    const PRECOS_FIXOS: Record<string, number> = {
-      mensalidade_carro: 9.9,
-      historico: 49.9,
-    };
-    const valorFinal =
-      tipo_produto && PRECOS_FIXOS[tipo_produto] !== undefined
-        ? PRECOS_FIXOS[tipo_produto]
-        : Number(valor.toFixed(2));
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Preço fixo por produto — blindagem anti price spoofing (server-side).
+    // ativacao: 29.90 padrão, 14.90 SE codigo_cupom válido (existe em profiles.codigo_indicacao).
+    // mensalidade_carro: 9.90 | historico: 49.90.
+    const PRECOS_FIXOS: Record<string, number> = {
+      mensalidade_carro: 9.9,
+      historico: 49.9,
+    };
+
+    let valorFinal: number;
+    if (tipo_produto === "ativacao") {
+      let cupomValido = false;
+      if (codigo_cupom && typeof codigo_cupom === "string" && codigo_cupom.trim() !== "") {
+        const { data: cupomRow } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("codigo_indicacao", codigo_cupom.trim())
+          .maybeSingle();
+        cupomValido = !!cupomRow?.id && cupomRow.id !== user_id; // bloqueia auto-cupom
+      }
+      valorFinal = cupomValido ? 14.9 : 29.9;
+    } else if (tipo_produto && PRECOS_FIXOS[tipo_produto] !== undefined) {
+      valorFinal = PRECOS_FIXOS[tipo_produto];
+    } else {
+      valorFinal = Number(valor.toFixed(2));
+    }
 
     // Resolve email do pagador se não veio
     let email = payer_email;
