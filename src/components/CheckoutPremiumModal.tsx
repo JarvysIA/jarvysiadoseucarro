@@ -38,6 +38,7 @@ export function CheckoutPremiumModal({
   useEffect(() => {
     if (!open) {
       setPixCopiaCola("");
+      setQrBase64(null);
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
