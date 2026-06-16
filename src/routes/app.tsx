@@ -11,6 +11,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
+import { MensalidadeVeiculoModal } from "@/components/MensalidadeVeiculoModal";
+import { FrotaModal } from "@/components/FrotaModal";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
@@ -121,14 +123,28 @@ function AppPage() {
   }, []);
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
+  const [mensalidadeOpen, setMensalidadeOpen] = useState(false);
+  const [frotaOpen, setFrotaOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
   const handleAddClick = () => {
-    // App é gratuito. O usuário pode cadastrar quantos veículos quiser;
-    // o status VIP/ativação é por placa via PaywallModal.
+    // Trial: livre. Ativo: 1º veículo grátis, do 2º ao 5º cobra mensalidade,
+    // 6º+ vai para plano de frota.
+    const status = profile?.status_usuario;
+    const count = vehicles.length;
+    if (status === "ativo") {
+      if (count >= 5) {
+        setFrotaOpen(true);
+        return;
+      }
+      if (count >= 1) {
+        setMensalidadeOpen(true);
+        return;
+      }
+    }
     setAddOpen(true);
   };
 
