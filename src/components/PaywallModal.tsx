@@ -101,6 +101,10 @@ export function PaywallModal({
       toast.error("Selecione um veículo antes de gerar o PIX.");
       return;
     }
+    if (!cpfSalvo && !isValidCpf(cpfInput)) {
+      toast.error("Informe um CPF válido para gerar o PIX.");
+      return;
+    }
 
     setIsLoadingPix(true);
     try {
@@ -116,22 +120,24 @@ export function PaywallModal({
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
-          valor: price,
-          tipo_produto: "ativacao",
+          tipo: "ativacao",
+          cpf: cpfSalvo ?? cpfDigits(cpfInput),
           codigo_cupom: couponApplied ? couponCode.trim() : null,
           descricao: "Jarvys — Ativação da IA Automotiva",
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
 
       setPixCopiaCola(payload);
       setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
       setTxid(data?.asaas_payment_id ?? "");
       setPagamentoId(data?.pagamento_id ?? null);
       setStatusPoll("aguardando");
+      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
       console.error("[gerar-pix-asaas]", e);
