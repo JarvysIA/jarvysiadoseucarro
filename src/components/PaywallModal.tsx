@@ -32,8 +32,28 @@ export function PaywallModal({
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrBase64, setQrBase64] = useState<string | null>(null);
+  const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
+  const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+
+  useEffect(() => {
+    if (!pagamentoId || statusPoll === "pago") return;
+    const t = setInterval(async () => {
+      const { data } = await supabase
+        .from("pagamentos_pix")
+        .select("status")
+        .eq("id", pagamentoId)
+        .maybeSingle();
+      if (data?.status === "pago") {
+        setStatusPoll("pago");
+        toast.success("Pagamento confirmado! Acesso liberado.");
+        onClose();
+      }
+    }, 8000);
+    return () => clearInterval(t);
+  }, [pagamentoId, statusPoll, onClose]);
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
