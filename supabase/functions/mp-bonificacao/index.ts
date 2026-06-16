@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         padrinho_id: padrinho?.id ?? null,
         codigo_cupom: pag.codigo_cupom,
         valor: VALOR_BONIFICACAO,
-        pix_recebimento: (padrinho as { pix_recebimento?: string } | null)?.pix_recebimento ?? null,
+        chave_pix: (padrinho as { pix_recebimento?: string } | null)?.pix_recebimento ?? null,
         erro,
         efi_response: efi_response as never,
       });
