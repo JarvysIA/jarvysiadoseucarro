@@ -59,13 +59,15 @@ Deno.serve(async (req) => {
       return json({ error: "Parâmetros inválidos (user_id e valor obrigatórios)" }, 400);
     }
 
+    // Admin client (service_role) — IGNORA RLS para validar cupom em profiles
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
     // Preço fixo por produto — blindagem anti price spoofing (server-side).
-    // ativacao: 29.90 padrão, 14.90 SE codigo_cupom válido (existe em profiles.codigo_indicacao).
+    // ativacao: 29.90 padrão, 19.90 SE codigo_cupom válido (existe em profiles.codigo_indicacao).
     // mensalidade_carro: 9.90 | historico: 49.90.
     const PRECOS_FIXOS: Record<string, number> = {
       mensalidade_carro: 9.9,
@@ -75,15 +77,24 @@ Deno.serve(async (req) => {
     let valorFinal: number;
     if (tipo_produto === "ativacao") {
       let cupomValido = false;
-      if (codigo_cupom && typeof codigo_cupom === "string" && codigo_cupom.trim() !== "") {
-        const { data: cupomRow } = await supabase
+      const cupomTrim = (codigo_cupom ?? "").toString().trim();
+      if (cupomTrim !== "") {
+        const { data: cupomRow, error: cupomErr } = await supabase
           .from("profiles")
-          .select("id")
-          .ilike("codigo_indicacao", codigo_cupom.trim())
+          .select("id, codigo_indicacao")
+          .ilike("codigo_indicacao", cupomTrim)
           .maybeSingle();
+        if (cupomErr) {
+          console.error("[gerar-pix-mp] erro consulta cupom:", cupomErr);
+        }
         cupomValido = !!cupomRow?.id && cupomRow.id !== user_id; // bloqueia auto-cupom
+        console.log("[gerar-pix-mp] cupom:", {
+          enviado: cupomTrim,
+          encontrado: cupomRow?.codigo_indicacao ?? null,
+          valido: cupomValido,
+        });
       }
-      valorFinal = cupomValido ? 14.9 : 29.9;
+      valorFinal = cupomValido ? 19.9 : 29.9;
     } else if (tipo_produto && PRECOS_FIXOS[tipo_produto] !== undefined) {
       valorFinal = PRECOS_FIXOS[tipo_produto];
     } else {
