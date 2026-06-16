@@ -299,6 +299,12 @@ export function PaywallModal({
               </>
             )}
 
+            {!pixCopiaCola && !loadingCpf && !cpfSalvo && (
+              <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoadingPix} />
+            )}
+
+
+
             <button
               type="button"
               onClick={handlePrimaryClick}
