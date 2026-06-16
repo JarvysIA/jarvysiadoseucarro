@@ -39,6 +39,9 @@ export function PaywallModal({
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfInput, setCpfInput] = useState("");
+  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
+
 
   useEffect(() => {
     if (!pagamentoId || statusPoll === "pago") return;
