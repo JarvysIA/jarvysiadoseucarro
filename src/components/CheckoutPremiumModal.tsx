@@ -69,6 +69,15 @@ export function CheckoutPremiumModal({
 
   const gerarPix = async () => {
     if (isLoading) return;
+
+    // CPF Just-in-Time: se o usuário ainda não tem CPF salvo, exigimos input válido
+    if (!cpfSalvo) {
+      if (!isValidCpf(cpfInput)) {
+        toast.error("Informe um CPF válido para gerar o PIX.");
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getUser();
@@ -82,21 +91,22 @@ export function CheckoutPremiumModal({
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
-          valor: VALOR_HISTORICO,
-          tipo_produto: "historico",
-          produto_ref_id: vehicleId,
+          tipo: "historico",
+          cpf: cpfSalvo ?? cpfDigits(cpfInput),
           descricao: "Jarvys — Porta-Luvas Digital",
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error(data?.error ?? "Resposta inválida do provedor de pagamento");
+      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
 
       setPixCopiaCola(payload);
       setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
       setPagamentoId(data?.pagamento_id ?? null);
       setStatusPoll("aguardando");
+      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
       console.error("[checkout historico pix]", e);
