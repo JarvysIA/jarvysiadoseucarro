@@ -1,71 +1,65 @@
-## Visão geral
+# Plano de Recuperação: Asaas Operacional (Vendas + Bonificação de Padrinhos)
 
-Vou preservar 100% do visual atual (Landing, Splash, Signup, Garagem, Bottom Nav). Toda a evolução é em **lógica + novas telas**, sem mexer no design existente.
+## Conselho honesto antes do plano
 
-Antes de codar preciso confirmar 2 pontos e habilitar o backend.
+Você não precisa de outra IA. O problema dos últimos dias **não foi de modelo**, foi de **escopo por prompt**. Aquele mega-prompt de 5 passos teria quebrado com qualquer IA — ele mistura banco + 3 edge functions + frontend + regras condicionais, tudo com dependências entre si. Quando algo dá errado no Passo 1, os Passos 2-5 constroem em cima de fundação torta e o bug fica invisível.
 
-## Pré-requisitos
+**Como vamos trabalhar daqui pra frente (regra de ouro):**
+- 1 prompt = 1 mudança verificável.
+- Sempre testar antes de seguir.
+- Eu te aviso quando um passo está pronto pra teste, e só avanço com seu OK.
+- Você **gasta menos crédito no total** assim, porque não precisa reverter coisas grandes.
 
-1. **Habilitar Lovable Cloud** (banco + auth + storage). Sem isso não há onde salvar `profiles`, `veiculos` nem autenticar.
-2. **API de placa**: a BrasilAPI **não** consulta placa de veículo (só FIPE por código). A "Puxa Placa" é paga e exige token. Como ainda não temos credencial, vou implementar a etapa como **loading tecnológico simulado** (2s) que cai direto no fallback manual dentro do modal — assim o fluxo funciona hoje e plugamos a API real depois trocando 1 função.
-3. **Admin secreto**: `/master-admin` precisa de proteção. Vou usar tabela `user_roles` + role `admin` (padrão seguro Supabase). Eu te explico como te tornar admin via SQL após o primeiro cadastro.
+Gemini/Claude são bons como "consultores de arquitetura" se você quiser uma 2ª opinião antes de me passar a tarefa. Mas a execução é mais barata e segura aqui, porque eu vejo seu código, banco, logs e secrets em tempo real.
 
-## Modelagem do banco
+## Estado atual após o rollback (verificado no código)
 
-**profiles** (1-1 com auth.users)
-- id (uuid, PK = auth.users.id)
-- nome (text)
-- whatsapp (text)
-- placa (text)
-- status_usuario (text, default 'trial') — 'trial' | 'ativo'
-- permite_indicacao (boolean, default false)
-- trial_inicio (timestamptz, default now())
-- created_at
+Edge functions presentes hoje:
+- `gerar-pix-asaas` ✅
+- `asaas-webhook` ✅
+- `gerar-pix-efi` + `setup-webhook-efi` + `efi-webhook` ⚠️ (legado EFI, ainda no projeto)
+- `verificar-pagamentos-pix`, `consultar-placa`, `consultar-historico-fipe` ✅
 
-**veiculos**
-- id, user_id (FK profiles), placa, marca, modelo, ano, motorizacao, km_atual (nullable), created_at
+Frontend já chama `gerar-pix-asaas` em `CheckoutPremiumModal`, `MensalidadeVeiculoModal`, `PaywallModal`.
 
-**user_roles** (separada, com enum `app_role`) + função `has_role()` security-definer.
+Secrets configurados: `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` ✅
 
-RLS: usuário lê/edita só os próprios dados. Admins (via `has_role`) leem/atualizam tudo em `profiles`.
+## Roteiro incremental (cada etapa = 1 prompt = 1 teste)
 
-## Passo a passo de implementação
+### Etapa 1 — Validar o que JÁ funciona no Asaas hoje
+Antes de mexer em qualquer linha, eu leio as 2 edge functions Asaas atuais e te entrego um diagnóstico curto: o que está ok, o que pode falhar, e o que falta. **Sem editar nada ainda.** Você confirma a lista de correções antes de qualquer escrita.
 
-**1. Splash inteligente** — `src/routes/splash.tsx` passa a checar `supabase.auth.getSession()`. Logado → `/app`. Não logado → `/welcome`. (Hoje usa `localStorage`.)
+### Etapa 2 — Garantir geração de Pix de venda funcionando ponta-a-ponta
+- Verificar `gerar-pix-asaas`: preço hardcoded no servidor (29,90 / 19,90 com cupom / 9,90 mensalidade / 49,90 histórico), criação de customer com CPF just-in-time, retorno de `encodedImage` + `payload`.
+- Teste real: você gera um Pix de R$ 0,01 (modo teste) ou de ativação, paga, e confirma que aparece no painel Asaas.
 
-**2. Signup conectado ao Supabase** — `src/routes/signup.tsx` mantém UI idêntica. Submit:
-   - `supabase.auth.signUp({ email gerado a partir do whatsapp OU pedir email? veja questão abaixo, password })`
-   - Insere em `profiles` (`status_usuario='trial'`, `permite_indicacao=false`)
-   - Dispara loading "Lendo placa..." (2s simulados)
-   - Abre **CarConfirmModal**
+### Etapa 3 — Garantir webhook Asaas recebendo e ativando conta
+- Validar header `asaas-access-token` contra `ASAAS_WEBHOOK_TOKEN`.
+- Idempotência: só processa `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` uma vez.
+- Atualiza `pagamentos_pix.status = 'pago'`, `profiles.status_usuario = 'ativo'`, `assinaturas` conforme o tipo (ativacao / mensalidade / historico).
+- Teste real: pagar um Pix e ver a conta ativar sozinha.
 
-**3. CarConfirmModal** (novo, `src/components/CarConfirmModal.tsx`)
-   - Mostra Marca/Modelo/Ano/Motorização (placeholder vazio no fluxo simulado → cai direto no fallback)
-   - Botão "Dados incorretos? Preencher manualmente" → abre inputs
-   - Campo "KM Atual do Painel (opcional)"
-   - "Confirmar e Ir para a Garagem" → insert em `veiculos`, fecha modal, navega para `/app`
-   - Estética: fundo grafite, borda neon, mesmo padrão da Splash/Landing
+### Etapa 4 — Pagamento de bonificação ao padrinho (R$ 5 via Pix Asaas)
+Esse é o motivo principal do seu desconforto com EFI (PF). Vamos:
+- Criar/ajustar a função que dispara transferência Pix ao padrinho quando o afilhado paga uma ativação.
+- Travas de segurança: anti-auto-referral (referrer ≠ usuário), anti-pagamento-duplo (só quando era trial antes), idempotência por `pagamento_id`.
+- Se padrinho não tiver chave Pix cadastrada → log em `logs_erro_bonificacao` e segue sem quebrar.
+- Teste real: simular indicação completa e ver R$ 5 saindo da conta Asaas.
 
-**4. Renomear `/garagem` → `/app`** — mantém todo o layout/carrossel atual. Atualizo `BottomNav`, redirects e o link da Landing.
-   - Topo do `/app` lê `profiles.status_usuario`:
-     - `trial` → banner "Você tem 30 dias de acesso total grátis"
-     - `ativo` → sem banner
-   - Aba/seção de Indicações:
-     - `trial` → cadeado + CTA "Ative por R$ 9,90"
-     - `ativo` → link de afiliado liberado para copiar
+### Etapa 5 — Limpeza do legado EFI
+Remover `gerar-pix-efi`, `setup-webhook-efi`, `efi-webhook` e secrets EFI (`EFI_CERTIFICATE_BASE64`, `EFI_CLIENT_ID`, `EFI_CLIENT_SECRET`, `EFI_PIX_KEY`) **só depois** das etapas 2-4 testadas e aprovadas. Antes disso, EFI fica como rede de segurança.
 
-**5. `/master-admin`** (oculto, não linkado em nenhum lugar)
-   - Protegido por `has_role(uid, 'admin')` — se não for admin, redireciona pra `/`
-   - Campo busca por nome/whatsapp
-   - Lista profiles com botão "Tornar VIP" → update `status_usuario='ativo'`, `permite_indicacao=true`
+### Etapa 6 — Configuração final no painel Asaas (você faz)
+Eu te passo a URL exata do webhook e o token a colar. Você cola no painel Asaas e a integração fica viva.
 
-## Decisões que preciso confirmar com você
+## Próximo passo
 
-**Q1 — Login:** o Supabase Auth exige **email + senha** (ou OAuth/telefone com SMS pago). Seu form atual tem WhatsApp + Senha, sem email. Como prefere?
-- **(a)** Adicionar campo Email no cadastro (mais simples, recomendado)
-- **(b)** Gerar email fake interno tipo `5511999999999@jarvys.app` a partir do WhatsApp (login fica "transparente" pro usuário, mas não dá pra recuperar senha por email)
-- **(c)** Habilitar login por telefone com SMS (custa por mensagem, precisa configurar provider tipo Twilio)
+Se você concordar com essa abordagem, eu começo pela **Etapa 1 (diagnóstico apenas, sem editar nada)** assim que você aprovar este plano. Aí você vê o que está bom e o que precisa mudar antes de gastar crédito em edição.
 
-**Q2 — API de placa:** confirma que tudo bem começarmos com o **loading simulado + fallback manual** (e plugamos a API real depois)? Ou você já tem token de algum serviço (Puxa Placa, Placa Fipe, API Brasil, etc.) pra eu integrar agora?
+## Como você ajuda a economizar crédito daqui pra frente
 
-Me responde essas 2 e eu sigo com a implementação completa.
+1. **Sempre que possível, cole o erro exato** (mensagem do console, log da edge function) — eu vou direto na causa em vez de adivinhar.
+2. **Diga o resultado do teste** depois de cada etapa ("paguei e ativou" ou "paguei e não ativou, log diz X").
+3. **Não junte 3 pedidos em 1 prompt.** Se aparecerem 3 bugs, manda 1 por vez.
+
+Topa começar pela Etapa 1?
