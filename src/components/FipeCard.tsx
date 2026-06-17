@@ -67,20 +67,8 @@ export function FipeCard({
         .select("fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,historico_fipe")
         .eq("id", vehicleId)
         .maybeSingle();
-      const { data: historico } = await supabase
-        .from("fipe_history")
-        .select("mes_referencia, valor")
-        .eq("vehicle_id", vehicleId)
-        .order("mes_referencia", { ascending: true });
       if (cancel) return;
-      const enriched: VehicleFipe = {
-        ...(row as unknown as VehicleFipe | null),
-        historico_fipe: (historico || []).map((h) => ({
-          mes_ano_extenso: h.mes_referencia,
-          valor: h.valor,
-        })),
-      } as VehicleFipe;
-      setData(enriched ?? null);
+      setData((row as unknown as VehicleFipe | null) ?? null);
       setLoading(false);
     })();
     return () => {

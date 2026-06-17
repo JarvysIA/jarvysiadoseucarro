@@ -11,8 +11,6 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
-import { MensalidadeVeiculoModal } from "@/components/MensalidadeVeiculoModal";
-import { FrotaModal } from "@/components/FrotaModal";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
@@ -123,34 +121,14 @@ function AppPage() {
   }, []);
   const [selectedId, setSelectedId] = useState<string>(initialSelectedId);
   const [addOpen, setAddOpen] = useState(false);
-  const [mensalidadeOpen, setMensalidadeOpen] = useState(false);
-  const [frotaOpen, setFrotaOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
 
   const handleAddClick = () => {
-    // Regras:
-    // - Trial: apenas 1 veículo. Para múltiplos, precisa ativar o plano principal.
-    // - Ativo: 1º grátis; 2º ao 5º cobra mensalidade (R$ 9,90); 6º+ vira plano de frota.
-    const status = profile?.status_usuario;
-    const count = vehicles.length;
-    if (status === "trial" && count >= 1) {
-      toast.error("Para gerenciar múltiplos veículos, ative o plano principal primeiro.");
-      setActivateOpen(true);
-      return;
-    }
-    if (status === "ativo") {
-      if (count >= 5) {
-        setFrotaOpen(true);
-        return;
-      }
-      if (count >= 1) {
-        setMensalidadeOpen(true);
-        return;
-      }
-    }
+    // App é gratuito. O usuário pode cadastrar quantos veículos quiser;
+    // o status VIP/ativação é por placa via PaywallModal.
     setAddOpen(true);
   };
 
@@ -474,19 +452,6 @@ function AppPage() {
         onAdded={handleAdded}
       />
 
-      <MensalidadeVeiculoModal
-        open={mensalidadeOpen}
-        onOpenChange={(v) => {
-          setMensalidadeOpen(v);
-          if (!v) return;
-        }}
-        onPaid={() => {
-          setMensalidadeOpen(false);
-          setAddOpen(true);
-        }}
-      />
-
-      <FrotaModal open={frotaOpen} onOpenChange={setFrotaOpen} />
 
       <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} vehicleId={selectedId} />
 

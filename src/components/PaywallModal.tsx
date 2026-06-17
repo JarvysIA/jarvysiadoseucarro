@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   X,
   Check,
@@ -15,8 +15,6 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveReferrerId } from "@/lib/referral";
-import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
-import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
 
 export function PaywallModal({
   open,
@@ -34,31 +32,8 @@ export function PaywallModal({
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
-  const [qrBase64, setQrBase64] = useState<string | null>(null);
-  const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
-  const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
-  const [cpfInput, setCpfInput] = useState("");
-  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
-
-
-  useEffect(() => {
-    if (!pagamentoId || statusPoll === "pago") return;
-    const t = setInterval(async () => {
-      const { data } = await supabase
-        .from("pagamentos_pix")
-        .select("status")
-        .eq("id", pagamentoId)
-        .maybeSingle();
-      if (data?.status === "pago") {
-        setStatusPoll("pago");
-        toast.success("Pagamento confirmado! Acesso liberado.");
-        onClose();
-      }
-    }, 8000);
-    return () => clearInterval(t);
-  }, [pagamentoId, statusPoll, onClose]);
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -86,10 +61,7 @@ export function PaywallModal({
   const handleClose = () => {
     // Reset PIX state ao fechar para permitir nova geração na próxima abertura
     setPixCopiaCola("");
-    setQrBase64(null);
     setTxid("");
-    setPagamentoId(null);
-    setStatusPoll(null);
     setIsLoadingPix(false);
     onClose();
   };
@@ -99,10 +71,6 @@ export function PaywallModal({
 
     if (!vehicleId) {
       toast.error("Selecione um veículo antes de gerar o PIX.");
-      return;
-    }
-    if (!cpfSalvo && !isValidCpf(cpfInput)) {
-      toast.error("Informe um CPF válido para gerar o PIX.");
       return;
     }
 
@@ -116,40 +84,30 @@ export function PaywallModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
-          tipo: "ativacao",
-          cpf: cpfSalvo ?? cpfDigits(cpfInput),
+          valor: price,
           codigo_cupom: couponApplied ? couponCode.trim() : null,
-          descricao: "Jarvys — Ativação da IA Automotiva",
         },
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
 
-      setPixCopiaCola(payload);
-      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
-      setTxid(data?.asaas_payment_id ?? "");
-      setPagamentoId(data?.pagamento_id ?? null);
-      setStatusPoll("aguardando");
-      if (!cpfSalvo) refreshCpf();
+      setPixCopiaCola(data.pix_copia_cola);
+      setTxid(data.txid_efi ?? "");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
-      console.error("[gerar-pix-asaas]", e);
-      toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX. Tente novamente.");
+      console.error("[gerar-pix-efi]", e);
+      toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
       setPixCopiaCola("");
-      setQrBase64(null);
       setTxid("");
     } finally {
       setIsLoadingPix(false);
     }
   };
-
 
   const copyPix = async () => {
     try {
@@ -280,30 +238,14 @@ export function PaywallModal({
           <div className="flex flex-col items-center">
             {pixCopiaCola && (
               <>
-                <div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
-                  {qrBase64 ? (
-                    <img src={`data:image/png;base64,${qrBase64}`} alt="QR Code PIX" className="h-full w-full object-contain" />
-                  ) : (
-                    <QrCode className="h-16 w-16 text-primary/70" />
-                  )}
+                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
+                  <QrCode className="h-16 w-16 text-primary/70" />
                 </div>
                 <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                   {pixCopiaCola.slice(0, 40)}…
                 </p>
-                {statusPoll === "aguardando" && (
-                  <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Aguardando confirmação do pagamento…
-                  </p>
-                )}
               </>
             )}
-
-            {!pixCopiaCola && !loadingCpf && !cpfSalvo && (
-              <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoadingPix} />
-            )}
-
-
 
             <button
               type="button"

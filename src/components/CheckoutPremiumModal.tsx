@@ -9,13 +9,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { CpfJustInTimeInput } from "@/components/CpfJustInTimeInput";
-import { cpfDigits, isValidCpf, useUserCpf } from "@/lib/cpf";
+
+const VALOR_HISTORICO = 49.9;
 
 /**
- * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Asaas).
- * Quando o webhook `asaas-webhook` confirma o pagamento, o pagamento_pix vira "pago"
- * e o histórico do veículo é liberado.
+ * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Efí).
+ * Cartão temporariamente desabilitado (operação 100% PIX para evitar chargebacks).
+ * Quando o pagamento é confirmado pela Edge Function `verificar-pagamentos-pix`,
+ * o `history_locked` do veículo é setado para `false` automaticamente.
  */
 export function CheckoutPremiumModal({
   open,
@@ -29,22 +30,17 @@ export function CheckoutPremiumModal({
   onUnlocked: () => void;
 }) {
   const [pixCopiaCola, setPixCopiaCola] = useState("");
-  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
-  const [cpfInput, setCpfInput] = useState("");
-  const { cpf: cpfSalvo, loading: loadingCpf, refresh: refreshCpf } = useUserCpf(open);
 
   // Reset ao fechar
   useEffect(() => {
     if (!open) {
       setPixCopiaCola("");
-      setQrBase64(null);
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
-      setCpfInput("");
     }
   }, [open]);
 
@@ -69,15 +65,6 @@ export function CheckoutPremiumModal({
 
   const gerarPix = async () => {
     if (isLoading) return;
-
-    // CPF Just-in-Time: se o usuário ainda não tem CPF salvo, exigimos input válido
-    if (!cpfSalvo) {
-      if (!isValidCpf(cpfInput)) {
-        toast.error("Informe um CPF válido para gerar o PIX.");
-        return;
-      }
-    }
-
     setIsLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getUser();
@@ -87,26 +74,22 @@ export function CheckoutPremiumModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
-          tipo: "historico",
-          cpf: cpfSalvo ?? cpfDigits(cpfInput),
-          descricao: "Jarvys — Porta-Luvas Digital",
+          valor: VALOR_HISTORICO,
+          tipo_produto: "historico",
+          produto_ref_id: vehicleId,
         },
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const payload = data?.payload ?? data?.qr_code;
-      if (!payload) throw new Error("Resposta inválida do provedor de pagamento");
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
 
-      setPixCopiaCola(payload);
-      setQrBase64(data?.encodedImage ?? data?.qr_code_base64 ?? null);
-      setPagamentoId(data?.pagamento_id ?? null);
+      setPixCopiaCola(data.pix_copia_cola);
+      setPagamentoId(data.id ?? null);
       setStatusPoll("aguardando");
-      if (!cpfSalvo) refreshCpf();
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
       console.error("[checkout historico pix]", e);
@@ -205,16 +188,8 @@ export function CheckoutPremiumModal({
             style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-xl bg-white p-1">
-                {qrBase64 ? (
-                  <img
-                    src={`data:image/png;base64,${qrBase64}`}
-                    alt="QR Code PIX"
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <QrCode className="h-14 w-14 text-primary/70" />
-                )}
+              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
+                <QrCode className="h-14 w-14 text-primary/70" />
               </div>
               <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                 {pixCopiaCola.slice(0, 40)}…
@@ -228,11 +203,6 @@ export function CheckoutPremiumModal({
             </div>
           </div>
         )}
-
-        {!pixCopiaCola && !loadingCpf && !cpfSalvo && (
-          <CpfJustInTimeInput value={cpfInput} onChange={setCpfInput} disabled={isLoading} />
-        )}
-
 
         <button
           type="button"

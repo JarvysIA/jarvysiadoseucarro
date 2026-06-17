@@ -20,7 +20,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as AssinaturasRouteImport } from './routes/assinaturas'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
@@ -80,11 +79,6 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AssinaturasRoute = AssinaturasRouteImport.update({
-  id: '/assinaturas',
-  path: '/assinaturas',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -105,7 +99,6 @@ const ApiPublicHooksFipeMonthlyRefreshRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/assinaturas': typeof AssinaturasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -122,7 +115,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/assinaturas': typeof AssinaturasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -140,7 +132,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRoute
-  '/assinaturas': typeof AssinaturasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -159,7 +150,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
-    | '/assinaturas'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -176,7 +166,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
-    | '/assinaturas'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -193,7 +182,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
-    | '/assinaturas'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -211,7 +199,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
-  AssinaturasRoute: typeof AssinaturasRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -305,13 +292,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/assinaturas': {
-      id: '/assinaturas'
-      path: '/assinaturas'
-      fullPath: '/assinaturas'
-      preLoaderRoute: typeof AssinaturasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -339,7 +319,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
-  AssinaturasRoute: AssinaturasRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,

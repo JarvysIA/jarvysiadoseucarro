@@ -14,51 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      assinaturas: {
-        Row: {
-          created_at: string
-          data_vencimento: string
-          id: string
-          status: string
-          updated_at: string
-          user_id: string
-          veiculo_id: string
-        }
-        Insert: {
-          created_at?: string
-          data_vencimento: string
-          id?: string
-          status?: string
-          updated_at?: string
-          user_id: string
-          veiculo_id: string
-        }
-        Update: {
-          created_at?: string
-          data_vencimento?: string
-          id?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-          veiculo_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "assinaturas_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "assinaturas_veiculo_id_fkey"
-            columns: ["veiculo_id"]
-            isOneToOne: false
-            referencedRelation: "veiculos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       despesas: {
         Row: {
           categoria: string
@@ -197,7 +152,6 @@ export type Database = {
           codigo_cupom: string | null
           created_at: string
           id: string
-          metadata: Json | null
           pix_copia_cola: string | null
           produto_ref_id: string | null
           status: string
@@ -205,13 +159,12 @@ export type Database = {
           txid_efi: string | null
           user_id: string
           valor: number
-          veiculo_id: string | null
+          veiculo_id: string
         }
         Insert: {
           codigo_cupom?: string | null
           created_at?: string
           id?: string
-          metadata?: Json | null
           pix_copia_cola?: string | null
           produto_ref_id?: string | null
           status?: string
@@ -219,13 +172,12 @@ export type Database = {
           txid_efi?: string | null
           user_id: string
           valor: number
-          veiculo_id?: string | null
+          veiculo_id: string
         }
         Update: {
           codigo_cupom?: string | null
           created_at?: string
           id?: string
-          metadata?: Json | null
           pix_copia_cola?: string | null
           produto_ref_id?: string | null
           status?: string
@@ -233,7 +185,7 @@ export type Database = {
           txid_efi?: string | null
           user_id?: string
           valor?: number
-          veiculo_id?: string | null
+          veiculo_id?: string
         }
         Relationships: [
           {
@@ -247,11 +199,9 @@ export type Database = {
       }
       profiles: {
         Row: {
-          asaas_customer_id: string | null
           cep: string | null
           cidade: string | null
           codigo_indicacao: string | null
-          cpf: string | null
           created_at: string
           email: string | null
           id: string
@@ -267,11 +217,9 @@ export type Database = {
           whatsapp: string
         }
         Insert: {
-          asaas_customer_id?: string | null
           cep?: string | null
           cidade?: string | null
           codigo_indicacao?: string | null
-          cpf?: string | null
           created_at?: string
           email?: string | null
           id: string
@@ -287,11 +235,9 @@ export type Database = {
           whatsapp: string
         }
         Update: {
-          asaas_customer_id?: string | null
           cep?: string | null
           cidade?: string | null
           codigo_indicacao?: string | null
-          cpf?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -482,7 +428,6 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       unaccent: { Args: { "": string }; Returns: string }
-      validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
