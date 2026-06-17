@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     if (tipo === "ativacao") {
       const { error: e } = await supabase
         .from("profiles")
-        .update({ status_usuario: "ativo" })
+        .update({ status_usuario: "ativo", permite_indicacao: true })
         .eq("id", userId);
       if (e) console.error("[asaas-webhook] erro ativar profile:", e);
       else console.info("[asaas-webhook] ativacao ✓ user:", userId);
@@ -154,24 +154,33 @@ Deno.serve(async (req) => {
     } else if (tipo === "mensalidade") {
       const vencimento = new Date();
       vencimento.setDate(vencimento.getDate() + 30);
-      const { error: e } = await supabase.from("assinaturas").upsert(
-        {
-          user_id: userId,
-          veiculo_id: veiculoId,
-          status: "ativo",
-          data_vencimento: vencimento.toISOString(),
-        },
-        { onConflict: "user_id,veiculo_id" },
-      );
-      if (e) console.error("[asaas-webhook] erro upsert assinatura:", e);
-      else console.info("[asaas-webhook] mensalidade ✓ user/veiculo:", userId, veiculoId);
+      let veiculoIdFinal = veiculoId;
 
-      if (veiculoId) {
-        await supabase
-          .from("veiculos")
-          .update({ status_pagamento: "ativo" })
-          .eq("id", veiculoId)
-          .eq("user_id", userId);
+      if (!veiculoIdFinal) {
+        const meta = pagamento.metadata as any;
+        if (meta?.placa) {
+          const { data: novoVeiculo } = await supabase
+            .from("veiculos")
+            .insert({
+              user_id: userId,
+              placa: meta.placa,
+              marca: meta.marca ?? null,
+              modelo: meta.modelo ?? null,
+              ano: meta.ano ?? null,
+            })
+            .select("id")
+            .single();
+          if (novoVeiculo) veiculoIdFinal = novoVeiculo.id;
+        }
+      }
+
+      if (veiculoIdFinal) {
+        await supabase.from("assinaturas").upsert(
+          { user_id: userId, veiculo_id: veiculoIdFinal, status: "ativo", data_vencimento: vencimento.toISOString() },
+          { onConflict: "user_id,veiculo_id" }
+        );
+        await supabase.from("veiculos").update({ status: "ativo" }).eq("id", veiculoIdFinal).eq("user_id", userId);
+        console.info("[asaas-webhook] mensalidade ✓ user/veiculo:", userId, veiculoIdFinal);
       }
     }
 
