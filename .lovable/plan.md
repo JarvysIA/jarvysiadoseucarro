@@ -1,71 +1,117 @@
-## Visão geral
+# Fase 1 — Migração Efí → Asaas (plano final aprovado nos ajustes)
 
-Vou preservar 100% do visual atual (Landing, Splash, Signup, Garagem, Bottom Nav). Toda a evolução é em **lógica + novas telas**, sem mexer no design existente.
+## Pré-checagens confirmadas
+- `pagamentos_pix.metadata jsonb` existe e está vazio nos 7 registros — disponível.
+- `profiles.asaas_customer_id` **existe** — reutilizada (sem migration).
+- RPC `validar_cupom_indicacao(text) → uuid` existe — usada como fonte autoritativa do padrinho.
+- Secrets `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` já cadastrados.
 
-Antes de codar preciso confirmar 2 pontos e habilitar o backend.
+## Princípios desta fase
+1. **Sem cópia literal do código Efí.** A lógica de pós-pagamento atual é re-expressa em um módulo novo, contendo **apenas o necessário ao fluxo Asaas**. Nenhuma refatoração fora de escopo.
+2. **Pipeline pós-pagamento idempotente único.** `asaas-webhook` e `verificar-pagamentos-asaas` chamam a mesma função interna.
+3. **`logs_erro_bonificacao` não é gravado nesta fase** — não há tentativa de PIX ao padrinho, logo não há falha de transferência a registrar.
+4. **Zero migrations.** Sem novas tabelas, colunas ou policies.
 
-## Pré-requisitos
+## Regra comercial (sem recriar lógica no frontend)
+- Sem cupom: R$ 29,90.
+- Com cupom válido: R$ 19,90.
+- Comissão padrinho: R$ 5,00 registrada em `metadata.comissao_padrinho` com `status='pendente'`. Nenhum pagamento ao padrinho nesta fase.
+- Validação/desconto seguem `validar_cupom_indicacao` no backend.
 
-1. **Habilitar Lovable Cloud** (banco + auth + storage). Sem isso não há onde salvar `profiles`, `veiculos` nem autenticar.
-2. **API de placa**: a BrasilAPI **não** consulta placa de veículo (só FIPE por código). A "Puxa Placa" é paga e exige token. Como ainda não temos credencial, vou implementar a etapa como **loading tecnológico simulado** (2s) que cai direto no fallback manual dentro do modal — assim o fluxo funciona hoje e plugamos a API real depois trocando 1 função.
-3. **Admin secreto**: `/master-admin` precisa de proteção. Vou usar tabela `user_roles` + role `admin` (padrão seguro Supabase). Eu te explico como te tornar admin via SQL após o primeiro cadastro.
+---
 
-## Modelagem do banco
+## A. Arquivos a criar
 
-**profiles** (1-1 com auth.users)
-- id (uuid, PK = auth.users.id)
-- nome (text)
-- whatsapp (text)
-- placa (text)
-- status_usuario (text, default 'trial') — 'trial' | 'ativo'
-- permite_indicacao (boolean, default false)
-- trial_inicio (timestamptz, default now())
-- created_at
+### A.1 `supabase/functions/_shared/pagamento-pipeline.ts` (NOVO)
+Função única **`confirmarPagamento({ supabase, pagamento_id })`** — escopo restrito ao fluxo Asaas:
 
-**veiculos**
-- id, user_id (FK profiles), placa, marca, modelo, ano, motorizacao, km_atual (nullable), created_at
+1. Carrega `pagamentos_pix` por `id`. Se já `status='pago'`, retorna `{ ok:true, already:true }` (idempotente).
+2. Marca `status='pago'`, `data_pagamento=now()`.
+3. **Histórico** (`tipo_produto='historico'`): `veiculos.history_locked=false` em `produto_ref_id ?? veiculo_id`.
+4. **Ativação** (`tipo_produto='ativacao'`):
+   - `veiculos.status='ativo'`,
+   - `profiles.status_usuario='ativo'`, `profiles.permite_indicacao=true`.
+5. **Indicação** (somente `ativacao` com `codigo_cupom`):
+   - `padrinho_id` ← RPC `validar_cupom_indicacao(codigo_cupom)`.
+   - Se válido e ≠ `user_id`: vincula `profiles.referrer_id`.
+   - Grava `metadata.comissao_padrinho` se ainda não existir:
+     ```json
+     { "padrinho_id", "afilhado_id": user_id, "pagamento_id": id,
+       "codigo_cupom", "valor": 5.00, "chave_pix": <snapshot pix_recebimento>,
+       "status": "pendente", "registrada_em": "<iso>" }
+     ```
+   - **Sem PIX, sem WhatsApp, sem `logs_erro_bonificacao`.**
 
-**user_roles** (separada, com enum `app_role`) + função `has_role()` security-definer.
+Todas as escritas verificam estado prévio. Função **não** altera nada fora desses 5 passos.
 
-RLS: usuário lê/edita só os próprios dados. Admins (via `has_role`) leem/atualizam tudo em `profiles`.
+### A.2 `supabase/functions/gerar-pix-asaas/index.ts` (NOVO)
+Mesma assinatura I/O de `gerar-pix-efi` (`{ user_id, veiculo_id, valor, codigo_cupom?, tipo_produto?, produto_ref_id? }` → `{ success, id, pix_copia_cola, txid_efi }`).
+- Customer: lê `profiles.asaas_customer_id`; se vazio, `POST /v3/customers` e atualiza.
+- `POST /v3/payments` (`billingType:"PIX"`, `value`, `dueDate=hoje`).
+- `GET /v3/payments/{id}/pixQrCode` → `payload`.
+- Insere em `pagamentos_pix` reusando colunas: `txid_efi ← asaas_payment_id`, `pix_copia_cola ← payload`, `metadata ← { gateway:"asaas", asaas_payment_id, asaas_customer_id }`.
 
-## Passo a passo de implementação
+### A.3 `supabase/functions/asaas-webhook/index.ts` (NOVO)
+- Valida header `asaas-access-token == ASAAS_WEBHOOK_TOKEN`.
+- Eventos `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED`.
+- Localiza `pagamentos_pix` por `metadata->>'asaas_payment_id'` (fallback `txid_efi`).
+- Chama **`confirmarPagamento`**. Responde 200.
 
-**1. Splash inteligente** — `src/routes/splash.tsx` passa a checar `supabase.auth.getSession()`. Logado → `/app`. Não logado → `/welcome`. (Hoje usa `localStorage`.)
+### A.4 `supabase/functions/verificar-pagamentos-asaas/index.ts` (NOVO)
+- Expira pendentes >1h (`status='expirado'`).
+- Lista pendentes <1h com `metadata->>'gateway'='asaas'`.
+- `GET /v3/payments/{asaas_payment_id}`; se `RECEIVED`/`CONFIRMED`, chama **a mesma** `confirmarPagamento`.
+- Nenhuma duplicação de regra.
 
-**2. Signup conectado ao Supabase** — `src/routes/signup.tsx` mantém UI idêntica. Submit:
-   - `supabase.auth.signUp({ email gerado a partir do whatsapp OU pedir email? veja questão abaixo, password })`
-   - Insere em `profiles` (`status_usuario='trial'`, `permite_indicacao=false`)
-   - Dispara loading "Lendo placa..." (2s simulados)
-   - Abre **CarConfirmModal**
+---
 
-**3. CarConfirmModal** (novo, `src/components/CarConfirmModal.tsx`)
-   - Mostra Marca/Modelo/Ano/Motorização (placeholder vazio no fluxo simulado → cai direto no fallback)
-   - Botão "Dados incorretos? Preencher manualmente" → abre inputs
-   - Campo "KM Atual do Painel (opcional)"
-   - "Confirmar e Ir para a Garagem" → insert em `veiculos`, fecha modal, navega para `/app`
-   - Estética: fundo grafite, borda neon, mesmo padrão da Splash/Landing
+## B. Arquivos a alterar (mínimo)
 
-**4. Renomear `/garagem` → `/app`** — mantém todo o layout/carrossel atual. Atualizo `BottomNav`, redirects e o link da Landing.
-   - Topo do `/app` lê `profiles.status_usuario`:
-     - `trial` → banner "Você tem 30 dias de acesso total grátis"
-     - `ativo` → sem banner
-   - Aba/seção de Indicações:
-     - `trial` → cadeado + CTA "Ative por R$ 9,90"
-     - `ativo` → link de afiliado liberado para copiar
+### B.1 `src/components/PaywallModal.tsx`
+Trocar `"gerar-pix-efi"` → `"gerar-pix-asaas"`. Nada mais.
 
-**5. `/master-admin`** (oculto, não linkado em nenhum lugar)
-   - Protegido por `has_role(uid, 'admin')` — se não for admin, redireciona pra `/`
-   - Campo busca por nome/whatsapp
-   - Lista profiles com botão "Tornar VIP" → update `status_usuario='ativo'`, `permite_indicacao=true`
+### B.2 `src/components/CheckoutPremiumModal.tsx`
+Trocar `"gerar-pix-efi"` → `"gerar-pix-asaas"`. Nada mais.
 
-## Decisões que preciso confirmar com você
+### B.3 Funções Efí (mesmo deploy)
+`gerar-pix-efi`, `efi-webhook`, `verificar-pagamentos-pix`, `setup-webhook-efi` passam a responder **HTTP 410 Gone** `{ error: "gateway descontinuado" }`. Remoção de arquivos e secrets `EFI_*` em PR posterior.
 
-**Q1 — Login:** o Supabase Auth exige **email + senha** (ou OAuth/telefone com SMS pago). Seu form atual tem WhatsApp + Senha, sem email. Como prefere?
-- **(a)** Adicionar campo Email no cadastro (mais simples, recomendado)
-- **(b)** Gerar email fake interno tipo `5511999999999@jarvys.app` a partir do WhatsApp (login fica "transparente" pro usuário, mas não dá pra recuperar senha por email)
-- **(c)** Habilitar login por telefone com SMS (custa por mensagem, precisa configurar provider tipo Twilio)
+---
 
-**Q2 — API de placa:** confirma que tudo bem começarmos com o **loading simulado + fallback manual** (e plugamos a API real depois)? Ou você já tem token de algum serviço (Puxa Placa, Placa Fipe, API Brasil, etc.) pra eu integrar agora?
+## C. Tabelas tocadas (zero DDL)
+- `pagamentos_pix` — insert/update `status`, `data_pagamento`, `metadata`.
+- `profiles` — leitura `codigo_indicacao`/`pix_recebimento`; escrita `asaas_customer_id`, `status_usuario`, `permite_indicacao`, `referrer_id`.
+- `veiculos` — `status`, `history_locked`.
+- RPC `validar_cupom_indicacao` — leitura.
+- `logs_erro_bonificacao` — **não tocada nesta fase**.
 
-Me responde essas 2 e eu sigo com a implementação completa.
+## D. Endpoints Asaas
+`POST /v3/customers`, `POST /v3/payments`, `GET /v3/payments/{id}/pixQrCode`, `GET /v3/payments/{id}`.
+
+## E. Secrets
+Reusar `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN`. Adicionar `ASAAS_ENV` (`production`). `EFI_*` mantidos até a validação real concluir; removidos depois.
+
+## F. Validação real (produção, contas controladas)
+- **A** Ativação sem cupom R$ 29,90 → `veiculos.status='ativo'`, `profiles.status_usuario='ativo'`, **sem** `metadata.comissao_padrinho`.
+- **B** Ativação com cupom R$ 19,90 → `metadata.comissao_padrinho` com `padrinho_id`, `afilhado_id`, `pagamento_id`, `status='pendente'`; **sem PIX enviado**, **sem `logs_erro_bonificacao`**.
+- **C** Histórico R$ 49,90 → `veiculos.history_locked=false`.
+- **D** Veículo extra R$ 9,90/mês → fase posterior.
+- Sandbox Asaas: opcional, apenas para sanity de comunicação inicial.
+
+## G. Riscos
+1. Consolidação do pipeline padroniza `veiculos.status='ativo'` (hoje há divergência `'active'`/`'ativo'` entre polling e webhook Efí). Efeito colateral aceito.
+2. Webhook Asaas mal configurado no painel — mitigado por `verificar-pagamentos-asaas` (janela 1h).
+3. Comissão acumula como `pendente` sem rotina de quitação — aceito; pagamento ao padrinho é fase futura.
+4. `validar_cupom_indicacao` é mais estrita que o fallback legado por `id`/prefixo do polling Efí. Alinha-se à regra oficial e ao `resolveReferrerId` do frontend.
+
+## H. Ordem de execução
+1. Criar `_shared/pagamento-pipeline.ts`.
+2. Criar `gerar-pix-asaas`, `asaas-webhook`, `verificar-pagamentos-asaas`.
+3. Tornar as 4 funções Efí inertes (HTTP 410).
+4. Trocar nome da function nos 2 componentes do frontend.
+5. Configurar `ASAAS_ENV=production` e webhook no painel Asaas (`/functions/v1/asaas-webhook`, header `asaas-access-token`).
+6. Executar validações A, B, C; D depois.
+7. PR de limpeza: remover arquivos e secrets `EFI_*`.
+
+## I. Explicitamente fora de escopo
+Tabela `comissoes_indicacao` dedicada; rotina/painel de pagamento ao padrinho; rename `txid_efi`; Asaas Transfer; WhatsApp ao padrinho; polling no `PaywallModal`; qualquer migration; qualquer mudança em OCR, IA, despesas, autenticação ou estrutura de veículos.
