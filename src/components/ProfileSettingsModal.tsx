@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, User as UserIcon } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
+import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
 
 type Props = {
   open: boolean;
@@ -25,6 +26,7 @@ type ProfileRow = {
   cidade: string | null;
   uf: string | null;
   pix_recebimento: string | null;
+  cpf: string | null;
 };
 
 function maskCep(v: string): string {
@@ -44,6 +46,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [uf, setUf] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [pixRecebimento, setPixRecebimento] = useState("");
+  const [cpf, setCpf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       }
       const { data } = await supabase
         .from("profiles")
-        .select("id,nome,email,whatsapp,cep,cidade,uf,pix_recebimento")
+        .select("id,nome,email,whatsapp,cep,cidade,uf,pix_recebimento,cpf")
         .eq("id", userId)
         .maybeSingle();
       if (cancel) return;
@@ -71,6 +74,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       setCidade(p?.cidade || "");
       setUf(p?.uf || "");
       setPixRecebimento(p?.pix_recebimento || "");
+      setCpf(p?.cpf ? maskCpf(p.cpf) : "");
       setNewPassword("");
       setLoading(false);
     })();
@@ -103,6 +107,12 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
 
   const save = async () => {
     if (!profile) return;
+    // CPF: aceita vazio (opcional) ou válido
+    const cpfDigits = onlyDigits(cpf);
+    if (cpfDigits.length > 0 && !isValidCpf(cpfDigits)) {
+      toast.error("CPF inválido.");
+      return;
+    }
     setSaving(true);
     try {
       const cepDigits = cep.replace(/\D/g, "") || null;
@@ -113,12 +123,14 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         uf: string | null;
         email?: string;
         pix_recebimento: string | null;
+        cpf: string | null;
       } = {
         whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
         uf: uf.trim().toUpperCase().slice(0, 2) || null,
         pix_recebimento: pixRecebimento.trim() || null,
+        cpf: cpfDigits || null,
       };
       if (email && email !== profile.email) updates.email = email.trim();
 
@@ -203,6 +215,20 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
               />
             </Field>
+
+            <Field label="CPF" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
+              <input
+                inputMode="numeric"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => setCpf(maskCpf(e.target.value))}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+              />
+              <span className="mt-1 text-[10px] text-muted-foreground">
+                Necessário para gerar PIX (exigência do Banco Central).
+              </span>
+            </Field>
+
 
             <Field label="Chave PIX para Recebimento de Indicação" icon={<KeyRound className="h-3.5 w-3.5" />}>
               <input

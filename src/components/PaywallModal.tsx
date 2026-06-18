@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveReferrerId } from "@/lib/referral";
+import { CpfRequiredModal } from "@/components/CpfRequiredModal";
 
 export function PaywallModal({
   open,
@@ -34,6 +35,7 @@ export function PaywallModal({
   const [pixCopiaCola, setPixCopiaCola] = useState("");
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
+  const [cpfModalOpen, setCpfModalOpen] = useState(false);
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -84,6 +86,19 @@ export function PaywallModal({
         return;
       }
 
+      // Pré-checagem: CPF obrigatório (regra do Banco Central / Asaas)
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("cpf")
+        .eq("id", userId)
+        .maybeSingle();
+      const cpfDigits = (prof?.cpf ?? "").toString().replace(/\D/g, "");
+      if (cpfDigits.length !== 11) {
+        setIsLoadingPix(false);
+        setCpfModalOpen(true);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
@@ -94,6 +109,11 @@ export function PaywallModal({
       });
 
       if (error) throw error;
+      if (data?.error === "CPF_REQUIRED") {
+        setIsLoadingPix(false);
+        setCpfModalOpen(true);
+        return;
+      }
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
@@ -134,6 +154,7 @@ export function PaywallModal({
   ];
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-md sm:items-center">
       <div
         className="relative w-full max-w-md overflow-hidden rounded-t-3xl border border-primary/40 bg-card p-6 sm:rounded-3xl"
@@ -287,5 +308,14 @@ export function PaywallModal({
         </button>
       </div>
     </div>
+    <CpfRequiredModal
+      open={cpfModalOpen}
+      onOpenChange={setCpfModalOpen}
+      onConfirmed={() => {
+        setCpfModalOpen(false);
+        void gerarPix();
+      }}
+    />
+    </>
   );
 }

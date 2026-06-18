@@ -51,6 +51,13 @@ async function asaasFetch(
   });
 }
 
+class CpfRequiredError extends Error {
+  constructor() {
+    super("CPF é obrigatório para gerar o PIX (exigência do Banco Central).");
+    this.name = "CpfRequiredError";
+  }
+}
+
 async function ensureCustomer(
   apiKey: string,
   supabase: ReturnType<typeof createClient>,
@@ -64,11 +71,16 @@ async function ensureCustomer(
 
   if (profile?.asaas_customer_id) return profile.asaas_customer_id as string;
 
+  const cpfDigits = (profile?.cpf ?? "").toString().replace(/\D/g, "");
+  if (!cpfDigits || cpfDigits.length < 11) {
+    throw new CpfRequiredError();
+  }
+
   const body: Record<string, unknown> = {
     name: profile?.nome ?? "Cliente Jarvys",
     email: profile?.email ?? undefined,
     mobilePhone: profile?.whatsapp ?? undefined,
-    cpfCnpj: profile?.cpf ?? undefined,
+    cpfCnpj: cpfDigits,
     externalReference: user_id,
   };
 
@@ -183,6 +195,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[gerar-pix-asaas]", err);
+    if (err instanceof CpfRequiredError) {
+      return json({ error: "CPF_REQUIRED", message: err.message }, 400);
+    }
     return json(
       { error: err instanceof Error ? err.message : "Erro desconhecido" },
       500,

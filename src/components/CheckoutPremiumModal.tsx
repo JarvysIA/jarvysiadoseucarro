@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { CpfRequiredModal } from "@/components/CpfRequiredModal";
 
 const VALOR_HISTORICO = 49.9;
 
@@ -33,6 +34,7 @@ export function CheckoutPremiumModal({
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
+  const [cpfModalOpen, setCpfModalOpen] = useState(false);
 
   // Reset ao fechar
   useEffect(() => {
@@ -41,6 +43,7 @@ export function CheckoutPremiumModal({
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
+      setCpfModalOpen(false);
     }
   }, [open]);
 
@@ -74,6 +77,19 @@ export function CheckoutPremiumModal({
         return;
       }
 
+      // Pré-checagem: CPF é obrigatório (regra do Banco Central / Asaas)
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("cpf")
+        .eq("id", userId)
+        .maybeSingle();
+      const cpfDigits = (prof?.cpf ?? "").toString().replace(/\D/g, "");
+      if (cpfDigits.length !== 11) {
+        setIsLoading(false);
+        setCpfModalOpen(true);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
@@ -85,6 +101,11 @@ export function CheckoutPremiumModal({
       });
 
       if (error) throw error;
+      if (data?.error === "CPF_REQUIRED") {
+        setIsLoading(false);
+        setCpfModalOpen(true);
+        return;
+      }
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
@@ -114,6 +135,7 @@ export function CheckoutPremiumModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !isLoading && onOpenChange(v)}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-md">
         <DialogHeader>
@@ -235,5 +257,14 @@ export function CheckoutPremiumModal({
         </p>
       </DialogContent>
     </Dialog>
+    <CpfRequiredModal
+      open={cpfModalOpen}
+      onOpenChange={setCpfModalOpen}
+      onConfirmed={() => {
+        setCpfModalOpen(false);
+        void gerarPix();
+      }}
+    />
+    </>
   );
 }
