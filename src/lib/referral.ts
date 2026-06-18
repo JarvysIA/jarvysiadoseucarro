@@ -34,16 +34,11 @@ export async function resolveReferrerId(refCode: string): Promise<string | null>
   const code = refCode.trim();
   if (!code) return null;
 
-  // 1) Tenta pelo codigo_indicacao (case-insensitive)
-  const byCode = await supabase
-    .from("profiles")
-    .select("id")
-    .ilike("codigo_indicacao", code)
-    .limit(1)
-    .maybeSingle();
-  if (byCode.data?.id) return byCode.data.id;
+  // 1) Valida via RPC (SECURITY DEFINER, ignora RLS e é case-insensitive via ILIKE)
+  const { data, error } = await supabase.rpc("validar_cupom_indicacao", { _codigo: code });
+  if (!error && data) return data as unknown as string;
 
-  // 2) Fallback legado: prefixo do uuid
+  // 2) Fallback legado: prefixo do uuid (apenas se RPC não encontrou)
   const legacy = code.toLowerCase();
   if (/^[a-f0-9-]{4,}$/i.test(legacy)) {
     const byUuid = await supabase
@@ -56,3 +51,4 @@ export async function resolveReferrerId(refCode: string): Promise<string | null>
   }
   return null;
 }
+
