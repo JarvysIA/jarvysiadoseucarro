@@ -195,6 +195,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[gerar-pix-asaas]", err);
+    if (err instanceof CpfRequiredError) {
+      return json({ error: "CPF_REQUIRED", message: err.message }, 400);
+    }
     return json(
       { error: err instanceof Error ? err.message : "Erro desconhecido" },
       500,
