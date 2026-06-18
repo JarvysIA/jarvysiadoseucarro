@@ -84,7 +84,7 @@ export function PaywallModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -94,13 +94,13 @@ export function PaywallModal({
       });
 
       if (error) throw error;
-      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
       setTxid(data.txid_efi ?? "");
       toast.success("PIX gerado! Copie o código abaixo.");
     } catch (e) {
-      console.error("[gerar-pix-efi]", e);
+      console.error("[gerar-pix-asaas]", e);
       toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
       setPixCopiaCola("");
       setTxid("");
