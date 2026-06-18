@@ -69,14 +69,12 @@ async function ensureCustomer(
     .eq("id", user_id)
     .maybeSingle();
 
-  if (profile?.asaas_customer_id) return profile.asaas_customer_id as string;
-
   const cpfDigits = (profile?.cpf ?? "").toString().replace(/\D/g, "");
   if (!cpfDigits || cpfDigits.length < 11) {
     throw new CpfRequiredError();
   }
 
-  const body: Record<string, unknown> = {
+  const baseBody: Record<string, unknown> = {
     name: profile?.nome ?? "Cliente Jarvys",
     email: profile?.email ?? undefined,
     mobilePhone: profile?.whatsapp ?? undefined,
@@ -84,9 +82,34 @@ async function ensureCustomer(
     externalReference: user_id,
   };
 
+  // Se já existe customer na Asaas, atualiza com CPF (caso tenha sido criado antes do fluxo de CPF)
+  if (profile?.asaas_customer_id) {
+    const existingId = profile.asaas_customer_id as string;
+    const updRes = await asaasFetch(
+      apiKey,
+      `/customers/${encodeURIComponent(existingId)}`,
+      { method: "POST", body: JSON.stringify(baseBody) },
+    );
+    if (updRes.ok) {
+      return existingId;
+    }
+    if (updRes.status === 404) {
+      // customer sumiu na Asaas → limpa e recria abaixo
+      await supabase
+        .from("profiles")
+        .update({ asaas_customer_id: null })
+        .eq("id", user_id);
+    } else {
+      const raw = await updRes.json().catch(() => ({}));
+      throw new Error(
+        `Asaas /customers/${existingId} ${updRes.status}: ${JSON.stringify(raw)}`,
+      );
+    }
+  }
+
   const res = await asaasFetch(apiKey, "/customers", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify(baseBody),
   });
   const raw = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -104,6 +127,7 @@ async function ensureCustomer(
 
   return customerId;
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
