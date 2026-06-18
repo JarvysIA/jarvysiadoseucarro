@@ -216,6 +216,20 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               />
             </Field>
 
+            <Field label="CPF" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
+              <input
+                inputMode="numeric"
+                placeholder="000.000.000-00"
+                value={cpf}
+                onChange={(e) => setCpf(maskCpf(e.target.value))}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+              />
+              <span className="mt-1 text-[10px] text-muted-foreground">
+                Necessário para gerar PIX (exigência do Banco Central).
+              </span>
+            </Field>
+
+
             <Field label="Chave PIX para Recebimento de Indicação" icon={<KeyRound className="h-3.5 w-3.5" />}>
               <input
                 type="text"
