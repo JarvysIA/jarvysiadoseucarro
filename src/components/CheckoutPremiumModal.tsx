@@ -74,7 +74,7 @@ export function CheckoutPremiumModal({
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("gerar-pix-efi", {
+      const { data, error } = await supabase.functions.invoke("gerar-pix-asaas", {
         body: {
           user_id: userId,
           veiculo_id: vehicleId,
@@ -85,7 +85,7 @@ export function CheckoutPremiumModal({
       });
 
       if (error) throw error;
-      if (!data?.pix_copia_cola) throw new Error("Resposta inválida da Efí");
+      if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
       setPagamentoId(data.id ?? null);
