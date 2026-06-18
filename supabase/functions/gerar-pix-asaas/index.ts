@@ -58,7 +58,7 @@ async function ensureCustomer(
 ): Promise<string> {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("asaas_customer_id, nome, email, telefone, cpf")
+    .select("asaas_customer_id, nome, email, whatsapp, cpf")
     .eq("id", user_id)
     .maybeSingle();
 
@@ -67,7 +67,7 @@ async function ensureCustomer(
   const body: Record<string, unknown> = {
     name: profile?.nome ?? "Cliente Jarvys",
     email: profile?.email ?? undefined,
-    mobilePhone: profile?.telefone ?? undefined,
+    mobilePhone: profile?.whatsapp ?? undefined,
     cpfCnpj: profile?.cpf ?? undefined,
     externalReference: user_id,
   };
