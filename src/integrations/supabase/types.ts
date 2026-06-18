@@ -196,6 +196,7 @@ export type Database = {
         Row: {
           codigo_cupom: string | null
           created_at: string
+          data_pagamento: string | null
           id: string
           metadata: Json | null
           pix_copia_cola: string | null
@@ -210,6 +211,7 @@ export type Database = {
         Insert: {
           codigo_cupom?: string | null
           created_at?: string
+          data_pagamento?: string | null
           id?: string
           metadata?: Json | null
           pix_copia_cola?: string | null
@@ -224,6 +226,7 @@ export type Database = {
         Update: {
           codigo_cupom?: string | null
           created_at?: string
+          data_pagamento?: string | null
           id?: string
           metadata?: Json | null
           pix_copia_cola?: string | null
