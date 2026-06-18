@@ -135,6 +135,7 @@ export function CheckoutPremiumModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !isLoading && onOpenChange(v)}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-md">
         <DialogHeader>
@@ -256,5 +257,14 @@ export function CheckoutPremiumModal({
         </p>
       </DialogContent>
     </Dialog>
+    <CpfRequiredModal
+      open={cpfModalOpen}
+      onOpenChange={setCpfModalOpen}
+      onConfirmed={() => {
+        setCpfModalOpen(false);
+        void gerarPix();
+      }}
+    />
+    </>
   );
 }
