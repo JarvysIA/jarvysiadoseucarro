@@ -13,9 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 const VALOR_HISTORICO = 49.9;
 
 /**
- * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Efí).
+ * Modal de checkout do "Porta-Luvas Digital" — R$ 49,90 via PIX (Asaas).
  * Cartão temporariamente desabilitado (operação 100% PIX para evitar chargebacks).
- * Quando o pagamento é confirmado pela Edge Function `verificar-pagamentos-pix`,
+ * Quando o pagamento é confirmado pela Edge Function `verificar-pagamentos-asaas`,
  * o `history_locked` do veículo é setado para `false` automaticamente.
  */
 export function CheckoutPremiumModal({
