@@ -59,6 +59,47 @@ export type Database = {
           },
         ]
       }
+      carteiras_indicacao: {
+        Row: {
+          created_at: string
+          id: string
+          saldo_disponivel: number
+          saldo_pendente: number
+          saldo_reservado: number
+          total_indicacoes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          saldo_disponivel?: number
+          saldo_pendente?: number
+          saldo_reservado?: number
+          total_indicacoes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          saldo_disponivel?: number
+          saldo_pendente?: number
+          saldo_reservado?: number
+          total_indicacoes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carteiras_indicacao_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       despesas: {
         Row: {
           categoria: string
@@ -188,6 +229,104 @@ export type Database = {
             columns: ["pagamento_id"]
             isOneToOne: false
             referencedRelation: "pagamentos_pix"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimentacoes_indicacao: {
+        Row: {
+          afilhado_id: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          liberado_em: string | null
+          padrinho_id: string
+          pagamento_id: string | null
+          referencia: string | null
+          status: string
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          afilhado_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          liberado_em?: string | null
+          padrinho_id: string
+          pagamento_id?: string | null
+          referencia?: string | null
+          status: string
+          tipo: string
+          valor: number
+        }
+        Update: {
+          afilhado_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          liberado_em?: string | null
+          padrinho_id?: string
+          pagamento_id?: string | null
+          referencia?: string | null
+          status?: string
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_indicacao_afilhado_id_fkey"
+            columns: ["afilhado_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_indicacao_padrinho_id_fkey"
+            columns: ["padrinho_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificacoes_indicacao: {
+        Row: {
+          created_at: string
+          id: string
+          lida: boolean
+          mensagem: string
+          payload: Json
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem: string
+          payload?: Json
+          tipo: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string
+          payload?: Json
+          tipo?: string
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_indicacao_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -476,6 +615,9 @@ export type Database = {
     }
     Functions: {
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
+      get_indicacao_dias_bloqueio: { Args: never; Returns: number }
+      get_indicacao_saque_minimo: { Args: never; Returns: number }
+      get_indicacao_valor_comissao: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -484,6 +626,24 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      liberar_comissoes_indicacao: {
+        Args: never
+        Returns: {
+          canceladas: number
+          liberadas: number
+        }[]
+      }
+      registrar_comissao_indicacao: {
+        Args: {
+          _afilhado_id: string
+          _descricao?: string
+          _padrinho_id: string
+          _pagamento_id: string
+          _referencia: string
+          _valor?: number
+        }
+        Returns: string
+      }
       unaccent: { Args: { "": string }; Returns: string }
       validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
     }
