@@ -1,25 +1,31 @@
-## Diagnóstico
+## Objetivo
+Exibir QR Code real escaneável no checkout PIX Asaas, mantendo copia e cola e tudo mais intacto.
 
-O cupom é gerado em MAIÚSCULAS, mas o problema **não é caixa alta vs. minúscula** — a função `resolveReferrerId` (em `src/lib/referral.ts`) já usa `ILIKE`, que é case-insensitive.
+## Arquivos tocados (3)
+1. `supabase/functions/gerar-pix-asaas/index.ts` — propagar `encodedImage` da resposta `/pixQrCode` do Asaas para o retorno da function.
+2. `src/components/CheckoutPremiumModal.tsx` — renderizar `<img>` do QR Code acima do copia e cola.
+3. `src/components/PaywallModal.tsx` — idem (cobre R$19,90 com cupom e R$49,90 do histórico, ambos usam este modal/CheckoutPremium).
 
-O motivo real do "cupom inválido" é **RLS da tabela `profiles`**: as policies atuais só permitem ao usuário logado ler o próprio perfil. Quando ele tenta aplicar um cupom de outro usuário (padrinho), o `SELECT` em `profiles` não retorna nada — independente de maiúsculas/minúsculas.
+Sem alteração em: banco/schema, webhook, pipeline, carteira de indicação, ativação, OCR, IA, veículos, valores, RPCs, RLS.
 
-Já existe a função `validar_cupom_indicacao(_codigo text)` no banco, `SECURITY DEFINER` e usando `ILIKE`, que retorna o `id` do padrinho ignorando RLS e ignorando caixa. Basta usá-la.
+## Mudanças
 
-## Mudança
+### Edge function `gerar-pix-asaas`
+- Ler também `encodedImage` (e `expirationDate`) do JSON de `/v3/payments/{id}/pixQrCode`.
+- Incluir `qr_code_base64: encodedImage ?? null` no JSON de resposta (além do `pix_copia_cola` já existente).
+- Não persistir nada novo no banco (o `encodedImage` pode ser regerado; mantém schema intacto).
+- Não falhar se faltar `encodedImage` — apenas omitir o campo.
 
-**Arquivo:** `src/lib/referral.ts` — função `resolveReferrerId`
+### Componentes de checkout
+Em ambos os modais, quando `pixCopiaCola` estiver preenchido:
+- Armazenar `qrCodeBase64` retornado pela function (novo state).
+- Renderizar acima do bloco de copia e cola:
+  - Se `qrCodeBase64` existir: `<img src={qrCodeBase64.startsWith("data:") ? qrCodeBase64 : \`data:image/png;base64,${qrCodeBase64}\`} alt="QR Code PIX" />` centralizado, ~220px.
+  - Fallback: se a function não devolver `qr_code_base64`, gerar localmente a partir do `pix_copia_cola` usando a lib `qrcode` (adicionar `bun add qrcode` + `@types/qrcode`) renderizando em `<canvas>` ou `<img>` com `QRCode.toDataURL`.
+- Manter intactos: botão Copiar, texto copia e cola, polling de status, valores.
 
-1. Substituir a query direta em `profiles` por uma chamada RPC:
-   ```ts
-   const { data, error } = await supabase.rpc("validar_cupom_indicacao", { _codigo: code });
-   if (data) return data as string;
-   ```
-2. Manter o fallback legado (prefixo de UUID) só se ainda houver usuários antigos — também usar RPC ou remover. Vou manter, mas só roda se o RPC não retornar nada.
-3. Normalização: aplicar `trim()` (já existe). Não precisa `toUpperCase()` porque o `ILIKE` no SQL já é case-insensitive.
-
-## Resultado esperado
-
-- Cupom digitado em qualquer caixa (`joao-jarvys-1234`, `JOAO-JARVYS-1234`, `Joao-Jarvys-1234`) é aceito.
-- Não há mais bloqueio por RLS, pois a validação ocorre dentro de uma função `SECURITY DEFINER`.
-- Nenhuma alteração no banco, no PaywallModal, no pipeline de pagamento ou nas policies.
+## Critério de aceite
+- R$29,90 (CheckoutPremium): QR aparece + copia e cola funciona.
+- R$19,90 com cupom: idem.
+- R$49,90 histórico (Paywall): idem.
+- Pagamento via QR confirma normalmente (webhook/pipeline inalterados).
