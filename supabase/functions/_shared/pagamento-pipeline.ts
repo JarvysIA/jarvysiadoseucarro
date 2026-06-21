@@ -36,9 +36,60 @@ export async function confirmarPagamento(
   if (errSel) throw errSel;
   if (!pag) throw new Error(`pagamento ${pagamento_id} não encontrado`);
 
-  // Idempotência: se já está pago, não reprocessa
+  // Idempotência: se já está pago, não reprocessa o fluxo principal.
+  // Hardening: ainda assim, tenta auto-curar comissão de indicação se houver
+  // metadata.comissao_padrinho legada sem movimentação registrada.
+  // A RPC é idempotente (UNIQUE em pagamento_id), então não duplica.
   if (pag.status === "pago") {
-    return { ok: true, already: true, pagamento_id, tipo_produto: pag.tipo_produto ?? undefined };
+    let comissao_registrada = false;
+    const meta = (pag.metadata as Record<string, unknown> | null) ?? {};
+    const comissaoMeta = (meta && typeof meta === "object" ? meta["comissao_padrinho"] : null) as
+      | Record<string, unknown>
+      | null;
+    if (
+      pag.tipo_produto !== "historico" &&
+      pag.codigo_cupom &&
+      comissaoMeta &&
+      typeof comissaoMeta === "object"
+    ) {
+      try {
+        const padrinho_id = (comissaoMeta["padrinho_id"] as string | undefined) ?? null;
+        const afilhado_id = (comissaoMeta["afilhado_id"] as string | undefined) ?? pag.user_id;
+        const cupom = String(pag.codigo_cupom).trim();
+        const valor = Number(comissaoMeta["valor"] ?? COMISSAO_VALOR);
+        if (padrinho_id && afilhado_id && padrinho_id !== afilhado_id) {
+          const { data: movId, error: errReg } = await supabase.rpc(
+            "registrar_comissao_indicacao",
+            {
+              _padrinho_id: padrinho_id,
+              _afilhado_id: afilhado_id,
+              _pagamento_id: pag.id,
+              _referencia: `cupom_${cupom}`,
+              _valor: valor,
+              _descricao: `Comissão por ativação com cupom ${cupom} (auto-cura)`,
+            },
+          );
+          if (errReg) throw errReg;
+          comissao_registrada = movId !== null;
+        }
+      } catch (e) {
+        console.error("[pipeline] auto-cura indicação falhou (não bloqueia):", e);
+        try {
+          await supabase.from("logs_erro_bonificacao").insert({
+            pagamento_id,
+            codigo_cupom: pag.codigo_cupom ?? null,
+            erro: ("auto-cura: " + (e instanceof Error ? e.message : String(e))).slice(0, 1000),
+          });
+        } catch (_) { /* swallow */ }
+      }
+    }
+    return {
+      ok: true,
+      already: true,
+      pagamento_id,
+      tipo_produto: pag.tipo_produto ?? undefined,
+      comissao_registrada,
+    };
   }
 
   const tipo = pag.tipo_produto === "historico" ? "historico" : "ativacao";
