@@ -20,6 +20,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
@@ -79,6 +80,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CarteiraRoute = CarteiraRouteImport.update({
+  id: '/carteira',
+  path: '/carteira',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -99,6 +105,7 @@ const ApiPublicHooksFipeMonthlyRefreshRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/forgot-password': typeof ForgotPasswordRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/carteira'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/carteira'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/carteira'
     | '/dashboard'
     | '/despesas'
     | '/forgot-password'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRoute
+  CarteiraRoute: typeof CarteiraRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
@@ -292,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/carteira': {
+      id: '/carteira'
+      path: '/carteira'
+      fullPath: '/carteira'
+      preLoaderRoute: typeof CarteiraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -319,6 +339,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRoute,
+  CarteiraRoute: CarteiraRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
@@ -335,13 +356,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
