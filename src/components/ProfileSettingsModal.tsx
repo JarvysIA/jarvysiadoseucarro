@@ -37,6 +37,7 @@ function maskCep(v: string): string {
 }
 
 export function ProfileSettingsModal({ open, onClose }: Props) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -186,6 +187,21 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
           </div>
         ) : (
           <div className="mt-2 flex flex-col gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate({ to: "/carteira" });
+              }}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-3 text-left text-sm font-semibold hover:border-primary/60"
+            >
+              <span className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-primary" />
+                Minha Carteira Jarvys
+              </span>
+              <span className="text-xs text-muted-foreground">Abrir →</span>
+            </button>
+
             <Field label="E-mail" icon={<Mail className="h-3.5 w-3.5" />}>
               <input
                 type="email"
