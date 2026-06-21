@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, User as UserIcon, Wallet } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   Dialog,
