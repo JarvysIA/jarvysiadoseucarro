@@ -112,7 +112,7 @@ export async function confirmarPagamento(
 
   // 4) Ativação
   if (pag.veiculo_id) {
-    await supabase.from("veiculos").update({ status: "active" }).eq("id", pag.veiculo_id);
+    await supabase.from("veiculos").update({ status: "ativo" }).eq("id", pag.veiculo_id);
   }
   if (pag.user_id) {
     await supabase
