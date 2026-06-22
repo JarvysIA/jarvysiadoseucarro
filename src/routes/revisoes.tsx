@@ -55,6 +55,7 @@ function RevisoesPage() {
     km_atual: number;
     placa: string;
     foto_url: string | null;
+    status: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ function RevisoesPage() {
     }
     supabase
       .from("veiculos")
-      .select("id,km_atual,history_locked,claimed_at,placa,marca,modelo,ano,cor,foto_url")
+      .select("id,km_atual,history_locked,claimed_at,placa,marca,modelo,ano,cor,foto_url,status")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
@@ -82,6 +83,7 @@ function RevisoesPage() {
           ano: string | null;
           cor: string | null;
           foto_url: string | null;
+          status?: string | null;
         };
         setVehicleKm(v?.km_atual ?? 0);
         setHistoryLocked(Boolean(v?.history_locked));
@@ -97,6 +99,7 @@ function RevisoesPage() {
             km_atual: v.km_atual ?? 0,
             placa: v.placa,
             foto_url: v.foto_url,
+            status: v.status ?? null,
           });
         }
       });
