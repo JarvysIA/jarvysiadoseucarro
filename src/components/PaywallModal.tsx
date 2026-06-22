@@ -34,6 +34,7 @@ export function PaywallModal({
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
   const [cpfModalOpen, setCpfModalOpen] = useState(false);
