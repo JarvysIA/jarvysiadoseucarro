@@ -2,12 +2,16 @@ import type { ProfileStatus } from "./profile-status";
 import { isActiveVehicleStatus, type VehicleStatus } from "./vehicle-status";
 
 export type Capability =
-  | "canUseAI"
-  | "canUseScanner"
-  | "canUseWhatsApp"
+  | "canUseAppJarvysChat"
+  | "canUseWhatsappJarvys"
+  | "canUseReceiptScanner"
+  | "canUseWhatsappOCR"
+  | "canUseWhatsapp"
+  | "canUseFipeCurrent"
+  | "canUseFipeAutoRefresh"
+  | "canUseFipeHistoryRefresh"
   | "canAddVehicle"
   | "canHaveUnlimitedVehicles"
-  | "canUseFipeAuto"
   | "canUseHistoricoPremium";
 
 export type BlockReason =
@@ -28,6 +32,21 @@ export type PlanContext = {
 export type VehicleContext = {
   status: VehicleStatus | string | null;
   activated_at?: string | null;
+  /**
+   * Bloqueio do histórico premium pago (R$49,90) PARA O VEÍCULO DO USUÁRIO ATUAL.
+   *
+   * Regras obrigatórias para quem preencher este campo:
+   * - Deve refletir SOMENTE o registro de veiculos pertencente ao usuário
+   *   autenticado (mesmo user_id), nunca uma consulta agregada por placa.
+   * - NÃO copiar history_locked=false de um veículo `archived` de outro
+   *   usuário que tenha cadastrado a mesma placa no passado.
+   * - Novo cadastro da mesma placa por outro usuário deve nascer com
+   *   history_locked=true (bloqueado), exigindo novo pagamento.
+   * - Entitlement premium não é transferível entre usuários, mesmo que a
+   *   placa seja a mesma. Apenas o status `vip` ignora esta regra
+   *   (ver canUseHistoricoPremium).
+   */
+  history_locked?: boolean | null;
 };
 
 const TRIAL_DURATION_DAYS = 30;
@@ -58,6 +77,24 @@ function vehicleIsActive(vehicle?: VehicleContext): boolean {
   return isActiveVehicleStatus(vehicle.status);
 }
 
+/**
+ * canUseHistoricoPremium
+ * - vip → libera sempre (benefício do plano).
+ * - Qualquer outro status (trial/ativo/enterprise/free) → libera somente
+ *   se vehicle.history_locked === false, e esse vehicle DEVE pertencer ao
+ *   usuário atual (ver VehicleContext.history_locked).
+ * - Default seguro: ausência de vehicle, history_locked !== false → bloqueia.
+ * - NÃO depende de trialActive, NÃO depende de veículo "ativado",
+ *   NÃO se mistura com canUseFipeHistoryRefresh.
+ */
+function canUseHistoricoPremium(
+  plan: PlanContext,
+  vehicle?: VehicleContext,
+): boolean {
+  if (plan.status_usuario === "vip") return true;
+  return vehicle?.history_locked === false;
+}
+
 export function can(
   capability: Capability,
   plan: PlanContext,
@@ -65,19 +102,29 @@ export function can(
 ): boolean {
   const status = plan.status_usuario;
 
-  // vip / enterprise: pode tudo nesta fase
+  // vip / enterprise: pode tudo exceto canUseHistoricoPremium quando não pago
   if (status === "vip" || status === "enterprise") {
+    if (capability === "canUseHistoricoPremium") {
+      return canUseHistoricoPremium(plan, vehicle);
+    }
     return true;
   }
 
   if (status === "trial") {
     const active = trialActive(plan);
     switch (capability) {
-      case "canUseAI":
-      case "canUseScanner":
-      case "canUseWhatsApp":
-      case "canUseFipeAuto":
+      case "canUseAppJarvysChat":
+        return true;
+      case "canUseFipeCurrent":
+        return true;
       case "canUseHistoricoPremium":
+        return canUseHistoricoPremium(plan, vehicle);
+      case "canUseReceiptScanner":
+      case "canUseWhatsapp":
+      case "canUseWhatsappJarvys":
+      case "canUseWhatsappOCR":
+      case "canUseFipeAutoRefresh":
+      case "canUseFipeHistoryRefresh":
         return active;
       case "canAddVehicle":
         return plan.vehicleCount < 1;
@@ -90,11 +137,18 @@ export function can(
 
   if (status === "ativo") {
     switch (capability) {
-      case "canUseAI":
-      case "canUseScanner":
-      case "canUseWhatsApp":
-      case "canUseFipeAuto":
+      case "canUseAppJarvysChat":
+        return true;
+      case "canUseFipeCurrent":
+        return true;
       case "canUseHistoricoPremium":
+        return canUseHistoricoPremium(plan, vehicle);
+      case "canUseReceiptScanner":
+      case "canUseWhatsapp":
+      case "canUseWhatsappJarvys":
+      case "canUseWhatsappOCR":
+      case "canUseFipeAutoRefresh":
+      case "canUseFipeHistoryRefresh":
         return vehicleIsActive(vehicle);
       case "canAddVehicle":
         return plan.vehicleCount < plan.activatedVehicleCount + 1;
@@ -126,13 +180,24 @@ export function reasonBlocked(
   if (status === "ativo") {
     if (capability === "canAddVehicle") return "vehicle_limit_reached";
     if (
-      capability === "canUseAI" ||
-      capability === "canUseScanner" ||
-      capability === "canUseWhatsApp" ||
-      capability === "canUseFipeAuto" ||
-      capability === "canUseHistoricoPremium"
+      capability === "canUseReceiptScanner" ||
+      capability === "canUseWhatsapp" ||
+      capability === "canUseWhatsappJarvys" ||
+      capability === "canUseWhatsappOCR" ||
+      capability === "canUseFipeAutoRefresh" ||
+      capability === "canUseFipeHistoryRefresh"
     ) {
       return vehicle ? "vehicle_not_activated" : "feature_requires_activation";
+    }
+    return "unknown";
+  }
+
+  if (status === "vip" || status === "enterprise") {
+    if (capability === "canUseHistoricoPremium") {
+      return "feature_requires_activation";
+    }
+    if (capability === "canHaveUnlimitedVehicles") {
+      return "enterprise_required";
     }
     return "unknown";
   }
