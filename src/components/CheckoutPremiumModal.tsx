@@ -214,9 +214,7 @@ export function CheckoutPremiumModal({
             style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
-                <QrCode className="h-14 w-14 text-primary/70" />
-              </div>
+              <PixQrCode base64={qrCodeBase64} copiaCola={pixCopiaCola} />
               <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                 {pixCopiaCola.slice(0, 40)}…
               </p>
