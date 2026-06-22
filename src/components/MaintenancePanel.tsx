@@ -70,6 +70,8 @@ type Props = {
   kmAtual: number;
   expenses?: MaintExpense[];
   onSave?: (update: MaintSaveInput) => void | Promise<void>;
+  /** Status do veículo ativo (Build 3 — gate canUseReceiptScanner). */
+  vehicleStatus?: string | null;
 };
 
 type FlowState = "idle" | "scanning" | "confirm" | "error" | "manual";
@@ -104,6 +106,7 @@ export function MaintenancePanel({
   kmAtual,
   expenses = [],
   onSave,
+  vehicleStatus,
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
@@ -111,6 +114,7 @@ export function MaintenancePanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const plan = useCurrentPlan();
 
   // Reset ao reabrir/trocar item
   useEffect(() => {
@@ -123,7 +127,27 @@ export function MaintenancePanel({
     }
   }, [open, computed?.item.key]);
 
-  const triggerUpload = () => setSourceOpen(true);
+  const triggerUpload = () => {
+    if (!plan) {
+      toast.error("Carregando seu plano… tente novamente em instantes.");
+      return;
+    }
+    const vehicle: VehicleContext | undefined = vehicleStatus
+      ? { status: vehicleStatus }
+      : undefined;
+    if (!can("canUseReceiptScanner", plan, vehicle)) {
+      const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
+      toast.error(
+        reason === "trial_expired"
+          ? "Seu período de teste expirou."
+          : reason === "vehicle_not_activated" || reason === "feature_requires_activation"
+            ? "Ative este veículo para usar o scanner."
+            : "Recurso indisponível no seu plano.",
+      );
+      return;
+    }
+    setSourceOpen(true);
+  };
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
@@ -131,6 +155,13 @@ export function MaintenancePanel({
     setErrorMsg(null);
     setScannedFile(file);
     try {
+      if (capabilityStartsTrial("canUseReceiptScanner")) {
+        try {
+          await ensureTrialStartedFn({ data: { capability: "canUseReceiptScanner" } });
+        } catch (e) {
+          console.warn("[MaintenancePanel] ensureTrialStarted", e);
+        }
+      }
       const { base64, mimeType } = await fileToBase64(file);
       const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
       if (!res.ok) {
