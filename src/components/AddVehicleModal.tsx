@@ -187,7 +187,83 @@ export function AddVehicleModal({
       desvalorizometro: opt.desvalorizometro,
     });
     setShowFipePicker(false);
+    setFipeRetryAttempted(false);
   };
+
+  /**
+   * Refaz lookup de FIPE. Retorna:
+   *  - "single": preencheu fipeLookup com 1 opção
+   *  - "multi":  abriu picker, precisa seleção do usuário
+   *  - "none":   continua sem FIPE
+   */
+  const runFipeLookup = async (): Promise<"single" | "multi" | "none"> => {
+    try {
+      const r = await lookupPlacaFipe(plate);
+      if (r.ok && r.fipe.length > 0) {
+        const mapped: FipeOption[] = r.fipe.map((o) => ({ ...o, texto_modelo: o.modelo }));
+        setFipeOptions(mapped);
+        if (mapped.length === 1) {
+          const first = mapped[0];
+          setFipeLookup({
+            codigo_fipe: first.codigo_fipe,
+            valor: first.valor,
+            mes_referencia: first.mes_referencia || "",
+            desvalorizometro: first.desvalorizometro,
+          });
+          setShowFipePicker(false);
+          setNotFound(false);
+          // Se houver informacoes_veiculo e os campos estiverem vazios, preenche.
+          const info = r.informacoes_veiculo || {};
+          setData((d) => ({
+            marca: d.marca || info.marca || "",
+            modelo: d.modelo || info.modelo || "",
+            ano: d.ano || info.ano_modelo || info.ano || "",
+            cor: d.cor || info.cor || "",
+            motorizacao: d.motorizacao || info.motor || info.combustivel || "",
+            chassi: d.chassi || info.chassi || "",
+          }));
+          return "single";
+        }
+        setFipeLookup(null);
+        setShowFipePicker(true);
+        setNotFound(false);
+        const info = r.informacoes_veiculo || {};
+        setData((d) => ({
+          marca: d.marca || info.marca || "",
+          modelo: d.modelo || info.modelo || "",
+          ano: d.ano || info.ano_modelo || info.ano || "",
+          cor: d.cor || info.cor || "",
+          motorizacao: d.motorizacao || info.motor || info.combustivel || "",
+          chassi: d.chassi || info.chassi || "",
+        }));
+        return "multi";
+      }
+      return "none";
+    } catch (e) {
+      console.warn("[runFipeLookup]", e);
+      return "none";
+    }
+  };
+
+  const retryFipeLookup = async () => {
+    if (!plateValid || retryingFipe) return;
+    setRetryingFipe(true);
+    try {
+      const result = await runFipeLookup();
+      if (result === "single") {
+        toast.success("FIPE localizada!");
+      } else if (result === "multi") {
+        toast.info("Selecione a versão FIPE correta para continuar.");
+      } else {
+        toast.error(
+          "Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.",
+        );
+      }
+    } finally {
+      setRetryingFipe(false);
+    }
+  };
+
 
   /** BrasilAPI: valor "vigente" (índice [0]) para o codigo_fipe selecionado. */
   const fetchBrasilApiCurrent = async (
