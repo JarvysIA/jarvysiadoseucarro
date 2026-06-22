@@ -298,9 +298,31 @@ export function AddVehicleModal({
       return;
     }
     if (showFipePicker && !fipeLookup) {
-      toast.error("Selecione a versão FIPE do veículo.");
+      toast.error("Selecione a versão FIPE correta para continuar.");
       return;
     }
+    // Retry defensivo: se vamos salvar sem FIPE mas a placa é válida,
+    // tenta uma vez antes de gravar sem FIPE. Se vier picker, aborta o submit.
+    if (!fipeLookup && plateValid && !fipeRetryAttempted) {
+      setSubmitting(true);
+      const result = await runFipeLookup();
+      setSubmitting(false);
+      if (result === "multi") {
+        toast.info("Selecione a versão FIPE correta para continuar.");
+        return;
+      }
+      if (result === "single") {
+        toast.success("FIPE localizada! Confirme novamente para salvar.");
+        return;
+      }
+      // none → marca tentativa e mostra aviso; próximo clique salva manual.
+      setFipeRetryAttempted(true);
+      toast.error(
+        "Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
