@@ -112,9 +112,10 @@ export function CheckoutPremiumModal({
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
+      setQrCodeBase64(data.qr_code_base64 ?? null);
       setPagamentoId(data.id ?? null);
       setStatusPoll("aguardando");
-      toast.success("PIX gerado! Copie o código abaixo.");
+      toast.success("PIX gerado! Escaneie o QR Code ou copie o código.");
     } catch (e) {
       console.error("[checkout historico pix]", e);
       toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX.");
