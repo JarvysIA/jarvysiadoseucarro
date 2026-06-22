@@ -284,11 +284,16 @@ export function CarteiraJarvys() {
         <p className="text-sm text-foreground/90">{proximoSaqueMsg}</p>
         <button
           type="button"
-          disabled
-          className="mt-3 w-full cursor-not-allowed rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70"
-          title="Disponível em breve"
+          disabled={!podeSaque}
+          onClick={() => setSaqueOpen(true)}
+          className={
+            podeSaque
+              ? "glow-neon mt-3 w-full rounded-xl bg-gradient-to-r from-primary to-primary/80 px-3 py-3 text-sm font-semibold text-primary-foreground"
+              : "mt-3 w-full cursor-not-allowed rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70"
+          }
+          title={podeSaque ? "Solicitar PIX" : "Saldo abaixo do mínimo"}
         >
-          Solicitar PIX — em breve
+          {podeSaque ? "Solicitar PIX" : "Solicitar PIX — saldo insuficiente"}
         </button>
       </section>
 
