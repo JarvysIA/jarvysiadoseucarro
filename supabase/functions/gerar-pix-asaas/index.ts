@@ -186,6 +186,8 @@ Deno.serve(async (req) => {
       throw new Error(`Asaas /pixQrCode ${qrRes.status}: ${JSON.stringify(qrJson)}`);
     }
     const payload = (qrJson as { payload?: string }).payload ?? "";
+    const encodedImage =
+      (qrJson as { encodedImage?: string }).encodedImage ?? null;
     if (!payload) throw new Error("Asaas pixQrCode sem payload");
 
     const { data: inserted, error: insertError } = await supabase
@@ -215,6 +217,7 @@ Deno.serve(async (req) => {
       success: true,
       id: inserted.id,
       pix_copia_cola: payload,
+      qr_code_base64: encodedImage,
       txid_efi: asaas_payment_id,
     });
   } catch (err) {
