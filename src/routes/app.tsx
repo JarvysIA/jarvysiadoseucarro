@@ -66,7 +66,7 @@ type Profile = {
   nome: string;
   status_usuario: ProfileStatus;
   permite_indicacao: boolean;
-  trial_inicio: string;
+  trial_inicio: string | null;
   referrer_id: string | null;
   is_super_admin: boolean;
 };
