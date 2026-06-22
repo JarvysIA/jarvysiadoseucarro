@@ -534,8 +534,22 @@ export function AddVehicleModal({
                 <div className="mb-4 space-y-3">
                   <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    Não localizamos a placa automaticamente. Preencha os dados manualmente.
+                    Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.
                   </div>
+                  <button
+                    type="button"
+                    onClick={retryFipeLookup}
+                    disabled={retryingFipe || !plateValid}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    {retryingFipe ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Search className="h-3.5 w-3.5" />
+                    )}
+                    Tentar FIPE novamente
+                  </button>
+
                   <Field label="Marca" value={data.marca} onChange={(v) => setData((d) => ({ ...d, marca: v }))} placeholder="Ex.: Toyota" />
                   <Field label="Modelo" value={data.modelo} onChange={(v) => setData((d) => ({ ...d, modelo: v }))} placeholder="Ex.: Corolla XEi" />
                   <div className="grid grid-cols-2 gap-3">
