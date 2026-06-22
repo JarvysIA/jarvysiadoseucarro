@@ -47,6 +47,7 @@ function DespesasPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [vehicleStatus, setVehicleStatus] = useState<string | null>(null);
 
   // Carrega metadados do veículo ativo (KM, lock e claim) para defaults do modal,
   // banner de Carfax Reverso e filtro da timeline.
@@ -55,17 +56,19 @@ function DespesasPage() {
       setVehicleKm(0);
       setHistoryLocked(false);
       setClaimedAt(null);
+      setVehicleStatus(null);
       return;
     }
     supabase
       .from("veiculos")
-      .select("km_atual,history_locked,claimed_at")
+      .select("km_atual,history_locked,claimed_at,status")
       .eq("id", activeVehicleId)
       .maybeSingle()
       .then(({ data }) => {
         setVehicleKm(data?.km_atual ?? 0);
         setHistoryLocked(Boolean((data as { history_locked?: boolean } | null)?.history_locked));
         setClaimedAt(((data as { claimed_at?: string | null } | null)?.claimed_at) ?? null);
+        setVehicleStatus(((data as { status?: string | null } | null)?.status) ?? null);
       });
   }, [activeVehicleId, reloadKey]);
 
