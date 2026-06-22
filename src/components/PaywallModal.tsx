@@ -264,9 +264,7 @@ export function PaywallModal({
           <div className="flex flex-col items-center">
             {pixCopiaCola && (
               <>
-                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
-                  <QrCode className="h-16 w-16 text-primary/70" />
-                </div>
+                <PixQrCode base64={qrCodeBase64} copiaCola={pixCopiaCola} size={180} />
                 <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                   {pixCopiaCola.slice(0, 40)}…
                 </p>
