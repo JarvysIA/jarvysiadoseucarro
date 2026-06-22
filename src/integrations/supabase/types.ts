@@ -644,6 +644,7 @@ export type Database = {
         }
         Returns: string
       }
+      solicitar_saque_indicacao: { Args: { _chave_pix: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
       validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
     }
