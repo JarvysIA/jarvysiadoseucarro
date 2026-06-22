@@ -32,6 +32,7 @@ export function CheckoutPremiumModal({
   onUnlocked: () => void;
 }) {
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
@@ -41,6 +42,7 @@ export function CheckoutPremiumModal({
   useEffect(() => {
     if (!open) {
       setPixCopiaCola("");
+      setQrCodeBase64(null);
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
