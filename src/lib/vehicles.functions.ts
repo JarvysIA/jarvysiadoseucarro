@@ -51,7 +51,7 @@ export const claimArchivedVehicleFn = createServerFn({ method: "POST" })
       .from("veiculos")
       .update({
         user_id: context.userId,
-        status: "active",
+        status: "ativo",
         history_locked: true,
         claimed_at: new Date().toISOString(),
       })

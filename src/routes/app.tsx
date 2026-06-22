@@ -177,7 +177,7 @@ function AppPage() {
           .from("veiculos")
           .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento")
           .eq("user_id", userId)
-          .eq("status", "active")
+          .eq("status", "ativo")
           .order("created_at", { ascending: true }),
       ]);
       setProfile(prof as Profile | null);
