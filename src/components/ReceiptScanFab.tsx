@@ -3,12 +3,22 @@ import { Camera, Loader2, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { parseReceiptFn, type ParsedReceipt } from "@/lib/parse-receipt.functions";
 import { ScannerSourceSheet } from "@/components/ScannerSourceSheet";
+import { useCurrentPlan } from "@/lib/use-current-plan";
+import {
+  can,
+  capabilityStartsTrial,
+  reasonBlocked,
+  type VehicleContext,
+} from "@/lib/plan-capabilities";
+import { ensureTrialStartedFn } from "@/lib/trial.functions";
 
 type Props = {
   /** Disparado quando a IA termina de ler a nota. */
   onParsed: (parsed: ParsedReceipt, file: File) => void;
   /** Posição vertical opcional (default bottom-44). */
   className?: string;
+  /** Status do veículo ativo (Build 3 — gate canUseReceiptScanner). */
+  vehicleStatus?: string | null;
 };
 
 function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -25,13 +35,41 @@ function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }>
 }
 
 /** FAB secundário (acima do "+") para ler nota fiscal com IA. */
-export function ReceiptScanFab({ onParsed, className }: Props) {
+export function ReceiptScanFab({ onParsed, className, vehicleStatus }: Props) {
   const [scanning, setScanning] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
+  const plan = useCurrentPlan();
 
   const handleFile = async (file: File) => {
+    if (!plan) {
+      toast.error("Carregando seu plano… tente novamente em instantes.");
+      return;
+    }
+    const vehicle: VehicleContext | undefined = vehicleStatus
+      ? { status: vehicleStatus }
+      : undefined;
+
+    if (!can("canUseReceiptScanner", plan, vehicle)) {
+      const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
+      toast.error(
+        reason === "trial_expired"
+          ? "Seu período de teste expirou."
+          : reason === "vehicle_not_activated" || reason === "feature_requires_activation"
+            ? "Ative este veículo para usar o scanner."
+            : "Recurso indisponível no seu plano.",
+      );
+      return;
+    }
+
     setScanning(true);
     try {
+      if (capabilityStartsTrial("canUseReceiptScanner")) {
+        try {
+          await ensureTrialStartedFn({ data: { capability: "canUseReceiptScanner" } });
+        } catch (e) {
+          console.warn("[ReceiptScanFab] ensureTrialStarted", e);
+        }
+      }
       const { base64, mimeType } = await fileToBase64(file);
       const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
       if (!res.ok) {

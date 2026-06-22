@@ -404,7 +404,7 @@ export type Database = {
           placa: string | null
           referrer_id: string | null
           status_usuario: string
-          trial_inicio: string
+          trial_inicio: string | null
           uf: string | null
           whatsapp: string
         }
@@ -424,7 +424,7 @@ export type Database = {
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string
-          trial_inicio?: string
+          trial_inicio?: string | null
           uf?: string | null
           whatsapp: string
         }
@@ -444,7 +444,7 @@ export type Database = {
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string
-          trial_inicio?: string
+          trial_inicio?: string | null
           uf?: string | null
           whatsapp?: string
         }
