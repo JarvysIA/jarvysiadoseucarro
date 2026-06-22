@@ -345,6 +345,7 @@ function DespesasPage() {
 
       {/* FAB IA — Ler nota com IA */}
       <ReceiptScanFab
+        vehicleStatus={vehicleStatus}
         className="bottom-44"
         onParsed={(parsed, file) => {
           setScannedPrefill({
