@@ -484,6 +484,7 @@ function RevisoesPage() {
       </button>
 
       <ReceiptScanFab
+        vehicleStatus={vehicleFull?.status ?? null}
         className="bottom-44"
         onParsed={(parsed, file) => {
           setScannedPrefill({
