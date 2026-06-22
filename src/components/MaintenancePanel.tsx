@@ -26,6 +26,14 @@ import { classifyExpenseTextFn } from "@/lib/classify-expense-text.functions";
 import { CATEGORIA_COLOR } from "@/lib/despesas";
 import { formatItemName } from "@/lib/format-item-name";
 import { toast } from "sonner";
+import { useCurrentPlan } from "@/lib/use-current-plan";
+import {
+  can,
+  capabilityStartsTrial,
+  reasonBlocked,
+  type VehicleContext,
+} from "@/lib/plan-capabilities";
+import { ensureTrialStartedFn } from "@/lib/trial.functions";
 
 async function classifyText(raw: string): Promise<string> {
   const t = raw.trim();
