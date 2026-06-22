@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { CpfRequiredModal } from "@/components/CpfRequiredModal";
+import { PixQrCode } from "@/components/PixQrCode";
 
 const VALOR_HISTORICO = 49.9;
 
@@ -31,6 +32,7 @@ export function CheckoutPremiumModal({
   onUnlocked: () => void;
 }) {
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [pagamentoId, setPagamentoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [statusPoll, setStatusPoll] = useState<"aguardando" | "pago" | null>(null);
@@ -40,6 +42,7 @@ export function CheckoutPremiumModal({
   useEffect(() => {
     if (!open) {
       setPixCopiaCola("");
+      setQrCodeBase64(null);
       setPagamentoId(null);
       setStatusPoll(null);
       setIsLoading(false);
@@ -109,9 +112,10 @@ export function CheckoutPremiumModal({
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
+      setQrCodeBase64(data.qr_code_base64 ?? null);
       setPagamentoId(data.id ?? null);
       setStatusPoll("aguardando");
-      toast.success("PIX gerado! Copie o código abaixo.");
+      toast.success("PIX gerado! Escaneie o QR Code ou copie o código.");
     } catch (e) {
       console.error("[checkout historico pix]", e);
       toast.error(e instanceof Error ? e.message : "Erro ao gerar PIX.");
@@ -210,9 +214,7 @@ export function CheckoutPremiumModal({
             style={{ boxShadow: "0 0 0 1px rgba(56,189,248,0.15)" }}
           >
             <div className="flex flex-col items-center">
-              <div className="flex h-28 w-28 items-center justify-center rounded-xl bg-secondary/40">
-                <QrCode className="h-14 w-14 text-primary/70" />
-              </div>
+              <PixQrCode base64={qrCodeBase64} copiaCola={pixCopiaCola} />
               <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                 {pixCopiaCola.slice(0, 40)}…
               </p>

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveReferrerId } from "@/lib/referral";
 import { CpfRequiredModal } from "@/components/CpfRequiredModal";
+import { PixQrCode } from "@/components/PixQrCode";
 
 export function PaywallModal({
   open,
@@ -33,6 +34,7 @@ export function PaywallModal({
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const [pixCopiaCola, setPixCopiaCola] = useState("");
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
   const [isLoadingPix, setIsLoadingPix] = useState(false);
   const [cpfModalOpen, setCpfModalOpen] = useState(false);
@@ -63,6 +65,7 @@ export function PaywallModal({
   const handleClose = () => {
     // Reset PIX state ao fechar para permitir nova geração na próxima abertura
     setPixCopiaCola("");
+    setQrCodeBase64(null);
     setTxid("");
     setIsLoadingPix(false);
     onClose();
@@ -117,12 +120,14 @@ export function PaywallModal({
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
+      setQrCodeBase64(data.qr_code_base64 ?? null);
       setTxid(data.txid_efi ?? "");
-      toast.success("PIX gerado! Copie o código abaixo.");
+      toast.success("PIX gerado! Escaneie o QR Code ou copie o código.");
     } catch (e) {
       console.error("[gerar-pix-asaas]", e);
       toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
       setPixCopiaCola("");
+      setQrCodeBase64(null);
       setTxid("");
     } finally {
       setIsLoadingPix(false);
@@ -259,9 +264,7 @@ export function PaywallModal({
           <div className="flex flex-col items-center">
             {pixCopiaCola && (
               <>
-                <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-secondary/40">
-                  <QrCode className="h-16 w-16 text-primary/70" />
-                </div>
+                <PixQrCode base64={qrCodeBase64} copiaCola={pixCopiaCola} size={180} />
                 <p className="mt-3 max-w-full truncate text-[10px] text-muted-foreground">
                   {pixCopiaCola.slice(0, 40)}…
                 </p>
