@@ -983,6 +983,7 @@ function VehicleStatusSection({
         computed={openComputed}
         kmAtual={kmAtual}
         expenses={openExpenses}
+        vehicleStatus="ativo"
         onSave={(payload) => {
           if (openItemKey) handleSaveMaintenance(openItemKey, payload);
         }}
