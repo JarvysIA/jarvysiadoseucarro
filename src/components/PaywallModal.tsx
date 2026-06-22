@@ -65,6 +65,7 @@ export function PaywallModal({
   const handleClose = () => {
     // Reset PIX state ao fechar para permitir nova geração na próxima abertura
     setPixCopiaCola("");
+    setQrCodeBase64(null);
     setTxid("");
     setIsLoadingPix(false);
     onClose();
