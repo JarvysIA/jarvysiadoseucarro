@@ -1,11 +1,23 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Copy, Check, Loader2, Share2, Wallet, Users, Clock, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import {
   getCarteiraIndicacao,
+  solicitarSaqueIndicacao,
   type CarteiraIndicacaoDTO,
   type MovimentacaoIndicacaoDTO,
 } from "@/lib/carteira-indicacao.functions";
@@ -117,6 +129,8 @@ function MovimentacaoItem({ m }: { m: MovimentacaoIndicacaoDTO }) {
 
 export function CarteiraJarvys() {
   const fetchCarteira = useServerFn(getCarteiraIndicacao);
+  const solicitarSaque = useServerFn(solicitarSaqueIndicacao);
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch, isFetching } = useQuery<CarteiraIndicacaoDTO>({
     queryKey: ["carteira-indicacao"],
     queryFn: () => fetchCarteira(),
@@ -124,16 +138,41 @@ export function CarteiraJarvys() {
   });
 
   const [copied, setCopied] = useState(false);
+  const [saqueOpen, setSaqueOpen] = useState(false);
+  const [chavePix, setChavePix] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const codigo = data?.codigo_indicacao ?? null;
   const carteira = data?.carteira;
   const movs = data?.movimentacoes ?? [];
+  const podeSaque = (carteira?.saldo_disponivel ?? 0) >= SAQUE_MINIMO;
+
+  // Pré-carrega chave PIX salva ao abrir o modal.
+  useEffect(() => {
+    if (!saqueOpen) return;
+    let cancel = false;
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("pix_recebimento")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      if (!cancel && prof?.pix_recebimento) {
+        setChavePix((prev) => prev || String(prof.pix_recebimento));
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [saqueOpen]);
 
   const proximoSaqueMsg = useMemo(() => {
     if (!carteira) return null;
     const diff = SAQUE_MINIMO - carteira.saldo_disponivel;
     if (carteira.saldo_disponivel >= SAQUE_MINIMO) {
-      return "Você já atingiu o valor mínimo para saque. O botão de solicitação será liberado na próxima etapa.";
+      return `Você tem ${BRL.format(carteira.saldo_disponivel)} disponível para saque via PIX.`;
     }
     return `Faltam ${BRL.format(Math.max(0, diff))} para solicitar seu PIX.`;
   }, [carteira]);
@@ -153,6 +192,28 @@ export function CarteiraJarvys() {
   const handleWhats = () => {
     if (!codigo) return;
     window.open(buildWhatsappLink(codigo), "_blank", "noopener,noreferrer");
+  };
+
+  const handleConfirmSaque = async () => {
+    if (submitting) return;
+    const chave = chavePix.trim();
+    if (!chave) {
+      toast.error("Informe sua chave PIX.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await solicitarSaque({ data: { chave_pix: chave } });
+      toast.success(`Saque de ${BRL.format(res.valor)} solicitado!`);
+      setSaqueOpen(false);
+      setChavePix("");
+      await queryClient.invalidateQueries({ queryKey: ["carteira-indicacao"] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Não foi possível solicitar o saque.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (isLoading) {
@@ -223,11 +284,16 @@ export function CarteiraJarvys() {
         <p className="text-sm text-foreground/90">{proximoSaqueMsg}</p>
         <button
           type="button"
-          disabled
-          className="mt-3 w-full cursor-not-allowed rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70"
-          title="Disponível em breve"
+          disabled={!podeSaque}
+          onClick={() => setSaqueOpen(true)}
+          className={
+            podeSaque
+              ? "glow-neon mt-3 w-full rounded-xl bg-gradient-to-r from-primary to-primary/80 px-3 py-3 text-sm font-semibold text-primary-foreground"
+              : "mt-3 w-full cursor-not-allowed rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm font-semibold text-muted-foreground opacity-70"
+          }
+          title={podeSaque ? "Solicitar PIX" : "Saldo abaixo do mínimo"}
         >
-          Solicitar PIX — em breve
+          {podeSaque ? "Solicitar PIX" : "Solicitar PIX — saldo insuficiente"}
         </button>
       </section>
 
@@ -284,6 +350,64 @@ export function CarteiraJarvys() {
           </ul>
         )}
       </section>
+
+      <Dialog
+        open={saqueOpen}
+        onOpenChange={(o) => {
+          if (submitting) return;
+          setSaqueOpen(o);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar saque PIX</DialogTitle>
+            <DialogDescription>
+              Seu saldo disponível será reservado até o processamento do pagamento.
+              O envio automático do PIX será implementado em uma próxima etapa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-border bg-background/60 p-3">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                Valor a solicitar
+              </p>
+              <p className="mt-1 text-lg font-bold text-primary">
+                {BRL.format(carteira?.saldo_disponivel ?? 0)}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="chave-pix">Sua chave PIX</Label>
+              <Input
+                id="chave-pix"
+                value={chavePix}
+                onChange={(e) => setChavePix(e.target.value)}
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                disabled={submitting}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setSaqueOpen(false)}
+              disabled={submitting}
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmSaque}
+              disabled={submitting || !chavePix.trim()}
+              className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar solicitação
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

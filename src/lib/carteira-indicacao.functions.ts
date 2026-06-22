@@ -92,3 +92,43 @@ export const getCarteiraIndicacao = createServerFn({ method: "GET" })
       movimentacoes,
     };
   });
+
+export type SolicitarSaqueResultado = {
+  ok: true;
+  movimentacao_id: string;
+  valor: number;
+};
+
+const SAQUE_ERROR_MESSAGES: Record<string, string> = {
+  NAO_AUTORIZADO: "Sessão expirada. Faça login novamente.",
+  CHAVE_PIX_INVALIDA: "Informe uma chave PIX válida.",
+  SALDO_INSUFICIENTE: "Saldo disponível abaixo do mínimo para saque.",
+  CARTEIRA_NAO_ENCONTRADA: "Carteira não encontrada.",
+};
+
+export const solicitarSaqueIndicacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { chave_pix: string }) => {
+    const chave = typeof input?.chave_pix === "string" ? input.chave_pix.trim() : "";
+    if (!chave) throw new Error("CHAVE_PIX_INVALIDA");
+    return { chave_pix: chave };
+  })
+  .handler(async ({ data, context }): Promise<SolicitarSaqueResultado> => {
+    const { supabase } = context;
+    const { data: rpcData, error } = await supabase.rpc("solicitar_saque_indicacao", {
+      _chave_pix: data.chave_pix,
+    });
+
+    if (error) {
+      const raw = (error.message || "").toUpperCase();
+      const code = Object.keys(SAQUE_ERROR_MESSAGES).find((k) => raw.includes(k));
+      throw new Error(code ? SAQUE_ERROR_MESSAGES[code] : "Não foi possível solicitar o saque. Tente novamente.");
+    }
+
+    const payload = (rpcData ?? {}) as { movimentacao_id?: string; valor?: number | string };
+    return {
+      ok: true,
+      movimentacao_id: String(payload.movimentacao_id ?? ""),
+      valor: toNumber(payload.valor),
+    };
+  });
