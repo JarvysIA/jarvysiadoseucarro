@@ -79,6 +79,8 @@ export function AddVehicleModal({
   const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
   const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
   const [showFipePicker, setShowFipePicker] = useState(false);
+  const [fipeRetryAttempted, setFipeRetryAttempted] = useState(false);
+  const [retryingFipe, setRetryingFipe] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -91,8 +93,11 @@ export function AddVehicleModal({
       setFipeLookup(null);
       setFipeOptions([]);
       setShowFipePicker(false);
+      setFipeRetryAttempted(false);
+      setRetryingFipe(false);
     }
   }, [open]);
+
 
   if (!open) return null;
 
@@ -182,7 +187,83 @@ export function AddVehicleModal({
       desvalorizometro: opt.desvalorizometro,
     });
     setShowFipePicker(false);
+    setFipeRetryAttempted(false);
   };
+
+  /**
+   * Refaz lookup de FIPE. Retorna:
+   *  - "single": preencheu fipeLookup com 1 opção
+   *  - "multi":  abriu picker, precisa seleção do usuário
+   *  - "none":   continua sem FIPE
+   */
+  const runFipeLookup = async (): Promise<"single" | "multi" | "none"> => {
+    try {
+      const r = await lookupPlacaFipe(plate);
+      if (r.ok && r.fipe.length > 0) {
+        const mapped: FipeOption[] = r.fipe.map((o) => ({ ...o, texto_modelo: o.modelo }));
+        setFipeOptions(mapped);
+        if (mapped.length === 1) {
+          const first = mapped[0];
+          setFipeLookup({
+            codigo_fipe: first.codigo_fipe,
+            valor: first.valor,
+            mes_referencia: first.mes_referencia || "",
+            desvalorizometro: first.desvalorizometro,
+          });
+          setShowFipePicker(false);
+          setNotFound(false);
+          // Se houver informacoes_veiculo e os campos estiverem vazios, preenche.
+          const info = r.informacoes_veiculo || {};
+          setData((d) => ({
+            marca: d.marca || info.marca || "",
+            modelo: d.modelo || info.modelo || "",
+            ano: d.ano || info.ano_modelo || info.ano || "",
+            cor: d.cor || info.cor || "",
+            motorizacao: d.motorizacao || info.motor || info.combustivel || "",
+            chassi: d.chassi || info.chassi || "",
+          }));
+          return "single";
+        }
+        setFipeLookup(null);
+        setShowFipePicker(true);
+        setNotFound(false);
+        const info = r.informacoes_veiculo || {};
+        setData((d) => ({
+          marca: d.marca || info.marca || "",
+          modelo: d.modelo || info.modelo || "",
+          ano: d.ano || info.ano_modelo || info.ano || "",
+          cor: d.cor || info.cor || "",
+          motorizacao: d.motorizacao || info.motor || info.combustivel || "",
+          chassi: d.chassi || info.chassi || "",
+        }));
+        return "multi";
+      }
+      return "none";
+    } catch (e) {
+      console.warn("[runFipeLookup]", e);
+      return "none";
+    }
+  };
+
+  const retryFipeLookup = async () => {
+    if (!plateValid || retryingFipe) return;
+    setRetryingFipe(true);
+    try {
+      const result = await runFipeLookup();
+      if (result === "single") {
+        toast.success("FIPE localizada!");
+      } else if (result === "multi") {
+        toast.info("Selecione a versão FIPE correta para continuar.");
+      } else {
+        toast.error(
+          "Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.",
+        );
+      }
+    } finally {
+      setRetryingFipe(false);
+    }
+  };
+
 
   /** BrasilAPI: valor "vigente" (índice [0]) para o codigo_fipe selecionado. */
   const fetchBrasilApiCurrent = async (
@@ -217,9 +298,31 @@ export function AddVehicleModal({
       return;
     }
     if (showFipePicker && !fipeLookup) {
-      toast.error("Selecione a versão FIPE do veículo.");
+      toast.error("Selecione a versão FIPE correta para continuar.");
       return;
     }
+    // Retry defensivo: se vamos salvar sem FIPE mas a placa é válida,
+    // tenta uma vez antes de gravar sem FIPE. Se vier picker, aborta o submit.
+    if (!fipeLookup && plateValid && !fipeRetryAttempted) {
+      setSubmitting(true);
+      const result = await runFipeLookup();
+      setSubmitting(false);
+      if (result === "multi") {
+        toast.info("Selecione a versão FIPE correta para continuar.");
+        return;
+      }
+      if (result === "single") {
+        toast.success("FIPE localizada! Confirme novamente para salvar.");
+        return;
+      }
+      // none → marca tentativa e mostra aviso; próximo clique salva manual.
+      setFipeRetryAttempted(true);
+      toast.error(
+        "Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
@@ -431,8 +534,22 @@ export function AddVehicleModal({
                 <div className="mb-4 space-y-3">
                   <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    Não localizamos a placa automaticamente. Preencha os dados manualmente.
+                    Não conseguimos localizar a FIPE agora. Você pode tentar novamente ou cadastrar manualmente sem FIPE.
                   </div>
+                  <button
+                    type="button"
+                    onClick={retryFipeLookup}
+                    disabled={retryingFipe || !plateValid}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                  >
+                    {retryingFipe ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Search className="h-3.5 w-3.5" />
+                    )}
+                    Tentar FIPE novamente
+                  </button>
+
                   <Field label="Marca" value={data.marca} onChange={(v) => setData((d) => ({ ...d, marca: v }))} placeholder="Ex.: Toyota" />
                   <Field label="Modelo" value={data.modelo} onChange={(v) => setData((d) => ({ ...d, modelo: v }))} placeholder="Ex.: Corolla XEi" />
                   <div className="grid grid-cols-2 gap-3">
