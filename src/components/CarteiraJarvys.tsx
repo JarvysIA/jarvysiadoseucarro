@@ -129,6 +129,8 @@ function MovimentacaoItem({ m }: { m: MovimentacaoIndicacaoDTO }) {
 
 export function CarteiraJarvys() {
   const fetchCarteira = useServerFn(getCarteiraIndicacao);
+  const solicitarSaque = useServerFn(solicitarSaqueIndicacao);
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, refetch, isFetching } = useQuery<CarteiraIndicacaoDTO>({
     queryKey: ["carteira-indicacao"],
     queryFn: () => fetchCarteira(),
@@ -136,16 +138,41 @@ export function CarteiraJarvys() {
   });
 
   const [copied, setCopied] = useState(false);
+  const [saqueOpen, setSaqueOpen] = useState(false);
+  const [chavePix, setChavePix] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const codigo = data?.codigo_indicacao ?? null;
   const carteira = data?.carteira;
   const movs = data?.movimentacoes ?? [];
+  const podeSaque = (carteira?.saldo_disponivel ?? 0) >= SAQUE_MINIMO;
+
+  // Pré-carrega chave PIX salva ao abrir o modal.
+  useEffect(() => {
+    if (!saqueOpen) return;
+    let cancel = false;
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("pix_recebimento")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      if (!cancel && prof?.pix_recebimento) {
+        setChavePix((prev) => prev || String(prof.pix_recebimento));
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [saqueOpen]);
 
   const proximoSaqueMsg = useMemo(() => {
     if (!carteira) return null;
     const diff = SAQUE_MINIMO - carteira.saldo_disponivel;
     if (carteira.saldo_disponivel >= SAQUE_MINIMO) {
-      return "Você já atingiu o valor mínimo para saque. O botão de solicitação será liberado na próxima etapa.";
+      return `Você tem ${BRL.format(carteira.saldo_disponivel)} disponível para saque via PIX.`;
     }
     return `Faltam ${BRL.format(Math.max(0, diff))} para solicitar seu PIX.`;
   }, [carteira]);
@@ -165,6 +192,28 @@ export function CarteiraJarvys() {
   const handleWhats = () => {
     if (!codigo) return;
     window.open(buildWhatsappLink(codigo), "_blank", "noopener,noreferrer");
+  };
+
+  const handleConfirmSaque = async () => {
+    if (submitting) return;
+    const chave = chavePix.trim();
+    if (!chave) {
+      toast.error("Informe sua chave PIX.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await solicitarSaque({ data: { chave_pix: chave } });
+      toast.success(`Saque de ${BRL.format(res.valor)} solicitado!`);
+      setSaqueOpen(false);
+      setChavePix("");
+      await queryClient.invalidateQueries({ queryKey: ["carteira-indicacao"] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Não foi possível solicitar o saque.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (isLoading) {
