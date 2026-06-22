@@ -120,12 +120,14 @@ export function PaywallModal({
       if (!data?.pix_copia_cola) throw new Error("Resposta inválida do gateway");
 
       setPixCopiaCola(data.pix_copia_cola);
+      setQrCodeBase64(data.qr_code_base64 ?? null);
       setTxid(data.txid_efi ?? "");
-      toast.success("PIX gerado! Copie o código abaixo.");
+      toast.success("PIX gerado! Escaneie o QR Code ou copie o código.");
     } catch (e) {
       console.error("[gerar-pix-asaas]", e);
       toast.error("Erro ao gerar PIX. Verifique sua conexão e tente novamente.");
       setPixCopiaCola("");
+      setQrCodeBase64(null);
       setTxid("");
     } finally {
       setIsLoadingPix(false);
