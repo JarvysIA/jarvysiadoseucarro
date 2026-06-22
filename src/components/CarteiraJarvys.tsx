@@ -350,6 +350,64 @@ export function CarteiraJarvys() {
           </ul>
         )}
       </section>
+
+      <Dialog
+        open={saqueOpen}
+        onOpenChange={(o) => {
+          if (submitting) return;
+          setSaqueOpen(o);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar saque PIX</DialogTitle>
+            <DialogDescription>
+              Seu saldo disponível será reservado até o processamento do pagamento.
+              O envio automático do PIX será implementado em uma próxima etapa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-border bg-background/60 p-3">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                Valor a solicitar
+              </p>
+              <p className="mt-1 text-lg font-bold text-primary">
+                {BRL.format(carteira?.saldo_disponivel ?? 0)}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="chave-pix">Sua chave PIX</Label>
+              <Input
+                id="chave-pix"
+                value={chavePix}
+                onChange={(e) => setChavePix(e.target.value)}
+                placeholder="CPF, e-mail, telefone ou chave aleatória"
+                disabled={submitting}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setSaqueOpen(false)}
+              disabled={submitting}
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmSaque}
+              disabled={submitting || !chavePix.trim()}
+              className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar solicitação
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
