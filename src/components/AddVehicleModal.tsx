@@ -79,6 +79,8 @@ export function AddVehicleModal({
   const [fipeLookup, setFipeLookup] = useState<FipeFromLookup>(null);
   const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
   const [showFipePicker, setShowFipePicker] = useState(false);
+  const [fipeRetryAttempted, setFipeRetryAttempted] = useState(false);
+  const [retryingFipe, setRetryingFipe] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -91,8 +93,11 @@ export function AddVehicleModal({
       setFipeLookup(null);
       setFipeOptions([]);
       setShowFipePicker(false);
+      setFipeRetryAttempted(false);
+      setRetryingFipe(false);
     }
   }, [open]);
+
 
   if (!open) return null;
 
