@@ -72,6 +72,38 @@ export function trialDaysLeft(plan: PlanContext): number | null {
   return left;
 }
 
+/**
+ * Indica se a capability, ao ser usada pela primeira vez por um usuário em
+ * trial com trial_inicio=null, deve iniciar o trial sob demanda.
+ *
+ * - true: recursos inteligentes que consomem trial (OCR, WhatsApp, FIPE
+ *   auto-refresh, refresh inteligente de histórico FIPE).
+ * - false: Dr. Jarvys no app, FIPE atual salva, histórico premium pago,
+ *   limites de veículo e qualquer leitura/operação não-inteligente.
+ *
+ * Usado pelo ensureTrialStartedFn como defesa em camadas — mesmo que um
+ * consumidor chame errado, capabilities não-triggerizadoras não iniciam trial.
+ */
+export function capabilityStartsTrial(capability: Capability): boolean {
+  switch (capability) {
+    case "canUseReceiptScanner":
+    case "canUseWhatsapp":
+    case "canUseWhatsappJarvys":
+    case "canUseWhatsappOCR":
+    case "canUseFipeAutoRefresh":
+    case "canUseFipeHistoryRefresh":
+      return true;
+    case "canUseAppJarvysChat":
+    case "canUseFipeCurrent":
+    case "canUseHistoricoPremium":
+    case "canAddVehicle":
+    case "canHaveUnlimitedVehicles":
+      return false;
+    default:
+      return false;
+  }
+}
+
 function vehicleIsActive(vehicle?: VehicleContext): boolean {
   if (!vehicle) return false;
   return isActiveVehicleStatus(vehicle.status);
