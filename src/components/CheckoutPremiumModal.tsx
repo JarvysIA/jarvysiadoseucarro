@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { CpfRequiredModal } from "@/components/CpfRequiredModal";
+import { PixQrCode } from "@/components/PixQrCode";
 
 const VALOR_HISTORICO = 49.9;
 
