@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveReferrerId } from "@/lib/referral";
 import { CpfRequiredModal } from "@/components/CpfRequiredModal";
+import { PixQrCode } from "@/components/PixQrCode";
 
 export function PaywallModal({
   open,
