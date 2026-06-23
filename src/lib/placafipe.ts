@@ -123,3 +123,59 @@ export async function consultarHistoricoFipe(hash: string): Promise<HistoricoFip
     return [];
   }
 }
+
+/* ============================================================
+ * Adapter: Placa FIPE → CarConfirmModal (signup)
+ * ============================================================ */
+
+export type CarConfirmFipeOption = {
+  codigo_fipe: string;
+  modelo: string;
+  valor: number;
+  combustivel?: string;
+  ano_modelo?: string;
+  mes_referencia?: string;
+  placafipe_hash: string;
+};
+
+export type LookupPlateViaPlacaFipeResult = {
+  marca: string;
+  modelo: string;
+  ano: string;
+  cor: string;
+  motorizacao: string;
+  chassi: string;
+  fipe_options: CarConfirmFipeOption[];
+} | null;
+
+/**
+ * Consulta a placa exclusivamente via Placa FIPE e adapta para o
+ * shape consumido pelo CarConfirmModal. NUNCA escolhe versão sozinho —
+ * devolve sempre o array completo de fipe_options.
+ */
+export async function lookupPlateViaPlacaFipe(
+  placa: string,
+): Promise<LookupPlateViaPlacaFipeResult> {
+  const r = await lookupPlacaFipe(placa);
+  if (!r.ok || !r.informacoes_veiculo) return null;
+  const info = r.informacoes_veiculo;
+  return {
+    marca: info.marca ?? "",
+    modelo: info.modelo ?? "",
+    ano: info.ano_modelo ?? info.ano ?? "",
+    cor: info.cor ?? "",
+    motorizacao: info.motor ?? "",
+    chassi: info.chassi ?? "",
+    fipe_options: r.fipe
+      .filter((o) => o.codigo_fipe && o.desvalorizometro)
+      .map((o) => ({
+        codigo_fipe: o.codigo_fipe,
+        modelo: o.modelo,
+        valor: o.valor,
+        combustivel: o.combustivel,
+        ano_modelo: o.ano_modelo,
+        mes_referencia: o.mes_referencia,
+        placafipe_hash: o.desvalorizometro,
+      })),
+  };
+}

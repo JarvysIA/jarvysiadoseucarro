@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Car, AlertCircle, Check, Search, X, Gauge } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import { sanitizePlate, isValidPlate } from "@/lib/plate";
 import {
   lookupPlacaFipe,
   consultarHistoricoFipe,

@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, User, Mail, Phone, Hash, Lock, Loader2 } from "lucide-react";
 import { saveUser } from "@/lib/jarvys-store";
 import { supabase } from "@/integrations/supabase/client";
-import { CarConfirmModal } from "@/components/CarConfirmModal";
-import { lookupPlate, sanitizePlate, isValidPlate } from "@/lib/plate-lookup";
+import { CarConfirmModal, type CarConfirmPayload } from "@/components/CarConfirmModal";
+import { sanitizePlate, isValidPlate } from "@/lib/plate";
+import { lookupPlateViaPlacaFipe } from "@/lib/placafipe";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
@@ -16,15 +17,7 @@ export const Route = createFileRoute("/signup")({
   component: SignupPage,
 });
 
-type CarDraft = {
-  marca: string;
-  modelo: string;
-  ano: string;
-  cor: string;
-  motorizacao: string;
-  chassi: string;
-  km_atual: number | null;
-};
+type CarDraft = CarConfirmPayload;
 
 function SignupPage() {
   const navigate = useNavigate();
@@ -169,6 +162,16 @@ function SignupPage() {
       }
       console.log("[signup] usuário autenticado antes de inserir veículo:", user);
 
+      const fipeFields = car.fipe
+        ? {
+            codigo_fipe: car.fipe.codigo_fipe,
+            fipe_valor: car.fipe.valor || null,
+            fipe_mes_referencia: car.fipe.mes_referencia || null,
+            placafipe_hash: car.fipe.placafipe_hash,
+            fipe_updated_at: new Date().toISOString(),
+          }
+        : {};
+
       const { error: vehErr } = await supabase.from("veiculos").insert({
         user_id: user.id,
         placa: plate,
@@ -179,6 +182,7 @@ function SignupPage() {
         motorizacao: car.motorizacao,
         chassi: car.chassi || null,
         km_atual: car.km_atual,
+        ...fipeFields,
       });
       if (vehErr) {
         console.error("[veiculos.insert] erro:", vehErr);
@@ -293,7 +297,7 @@ function SignupPage() {
       <CarConfirmModal
         open={modalOpen}
         plate={form.plate}
-        lookup={lookupPlate}
+        lookup={lookupPlateViaPlacaFipe}
         onConfirm={handleConfirmCar}
       />
     </div>
