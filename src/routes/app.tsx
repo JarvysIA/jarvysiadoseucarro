@@ -487,6 +487,10 @@ function AppPage() {
               }),
             )
           }
+          onPaywall={() => {
+            setSelectedId(selected.id);
+            setActivateOpen(true);
+          }}
           onDeleted={() => {
             const removedId = selected.id;
             setVehicles((prev) => {
@@ -666,6 +670,7 @@ function VehicleStatusSection({
   onKmChange,
   onMaintenanceSaved,
   onDeleted,
+  onPaywall,
 }: {
   vehicleId: string;
   placa: string;
@@ -675,6 +680,7 @@ function VehicleStatusSection({
   onKmChange: (km: number) => void;
   onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
   onDeleted: () => void;
+  onPaywall?: () => void;
 }) {
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
@@ -954,7 +960,13 @@ function VehicleStatusSection({
           })}
         </div>
 
-        <FipeCard vehicleId={vehicleId} placa={placa} ano={ano} />
+        <FipeCard
+          vehicleId={vehicleId}
+          placa={placa}
+          ano={ano}
+          vehicleStatus="ativo"
+          onPaywall={onPaywall}
+        />
       </section>
 
       {/* Zona perigosa — Soft delete do veículo */}
