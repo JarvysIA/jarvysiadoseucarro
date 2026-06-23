@@ -23,6 +23,8 @@ export type MovimentacaoIndicacaoDTO = {
 export type CarteiraIndicacaoDTO = {
   carteira: CarteiraResumo;
   codigo_indicacao: string | null;
+  indicacao_liberada: boolean;
+  status_usuario: string | null;
   movimentacoes: MovimentacaoIndicacaoDTO[];
 };
 
@@ -52,7 +54,7 @@ export const getCarteiraIndicacao = createServerFn({ method: "GET" })
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("codigo_indicacao")
+        .select("codigo_indicacao, status_usuario, permite_indicacao")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -86,9 +88,15 @@ export const getCarteiraIndicacao = createServerFn({ method: "GET" })
       afilhado_nome_mascarado: null,
     }));
 
+    const indicacaoLiberada = !!(profileRes.data?.permite_indicacao as boolean | undefined);
+
     return {
       carteira,
-      codigo_indicacao: (profileRes.data?.codigo_indicacao as string | null) ?? null,
+      codigo_indicacao: indicacaoLiberada
+        ? ((profileRes.data?.codigo_indicacao as string | null) ?? null)
+        : null,
+      indicacao_liberada: indicacaoLiberada,
+      status_usuario: (profileRes.data?.status_usuario as string | null) ?? null,
       movimentacoes,
     };
   });
