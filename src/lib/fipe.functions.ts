@@ -3,91 +3,61 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type FipeHistoricoItem = { mes_referencia: string; valor: string | number };
 
-type FipeTabela = { codigo: number; mes: string };
-type FipePrecoItem = {
-  anoModelo?: number | string;
-  valor?: string;
-  mesReferencia?: string;
-  codigoFipe?: string;
+type HistoricoPoint = {
+  mes_ano_extenso: string;
+  mes: string | number | null;
+  ano: number | null;
+  valor: number;
+  codigo_fipe?: string | null;
 };
-
-/** "R$ 45.123,50" → 45123.5 */
-function parseValorBR(raw: string): number {
-  const clean = String(raw).replace(/[R$\s.]/g, "").replace(",", ".");
-  const n = parseFloat(clean);
-  return Number.isFinite(n) ? n : 0;
-}
 
 const MES_PT_TO_NUM: Record<string, number> = {
   janeiro: 1, fevereiro: 2, "março": 3, marco: 3, abril: 4, maio: 5, junho: 6,
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 };
 
-/** "abril de 2025" → 202504 (number) para ordenação cronológica estrita. */
-function parseRefMonth(s: string): number {
-  if (!s) return 0;
-  const parts = s.toLowerCase().trim().split(" de ");
-  if (parts.length !== 2) return 0;
-  const mes = MES_PT_TO_NUM[parts[0].trim()] || 0;
-  const ano = parseInt(parts[1].trim(), 10) || 0;
+/** Converte mes (string nome ou número) + ano em um inteiro YYYYMM para ordenação. */
+function pointSortKey(p: HistoricoPoint): number {
+  let ano = typeof p.ano === "number" ? p.ano : 0;
+  let mes = 0;
+
+  if (typeof p.mes === "number") {
+    mes = p.mes;
+  } else if (typeof p.mes === "string" && p.mes.trim()) {
+    const s = p.mes.toLowerCase().trim();
+    const asNum = parseInt(s, 10);
+    if (Number.isFinite(asNum) && asNum >= 1 && asNum <= 12) {
+      mes = asNum;
+    } else {
+      mes = MES_PT_TO_NUM[s] || 0;
+    }
+  }
+
+  // Fallback: extrai do texto "abril de 2025" / "abril/2025"
+  if ((!ano || !mes) && p.mes_ano_extenso) {
+    const lower = p.mes_ano_extenso.toLowerCase().trim();
+    const parts = lower.includes(" de ") ? lower.split(" de ") : lower.split("/");
+    if (parts.length === 2) {
+      const m = MES_PT_TO_NUM[parts[0].trim()] || parseInt(parts[0], 10) || 0;
+      const a = parseInt(parts[1].trim(), 10) || 0;
+      if (!mes) mes = m;
+      if (!ano) ano = a;
+    }
+  }
+
   return ano * 100 + mes;
 }
 
 /**
- * Normaliza a string `mes` da tabela BrasilAPI (ex.: "abril/2025 ") para o
- * mesmo formato armazenado em `fipe_history.mes_referencia` ("abril de 2025").
- */
-function normalizeTabelaMes(mes: string): string {
-  const lower = (mes || "").toLowerCase().trim();
-  const parts = lower.split("/");
-  if (parts.length === 2) {
-    return `${parts[0].trim()} de ${parts[1].trim()}`;
-  }
-  return lower;
-}
-
-/** Busca as N tabelas FIPE mais recentes (default = 6: mês atual + 5 anteriores). */
-async function fetchRecentFipeTabelas(n = 6): Promise<FipeTabela[]> {
-  const res = await fetch("https://brasilapi.com.br/api/fipe/tabelas/v1", {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`BrasilAPI tabelas HTTP ${res.status}`);
-  const all = (await res.json()) as FipeTabela[];
-  return Array.isArray(all) ? all.slice(0, n) : [];
-}
-
-/**
- * Resgata o preço FIPE de um `codigo_fipe` em uma `tabela_referencia` específica.
- * Filtra por `Number(anoModelo)`; cai no índice [0] se não houver match exato.
- */
-async function fetchFipePrecoForTabela(
-  codigoFipe: string,
-  tabelaCodigo: number,
-  anoModelo: number,
-): Promise<FipePrecoItem | null> {
-  const url = `https://brasilapi.com.br/api/fipe/preco/v1/${encodeURIComponent(
-    codigoFipe,
-  )}?tabela_referencia=${tabelaCodigo}`;
-  try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
-    if (!res.ok) return null;
-    const arr = (await res.json()) as FipePrecoItem[];
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-    const match = arr.find((p) => Number(p.anoModelo) === anoModelo) ?? arr[0];
-    return match ?? null;
-  } catch (e) {
-    console.warn("[fetchFipePrecoForTabela] erro", { codigoFipe, tabelaCodigo, e });
-    return null;
-  }
-}
-
-/**
- * Refresh FIPE com janela deslizante de 6 meses:
- *   1) Busca as 6 tabelas FIPE mais recentes (mês atual + 5 anteriores)
- *   2) Faz 6 chamadas em paralelo via Promise.all
- *   3) Filtra por Number(anoModelo) (fallback no índice [0])
- *   4) Ordena cronologicamente e grava em fipe_history (upsert)
- *   5) Atualiza o valor "vigente" no veículo (último ponto)
+ * Atualiza dados FIPE de um veículo usando exclusivamente Placa FIPE.
+ *
+ * Fluxo:
+ *   1. Busca o veículo pelo id e valida ownership.
+ *   2. Respeita throttle de 30 dias salvo force=true.
+ *   3. Resolve placafipe_hash (usa o salvo ou recupera via lookupPlacaFipe + codigo_fipe).
+ *   4. Chama consultar-historico-fipe(hash).
+ *   5. Atualiza veiculos.historico_fipe, fipe_valor, fipe_mes_referencia, fipe_updated_at.
+ *   6. Em falha de API, nunca apaga dados existentes — retorna reason controlada.
  */
 export const refreshFipeFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -96,16 +66,17 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
     return { vehicleId: data.vehicleId, force: Boolean(data.force) };
   })
   .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { supabase, userId } = context;
 
-    const { data: v, error } = await supabaseAdmin
+    const { data: v, error } = await supabase
       .from("veiculos")
-      .select("id,user_id,ano,codigo_fipe,fipe_updated_at,fipe_valor,fipe_mes_referencia")
+      .select(
+        "id,user_id,placa,codigo_fipe,placafipe_hash,fipe_updated_at,fipe_valor,fipe_mes_referencia",
+      )
       .eq("id", data.vehicleId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!v || v.user_id !== context.userId) throw new Error("Acesso negado.");
-    if (!v.codigo_fipe) return { refreshed: false as const, reason: "no_codigo_fipe" };
+    if (!v || v.user_id !== userId) throw new Error("Acesso negado.");
 
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     if (!data.force && v.fipe_updated_at) {
@@ -120,118 +91,105 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
       }
     }
 
-    const anoNum = Number((v.ano || "").toString().replace(/\D/g, ""));
-    let tabelas: FipeTabela[] = [];
+    // 1) Resolver hash
+    let hash = (v.placafipe_hash || "").trim();
+
+    if (!hash && v.placa && v.codigo_fipe) {
+      try {
+        const { data: lookupResp, error: lookupErr } = await supabase.functions.invoke(
+          "consultar-placa",
+          { body: { placa: v.placa } },
+        );
+        if (!lookupErr && lookupResp?.ok && Array.isArray(lookupResp.fipe)) {
+          const match = lookupResp.fipe.find((opt: { codigo_fipe?: string; codigoFipe?: string }) => {
+            const c = (opt?.codigo_fipe ?? opt?.codigoFipe ?? "").toString().trim();
+            return c && c === v.codigo_fipe;
+          }) as { desvalorizometro?: string; hash?: string } | undefined;
+          const recovered = (match?.desvalorizometro || match?.hash || "").toString().trim();
+          if (recovered) {
+            hash = recovered;
+            await supabase
+              .from("veiculos")
+              .update({ placafipe_hash: hash })
+              .eq("id", v.id);
+          }
+        }
+      } catch (e) {
+        console.warn("[refreshFipeFn] lookupPlacaFipe fallback erro", e);
+      }
+    }
+
+    if (!hash) {
+      return { refreshed: false as const, reason: "no_hash" };
+    }
+
+    // 2) Histórico via Placa FIPE
+    let historico: HistoricoPoint[] = [];
     try {
-      tabelas = await fetchRecentFipeTabelas(6);
+      const { data: histResp, error: histErr } = await supabase.functions.invoke(
+        "consultar-historico-fipe",
+        { body: { hash } },
+      );
+      if (histErr) {
+        console.error("[refreshFipeFn] consultar-historico-fipe error", histErr);
+        return { refreshed: false as const, reason: "api_error" };
+      }
+      const arr: unknown[] = Array.isArray(histResp?.historico) ? histResp.historico : [];
+      historico = arr
+        .map((raw) => {
+          const h = raw as Record<string, unknown>;
+          const valorRaw = h?.valor;
+          let valor = 0;
+          if (typeof valorRaw === "number") {
+            valor = valorRaw;
+          } else if (typeof valorRaw === "string") {
+            const clean = valorRaw.replace(/R\$/gi, "").replace(/\s/g, "")
+              .replace(/\./g, "").replace(",", ".");
+            const n = parseFloat(clean);
+            valor = Number.isFinite(n) ? n : 0;
+          }
+          return {
+            mes_ano_extenso: String(h?.mes_ano_extenso || ""),
+            mes: (h?.mes as string | number | null) ?? null,
+            ano: typeof h?.ano === "number" ? (h.ano as number) : null,
+            valor,
+            codigo_fipe: (h?.codigo_fipe as string | null) ?? null,
+          } as HistoricoPoint;
+        })
+        .filter((p) => (p.mes_ano_extenso || p.ano) && p.valor > 0);
     } catch (e) {
-      console.error("[refreshFipeFn] erro ao buscar tabelas", e);
-      return { refreshed: false as const, reason: "tabelas_fetch_error" };
-    }
-    if (tabelas.length === 0) {
-      return { refreshed: false as const, reason: "no_tabelas" };
+      console.error("[refreshFipeFn] exception fetching historico", e);
+      return { refreshed: false as const, reason: "api_error" };
     }
 
-    const results = await Promise.all(
-      tabelas.map((t) => fetchFipePrecoForTabela(v.codigo_fipe!, t.codigo, anoNum)),
-    );
-
-    type Point = { mes_referencia: string; valor: number };
-    const points: Point[] = results
-      .map((item, idx) => {
-        if (!item) return null;
-        const valor = parseValorBR(item.valor || "0");
-        // Preferimos o mesReferencia da resposta; cai no `mes` da tabela como fallback.
-        const mes = (item.mesReferencia && item.mesReferencia.trim()) ||
-          normalizeTabelaMes(tabelas[idx]!.mes);
-        if (!valor || !mes) return null;
-        return { mes_referencia: mes, valor };
-      })
-      .filter((p): p is Point => p !== null);
-
-    if (points.length === 0) {
-      return { refreshed: false as const, reason: "no_valid_points" };
+    if (historico.length === 0) {
+      return { refreshed: false as const, reason: "no_history" };
     }
 
-    // Ordenação cronológica estrita (mais antigo → mais recente)
-    points.sort((a, b) => parseRefMonth(a.mes_referencia) - parseRefMonth(b.mes_referencia));
+    // 3) Ponto mais recente (prefere ano/mes numéricos)
+    const sorted = [...historico].sort((a, b) => pointSortKey(a) - pointSortKey(b));
+    const latest = sorted[sorted.length - 1];
 
-    const rows = points.map((p) => ({
-      vehicle_id: v.id,
-      codigo_fipe: v.codigo_fipe as string,
-      mes_referencia: p.mes_referencia,
-      valor: p.valor,
-    }));
-
-    const { error: upErr } = await supabaseAdmin
-      .from("fipe_history")
-      .upsert(rows, { onConflict: "vehicle_id,mes_referencia" });
-    if (upErr) {
-      console.error("[refreshFipeFn] upsert history error", upErr);
-    }
-
-    const latest = points[points.length - 1];
+    // 4) Atualiza veículo
     const nowIso = new Date().toISOString();
-    await supabaseAdmin
+    const { error: upErr } = await supabase
       .from("veiculos")
       .update({
+        historico_fipe: historico as never,
         fipe_valor: latest.valor,
-        fipe_mes_referencia: latest.mes_referencia,
+        fipe_mes_referencia: latest.mes_ano_extenso || v.fipe_mes_referencia,
         fipe_updated_at: nowIso,
-      })
+      } as never)
       .eq("id", v.id);
+    if (upErr) {
+      console.error("[refreshFipeFn] update error", upErr);
+      return { refreshed: false as const, reason: "update_error" };
+    }
 
     return {
       refreshed: true as const,
       valor: latest.valor,
-      mes_referencia: latest.mes_referencia,
-      inserted: rows.length,
+      mes_referencia: latest.mes_ano_extenso,
+      points: historico.length,
     };
-  });
-
-/**
- * (Legado) Importa o histórico FIPE retornado pela API paga (PuxaPlaca).
- * Mantido para compatibilidade; novos fluxos usam `refreshFipeFn`.
- */
-export const seedFipeHistoryFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: {
-    vehicleId: string;
-    codigo_fipe: string;
-    historico: FipeHistoricoItem[];
-  }) => {
-    if (!data?.vehicleId) throw new Error("vehicleId obrigatório.");
-    if (!data?.codigo_fipe) throw new Error("codigo_fipe obrigatório.");
-    return {
-      vehicleId: data.vehicleId,
-      codigo_fipe: data.codigo_fipe,
-      historico: Array.isArray(data.historico) ? data.historico : [],
-    };
-  })
-  .handler(async ({ data, context }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: v, error } = await supabaseAdmin
-      .from("veiculos")
-      .select("id,user_id")
-      .eq("id", data.vehicleId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!v || v.user_id !== context.userId) throw new Error("Acesso negado.");
-
-    const rows = data.historico
-      .map((h) => ({
-        vehicle_id: data.vehicleId,
-        codigo_fipe: data.codigo_fipe,
-        mes_referencia: (h.mes_referencia || "").trim(),
-        valor: typeof h.valor === "number" ? h.valor : parseValorBR(String(h.valor || "0")),
-      }))
-      .filter((r) => r.mes_referencia && r.valor > 0);
-
-    if (rows.length === 0) return { ok: true, inserted: 0 };
-
-    const { error: upErr } = await supabaseAdmin
-      .from("fipe_history")
-      .upsert(rows, { onConflict: "vehicle_id,mes_referencia" });
-    if (upErr) throw new Error(upErr.message);
-    return { ok: true, inserted: rows.length };
   });

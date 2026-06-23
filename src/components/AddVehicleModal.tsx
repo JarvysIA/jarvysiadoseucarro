@@ -265,31 +265,6 @@ export function AddVehicleModal({
   };
 
 
-  /** BrasilAPI: valor "vigente" (índice [0]) para o codigo_fipe selecionado. */
-  const fetchBrasilApiCurrent = async (
-    codigoFipe: string,
-  ): Promise<{ valor: number; mes_referencia: string } | null> => {
-    try {
-      const res = await fetch(
-        `https://brasilapi.com.br/api/fipe/preco/v1/${encodeURIComponent(codigoFipe)}`,
-        { headers: { Accept: "application/json" } },
-      );
-      if (!res.ok) return null;
-      const arr = (await res.json()) as Array<{ valor?: string; mesReferencia?: string; anoModelo?: number | string }>;
-      if (!Array.isArray(arr) || arr.length === 0) return null;
-      const anoNum = Number((data.ano || "").toString().replace(/\D/g, ""));
-      const match = arr.find((p) => Number(p.anoModelo) === anoNum) ?? arr[0];
-      const clean = String(match.valor ?? "").replace(/[R$\s.]/g, "").replace(",", ".");
-      const valor = parseFloat(clean);
-      return {
-        valor: Number.isFinite(valor) ? valor : 0,
-        mes_referencia: (match.mesReferencia || "").trim(),
-      };
-    } catch (e) {
-      console.warn("[BrasilAPI preco]", e);
-      return null;
-    }
-  };
 
 
   const confirmAdd = async () => {
