@@ -538,6 +538,7 @@ export type Database = {
           modelo: string | null
           motorizacao: string | null
           placa: string
+          placafipe_hash: string | null
           status: string
           user_id: string | null
         }
@@ -567,6 +568,7 @@ export type Database = {
           modelo?: string | null
           motorizacao?: string | null
           placa: string
+          placafipe_hash?: string | null
           status?: string
           user_id?: string | null
         }
@@ -596,6 +598,7 @@ export type Database = {
           modelo?: string | null
           motorizacao?: string | null
           placa?: string
+          placafipe_hash?: string | null
           status?: string
           user_id?: string | null
         }
