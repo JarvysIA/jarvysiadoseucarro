@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { TrendingUp, X, Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -9,7 +9,17 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { refreshFipeFn } from "@/lib/fipe.functions";
+import { lookupPlacaFipe } from "@/lib/placafipe";
+import { ensureTrialStartedFn } from "@/lib/trial.functions";
+import { useCurrentPlan } from "@/lib/use-current-plan";
+import { can, type VehicleContext } from "@/lib/plan-capabilities";
+import {
+  FipeVersionPickerModal,
+  type FipePickerOption,
+} from "@/components/FipeVersionPickerModal";
 
 type HistPoint = {
   mes_ano_extenso: string;
@@ -23,6 +33,7 @@ type VehicleFipe = {
   fipe_mes_referencia: string | null;
   fipe_updated_at: string | null;
   codigo_fipe: string | null;
+  placafipe_hash: string | null;
   historico_fipe: HistPoint[] | null;
 };
 
@@ -38,7 +49,6 @@ const MES_PT_TO_NUM: Record<string, number> = {
 /** "Janeiro/2024" ou "abril de 2025" → { mes: 1..12, ano: 2024 } */
 function parseMesAno(raw: string): { mes: number; ano: number } {
   const s = String(raw || "").toLowerCase().trim();
-  // separa pelo primeiro / ou " de "
   const parts = s.includes("/") ? s.split("/") : s.split(" de ");
   if (parts.length !== 2) return { mes: 0, ano: 0 };
   const mes = MES_PT_TO_NUM[parts[0].trim()] || 0;
@@ -48,39 +58,207 @@ function parseMesAno(raw: string): { mes: number; ano: number } {
 
 export function FipeCard({
   vehicleId,
+  placa,
+  vehicleStatus = "ativo",
+  onPaywall,
 }: {
   vehicleId: string;
   placa?: string;
   ano?: string;
+  vehicleStatus?: string | null;
+  onPaywall?: () => void;
 }) {
   const [data, setData] = useState<VehicleFipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [openChart, setOpenChart] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerOptions, setPickerOptions] = useState<FipePickerOption[]>([]);
+  const plan = useCurrentPlan();
+
+  const reload = useCallback(async () => {
+    const { data: row } = await supabase
+      .from("veiculos")
+      .select(
+        "fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,placafipe_hash,historico_fipe",
+      )
+      .eq("id", vehicleId)
+      .maybeSingle();
+    setData((row as unknown as VehicleFipe | null) ?? null);
+  }, [vehicleId]);
 
   useEffect(() => {
     let cancel = false;
     setLoading(true);
     setData(null);
     (async () => {
-      const { data: row } = await supabase
-        .from("veiculos")
-        .select("fipe_valor,fipe_mes_referencia,fipe_updated_at,codigo_fipe,historico_fipe")
-        .eq("id", vehicleId)
-        .maybeSingle();
-      if (cancel) return;
-      setData((row as unknown as VehicleFipe | null) ?? null);
-      setLoading(false);
+      await reload();
+      if (!cancel) setLoading(false);
     })();
     return () => {
       cancel = true;
     };
-  }, [vehicleId]);
+  }, [vehicleId, reload]);
 
   const valor = data?.fipe_valor != null ? Number(data.fipe_valor) : null;
   const mes = data?.fipe_mes_referencia ?? null;
   const hasFipe = valor != null && valor > 0;
   const hist = Array.isArray(data?.historico_fipe) ? data!.historico_fipe! : [];
   const hasHistorico = hist.length > 0;
+
+  const reportRefreshResult = (r: Awaited<ReturnType<typeof refreshFipeFn>>) => {
+    if (r && "refreshed" in r && r.refreshed) {
+      toast.success("FIPE atualizada.");
+      return;
+    }
+    const reason = (r as { reason?: string } | null)?.reason;
+    if (reason === "fresh") {
+      toast.success("FIPE já está atualizada.");
+    } else if (reason === "no_history") {
+      toast.message("Histórico FIPE indisponível no momento.");
+    } else if (reason === "api_error") {
+      toast.error("Falha ao consultar Placa FIPE. Tente novamente.");
+    } else if (reason === "update_error") {
+      toast.error("Não foi possível salvar a atualização.");
+    }
+  };
+
+  const saveChosenOption = async (opt: FipePickerOption) => {
+    const nowIso = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      codigo_fipe: opt.codigo_fipe,
+      placafipe_hash: opt.placafipe_hash,
+      fipe_updated_at: nowIso,
+    };
+    if (Number.isFinite(opt.valor) && opt.valor > 0) update.fipe_valor = opt.valor;
+    if (opt.mes_referencia) update.fipe_mes_referencia = opt.mes_referencia;
+    const { error: upErr } = await supabase
+      .from("veiculos")
+      .update(update as never)
+      .eq("id", vehicleId);
+    if (upErr) {
+      console.error("[FipeCard] save chosen option", upErr);
+      throw upErr;
+    }
+  };
+
+  const runExecutableRefresh = async () => {
+    // Inicia trial somente agora, quando o refresh será realmente executado.
+    try {
+      await ensureTrialStartedFn({
+        data: { capability: "canUseFipeHistoryRefresh" },
+      });
+    } catch (e) {
+      console.warn("[FipeCard] ensureTrialStarted", e);
+    }
+    const r = await refreshFipeFn({ data: { vehicleId, force: true } });
+    reportRefreshResult(r);
+    await reload();
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    if (!plan) {
+      toast.message("Carregando seu plano… tente novamente em instantes.");
+      return;
+    }
+    const vehicle: VehicleContext = { status: vehicleStatus ?? null };
+    // Gate: só executa quando o plano permite. Caso contrário abre Paywall
+    // (R$29,90 — ativação do veículo). NÃO inicia trial.
+    if (!can("canUseFipeHistoryRefresh", plan, vehicle)) {
+      if (onPaywall) onPaywall();
+      else toast.error("Ative este veículo para atualizar a FIPE.");
+      return;
+    }
+
+    setRefreshing(true);
+    try {
+      const hasResolvable = Boolean(
+        (data?.placafipe_hash && data.placafipe_hash.trim()) ||
+          (data?.codigo_fipe && data.codigo_fipe.trim()),
+      );
+
+      if (hasResolvable) {
+        // Caminho rápido: já temos hash ou código. Executável → inicia trial.
+        await runExecutableRefresh();
+        return;
+      }
+
+      // Sem hash e sem código → precisa de Placa FIPE lookup.
+      if (!placa) {
+        toast.error("Placa do veículo indisponível para consulta FIPE.");
+        return;
+      }
+      const lookup = await lookupPlacaFipe(placa);
+      const opts: FipePickerOption[] = (lookup.ok ? lookup.fipe : [])
+        .filter((o) => o.codigo_fipe && o.desvalorizometro)
+        .map((o) => ({
+          codigo_fipe: o.codigo_fipe,
+          modelo: o.modelo,
+          valor: o.valor,
+          combustivel: o.combustivel,
+          ano_modelo: o.ano_modelo,
+          mes_referencia: o.mes_referencia,
+          placafipe_hash: o.desvalorizometro,
+        }));
+
+      if (opts.length === 0) {
+        // Nada executável → não inicia trial.
+        toast.error("Nenhuma versão FIPE encontrada para esta placa.");
+        return;
+      }
+
+      if (opts.length === 1) {
+        // 1 opção: grava + inicia trial + refresh.
+        const opt = opts[0];
+        try {
+          await ensureTrialStartedFn({
+            data: { capability: "canUseFipeHistoryRefresh" },
+          });
+        } catch (e) {
+          console.warn("[FipeCard] ensureTrialStarted", e);
+        }
+        await saveChosenOption(opt);
+        const r = await refreshFipeFn({ data: { vehicleId, force: true } });
+        reportRefreshResult(r);
+        await reload();
+        return;
+      }
+
+      // Múltiplas opções → abre picker. NÃO inicia trial agora.
+      setPickerOptions(opts);
+      setPickerOpen(true);
+    } catch (e) {
+      console.error("[FipeCard] handleRefresh", e);
+      toast.error("Erro ao atualizar FIPE.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleVersionChosen = async (opt: FipePickerOption) => {
+    setPickerOpen(false);
+    setRefreshing(true);
+    try {
+      // Agora sim, escolha confirmada → inicia trial e executa refresh.
+      try {
+        await ensureTrialStartedFn({
+          data: { capability: "canUseFipeHistoryRefresh" },
+        });
+      } catch (e) {
+        console.warn("[FipeCard] ensureTrialStarted (after pick)", e);
+      }
+      await saveChosenOption(opt);
+      const r = await refreshFipeFn({ data: { vehicleId, force: true } });
+      reportRefreshResult(r);
+      await reload();
+    } catch (e) {
+      console.error("[FipeCard] handleVersionChosen", e);
+      toast.error("Não foi possível salvar a versão escolhida.");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
@@ -120,9 +298,31 @@ export function FipeCard({
         )}
       </button>
 
+      <button
+        type="button"
+        onClick={handleRefresh}
+        disabled={refreshing || loading || !plan}
+        className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+      >
+        {refreshing ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <RefreshCw className="h-4 w-4" />
+        )}
+        {refreshing ? "Atualizando FIPE…" : "Atualizar FIPE"}
+      </button>
+
       {openChart && (
         <FipeChartModal historico={hist} onClose={() => setOpenChart(false)} />
       )}
+
+      <FipeVersionPickerModal
+        open={pickerOpen}
+        plate={placa ?? ""}
+        options={pickerOptions}
+        onClose={() => setPickerOpen(false)}
+        onChoose={handleVersionChosen}
+      />
     </>
   );
 }
@@ -134,7 +334,6 @@ function FipeChartModal({
   historico: HistPoint[];
   onClose: () => void;
 }) {
-  // Normaliza pontos com (mes, ano) parseados.
   const allPoints = useMemo(() => {
     return historico
       .map((h) => {
@@ -149,7 +348,6 @@ function FipeChartModal({
       .filter((p) => p.ano > 0 && p.mes > 0 && p.valor > 0);
   }, [historico]);
 
-  // Lista de anos disponíveis, ordenada asc.
   const anosDisponiveis = useMemo(() => {
     const set = new Set<number>();
     allPoints.forEach((p) => set.add(p.ano));
