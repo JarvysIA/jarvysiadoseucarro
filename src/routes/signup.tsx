@@ -172,22 +172,43 @@ function SignupPage() {
           }
         : {};
 
-      const { error: vehErr } = await supabase.from("veiculos").insert({
-        user_id: user.id,
-        placa: plate,
-        marca: car.marca,
-        modelo: car.modelo,
-        ano: car.ano,
-        cor: car.cor,
-        motorizacao: car.motorizacao,
-        chassi: car.chassi || null,
-        km_atual: car.km_atual,
-        ...fipeFields,
-      });
+      const { data: inserted, error: vehErr } = await supabase
+        .from("veiculos")
+        .insert({
+          user_id: user.id,
+          placa: plate,
+          marca: car.marca,
+          modelo: car.modelo,
+          ano: car.ano,
+          cor: car.cor,
+          motorizacao: car.motorizacao,
+          chassi: car.chassi || null,
+          km_atual: car.km_atual,
+          ...fipeFields,
+        })
+        .select("id")
+        .single();
       if (vehErr) {
         console.error("[veiculos.insert] erro:", vehErr);
         toast.error(`Erro ao salvar veículo: ${vehErr.message}${vehErr.code ? ` (${vehErr.code})` : ""}`);
         return;
+      }
+
+      // Step 3.1: busca histórico FIPE completo via Placa FIPE (não-bloqueante)
+      const hash = car.fipe?.placafipe_hash?.trim() || "";
+      if (hash && inserted?.id) {
+        try {
+          const { consultarHistoricoFipe } = await import("@/lib/placafipe");
+          const historico = await consultarHistoricoFipe(hash);
+          if (historico.length > 0) {
+            await supabase
+              .from("veiculos")
+              .update({ historico_fipe: historico as never } as never)
+              .eq("id", inserted.id);
+          }
+        } catch (e) {
+          console.warn("[signup] consultarHistoricoFipe falhou", e);
+        }
       }
 
       // Step 4: normaliza telefone (E.164) e persiste no profile
