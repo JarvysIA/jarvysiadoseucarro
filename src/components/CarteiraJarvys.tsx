@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Check, Loader2, Share2, Wallet, Users, Clock, ShieldAlert } from "lucide-react";
+import { Copy, Check, Loader2, Lock, Share2, Wallet, Users, Clock, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -146,6 +146,7 @@ export function CarteiraJarvys() {
   const carteira = data?.carteira;
   const movs = data?.movimentacoes ?? [];
   const podeSaque = (carteira?.saldo_disponivel ?? 0) >= SAQUE_MINIMO;
+  const indicacaoLiberada = data?.indicacao_liberada ?? false;
 
   // Pré-carrega chave PIX salva ao abrir o modal.
   useEffect(() => {
@@ -298,40 +299,59 @@ export function CarteiraJarvys() {
       </section>
 
       {/* Código */}
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Meu código de indicação
-        </div>
-        <div className="rounded-xl border border-border bg-background px-3 py-3 text-center font-mono text-base font-bold tracking-wider text-primary">
-          {codigo ?? "—"}
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={handleCopy}
-            disabled={!codigo}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium disabled:opacity-50"
-          >
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copiado" : "Copiar código"}
-          </button>
-          <button
-            type="button"
-            onClick={handleWhats}
-            disabled={!codigo}
-            className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            <Share2 className="h-4 w-4" />
-            WhatsApp
-          </button>
-        </div>
-        {semIndicacoes && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Você ainda não possui indicações. Compartilhe seu código e ganhe R$ 5,00 a cada
-            amigo que ativar o Jarvys.
-          </p>
-        )}
-      </section>
+      {indicacaoLiberada ? (
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Meu código de indicação
+          </div>
+          <div className="rounded-xl border border-border bg-background px-3 py-3 text-center font-mono text-base font-bold tracking-wider text-primary">
+            {codigo ?? "—"}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleCopy}
+              disabled={!codigo}
+              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-medium disabled:opacity-50"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copiado" : "Copiar código"}
+            </button>
+            <button
+              type="button"
+              onClick={handleWhats}
+              disabled={!codigo}
+              className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <Share2 className="h-4 w-4" />
+              WhatsApp
+            </button>
+          </div>
+          {semIndicacoes && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Você ainda não possui indicações. Compartilhe seu código e ganhe R$ 5,00 a cada
+              amigo que ativar o Jarvys.
+            </p>
+          )}
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" /> Meu código de indicação
+          </div>
+          <div className="flex items-start gap-3 rounded-xl border border-border bg-background/60 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+              <Lock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Seu cupom está bloqueado</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ative o Jarvys para liberar seu código de indicação e começar a ganhar com indicações.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Histórico */}
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
