@@ -308,17 +308,11 @@ export function AddVehicleModal({
       }
       const km_atual = km ? Number(km.replace(/\D/g, "")) || null : null;
       const codigoFipe = fipeLookup?.codigo_fipe?.trim() || null;
+      const placafipeHash = fipeLookup?.desvalorizometro?.trim() || null;
 
-      // Ponte BrasilAPI: busca valor vigente para gravar de imediato.
-      let fipeValor: number | null = fipeLookup?.valor || null;
-      let fipeMesRef: string | null = fipeLookup?.mes_referencia || null;
-      if (codigoFipe) {
-        const atual = await fetchBrasilApiCurrent(codigoFipe);
-        if (atual && atual.valor > 0) {
-          fipeValor = atual.valor;
-          fipeMesRef = atual.mes_referencia || fipeMesRef;
-        }
-      }
+      // Valor e mês de referência vêm diretamente da Placa FIPE.
+      const fipeValor: number | null = fipeLookup?.valor || null;
+      const fipeMesRef: string | null = fipeLookup?.mes_referencia || null;
 
       const insertPayload: Record<string, unknown> = {
         user_id: userId,
@@ -333,6 +327,7 @@ export function AddVehicleModal({
       };
       // Elimina envio de null para FIPE: só grava quando temos dado real.
       if (codigoFipe) insertPayload.codigo_fipe = codigoFipe;
+      if (placafipeHash) insertPayload.placafipe_hash = placafipeHash;
       if (fipeValor && fipeValor > 0) insertPayload.fipe_valor = fipeValor;
       if (fipeMesRef) insertPayload.fipe_mes_referencia = fipeMesRef;
       if (codigoFipe) insertPayload.fipe_updated_at = new Date().toISOString();
@@ -358,15 +353,6 @@ export function AddVehicleModal({
         console.warn("[inheritVehicleImageFn]", e);
       }
 
-      // Dispara o seed inicial dos 6 meses na BrasilAPI (não-bloqueante crítico).
-      if (codigoFipe) {
-        try {
-          const { refreshFipeFn } = await import("@/lib/fipe.functions");
-          await refreshFipeFn({ data: { vehicleId: inserted.id, force: true } });
-        } catch (e) {
-          console.warn("[FIPE seed via BrasilAPI]", e);
-        }
-      }
 
       // Histórico completo via placafipe.com.br (desvalorizômetro).
       const hash = fipeLookup?.desvalorizometro?.trim() || "";
