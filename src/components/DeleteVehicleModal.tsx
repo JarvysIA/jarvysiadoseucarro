@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { sanitizePlate } from "@/lib/plate-lookup";
+import { sanitizePlate } from "@/lib/plate";
 import { softDeleteVehicleFn } from "@/lib/vehicles.functions";
 
 export function DeleteVehicleModal({

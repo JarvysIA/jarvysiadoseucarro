@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sanitizePlate } from "@/lib/plate-lookup";
+import { sanitizePlate } from "@/lib/plate";
 
 export type ArchivedLookup = {
   found: false;
