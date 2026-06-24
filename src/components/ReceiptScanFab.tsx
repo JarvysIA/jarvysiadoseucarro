@@ -17,8 +17,19 @@ type Props = {
   onParsed: (parsed: ParsedReceipt, file: File) => void;
   /** Posição vertical opcional (default bottom-44). */
   className?: string;
-  /** Status do veículo ativo (Build 3 — gate canUseReceiptScanner). */
+  /** Status do veículo NA GARAGEM (ativo | archived). */
   vehicleStatus?: string | null;
+  /**
+   * Ativação COMERCIAL do veículo (R$29,90 via pagamentos_pix).
+   * Quando false e o usuário é "ativo", o gate bloqueia o OCR.
+   */
+  isActivated?: boolean;
+  /**
+   * Disparado quando o gate bloqueia por ausência de ativação do veículo.
+   * Esperado: abrir PaywallModal de ativação R$29,90 do veículo atual.
+   * Quando ausente, cai em toast.error.
+   */
+  onPaywall?: () => void;
 };
 
 function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }> {
@@ -35,7 +46,13 @@ function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }>
 }
 
 /** FAB secundário (acima do "+") para ler nota fiscal com IA. */
-export function ReceiptScanFab({ onParsed, className, vehicleStatus }: Props) {
+export function ReceiptScanFab({
+  onParsed,
+  className,
+  vehicleStatus,
+  isActivated,
+  onPaywall,
+}: Props) {
   const [scanning, setScanning] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const plan = useCurrentPlan();
@@ -45,12 +62,21 @@ export function ReceiptScanFab({ onParsed, className, vehicleStatus }: Props) {
       toast.error("Carregando seu plano… tente novamente em instantes.");
       return;
     }
-    const vehicle: VehicleContext | undefined = vehicleStatus
-      ? { status: vehicleStatus }
-      : undefined;
+    const vehicle: VehicleContext | undefined =
+      vehicleStatus || isActivated !== undefined
+        ? { status: vehicleStatus ?? null, isActivated }
+        : undefined;
 
     if (!can("canUseReceiptScanner", plan, vehicle)) {
       const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
+      if (
+        (reason === "vehicle_not_activated" ||
+          reason === "feature_requires_activation") &&
+        onPaywall
+      ) {
+        onPaywall();
+        return;
+      }
       toast.error(
         reason === "trial_expired"
           ? "Seu período de teste expirou."
@@ -60,6 +86,7 @@ export function ReceiptScanFab({ onParsed, className, vehicleStatus }: Props) {
       );
       return;
     }
+
 
     setScanning(true);
     try {
