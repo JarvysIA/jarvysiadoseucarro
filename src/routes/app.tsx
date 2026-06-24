@@ -180,6 +180,7 @@ function AppPage() {
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
+    setPlanRefreshKey((k) => k + 1);
     // Rola para o novo card no próximo tick
     setTimeout(() => {
       const el = scrollerRef.current?.querySelector<HTMLElement>(
@@ -556,6 +557,13 @@ function AppPage() {
               setActiveVehicleId(nextId || null);
               return next;
             });
+            setActivatedVehicleIds((prev) => {
+              if (!prev.has(removedId)) return prev;
+              const next = new Set(prev);
+              next.delete(removedId);
+              return next;
+            });
+            setPlanRefreshKey((k) => k + 1);
             navigate({ to: "/app", replace: true });
           }}
         />
