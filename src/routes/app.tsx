@@ -492,8 +492,20 @@ function AppPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdded={handleAdded}
+        onLimitBlocked={openLimitModal}
       />
 
+      <VehicleLimitModal
+        open={limitModal.open}
+        onClose={() => setLimitModal((s) => ({ ...s, open: false }))}
+        reason={limitModal.reason}
+        eligibleVehicleId={limitModal.eligibleId}
+        onActivate={(id) => {
+          setLimitModal((s) => ({ ...s, open: false }));
+          setSelectedId(id);
+          setActivateOpen(true);
+        }}
+      />
 
       <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} vehicleId={selectedId} />
 
