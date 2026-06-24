@@ -12,7 +12,7 @@ import type { ProfileStatus } from "@/lib/profile-status";
  *   status='ativo' e data_vencimento > now() (mesma regra da trigger
  *   proteger_cadastro_veiculo). Não usa apenas veiculos.status.
  */
-export function useCurrentPlan(): PlanContext | null {
+export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
   const [plan, setPlan] = useState<PlanContext | null>(null);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function useCurrentPlan(): PlanContext | null {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return plan;
 }

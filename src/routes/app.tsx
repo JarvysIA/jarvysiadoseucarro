@@ -136,7 +136,8 @@ function AppPage() {
   }>({ open: false, reason: "no_eligible", eligibleId: null });
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
-  const plan = useCurrentPlan();
+  const [planRefreshKey, setPlanRefreshKey] = useState(0);
+  const plan = useCurrentPlan(planRefreshKey);
 
   const openLimitModal = () => {
     const eligible =
