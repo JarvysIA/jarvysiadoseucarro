@@ -126,13 +126,39 @@ function AppPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
+  const [activatedVehicleIds, setActivatedVehicleIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [limitModal, setLimitModal] = useState<{
+    open: boolean;
+    reason: VehicleLimitReason;
+    eligibleId: string | null;
+  }>({ open: false, reason: "no_eligible", eligibleId: null });
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
+  const plan = useCurrentPlan();
+
+  const openLimitModal = () => {
+    const eligible =
+      vehicles.find((v) => v.id === selectedId && !activatedVehicleIds.has(v.id)) ??
+      vehicles.find((v) => !activatedVehicleIds.has(v.id)) ??
+      null;
+    const status = plan?.status_usuario;
+    const reason: VehicleLimitReason = !eligible
+      ? "no_eligible"
+      : status === "trial"
+      ? "trial_limit"
+      : "ativo_limit";
+    setLimitModal({ open: true, reason, eligibleId: eligible?.id ?? null });
+  };
 
   const handleAddClick = () => {
-    // App é gratuito. O usuário pode cadastrar quantos veículos quiser;
-    // o status VIP/ativação é por placa via PaywallModal.
-    setAddOpen(true);
+    if (!plan) return;
+    if (can("canAddVehicle", plan)) {
+      setAddOpen(true);
+      return;
+    }
+    openLimitModal();
   };
 
   const handleAdded = (v: AddedVehicle) => {
