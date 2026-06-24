@@ -241,6 +241,12 @@ function AppPage() {
       });
       setVehicles(mapped);
       cachedVehicles = mapped;
+      const activeIds = new Set(mapped.map((m) => m.id));
+      const actSet = new Set<string>();
+      for (const row of (subs ?? []) as { veiculo_id: string | null }[]) {
+        if (row.veiculo_id && activeIds.has(row.veiculo_id)) actSet.add(row.veiculo_id);
+      }
+      setActivatedVehicleIds(actSet);
       if (mapped.length) {
         const saved = getActiveVehicleId();
         const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
