@@ -7,7 +7,9 @@ import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseMod
 import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { CertificadoJarvysModal } from "@/components/CertificadoJarvysModal";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
+import { PaywallModal } from "@/components/PaywallModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
+import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,11 @@ function RevisoesPage() {
     foto_url: string | null;
     status: string | null;
   } | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const activatedVehicleIds = useActivatedVehicleIds();
+  const isActivated = activeVehicleId
+    ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
+    : undefined;
 
   useEffect(() => {
     if (!activeVehicleId) {
@@ -485,6 +492,8 @@ function RevisoesPage() {
 
       <ReceiptScanFab
         vehicleStatus={vehicleFull?.status ?? null}
+        isActivated={isActivated}
+        onPaywall={() => setActivateOpen(true)}
         className="bottom-44"
         onParsed={(parsed, file) => {
           setScannedPrefill({
@@ -499,6 +508,13 @@ function RevisoesPage() {
           });
         }}
       />
+
+      <PaywallModal
+        open={activateOpen}
+        onClose={() => setActivateOpen(false)}
+        vehicleId={activeVehicleId ?? undefined}
+      />
+
 
       <NewExpenseModal
         open={addOpen}
