@@ -520,6 +520,8 @@ function AppPage() {
           placa={selected.plate}
           ano={selected.year}
           kmAtual={selected.km}
+          vehicleStatus={"ativo"}
+          isActivated={activatedVehicleIds.has(selected.id)}
           overrides={{
             km_ultima_troca_oleo: selected.kmUltimaTrocaOleo,
             km_ultima_troca_filtros: selected.kmUltimaTrocaFiltros,
@@ -729,6 +731,8 @@ function VehicleStatusSection({
   placa,
   ano,
   kmAtual,
+  vehicleStatus,
+  isActivated,
   overrides: dbOverrides,
   onKmChange,
   onMaintenanceSaved,
@@ -739,6 +743,8 @@ function VehicleStatusSection({
   placa: string;
   ano: string;
   kmAtual: number;
+  vehicleStatus: string | null;
+  isActivated: boolean;
   overrides: VehicleMaintOverrides;
   onKmChange: (km: number) => void;
   onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
@@ -1027,7 +1033,8 @@ function VehicleStatusSection({
           vehicleId={vehicleId}
           placa={placa}
           ano={ano}
-          vehicleStatus="ativo"
+          vehicleStatus={vehicleStatus}
+          isActivated={isActivated}
           onPaywall={onPaywall}
         />
       </section>
@@ -1058,7 +1065,9 @@ function VehicleStatusSection({
         computed={openComputed}
         kmAtual={kmAtual}
         expenses={openExpenses}
-        vehicleStatus="ativo"
+        vehicleStatus={vehicleStatus}
+        isActivated={isActivated}
+        onPaywall={onPaywall}
         onSave={(payload) => {
           if (openItemKey) handleSaveMaintenance(openItemKey, payload);
         }}

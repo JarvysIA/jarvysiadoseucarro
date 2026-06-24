@@ -59,13 +59,17 @@ function parseMesAno(raw: string): { mes: number; ano: number } {
 export function FipeCard({
   vehicleId,
   placa,
-  vehicleStatus = "ativo",
+  vehicleStatus = null,
+  isActivated,
   onPaywall,
 }: {
   vehicleId: string;
   placa?: string;
   ano?: string;
+  /** Status do veículo NA GARAGEM (ativo | archived). */
   vehicleStatus?: string | null;
+  /** Ativação COMERCIAL do veículo (R$29,90 via pagamentos_pix). */
+  isActivated?: boolean;
   onPaywall?: () => void;
 }) {
   const [data, setData] = useState<VehicleFipe | null>(null);
@@ -162,7 +166,7 @@ export function FipeCard({
       toast.message("Carregando seu plano… tente novamente em instantes.");
       return;
     }
-    const vehicle: VehicleContext = { status: vehicleStatus ?? null };
+    const vehicle: VehicleContext = { status: vehicleStatus ?? null, isActivated };
     // Gate: só executa quando o plano permite. Caso contrário abre Paywall
     // (R$29,90 — ativação do veículo). NÃO inicia trial.
     if (!can("canUseFipeHistoryRefresh", plan, vehicle)) {

@@ -70,8 +70,15 @@ type Props = {
   kmAtual: number;
   expenses?: MaintExpense[];
   onSave?: (update: MaintSaveInput) => void | Promise<void>;
-  /** Status do veículo ativo (Build 3 — gate canUseReceiptScanner). */
+  /** Status do veículo NA GARAGEM (ativo | archived). */
   vehicleStatus?: string | null;
+  /** Ativação COMERCIAL do veículo (R$29,90 via pagamentos_pix). */
+  isActivated?: boolean;
+  /**
+   * Disparado quando o gate de OCR bloqueia por veículo não ativado.
+   * Esperado: abrir PaywallModal de ativação R$29,90 do veículo atual.
+   */
+  onPaywall?: () => void;
 };
 
 type FlowState = "idle" | "scanning" | "confirm" | "error" | "manual";
@@ -107,6 +114,8 @@ export function MaintenancePanel({
   expenses = [],
   onSave,
   vehicleStatus,
+  isActivated,
+  onPaywall,
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
@@ -132,11 +141,20 @@ export function MaintenancePanel({
       toast.error("Carregando seu plano… tente novamente em instantes.");
       return;
     }
-    const vehicle: VehicleContext | undefined = vehicleStatus
-      ? { status: vehicleStatus }
-      : undefined;
+    const vehicle: VehicleContext | undefined =
+      vehicleStatus || isActivated !== undefined
+        ? { status: vehicleStatus ?? null, isActivated }
+        : undefined;
     if (!can("canUseReceiptScanner", plan, vehicle)) {
       const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
+      if (
+        (reason === "vehicle_not_activated" ||
+          reason === "feature_requires_activation") &&
+        onPaywall
+      ) {
+        onPaywall();
+        return;
+      }
       toast.error(
         reason === "trial_expired"
           ? "Seu período de teste expirou."
