@@ -1,5 +1,24 @@
+// =============================================================================
+// WhatsApp futuro (não implementado neste build — registro de contrato).
+//
+// Quando o WhatsApp for implementado, TODO handler de WhatsApp deve seguir:
+//
+//   Mensagem WhatsApp recebida
+//     → identificar usuário pelo telefone
+//     → identificar veículo
+//     → buscar se veículo está ativado via pagamentos_pix
+//       (status='pago' + tipo_produto='ativacao' + veiculo_id)
+//     → montar VehicleContext com isActivated
+//     → chamar can("canUseWhatsappOCR") ou can("canUseWhatsappJarvys")
+//     → se bloquear, responder oferecendo ativação R$29,90
+//     → se liberar, processar
+//
+// Nenhum handler de WhatsApp pode rodar OCR, Dr. Jarvys ou automações
+// sem VehicleContext.isActivated validado via can(...).
+// =============================================================================
+
 import type { ProfileStatus } from "./profile-status";
-import { isActiveVehicleStatus, type VehicleStatus } from "./vehicle-status";
+import type { VehicleStatus } from "./vehicle-status";
 
 export type Capability =
   | "canUseAppJarvysChat"
@@ -30,8 +49,25 @@ export type PlanContext = {
 };
 
 export type VehicleContext = {
+  /**
+   * Status do veículo NA GARAGEM (ativo | archived).
+   * NÃO significa que o veículo foi pago/ativado comercialmente.
+   */
   status: VehicleStatus | string | null;
   activated_at?: string | null;
+  /**
+   * Ativação COMERCIAL real do veículo (R$29,90 via pagamentos_pix).
+   *
+   * Fonte obrigatória:
+   * - pagamentos_pix.status = 'pago'
+   * - pagamentos_pix.tipo_produto = 'ativacao'
+   * - pagamentos_pix.veiculo_id = veiculos.id
+   * - veiculos.status = 'ativo'
+   *
+   * NÃO usar tabela `assinaturas`. NÃO confundir com vehicle.status
+   * (garagem) nem com history_locked (histórico premium R$49,90).
+   */
+  isActivated?: boolean;
   /**
    * Bloqueio do histórico premium pago (R$49,90) PARA O VEÍCULO DO USUÁRIO ATUAL.
    *
@@ -45,6 +81,7 @@ export type VehicleContext = {
    * - Entitlement premium não é transferível entre usuários, mesmo que a
    *   placa seja a mesma. Apenas o status `vip` ignora esta regra
    *   (ver canUseHistoricoPremium).
+   * - Independente de isActivated. R$49,90 é produto separado de R$29,90.
    */
   history_locked?: boolean | null;
 };
@@ -104,9 +141,12 @@ export function capabilityStartsTrial(capability: Capability): boolean {
   }
 }
 
-function vehicleIsActive(vehicle?: VehicleContext): boolean {
-  if (!vehicle) return false;
-  return isActiveVehicleStatus(vehicle.status);
+/**
+ * Ativação COMERCIAL do veículo (R$29,90 pago via pagamentos_pix).
+ * Distinta de vehicle.status (garagem) e de history_locked (premium R$49,90).
+ */
+function vehicleIsActivated(vehicle?: VehicleContext): boolean {
+  return vehicle?.isActivated === true;
 }
 
 /**
@@ -181,7 +221,7 @@ export function can(
       case "canUseWhatsappOCR":
       case "canUseFipeAutoRefresh":
       case "canUseFipeHistoryRefresh":
-        return vehicleIsActive(vehicle);
+        return vehicleIsActivated(vehicle);
       case "canAddVehicle":
         return plan.vehicleCount < plan.activatedVehicleCount + 1;
       case "canHaveUnlimitedVehicles":
