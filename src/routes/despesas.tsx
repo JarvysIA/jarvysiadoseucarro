@@ -7,7 +7,9 @@ import { BottomNav } from "@/components/BottomNav";
 import { NewExpenseModal, type ExpensePrefill } from "@/components/NewExpenseModal";
 import { ReceiptScanFab } from "@/components/ReceiptScanFab";
 import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
+import { PaywallModal } from "@/components/PaywallModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
+import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
 import { formatItemName } from "@/lib/format-item-name";
 import {
   CATEGORIAS,
@@ -48,6 +50,11 @@ function DespesasPage() {
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
   const [vehicleStatus, setVehicleStatus] = useState<string | null>(null);
+  const [activateOpen, setActivateOpen] = useState(false);
+  const activatedVehicleIds = useActivatedVehicleIds();
+  const isActivated = activeVehicleId
+    ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
+    : undefined;
 
   // Carrega metadados do veículo ativo (KM, lock e claim) para defaults do modal,
   // banner de Carfax Reverso e filtro da timeline.
@@ -346,6 +353,8 @@ function DespesasPage() {
       {/* FAB IA — Ler nota com IA */}
       <ReceiptScanFab
         vehicleStatus={vehicleStatus}
+        isActivated={isActivated}
+        onPaywall={() => setActivateOpen(true)}
         className="bottom-44"
         onParsed={(parsed, file) => {
           setScannedPrefill({
@@ -360,6 +369,13 @@ function DespesasPage() {
           });
         }}
       />
+
+      <PaywallModal
+        open={activateOpen}
+        onClose={() => setActivateOpen(false)}
+        vehicleId={activeVehicleId ?? undefined}
+      />
+
 
       <NewExpenseModal
         open={addOpen}
