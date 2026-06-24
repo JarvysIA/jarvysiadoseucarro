@@ -196,7 +196,8 @@ function AppPage() {
         return;
       }
       const userId = session.session.user.id;
-      const [{ data: prof }, { data: veics }] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [{ data: prof }, { data: veics }, { data: subs }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
@@ -208,6 +209,12 @@ function AppPage() {
           .eq("user_id", userId)
           .eq("status", "ativo")
           .order("created_at", { ascending: true }),
+        supabase
+          .from("assinaturas")
+          .select("veiculo_id")
+          .eq("user_id", userId)
+          .eq("status", "ativo")
+          .gt("data_vencimento", nowIso),
       ]);
       setProfile(prof as Profile | null);
       cachedProfile = (prof as Profile | null) ?? null;
