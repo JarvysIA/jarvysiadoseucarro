@@ -58,10 +58,12 @@ export function AddVehicleModal({
   open,
   onClose,
   onAdded,
+  onLimitBlocked,
 }: {
   open: boolean;
   onClose: () => void;
   onAdded: (v: AddedVehicle) => void;
+  onLimitBlocked?: () => void;
 }) {
   const [step, setStep] = useState<Step>("plate");
   const [plateRaw, setPlateRaw] = useState("");
