@@ -198,8 +198,7 @@ function AppPage() {
         return;
       }
       const userId = session.session.user.id;
-      const nowIso = new Date().toISOString();
-      const [{ data: prof }, { data: veics }, { data: subs }] = await Promise.all([
+      const [{ data: prof }, { data: veics }, { data: activations }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
@@ -212,11 +211,12 @@ function AppPage() {
           .eq("status", "ativo")
           .order("created_at", { ascending: true }),
         supabase
-          .from("assinaturas")
+          .from("pagamentos_pix")
           .select("veiculo_id")
           .eq("user_id", userId)
-          .eq("status", "ativo")
-          .gt("data_vencimento", nowIso),
+          .eq("status", "pago")
+          .eq("tipo_produto", "ativacao")
+          .not("veiculo_id", "is", null),
       ]);
       setProfile(prof as Profile | null);
       cachedProfile = (prof as Profile | null) ?? null;
@@ -245,7 +245,7 @@ function AppPage() {
       cachedVehicles = mapped;
       const activeIds = new Set(mapped.map((m) => m.id));
       const actSet = new Set<string>();
-      for (const row of (subs ?? []) as { veiculo_id: string | null }[]) {
+      for (const row of (activations ?? []) as { veiculo_id: string | null }[]) {
         if (row.veiculo_id && activeIds.has(row.veiculo_id)) actSet.add(row.veiculo_id);
       }
       setActivatedVehicleIds(actSet);

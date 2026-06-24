@@ -8,9 +8,10 @@ import type { ProfileStatus } from "@/lib/profile-status";
  *
  * Build 4A: vehicleCount e activatedVehicleCount agora são reais.
  * - vehicleCount = veiculos do usuário com status='ativo' (archived NÃO conta).
- * - activatedVehicleCount = veículos cujo veiculo_id possui assinatura com
- *   status='ativo' e data_vencimento > now() (mesma regra da trigger
- *   proteger_cadastro_veiculo). Não usa apenas veiculos.status.
+ * - activatedVehicleCount = veículos cujo veiculo_id possui pagamento
+ *   confirmado em pagamentos_pix (status='pago', tipo_produto='ativacao').
+ *   Histórico premium (tipo_produto='historico') NÃO conta.
+ *   assinaturas não é usada porque não é alimentada pelo fluxo atual.
  */
 export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
   const [plan, setPlan] = useState<PlanContext | null>(null);
@@ -26,8 +27,7 @@ export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
         return;
       }
 
-      const nowIso = new Date().toISOString();
-      const [profileRes, vehiclesRes, subsRes] = await Promise.all([
+      const [profileRes, vehiclesRes, activationsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("status_usuario, trial_inicio")
@@ -39,11 +39,12 @@ export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
           .eq("user_id", userId)
           .eq("status", "ativo"),
         supabase
-          .from("assinaturas")
+          .from("pagamentos_pix")
           .select("veiculo_id")
           .eq("user_id", userId)
-          .eq("status", "ativo")
-          .gt("data_vencimento", nowIso),
+          .eq("status", "pago")
+          .eq("tipo_produto", "ativacao")
+          .not("veiculo_id", "is", null),
       ]);
 
       if (cancelled) return;
@@ -56,7 +57,7 @@ export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
         ((vehiclesRes.data ?? []) as { id: string }[]).map((v) => v.id),
       );
       const activatedIds = new Set<string>();
-      for (const row of (subsRes.data ?? []) as { veiculo_id: string }[]) {
+      for (const row of (activationsRes.data ?? []) as { veiculo_id: string | null }[]) {
         if (row.veiculo_id && activeVehicleIds.has(row.veiculo_id)) {
           activatedIds.add(row.veiculo_id);
         }
