@@ -11,6 +11,9 @@ import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
 import { DeleteVehicleModal } from "@/components/DeleteVehicleModal";
 import { PaywallModal } from "@/components/PaywallModal";
+import { VehicleLimitModal, type VehicleLimitReason } from "@/components/VehicleLimitModal";
+import { useCurrentPlan } from "@/lib/use-current-plan";
+import { can } from "@/lib/plan-capabilities";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
@@ -123,13 +126,39 @@ function AppPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
+  const [activatedVehicleIds, setActivatedVehicleIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [limitModal, setLimitModal] = useState<{
+    open: boolean;
+    reason: VehicleLimitReason;
+    eligibleId: string | null;
+  }>({ open: false, reason: "no_eligible", eligibleId: null });
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
+  const plan = useCurrentPlan();
+
+  const openLimitModal = () => {
+    const eligible =
+      vehicles.find((v) => v.id === selectedId && !activatedVehicleIds.has(v.id)) ??
+      vehicles.find((v) => !activatedVehicleIds.has(v.id)) ??
+      null;
+    const status = plan?.status_usuario;
+    const reason: VehicleLimitReason = !eligible
+      ? "no_eligible"
+      : status === "trial"
+      ? "trial_limit"
+      : "ativo_limit";
+    setLimitModal({ open: true, reason, eligibleId: eligible?.id ?? null });
+  };
 
   const handleAddClick = () => {
-    // App é gratuito. O usuário pode cadastrar quantos veículos quiser;
-    // o status VIP/ativação é por placa via PaywallModal.
-    setAddOpen(true);
+    if (!plan) return;
+    if (can("canAddVehicle", plan)) {
+      setAddOpen(true);
+      return;
+    }
+    openLimitModal();
   };
 
   const handleAdded = (v: AddedVehicle) => {
@@ -167,7 +196,8 @@ function AppPage() {
         return;
       }
       const userId = session.session.user.id;
-      const [{ data: prof }, { data: veics }] = await Promise.all([
+      const nowIso = new Date().toISOString();
+      const [{ data: prof }, { data: veics }, { data: subs }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
@@ -179,6 +209,12 @@ function AppPage() {
           .eq("user_id", userId)
           .eq("status", "ativo")
           .order("created_at", { ascending: true }),
+        supabase
+          .from("assinaturas")
+          .select("veiculo_id")
+          .eq("user_id", userId)
+          .eq("status", "ativo")
+          .gt("data_vencimento", nowIso),
       ]);
       setProfile(prof as Profile | null);
       cachedProfile = (prof as Profile | null) ?? null;
@@ -205,6 +241,12 @@ function AppPage() {
       });
       setVehicles(mapped);
       cachedVehicles = mapped;
+      const activeIds = new Set(mapped.map((m) => m.id));
+      const actSet = new Set<string>();
+      for (const row of (subs ?? []) as { veiculo_id: string | null }[]) {
+        if (row.veiculo_id && activeIds.has(row.veiculo_id)) actSet.add(row.veiculo_id);
+      }
+      setActivatedVehicleIds(actSet);
       if (mapped.length) {
         const saved = getActiveVehicleId();
         const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
@@ -450,8 +492,20 @@ function AppPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdded={handleAdded}
+        onLimitBlocked={openLimitModal}
       />
 
+      <VehicleLimitModal
+        open={limitModal.open}
+        onClose={() => setLimitModal((s) => ({ ...s, open: false }))}
+        reason={limitModal.reason}
+        eligibleVehicleId={limitModal.eligibleId}
+        onActivate={(id) => {
+          setLimitModal((s) => ({ ...s, open: false }));
+          setSelectedId(id);
+          setActivateOpen(true);
+        }}
+      />
 
       <PaywallModal open={activateOpen} onClose={() => setActivateOpen(false)} vehicleId={selectedId} />
 

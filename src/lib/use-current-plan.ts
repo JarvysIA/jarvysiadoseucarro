@@ -6,13 +6,11 @@ import type { ProfileStatus } from "@/lib/profile-status";
 /**
  * Hook leve para montar o PlanContext do usuário autenticado.
  *
- * Build 3: usado pelos gates de OCR (ReceiptScanFab, MaintenancePanel).
- * Faz um único SELECT mínimo em `profiles` e devolve `null` enquanto carrega.
- *
- * vehicleCount/activatedVehicleCount são fixados em 0 porque os consumidores
- * atuais (OCR) não dependem dessas contagens — elas só afetam canAddVehicle /
- * canHaveUnlimitedVehicles. Quando um futuro consumidor precisar delas,
- * estender este hook.
+ * Build 4A: vehicleCount e activatedVehicleCount agora são reais.
+ * - vehicleCount = veiculos do usuário com status='ativo' (archived NÃO conta).
+ * - activatedVehicleCount = veículos cujo veiculo_id possui assinatura com
+ *   status='ativo' e data_vencimento > now() (mesma regra da trigger
+ *   proteger_cadastro_veiculo). Não usa apenas veiculos.status.
  */
 export function useCurrentPlan(): PlanContext | null {
   const [plan, setPlan] = useState<PlanContext | null>(null);
@@ -27,21 +25,50 @@ export function useCurrentPlan(): PlanContext | null {
         if (!cancelled) setPlan(null);
         return;
       }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("status_usuario, trial_inicio")
-        .eq("id", userId)
-        .maybeSingle();
+
+      const nowIso = new Date().toISOString();
+      const [profileRes, vehiclesRes, subsRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("status_usuario, trial_inicio")
+          .eq("id", userId)
+          .maybeSingle(),
+        supabase
+          .from("veiculos")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("status", "ativo"),
+        supabase
+          .from("assinaturas")
+          .select("veiculo_id")
+          .eq("user_id", userId)
+          .eq("status", "ativo")
+          .gt("data_vencimento", nowIso),
+      ]);
+
       if (cancelled) return;
-      if (error || !data) {
+      if (profileRes.error || !profileRes.data) {
         setPlan(null);
         return;
       }
+
+      const activeVehicleIds = new Set<string>(
+        ((vehiclesRes.data ?? []) as { id: string }[]).map((v) => v.id),
+      );
+      const activatedIds = new Set<string>();
+      for (const row of (subsRes.data ?? []) as { veiculo_id: string }[]) {
+        if (row.veiculo_id && activeVehicleIds.has(row.veiculo_id)) {
+          activatedIds.add(row.veiculo_id);
+        }
+      }
+
       setPlan({
-        status_usuario: (data.status_usuario as ProfileStatus) ?? "trial",
-        trial_inicio: (data.trial_inicio as string | null) ?? null,
-        vehicleCount: 0,
-        activatedVehicleCount: 0,
+        status_usuario:
+          (profileRes.data.status_usuario as ProfileStatus) ?? "trial",
+        trial_inicio:
+          (profileRes.data.trial_inicio as string | null) ?? null,
+        vehicleCount: activeVehicleIds.size,
+        activatedVehicleCount: activatedIds.size,
       });
     })();
 

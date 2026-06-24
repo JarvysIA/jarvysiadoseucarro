@@ -58,10 +58,12 @@ export function AddVehicleModal({
   open,
   onClose,
   onAdded,
+  onLimitBlocked,
 }: {
   open: boolean;
   onClose: () => void;
   onAdded: (v: AddedVehicle) => void;
+  onLimitBlocked?: () => void;
 }) {
   const [step, setStep] = useState<Step>("plate");
   const [plateRaw, setPlateRaw] = useState("");
@@ -338,6 +340,16 @@ export function AddVehicleModal({
         .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
         .single();
       if (error || !inserted) {
+        const code = (error as { code?: string } | null)?.code;
+        const msg = (error as { message?: string } | null)?.message ?? "";
+        if (
+          onLimitBlocked &&
+          (code === "23514" || msg.includes("CADASTRO_BLOQUEADO"))
+        ) {
+          onClose();
+          onLimitBlocked();
+          return;
+        }
         toast.error("Não foi possível adicionar o veículo.");
         return;
       }
