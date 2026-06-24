@@ -340,6 +340,16 @@ export function AddVehicleModal({
         .select("id,placa,marca,modelo,ano,cor,km_atual,chassi")
         .single();
       if (error || !inserted) {
+        const code = (error as { code?: string } | null)?.code;
+        const msg = (error as { message?: string } | null)?.message ?? "";
+        if (
+          onLimitBlocked &&
+          (code === "23514" || msg.includes("CADASTRO_BLOQUEADO"))
+        ) {
+          onClose();
+          onLimitBlocked();
+          return;
+        }
         toast.error("Não foi possível adicionar o veículo.");
         return;
       }
