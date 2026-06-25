@@ -881,7 +881,7 @@ function VehicleStatusSection({
     return () => {
       cancelled = true;
     };
-  }, [openItemKey, vehicleId, expenses, historyLocked, claimedAt]);
+  }, [openItemKey, vehicleId, expenses, effectiveLock, claimedAt]);
 
   const openExpenses = openItemKey
     ? [
