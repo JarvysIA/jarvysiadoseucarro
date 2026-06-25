@@ -144,7 +144,7 @@ function DespesasPage() {
     return () => {
       cancel = true;
     };
-  }, [year, month, activeVehicleId, reloadKey, historyLocked, claimedAt]);
+  }, [year, month, activeVehicleId, reloadKey, effectiveLock, claimedAt]);
 
   const prevMonth = () => {
     if (month === 0) {
