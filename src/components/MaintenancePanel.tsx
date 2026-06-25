@@ -134,6 +134,7 @@ export function MaintenancePanel({
   onPaywall,
   vehicleId,
   historyLocked = false,
+  hasPremiumHistoryAvailable = false,
   onHistoryUnlocked,
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
@@ -143,6 +144,10 @@ export function MaintenancePanel({
   const [saving, setSaving] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const showLockedBanner =
+    isPlanLoaded && historyLocked && !!vehicleId && hasPremiumHistoryAvailable && !isVip;
 
   // Reset ao reabrir/trocar item
   useEffect(() => {
