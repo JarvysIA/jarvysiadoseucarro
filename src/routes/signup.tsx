@@ -184,6 +184,8 @@ function SignupPage() {
           motorizacao: car.motorizacao,
           chassi: car.chassi || null,
           km_atual: car.km_atual,
+          // Patch G: novo cadastro nasce com Histórico Premium bloqueado.
+          history_locked: true,
           ...fipeFields,
         })
         .select("id")
