@@ -46,6 +46,7 @@ function RevisoesPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [hasPremiumHistoryAvailable, setHasPremiumHistoryAvailable] = useState(false);
   const [placa, setPlaca] = useState<string | null>(null);
   const [scannedPrefill, setScannedPrefill] = useState<ExpensePrefill | null>(null);
   const [certOpen, setCertOpen] = useState(false);
@@ -62,6 +63,10 @@ function RevisoesPage() {
   } | null>(null);
   const [activateOpen, setActivateOpen] = useState(false);
   const activatedVehicleIds = useActivatedVehicleIds();
+  const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const effectiveLock = historyLocked && !isVip;
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
