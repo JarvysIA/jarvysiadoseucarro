@@ -35,6 +35,50 @@ export const claimArchivedVehicleFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<ArchivedLookup> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Patch 2: se o próprio usuário já tem veículo com essa placa (ativo OU
+    // legado 'active'), NÃO claimar archived de terceiros — evita duplicata
+    // do tipo "veículo pago oculto + veículo free claimed".
+    // Restrito ao user_id atual; outros usuários continuam livres para
+    // cadastrar a mesma placa normalmente.
+    const { data: mineRaw, error: mineErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id,placa,marca,modelo,ano,cor,chassi,km_atual,foto_url,status")
+      .eq("placa", data.placa)
+      .eq("user_id", context.userId)
+      .in("status", ["ativo", "active"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (mineErr) throw new Error(mineErr.message);
+    if (mineRaw) {
+      const mine = mineRaw as {
+        id: string; placa: string; marca: string | null; modelo: string | null;
+        ano: string | null; cor: string | null; chassi: string | null;
+        km_atual: number | null; foto_url: string | null; status: string;
+      };
+      if (mine.status === "active") {
+        await supabaseAdmin
+          .from("veiculos")
+          .update({ status: "ativo" })
+          .eq("id", mine.id);
+      }
+      return {
+        found: true,
+        vehicle: {
+          id: mine.id,
+          placa: mine.placa,
+          marca: mine.marca,
+          modelo: mine.modelo,
+          ano: mine.ano,
+          cor: mine.cor,
+          chassi: mine.chassi,
+          km_atual: mine.km_atual,
+          foto_url: mine.foto_url,
+        },
+      };
+    }
+
     const { data: archived, error } = await supabaseAdmin
       .from("veiculos")
       .select("id,placa,marca,modelo,ano,cor,chassi,km_atual,foto_url")
