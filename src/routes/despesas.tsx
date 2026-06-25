@@ -12,6 +12,7 @@ import { useActiveVehicleId } from "@/lib/active-vehicle";
 import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
 import { useCurrentPlan } from "@/lib/use-current-plan";
 import { formatItemName } from "@/lib/format-item-name";
+import { hasPremiumHistoryAvailableFn } from "@/lib/vehicles.functions";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
@@ -85,27 +86,22 @@ function DespesasPage() {
       });
   }, [activeVehicleId, reloadKey]);
 
-  // hasPremiumHistoryAvailable: existe lançamento pré-claim para vender?
-  // Carro novo (claimed_at=null) → sempre false. Sem isso, banner R$49,90
-  // não deve ser exibido.
+  // hasPremiumHistoryAvailable: existe histórico operacional em OUTRO
+  // vehicle_id da mesma placa (archived ou de outro user)? Server function
+  // segura — retorna apenas booleano.
   useEffect(() => {
-    if (!activeVehicleId || !claimedAt) {
+    if (!activeVehicleId) {
       setHasPremiumHistoryAvailable(false);
       return;
     }
     let cancel = false;
-    supabase
-      .from("despesas")
-      .select("id", { head: true, count: "exact" })
-      .eq("vehicle_id", activeVehicleId)
-      .lt("created_at", claimedAt)
-      .then(({ count }) => {
-        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [activeVehicleId, claimedAt, reloadKey]);
+    hasPremiumHistoryAvailableFn({ data: { vehicleId: activeVehicleId } })
+      .then((r) => { if (!cancel) setHasPremiumHistoryAvailable(r.available); })
+      .catch(() => { if (!cancel) setHasPremiumHistoryAvailable(false); });
+    return () => { cancel = true; };
+  }, [activeVehicleId, reloadKey]);
+
+
 
   useEffect(() => {
     let cancel = false;

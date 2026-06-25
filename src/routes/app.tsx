@@ -6,6 +6,7 @@ import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
+import { hasPremiumHistoryAvailableFn } from "@/lib/vehicles.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
@@ -795,26 +796,20 @@ function VehicleStatusSection({
     };
   }, [vehicleId, historyReloadKey]);
 
-  // hasPremiumHistoryAvailable: existe lançamento pré-claim (histórico do
-  // dono anterior) que justifique exibir o paywall R$49,90?
+  // hasPremiumHistoryAvailable: existe histórico operacional pré-claim em
+  // OUTRO vehicle_id da mesma placa (archived ou de outro user)? Calculado
+  // via server function segura — retorna apenas booleano, sem vazar dados.
   useEffect(() => {
-    if (!vehicleId || !claimedAt) {
+    if (!vehicleId) {
       setHasPremiumHistoryAvailable(false);
       return;
     }
     let cancel = false;
-    supabase
-      .from("despesas")
-      .select("id", { head: true, count: "exact" })
-      .eq("vehicle_id", vehicleId)
-      .lt("created_at", claimedAt)
-      .then(({ count }) => {
-        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [vehicleId, claimedAt, historyReloadKey]);
+    hasPremiumHistoryAvailableFn({ data: { vehicleId } })
+      .then((r) => { if (!cancel) setHasPremiumHistoryAvailable(r.available); })
+      .catch(() => { if (!cancel) setHasPremiumHistoryAvailable(false); });
+    return () => { cancel = true; };
+  }, [vehicleId, historyReloadKey]);
 
   // Itens reais — consomem as colunas km_ultima_troca_* da tabela veiculos.
   const items = useMemo(

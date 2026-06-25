@@ -307,3 +307,66 @@ export const getRevendaHistoryFn = createServerFn({ method: "POST" })
       })),
     };
   });
+
+/**
+ * Detecta de forma segura se existe Histórico Premium R$49,90 vendável
+ * para a placa do veículo atual. Retorna APENAS um booleano — nenhum
+ * detalhe (descrição, valor, data, oficina, km, ids de terceiros).
+ *
+ * Critério aprovado:
+ *   samePlate
+ *   && otherVehicleId (id != vehicleId atual)
+ *   && hasOperationalHistory (>=1 despesa)
+ *   && (status='archived' OR user_id != context.userId)
+ *
+ * Veículos do próprio usuário com a mesma placa NÃO contam — evita
+ * "vender" histórico para duplicata interna do mesmo dono.
+ */
+export const hasPremiumHistoryAvailableFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { vehicleId: string }) => {
+    const vehicleId = (data?.vehicleId ?? "").trim();
+    if (!vehicleId) throw new Error("vehicleId obrigatório.");
+    return { vehicleId };
+  })
+  .handler(async ({ data, context }): Promise<{ available: boolean }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1) Valida posse do veículo atual e obtém placa.
+    const { data: cur, error: cErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id,placa,user_id")
+      .eq("id", data.vehicleId)
+      .maybeSingle();
+    if (cErr) throw new Error(cErr.message);
+    if (!cur) return { available: false };
+    const curRow = cur as { id: string; placa: string; user_id: string };
+    if (curRow.user_id !== context.userId) return { available: false };
+    if (!curRow.placa) return { available: false };
+
+    // 2) Outros vehicle_ids elegíveis com a mesma placa.
+    const { data: others, error: oErr } = await supabaseAdmin
+      .from("veiculos")
+      .select("id,status,user_id")
+      .eq("placa", curRow.placa)
+      .neq("id", curRow.id);
+    if (oErr) throw new Error(oErr.message);
+
+    const eligibleIds = (others || [])
+      .filter((v) => {
+        const row = v as { id: string; status: string | null; user_id: string };
+        return row.status === "archived" || row.user_id !== context.userId;
+      })
+      .map((v) => (v as { id: string }).id);
+    if (eligibleIds.length === 0) return { available: false };
+
+    // 3) Existe ao menos 1 despesa em algum desses vehicle_ids?
+    const { count, error: dErr } = await supabaseAdmin
+      .from("despesas")
+      .select("id", { head: true, count: "exact" })
+      .in("vehicle_id", eligibleIds)
+      .limit(1);
+    if (dErr) throw new Error(dErr.message);
+
+    return { available: (count ?? 0) > 0 };
+  });

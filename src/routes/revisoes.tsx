@@ -25,7 +25,7 @@ import {
   getReceiptSignedUrl,
   type Despesa,
 } from "@/lib/despesas";
-import { getRevendaHistoryFn, type RevendaItem } from "@/lib/vehicles.functions";
+import { getRevendaHistoryFn, hasPremiumHistoryAvailableFn, type RevendaItem } from "@/lib/vehicles.functions";
 import { formatItemName } from "@/lib/format-item-name";
 
 export const Route = createFileRoute("/revisoes")({
@@ -118,25 +118,19 @@ function RevisoesPage() {
       });
   }, [activeVehicleId, reloadKey]);
 
-  // hasPremiumHistoryAvailable: existe lançamento pré-claim para vender?
+  // hasPremiumHistoryAvailable: existe histórico operacional em OUTRO
+  // vehicle_id da mesma placa? Server function segura — só booleano.
   useEffect(() => {
-    if (!activeVehicleId || !claimedAt) {
+    if (!activeVehicleId) {
       setHasPremiumHistoryAvailable(false);
       return;
     }
     let cancel = false;
-    supabase
-      .from("despesas")
-      .select("id", { head: true, count: "exact" })
-      .eq("vehicle_id", activeVehicleId)
-      .lt("created_at", claimedAt)
-      .then(({ count }) => {
-        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
-      });
-    return () => {
-      cancel = true;
-    };
-  }, [activeVehicleId, claimedAt, reloadKey]);
+    hasPremiumHistoryAvailableFn({ data: { vehicleId: activeVehicleId } })
+      .then((r) => { if (!cancel) setHasPremiumHistoryAvailable(r.available); })
+      .catch(() => { if (!cancel) setHasPremiumHistoryAvailable(false); });
+    return () => { cancel = true; };
+  }, [activeVehicleId, reloadKey]);
 
   useEffect(() => {
     let cancel = false;
