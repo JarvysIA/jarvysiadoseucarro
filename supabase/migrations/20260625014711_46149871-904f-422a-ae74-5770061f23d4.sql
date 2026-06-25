@@ -1,0 +1,1 @@
+ALTER TABLE public.veiculos ALTER COLUMN history_locked SET DEFAULT true;

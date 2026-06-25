@@ -34,6 +34,7 @@ import {
   type VehicleContext,
 } from "@/lib/plan-capabilities";
 import { ensureTrialStartedFn } from "@/lib/trial.functions";
+import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 
 async function classifyText(raw: string): Promise<string> {
   const t = raw.trim();
@@ -79,6 +80,15 @@ type Props = {
    * Esperado: abrir PaywallModal de ativação R$29,90 do veículo atual.
    */
   onPaywall?: () => void;
+  /**
+   * Patch E — Histórico Premium R$49,90.
+   * Quando historyLocked=true, o histórico operacional pré-claim fica
+   * oculto e um banner R$49,90 é exibido. Lançamentos pós-claim do
+   * usuário atual continuam visíveis normalmente.
+   */
+  vehicleId?: string;
+  historyLocked?: boolean;
+  onHistoryUnlocked?: () => void;
 };
 
 type FlowState = "idle" | "scanning" | "confirm" | "error" | "manual";
@@ -116,6 +126,9 @@ export function MaintenancePanel({
   vehicleStatus,
   isActivated,
   onPaywall,
+  vehicleId,
+  historyLocked = false,
+  onHistoryUnlocked,
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
@@ -149,7 +162,8 @@ export function MaintenancePanel({
       const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
       if (
         (reason === "vehicle_not_activated" ||
-          reason === "feature_requires_activation") &&
+          reason === "feature_requires_activation" ||
+          reason === "trial_expired") &&
         onPaywall
       ) {
         onPaywall();
@@ -348,6 +362,16 @@ export function MaintenancePanel({
                   </p>
                 </div>
 
+                {/* Patch E: banner Histórico Premium R$49,90 quando o
+                    veículo foi resgatado. Aparece junto com lançamentos
+                    pós-claim do usuário atual, sem ocultar a lista. */}
+                {historyLocked && vehicleId && (
+                  <LockedHistoryBanner
+                    vehicleId={vehicleId}
+                    onUnlocked={() => onHistoryUnlocked?.()}
+                  />
+                )}
+
                 {/* Histórico */}
                 {expenses.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border bg-background/40 p-5 text-center">
@@ -389,6 +413,7 @@ export function MaintenancePanel({
                     ))}
                   </div>
                 )}
+
 
                 {/* CTA IA */}
                 <button

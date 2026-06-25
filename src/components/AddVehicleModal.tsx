@@ -326,6 +326,9 @@ export function AddVehicleModal({
         motorizacao: data.motorizacao.trim(),
         chassi: (data.chassi || "").trim(),
         km_atual,
+        // Patch G: novo cadastro nasce com Histórico Premium bloqueado.
+        // Só destrava via pagamento R$49,90 (unlockHistoryFn) ou VIP.
+        history_locked: true,
       };
       // Elimina envio de null para FIPE: só grava quando temos dado real.
       if (codigoFipe) insertPayload.codigo_fipe = codigoFipe;
