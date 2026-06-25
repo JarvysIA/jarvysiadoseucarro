@@ -213,27 +213,48 @@ export const getRevendaHistoryFn = createServerFn({ method: "POST" })
     // Confirma que o usuário é dono atual de pelo menos 1 veículo com essa placa.
     const { data: owned, error: oErr } = await supabaseAdmin
       .from("veiculos")
-      .select("id,claimed_at")
+      .select("id,claimed_at,history_locked")
       .eq("placa", data.placa)
       .eq("user_id", context.userId)
       .maybeSingle();
     if (oErr) throw new Error(oErr.message);
     if (!owned) throw new Error("Acesso negado.");
 
-    // Coleta TODOS os vehicle_ids que já compartilharam essa placa.
-    const { data: vs, error: vErr } = await supabaseAdmin
-      .from("veiculos")
-      .select("id")
-      .eq("placa", data.placa);
-    if (vErr) throw new Error(vErr.message);
-    const ids = (vs || []).map((v) => v.id);
+    // Patch H: entitlement do Histórico Premium R$49,90.
+    // VIP ou history_locked=false → libera tudo (todos vehicle_ids da placa).
+    // Caso contrário → restringe ao veículo do usuário atual + created_at >= claimed_at.
+    const ownedRow = owned as { id: string; claimed_at: string | null; history_locked: boolean };
+    const { data: prof, error: pErr } = await supabaseAdmin
+      .from("profiles")
+      .select("status_usuario")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    const isVip = (prof as { status_usuario?: string } | null)?.status_usuario === "vip";
+    const entitled = isVip || ownedRow.history_locked === false;
+
+    let ids: string[];
+    if (entitled) {
+      const { data: vs, error: vErr } = await supabaseAdmin
+        .from("veiculos")
+        .select("id")
+        .eq("placa", data.placa);
+      if (vErr) throw new Error(vErr.message);
+      ids = (vs || []).map((v) => v.id);
+    } else {
+      ids = [ownedRow.id];
+    }
     if (ids.length === 0) return { items: [] };
 
-    const { data: rows, error: dErr } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("despesas")
       .select("id,data,valor,categoria,descricao,km_registro,receipt_image_url,created_at,vehicle_id")
-      .in("vehicle_id", ids)
-      .order("data", { ascending: false });
+      .in("vehicle_id", ids);
+    if (!entitled && ownedRow.claimed_at) {
+      // Patch I: filtro de histórico pré-claim aplicado no servidor.
+      query = query.gte("created_at", ownedRow.claimed_at);
+    }
+    const { data: rows, error: dErr } = await query.order("data", { ascending: false });
     if (dErr) throw new Error(dErr.message);
     return {
       items: ((rows || []) as RevendaItem[]).map((r) => ({
