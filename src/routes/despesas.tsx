@@ -10,6 +10,7 @@ import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { PaywallModal } from "@/components/PaywallModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
+import { useCurrentPlan } from "@/lib/use-current-plan";
 import { formatItemName } from "@/lib/format-item-name";
 import {
   CATEGORIAS,
