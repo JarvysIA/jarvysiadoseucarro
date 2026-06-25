@@ -6,6 +6,7 @@ import logo from "@/assets/jarvys-logo.png";
 import fallbackCarImg from "@/assets/car-fallback.jpg";
 import { supabase } from "@/integrations/supabase/client";
 import { generateVehicleImageFn } from "@/lib/vehicle-image.functions";
+import { hasPremiumHistoryAvailableFn } from "@/lib/vehicles.functions";
 import { ChatFab } from "@/components/ChatFab";
 import { BottomNav } from "@/components/BottomNav";
 import { AddVehicleModal, type AddedVehicle } from "@/components/AddVehicleModal";
