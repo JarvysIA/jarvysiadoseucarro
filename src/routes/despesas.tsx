@@ -126,7 +126,8 @@ function DespesasPage() {
         .gte("data", start.toISOString())
         .lt("data", end.toISOString());
       // Carfax Reverso: oculta lançamentos do antigo dono até o usuário destravar.
-      if (historyLocked && claimedAt) {
+      // VIP nunca sofre esse filtro (effectiveLock = false).
+      if (effectiveLock && claimedAt) {
         query = query.gte("created_at", claimedAt);
       }
       const { data, error } = await query.order("data", { ascending: false });
