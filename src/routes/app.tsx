@@ -1131,6 +1131,7 @@ function VehicleStatusSection({
         onPaywall={onPaywall}
         vehicleId={vehicleId}
         historyLocked={historyLocked}
+        hasPremiumHistoryAvailable={hasPremiumHistoryAvailable}
         onHistoryUnlocked={() => {
           setHistoryLocked(false);
           setHistoryReloadKey((k) => k + 1);
