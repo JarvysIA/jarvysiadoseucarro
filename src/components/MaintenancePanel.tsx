@@ -149,7 +149,8 @@ export function MaintenancePanel({
       const reason = reasonBlocked("canUseReceiptScanner", plan, vehicle);
       if (
         (reason === "vehicle_not_activated" ||
-          reason === "feature_requires_activation") &&
+          reason === "feature_requires_activation" ||
+          reason === "trial_expired") &&
         onPaywall
       ) {
         onPaywall();

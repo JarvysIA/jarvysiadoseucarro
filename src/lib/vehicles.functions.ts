@@ -54,6 +54,13 @@ export const claimArchivedVehicleFn = createServerFn({ method: "POST" })
         status: "ativo",
         history_locked: true,
         claimed_at: new Date().toISOString(),
+        // Patch F: zera KMs de manutenção herdadas do dono anterior — esses
+        // valores alimentam o semáforo e revelam histórico operacional.
+        // km_atual (estado físico do veículo) é preservado.
+        km_ultima_troca_oleo: null,
+        km_ultima_troca_filtros: null,
+        km_ultima_troca_pastilhas: null,
+        km_ultima_troca_arrefecimento: null,
       })
       .eq("id", archived.id)
       .eq("status", "archived")
