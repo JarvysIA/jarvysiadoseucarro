@@ -10,6 +10,7 @@ import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { PaywallModal } from "@/components/PaywallModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
+import { useCurrentPlan } from "@/lib/use-current-plan";
 import { formatItemName } from "@/lib/format-item-name";
 import {
   CATEGORIAS,
@@ -49,9 +50,14 @@ function DespesasPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [hasPremiumHistoryAvailable, setHasPremiumHistoryAvailable] = useState(false);
   const [vehicleStatus, setVehicleStatus] = useState<string | null>(null);
   const [activateOpen, setActivateOpen] = useState(false);
   const activatedVehicleIds = useActivatedVehicleIds();
+  const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const effectiveLock = historyLocked && !isVip;
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
@@ -79,6 +85,28 @@ function DespesasPage() {
       });
   }, [activeVehicleId, reloadKey]);
 
+  // hasPremiumHistoryAvailable: existe lançamento pré-claim para vender?
+  // Carro novo (claimed_at=null) → sempre false. Sem isso, banner R$49,90
+  // não deve ser exibido.
+  useEffect(() => {
+    if (!activeVehicleId || !claimedAt) {
+      setHasPremiumHistoryAvailable(false);
+      return;
+    }
+    let cancel = false;
+    supabase
+      .from("despesas")
+      .select("id", { head: true, count: "exact" })
+      .eq("vehicle_id", activeVehicleId)
+      .lt("created_at", claimedAt)
+      .then(({ count }) => {
+        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [activeVehicleId, claimedAt, reloadKey]);
+
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -98,7 +126,8 @@ function DespesasPage() {
         .gte("data", start.toISOString())
         .lt("data", end.toISOString());
       // Carfax Reverso: oculta lançamentos do antigo dono até o usuário destravar.
-      if (historyLocked && claimedAt) {
+      // VIP nunca sofre esse filtro (effectiveLock = false).
+      if (effectiveLock && claimedAt) {
         query = query.gte("created_at", claimedAt);
       }
       const { data, error } = await query.order("data", { ascending: false });
@@ -115,7 +144,7 @@ function DespesasPage() {
     return () => {
       cancel = true;
     };
-  }, [year, month, activeVehicleId, reloadKey, historyLocked, claimedAt]);
+  }, [year, month, activeVehicleId, reloadKey, effectiveLock, claimedAt]);
 
   const prevMonth = () => {
     if (month === 0) {
@@ -159,7 +188,7 @@ function DespesasPage() {
         </p>
       </header>
 
-      {historyLocked && activeVehicleId && (
+      {isPlanLoaded && historyLocked && activeVehicleId && hasPremiumHistoryAvailable && !isVip && (
         <section className="mt-4 px-6">
           <LockedHistoryBanner
             vehicleId={activeVehicleId}

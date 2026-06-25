@@ -767,6 +767,11 @@ function VehicleStatusSection({
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
   const [historyReloadKey, setHistoryReloadKey] = useState(0);
+  const [hasPremiumHistoryAvailable, setHasPremiumHistoryAvailable] = useState(false);
+  const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const effectiveLock = historyLocked && !isVip;
   useEffect(() => {
     if (!vehicleId) {
       setHistoryLocked(false);
@@ -789,6 +794,27 @@ function VehicleStatusSection({
       cancelled = true;
     };
   }, [vehicleId, historyReloadKey]);
+
+  // hasPremiumHistoryAvailable: existe lançamento pré-claim (histórico do
+  // dono anterior) que justifique exibir o paywall R$49,90?
+  useEffect(() => {
+    if (!vehicleId || !claimedAt) {
+      setHasPremiumHistoryAvailable(false);
+      return;
+    }
+    let cancel = false;
+    supabase
+      .from("despesas")
+      .select("id", { head: true, count: "exact" })
+      .eq("vehicle_id", vehicleId)
+      .lt("created_at", claimedAt)
+      .then(({ count }) => {
+        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [vehicleId, claimedAt, historyReloadKey]);
 
   // Itens reais — consomem as colunas km_ultima_troca_* da tabela veiculos.
   const items = useMemo(
@@ -832,8 +858,8 @@ function VehicleStatusSection({
         .eq("vehicle_id", vehicleId)
         .ilike("descricao", `%${tag}%`);
       // Patch E: oculta lançamentos do dono anterior quando o histórico está
-      // bloqueado. Lançamentos pós-claim do usuário atual continuam visíveis.
-      if (historyLocked && claimedAt) {
+      // bloqueado. VIP nunca sofre esse filtro (effectiveLock=false).
+      if (effectiveLock && claimedAt) {
         query = query.gte("created_at", claimedAt);
       }
       const { data, error } = await query.order("data", { ascending: false });
@@ -855,7 +881,7 @@ function VehicleStatusSection({
     return () => {
       cancelled = true;
     };
-  }, [openItemKey, vehicleId, expenses, historyLocked, claimedAt]);
+  }, [openItemKey, vehicleId, expenses, effectiveLock, claimedAt]);
 
   const openExpenses = openItemKey
     ? [
@@ -1105,6 +1131,7 @@ function VehicleStatusSection({
         onPaywall={onPaywall}
         vehicleId={vehicleId}
         historyLocked={historyLocked}
+        hasPremiumHistoryAvailable={hasPremiumHistoryAvailable}
         onHistoryUnlocked={() => {
           setHistoryLocked(false);
           setHistoryReloadKey((k) => k + 1);

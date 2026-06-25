@@ -88,6 +88,12 @@ type Props = {
    */
   vehicleId?: string;
   historyLocked?: boolean;
+  /**
+   * Flag derivada: existem lançamentos pré-claim para vender?
+   * Sem isso, o banner R$49,90 NÃO deve aparecer (carro novo sem
+   * histórico antigo não tem produto para ofertar).
+   */
+  hasPremiumHistoryAvailable?: boolean;
   onHistoryUnlocked?: () => void;
 };
 
@@ -128,6 +134,7 @@ export function MaintenancePanel({
   onPaywall,
   vehicleId,
   historyLocked = false,
+  hasPremiumHistoryAvailable = false,
   onHistoryUnlocked,
 }: Props) {
   const [flow, setFlow] = useState<FlowState>("idle");
@@ -137,6 +144,10 @@ export function MaintenancePanel({
   const [saving, setSaving] = useState(false);
   const [sourceOpen, setSourceOpen] = useState(false);
   const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const showLockedBanner =
+    isPlanLoaded && historyLocked && !!vehicleId && hasPremiumHistoryAvailable && !isVip;
 
   // Reset ao reabrir/trocar item
   useEffect(() => {
@@ -365,7 +376,7 @@ export function MaintenancePanel({
                 {/* Patch E: banner Histórico Premium R$49,90 quando o
                     veículo foi resgatado. Aparece junto com lançamentos
                     pós-claim do usuário atual, sem ocultar a lista. */}
-                {historyLocked && vehicleId && (
+                {showLockedBanner && vehicleId && (
                   <LockedHistoryBanner
                     vehicleId={vehicleId}
                     onUnlocked={() => onHistoryUnlocked?.()}

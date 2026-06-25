@@ -10,6 +10,7 @@ import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 import { PaywallModal } from "@/components/PaywallModal";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
 import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
+import { useCurrentPlan } from "@/lib/use-current-plan";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,7 @@ function RevisoesPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [hasPremiumHistoryAvailable, setHasPremiumHistoryAvailable] = useState(false);
   const [placa, setPlaca] = useState<string | null>(null);
   const [scannedPrefill, setScannedPrefill] = useState<ExpensePrefill | null>(null);
   const [certOpen, setCertOpen] = useState(false);
@@ -61,6 +63,10 @@ function RevisoesPage() {
   } | null>(null);
   const [activateOpen, setActivateOpen] = useState(false);
   const activatedVehicleIds = useActivatedVehicleIds();
+  const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const effectiveLock = historyLocked && !isVip;
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
@@ -112,6 +118,26 @@ function RevisoesPage() {
       });
   }, [activeVehicleId, reloadKey]);
 
+  // hasPremiumHistoryAvailable: existe lançamento pré-claim para vender?
+  useEffect(() => {
+    if (!activeVehicleId || !claimedAt) {
+      setHasPremiumHistoryAvailable(false);
+      return;
+    }
+    let cancel = false;
+    supabase
+      .from("despesas")
+      .select("id", { head: true, count: "exact" })
+      .eq("vehicle_id", activeVehicleId)
+      .lt("created_at", claimedAt)
+      .then(({ count }) => {
+        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [activeVehicleId, claimedAt, reloadKey]);
+
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -143,7 +169,8 @@ function RevisoesPage() {
             created_at: r.created_at,
           })) as Despesa[];
         // Carfax Reverso: oculta lançamentos do antigo dono até destravar.
-        if (historyLocked && claimedAt) {
+        // VIP nunca sofre esse filtro.
+        if (effectiveLock && claimedAt) {
           all = all.filter((d) => new Date(d.created_at) >= new Date(claimedAt));
         }
         setItems(all);
@@ -157,7 +184,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId, placa, reloadKey, historyLocked, claimedAt]);
+  }, [activeVehicleId, placa, reloadKey, effectiveLock, claimedAt]);
 
   // Carrega o signed URL ao abrir o modal (bloqueado para registros do dono antigo)
   useEffect(() => {
@@ -238,7 +265,7 @@ function RevisoesPage() {
         )}
       </header>
 
-      {historyLocked && activeVehicleId && (
+      {isPlanLoaded && historyLocked && activeVehicleId && hasPremiumHistoryAvailable && !isVip && (
         <section className="mt-4 px-6">
           <LockedHistoryBanner
             vehicleId={activeVehicleId}
