@@ -858,8 +858,8 @@ function VehicleStatusSection({
         .eq("vehicle_id", vehicleId)
         .ilike("descricao", `%${tag}%`);
       // Patch E: oculta lançamentos do dono anterior quando o histórico está
-      // bloqueado. Lançamentos pós-claim do usuário atual continuam visíveis.
-      if (historyLocked && claimedAt) {
+      // bloqueado. VIP nunca sofre esse filtro (effectiveLock=false).
+      if (effectiveLock && claimedAt) {
         query = query.gte("created_at", claimedAt);
       }
       const { data, error } = await query.order("data", { ascending: false });
