@@ -265,7 +265,7 @@ function RevisoesPage() {
         )}
       </header>
 
-      {historyLocked && activeVehicleId && (
+      {isPlanLoaded && historyLocked && activeVehicleId && hasPremiumHistoryAvailable && !isVip && (
         <section className="mt-4 px-6">
           <LockedHistoryBanner
             vehicleId={activeVehicleId}
