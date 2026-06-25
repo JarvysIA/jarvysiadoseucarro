@@ -1103,11 +1103,18 @@ function VehicleStatusSection({
         vehicleStatus={vehicleStatus}
         isActivated={isActivated}
         onPaywall={onPaywall}
+        vehicleId={vehicleId}
+        historyLocked={historyLocked}
+        onHistoryUnlocked={() => {
+          setHistoryLocked(false);
+          setHistoryReloadKey((k) => k + 1);
+        }}
         onSave={(payload) => {
           if (openItemKey) handleSaveMaintenance(openItemKey, payload);
         }}
       />
     </>
+
   );
 }
 
