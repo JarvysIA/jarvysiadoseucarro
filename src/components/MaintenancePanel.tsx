@@ -376,7 +376,7 @@ export function MaintenancePanel({
                 {/* Patch E: banner Histórico Premium R$49,90 quando o
                     veículo foi resgatado. Aparece junto com lançamentos
                     pós-claim do usuário atual, sem ocultar a lista. */}
-                {historyLocked && vehicleId && (
+                {showLockedBanner && vehicleId && (
                   <LockedHistoryBanner
                     vehicleId={vehicleId}
                     onUnlocked={() => onHistoryUnlocked?.()}
