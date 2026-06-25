@@ -50,9 +50,14 @@ function DespesasPage() {
   const [vehicleKm, setVehicleKm] = useState(0);
   const [historyLocked, setHistoryLocked] = useState(false);
   const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [hasPremiumHistoryAvailable, setHasPremiumHistoryAvailable] = useState(false);
   const [vehicleStatus, setVehicleStatus] = useState<string | null>(null);
   const [activateOpen, setActivateOpen] = useState(false);
   const activatedVehicleIds = useActivatedVehicleIds();
+  const plan = useCurrentPlan();
+  const isPlanLoaded = !!plan;
+  const isVip = plan?.status_usuario === "vip";
+  const effectiveLock = historyLocked && !isVip;
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
