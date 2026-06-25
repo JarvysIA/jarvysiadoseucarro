@@ -760,6 +760,36 @@ function VehicleStatusSection({
     Record<string, Partial<Record<MaintItemKey, MaintExpense[]>>>
   >({});
 
+  // Patch E: entitlement do Histórico Premium R$49,90.
+  // Carrega history_locked + claimed_at para gatear o histórico operacional
+  // do MaintenancePanel. Registros pós-claim continuam visíveis; pré-claim
+  // ficam ocultos com banner de oferta R$49,90.
+  const [historyLocked, setHistoryLocked] = useState(false);
+  const [claimedAt, setClaimedAt] = useState<string | null>(null);
+  const [historyReloadKey, setHistoryReloadKey] = useState(0);
+  useEffect(() => {
+    if (!vehicleId) {
+      setHistoryLocked(false);
+      setClaimedAt(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("veiculos")
+      .select("history_locked,claimed_at")
+      .eq("id", vehicleId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const row = data as { history_locked?: boolean; claimed_at?: string | null } | null;
+        setHistoryLocked(Boolean(row?.history_locked));
+        setClaimedAt(row?.claimed_at ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicleId, historyReloadKey]);
+
   // Itens reais — consomem as colunas km_ultima_troca_* da tabela veiculos.
   const items = useMemo(
     () => buildMaintenanceItems(vehicleId, kmAtual, dbOverrides),
@@ -796,12 +826,17 @@ function VehicleStatusSection({
     }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("despesas")
-        .select("id, data, valor, descricao")
+        .select("id, data, valor, descricao, created_at")
         .eq("vehicle_id", vehicleId)
-        .ilike("descricao", `%${tag}%`)
-        .order("data", { ascending: false });
+        .ilike("descricao", `%${tag}%`);
+      // Patch E: oculta lançamentos do dono anterior quando o histórico está
+      // bloqueado. Lançamentos pós-claim do usuário atual continuam visíveis.
+      if (historyLocked && claimedAt) {
+        query = query.gte("created_at", claimedAt);
+      }
+      const { data, error } = await query.order("data", { ascending: false });
       if (cancelled) return;
       if (error) {
         console.error("[maint history]", error);
@@ -820,7 +855,7 @@ function VehicleStatusSection({
     return () => {
       cancelled = true;
     };
-  }, [openItemKey, vehicleId, expenses]);
+  }, [openItemKey, vehicleId, expenses, historyLocked, claimedAt]);
 
   const openExpenses = openItemKey
     ? [
