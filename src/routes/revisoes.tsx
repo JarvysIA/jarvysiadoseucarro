@@ -169,7 +169,8 @@ function RevisoesPage() {
             created_at: r.created_at,
           })) as Despesa[];
         // Carfax Reverso: oculta lançamentos do antigo dono até destravar.
-        if (historyLocked && claimedAt) {
+        // VIP nunca sofre esse filtro.
+        if (effectiveLock && claimedAt) {
           all = all.filter((d) => new Date(d.created_at) >= new Date(claimedAt));
         }
         setItems(all);
@@ -183,7 +184,7 @@ function RevisoesPage() {
     return () => {
       cancel = true;
     };
-  }, [activeVehicleId, placa, reloadKey, historyLocked, claimedAt]);
+  }, [activeVehicleId, placa, reloadKey, effectiveLock, claimedAt]);
 
   // Carrega o signed URL ao abrir o modal (bloqueado para registros do dono antigo)
   useEffect(() => {
