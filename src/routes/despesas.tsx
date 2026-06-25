@@ -85,6 +85,28 @@ function DespesasPage() {
       });
   }, [activeVehicleId, reloadKey]);
 
+  // hasPremiumHistoryAvailable: existe lançamento pré-claim para vender?
+  // Carro novo (claimed_at=null) → sempre false. Sem isso, banner R$49,90
+  // não deve ser exibido.
+  useEffect(() => {
+    if (!activeVehicleId || !claimedAt) {
+      setHasPremiumHistoryAvailable(false);
+      return;
+    }
+    let cancel = false;
+    supabase
+      .from("despesas")
+      .select("id", { head: true, count: "exact" })
+      .eq("vehicle_id", activeVehicleId)
+      .lt("created_at", claimedAt)
+      .then(({ count }) => {
+        if (!cancel) setHasPremiumHistoryAvailable((count ?? 0) > 0);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [activeVehicleId, claimedAt, reloadKey]);
+
   useEffect(() => {
     let cancel = false;
     (async () => {
