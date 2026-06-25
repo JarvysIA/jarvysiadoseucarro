@@ -88,6 +88,12 @@ type Props = {
    */
   vehicleId?: string;
   historyLocked?: boolean;
+  /**
+   * Flag derivada: existem lançamentos pré-claim para vender?
+   * Sem isso, o banner R$49,90 NÃO deve aparecer (carro novo sem
+   * histórico antigo não tem produto para ofertar).
+   */
+  hasPremiumHistoryAvailable?: boolean;
   onHistoryUnlocked?: () => void;
 };
 
