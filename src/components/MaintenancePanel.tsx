@@ -34,6 +34,7 @@ import {
   type VehicleContext,
 } from "@/lib/plan-capabilities";
 import { ensureTrialStartedFn } from "@/lib/trial.functions";
+import { LockedHistoryBanner } from "@/components/LockedHistoryBanner";
 
 async function classifyText(raw: string): Promise<string> {
   const t = raw.trim();
