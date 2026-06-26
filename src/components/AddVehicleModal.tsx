@@ -264,6 +264,7 @@ export function AddVehicleModal({
         setShowFipePicker(true);
         setNotFound(false);
         const info = r.informacoes_veiculo || {};
+        setCilindradasFromLookup(info.cilindradas ?? null);
         setData((d) => ({
           marca: d.marca || info.marca || "",
           modelo: d.modelo || info.modelo || "",
