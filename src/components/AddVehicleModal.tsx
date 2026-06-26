@@ -97,6 +97,7 @@ export function AddVehicleModal({
   const [showFipePicker, setShowFipePicker] = useState(false);
   const [fipeRetryAttempted, setFipeRetryAttempted] = useState(false);
   const [retryingFipe, setRetryingFipe] = useState(false);
+  const [cilindradasFromLookup, setCilindradasFromLookup] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
