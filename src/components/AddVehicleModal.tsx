@@ -164,6 +164,7 @@ export function AddVehicleModal({
         motorizacao: info.motor || info.combustivel || "",
         chassi: info.chassi || "",
       });
+      setCilindradasFromLookup(info.cilindradas ?? null);
       const opts = r.fipe;
       // Mapeia para compat. com a UI existente (texto_modelo).
       const mapped: FipeOption[] = opts.map((o) => ({ ...o, texto_modelo: o.modelo }));
@@ -179,6 +180,11 @@ export function AddVehicleModal({
                 valor: first.valor,
                 mes_referencia: first.mes_referencia || "",
                 desvalorizometro: first.desvalorizometro,
+                modelo: first.modelo,
+                combustivel: first.combustivel,
+                ano_modelo: first.ano_modelo,
+                codigo_marca: first.codigo_marca,
+                codigo_modelo: first.codigo_modelo,
               }
             : null,
         );
@@ -192,6 +198,7 @@ export function AddVehicleModal({
       setFipeLookup(null);
       setFipeOptions([]);
       setShowFipePicker(false);
+      setCilindradasFromLookup(null);
       setNotFound(true);
     }
     setStep("confirm");
@@ -203,6 +210,11 @@ export function AddVehicleModal({
       valor: opt.valor,
       mes_referencia: opt.mes_referencia || "",
       desvalorizometro: opt.desvalorizometro,
+      modelo: opt.modelo,
+      combustivel: opt.combustivel,
+      ano_modelo: opt.ano_modelo,
+      codigo_marca: opt.codigo_marca,
+      codigo_modelo: opt.codigo_modelo,
     });
     setShowFipePicker(false);
     setFipeRetryAttempted(false);
