@@ -77,6 +77,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
     setCor("");
     setMotorizacao("");
     setChassi("");
+    setCilindradas(null);
     setFipeOptions([]);
     setSelectedFipe(null);
     lookup(plate).then((r) => {
@@ -88,6 +89,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         setCor(r.cor || "");
         setMotorizacao(r.motorizacao || "");
         setChassi(r.chassi || "");
+        setCilindradas(r.cilindradas ?? null);
         setAutofilled(true);
         const opts = r.fipe_options ?? [];
         setFipeOptions(opts);
