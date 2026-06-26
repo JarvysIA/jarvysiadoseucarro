@@ -8,6 +8,15 @@ import {
   type PlacaFipeOption,
 } from "@/lib/placafipe";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
+import { buildVehicleSignature, normalizeAnoModelo } from "@/lib/vehicle-signature";
+
+function parseCilindradas(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s || !/^\d+$/.test(s)) return null;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 import { toast } from "sonner";
 
@@ -30,6 +39,11 @@ type FipeFromLookup = {
   valor: number;
   mes_referencia: string;
   desvalorizometro: string;
+  modelo?: string;
+  combustivel?: string;
+  ano_modelo?: string;
+  codigo_marca?: string;
+  codigo_modelo?: string;
 } | null;
 
 export type AddedVehicle = {
@@ -83,6 +97,7 @@ export function AddVehicleModal({
   const [showFipePicker, setShowFipePicker] = useState(false);
   const [fipeRetryAttempted, setFipeRetryAttempted] = useState(false);
   const [retryingFipe, setRetryingFipe] = useState(false);
+  const [cilindradasFromLookup, setCilindradasFromLookup] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -97,6 +112,7 @@ export function AddVehicleModal({
       setShowFipePicker(false);
       setFipeRetryAttempted(false);
       setRetryingFipe(false);
+      setCilindradasFromLookup(null);
     }
   }, [open]);
 
@@ -148,6 +164,7 @@ export function AddVehicleModal({
         motorizacao: info.motor || info.combustivel || "",
         chassi: info.chassi || "",
       });
+      setCilindradasFromLookup(info.cilindradas ?? null);
       const opts = r.fipe;
       // Mapeia para compat. com a UI existente (texto_modelo).
       const mapped: FipeOption[] = opts.map((o) => ({ ...o, texto_modelo: o.modelo }));
@@ -163,6 +180,11 @@ export function AddVehicleModal({
                 valor: first.valor,
                 mes_referencia: first.mes_referencia || "",
                 desvalorizometro: first.desvalorizometro,
+                modelo: first.modelo,
+                combustivel: first.combustivel,
+                ano_modelo: first.ano_modelo,
+                codigo_marca: first.codigo_marca,
+                codigo_modelo: first.codigo_modelo,
               }
             : null,
         );
@@ -176,6 +198,7 @@ export function AddVehicleModal({
       setFipeLookup(null);
       setFipeOptions([]);
       setShowFipePicker(false);
+      setCilindradasFromLookup(null);
       setNotFound(true);
     }
     setStep("confirm");
@@ -187,6 +210,11 @@ export function AddVehicleModal({
       valor: opt.valor,
       mes_referencia: opt.mes_referencia || "",
       desvalorizometro: opt.desvalorizometro,
+      modelo: opt.modelo,
+      combustivel: opt.combustivel,
+      ano_modelo: opt.ano_modelo,
+      codigo_marca: opt.codigo_marca,
+      codigo_modelo: opt.codigo_modelo,
     });
     setShowFipePicker(false);
     setFipeRetryAttempted(false);
@@ -211,11 +239,17 @@ export function AddVehicleModal({
             valor: first.valor,
             mes_referencia: first.mes_referencia || "",
             desvalorizometro: first.desvalorizometro,
+            modelo: first.modelo,
+            combustivel: first.combustivel,
+            ano_modelo: first.ano_modelo,
+            codigo_marca: first.codigo_marca,
+            codigo_modelo: first.codigo_modelo,
           });
           setShowFipePicker(false);
           setNotFound(false);
           // Se houver informacoes_veiculo e os campos estiverem vazios, preenche.
           const info = r.informacoes_veiculo || {};
+          setCilindradasFromLookup(info.cilindradas ?? null);
           setData((d) => ({
             marca: d.marca || info.marca || "",
             modelo: d.modelo || info.modelo || "",
@@ -230,6 +264,7 @@ export function AddVehicleModal({
         setShowFipePicker(true);
         setNotFound(false);
         const info = r.informacoes_veiculo || {};
+        setCilindradasFromLookup(info.cilindradas ?? null);
         setData((d) => ({
           marca: d.marca || info.marca || "",
           modelo: d.modelo || info.modelo || "",
@@ -336,6 +371,23 @@ export function AddVehicleModal({
       if (fipeValor && fipeValor > 0) insertPayload.fipe_valor = fipeValor;
       if (fipeMesRef) insertPayload.fipe_mes_referencia = fipeMesRef;
       if (codigoFipe) insertPayload.fipe_updated_at = new Date().toISOString();
+
+      // Build 3.3: campos técnicos vindos da versão FIPE escolhida + Placa FIPE.
+      if (fipeLookup?.modelo) insertPayload.modelo_fipe = fipeLookup.modelo;
+      if (fipeLookup?.combustivel) insertPayload.combustivel_fipe = fipeLookup.combustivel;
+      const anoModeloInt = normalizeAnoModelo(fipeLookup?.ano_modelo ?? data.ano);
+      if (anoModeloInt !== null) insertPayload.ano_modelo = anoModeloInt;
+      if (fipeLookup?.codigo_marca) insertPayload.codigo_marca = fipeLookup.codigo_marca;
+      if (fipeLookup?.codigo_modelo) insertPayload.codigo_modelo = fipeLookup.codigo_modelo;
+      const cilindradasInt = parseCilindradas(cilindradasFromLookup);
+      if (cilindradasInt !== null) insertPayload.cilindradas = cilindradasInt;
+      if (codigoFipe) {
+        const signature = buildVehicleSignature({
+          codigoFipe,
+          anoModelo: fipeLookup?.ano_modelo ?? data.ano,
+        });
+        if (signature) insertPayload.vehicle_signature = signature;
+      }
 
       const { data: inserted, error } = await supabase
         .from("veiculos")
