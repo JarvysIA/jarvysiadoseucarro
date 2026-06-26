@@ -112,6 +112,7 @@ export function AddVehicleModal({
       setShowFipePicker(false);
       setFipeRetryAttempted(false);
       setRetryingFipe(false);
+      setCilindradasFromLookup(null);
     }
   }, [open]);
 
