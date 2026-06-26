@@ -80,6 +80,8 @@ export async function lookupPlacaFipe(placa: string): Promise<PlacaFipeLookup> {
           ano_modelo: pick(it, ["ano_modelo", "anoModelo", "ano"]),
           mes_referencia: pick(it, ["mes_referencia", "mesReferencia", "referencia"]),
           desvalorizometro: hash,
+          codigo_marca: pick(it, ["codigo_marca", "codigoMarca"]) || undefined,
+          codigo_modelo: pick(it, ["codigo_modelo", "codigoModelo"]) || undefined,
         } as PlacaFipeOption;
       })
       .filter((x): x is PlacaFipeOption => x !== null);
