@@ -514,9 +514,14 @@ export type Database = {
       veiculos: {
         Row: {
           ano: string | null
+          ano_modelo: number | null
           chassi: string | null
+          cilindradas: number | null
           claimed_at: string | null
           codigo_fipe: string | null
+          codigo_marca: string | null
+          codigo_modelo: string | null
+          combustivel_fipe: string | null
           cor: string | null
           created_at: string
           fipe_historico: Json | null
@@ -536,17 +541,24 @@ export type Database = {
           km_ultima_troca_pastilhas: number | null
           marca: string | null
           modelo: string | null
+          modelo_fipe: string | null
           motorizacao: string | null
           placa: string
           placafipe_hash: string | null
           status: string
           user_id: string | null
+          vehicle_signature: string | null
         }
         Insert: {
           ano?: string | null
+          ano_modelo?: number | null
           chassi?: string | null
+          cilindradas?: number | null
           claimed_at?: string | null
           codigo_fipe?: string | null
+          codigo_marca?: string | null
+          codigo_modelo?: string | null
+          combustivel_fipe?: string | null
           cor?: string | null
           created_at?: string
           fipe_historico?: Json | null
@@ -566,17 +578,24 @@ export type Database = {
           km_ultima_troca_pastilhas?: number | null
           marca?: string | null
           modelo?: string | null
+          modelo_fipe?: string | null
           motorizacao?: string | null
           placa: string
           placafipe_hash?: string | null
           status?: string
           user_id?: string | null
+          vehicle_signature?: string | null
         }
         Update: {
           ano?: string | null
+          ano_modelo?: number | null
           chassi?: string | null
+          cilindradas?: number | null
           claimed_at?: string | null
           codigo_fipe?: string | null
+          codigo_marca?: string | null
+          codigo_modelo?: string | null
+          combustivel_fipe?: string | null
           cor?: string | null
           created_at?: string
           fipe_historico?: Json | null
@@ -596,11 +615,13 @@ export type Database = {
           km_ultima_troca_pastilhas?: number | null
           marca?: string | null
           modelo?: string | null
+          modelo_fipe?: string | null
           motorizacao?: string | null
           placa?: string
           placafipe_hash?: string | null
           status?: string
           user_id?: string | null
+          vehicle_signature?: string | null
         }
         Relationships: [
           {
