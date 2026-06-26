@@ -9,6 +9,8 @@ export type FipeOption = {
   ano_modelo?: string;
   mes_referencia?: string;
   placafipe_hash: string;
+  codigo_marca?: string;
+  codigo_modelo?: string;
 };
 
 export type PlateLookupResult = {
@@ -18,6 +20,7 @@ export type PlateLookupResult = {
   cor: string;
   motorizacao: string;
   chassi?: string;
+  cilindradas?: string;
   fipe_options?: FipeOption[];
 } | null;
 
@@ -30,6 +33,7 @@ export type CarConfirmPayload = {
   chassi: string;
   km_atual: number | null;
   fipe: FipeOption | null;
+  cilindradas?: string | null;
 };
 
 type Props = {
@@ -55,6 +59,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
   const [cor, setCor] = useState("");
   const [motorizacao, setMotorizacao] = useState("");
   const [chassi, setChassi] = useState("");
+  const [cilindradas, setCilindradas] = useState<string | null>(null);
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
@@ -72,6 +77,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
     setCor("");
     setMotorizacao("");
     setChassi("");
+    setCilindradas(null);
     setFipeOptions([]);
     setSelectedFipe(null);
     lookup(plate).then((r) => {
@@ -83,6 +89,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         setCor(r.cor || "");
         setMotorizacao(r.motorizacao || "");
         setChassi(r.chassi || "");
+        setCilindradas(r.cilindradas ?? null);
         setAutofilled(true);
         const opts = r.fipe_options ?? [];
         setFipeOptions(opts);
@@ -119,6 +126,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         chassi: chassi.trim(),
         km_atual: km ? Number(km.replace(/\D/g, "")) || null : null,
         fipe: selectedFipe,
+        cilindradas,
       });
     } finally {
       setSubmitting(false);

@@ -9,9 +9,12 @@ export type PlacaFipeOption = {
   ano_modelo?: string;
   mes_referencia?: string;
   desvalorizometro: string; // hash usado pelo endpoint de histórico
+  codigo_marca?: string;
+  codigo_modelo?: string;
 };
 
 export type PlacaFipeVehicleInfo = {
+  cilindradas?: string;
   marca?: string;
   modelo?: string;
   ano?: string;
@@ -77,6 +80,8 @@ export async function lookupPlacaFipe(placa: string): Promise<PlacaFipeLookup> {
           ano_modelo: pick(it, ["ano_modelo", "anoModelo", "ano"]),
           mes_referencia: pick(it, ["mes_referencia", "mesReferencia", "referencia"]),
           desvalorizometro: hash,
+          codigo_marca: pick(it, ["codigo_marca", "codigoMarca"]) || undefined,
+          codigo_modelo: pick(it, ["codigo_modelo", "codigoModelo"]) || undefined,
         } as PlacaFipeOption;
       })
       .filter((x): x is PlacaFipeOption => x !== null);
@@ -136,6 +141,8 @@ export type CarConfirmFipeOption = {
   ano_modelo?: string;
   mes_referencia?: string;
   placafipe_hash: string;
+  codigo_marca?: string;
+  codigo_modelo?: string;
 };
 
 export type LookupPlateViaPlacaFipeResult = {
@@ -145,6 +152,7 @@ export type LookupPlateViaPlacaFipeResult = {
   cor: string;
   motorizacao: string;
   chassi: string;
+  cilindradas?: string;
   fipe_options: CarConfirmFipeOption[];
 } | null;
 
@@ -166,6 +174,7 @@ export async function lookupPlateViaPlacaFipe(
     cor: info.cor ?? "",
     motorizacao: info.motor ?? "",
     chassi: info.chassi ?? "",
+    cilindradas: info.cilindradas ?? undefined,
     fipe_options: r.fipe
       .filter((o) => o.codigo_fipe && o.desvalorizometro)
       .map((o) => ({
@@ -176,6 +185,9 @@ export async function lookupPlateViaPlacaFipe(
         ano_modelo: o.ano_modelo,
         mes_referencia: o.mes_referencia,
         placafipe_hash: o.desvalorizometro,
+        codigo_marca: o.codigo_marca,
+        codigo_modelo: o.codigo_modelo,
       })),
   };
 }
+

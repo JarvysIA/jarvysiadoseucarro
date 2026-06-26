@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CarConfirmModal, type CarConfirmPayload } from "@/components/CarConfirmModal";
 import { sanitizePlate, isValidPlate } from "@/lib/plate";
 import { lookupPlateViaPlacaFipe } from "@/lib/placafipe";
+import { buildVehicleSignature, normalizeAnoModelo } from "@/lib/vehicle-signature";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
@@ -162,6 +163,14 @@ function SignupPage() {
       }
       console.log("[signup] usuário autenticado antes de inserir veículo:", user);
 
+      const parseCilindradas = (raw: string | null | undefined): number | null => {
+        if (raw == null) return null;
+        const s = String(raw).trim();
+        if (!s || !/^\d+$/.test(s)) return null;
+        const n = parseInt(s, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      };
+
       const fipeFields = car.fipe
         ? {
             codigo_fipe: car.fipe.codigo_fipe,
@@ -169,8 +178,19 @@ function SignupPage() {
             fipe_mes_referencia: car.fipe.mes_referencia || null,
             placafipe_hash: car.fipe.placafipe_hash,
             fipe_updated_at: new Date().toISOString(),
+            modelo_fipe: car.fipe.modelo || null,
+            combustivel_fipe: car.fipe.combustivel || null,
+            ano_modelo: normalizeAnoModelo(car.fipe.ano_modelo),
+            codigo_marca: car.fipe.codigo_marca || null,
+            codigo_modelo: car.fipe.codigo_modelo || null,
+            vehicle_signature: buildVehicleSignature({
+              codigoFipe: car.fipe.codigo_fipe,
+              anoModelo: car.fipe.ano_modelo ?? car.ano,
+            }),
           }
         : {};
+
+      const cilindradasValue = parseCilindradas(car.cilindradas);
 
       const { data: inserted, error: vehErr } = await supabase
         .from("veiculos")
@@ -184,6 +204,7 @@ function SignupPage() {
           motorizacao: car.motorizacao,
           chassi: car.chassi || null,
           km_atual: car.km_atual,
+          cilindradas: cilindradasValue,
           // Patch G: novo cadastro nasce com Histórico Premium bloqueado.
           history_locked: true,
           ...fipeFields,
