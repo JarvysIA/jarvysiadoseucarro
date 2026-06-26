@@ -9,6 +9,8 @@ export type FipeOption = {
   ano_modelo?: string;
   mes_referencia?: string;
   placafipe_hash: string;
+  codigo_marca?: string;
+  codigo_modelo?: string;
 };
 
 export type PlateLookupResult = {
@@ -18,6 +20,7 @@ export type PlateLookupResult = {
   cor: string;
   motorizacao: string;
   chassi?: string;
+  cilindradas?: string;
   fipe_options?: FipeOption[];
 } | null;
 
@@ -30,6 +33,7 @@ export type CarConfirmPayload = {
   chassi: string;
   km_atual: number | null;
   fipe: FipeOption | null;
+  cilindradas?: string | null;
 };
 
 type Props = {
