@@ -8,6 +8,15 @@ import {
   type PlacaFipeOption,
 } from "@/lib/placafipe";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
+import { buildVehicleSignature, normalizeAnoModelo } from "@/lib/vehicle-signature";
+
+function parseCilindradas(raw: string | null | undefined): number | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s || !/^\d+$/.test(s)) return null;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 import { toast } from "sonner";
 
