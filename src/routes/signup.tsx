@@ -163,6 +163,14 @@ function SignupPage() {
       }
       console.log("[signup] usuário autenticado antes de inserir veículo:", user);
 
+      const parseCilindradas = (raw: string | null | undefined): number | null => {
+        if (raw == null) return null;
+        const s = String(raw).trim();
+        if (!s || !/^\d+$/.test(s)) return null;
+        const n = parseInt(s, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      };
+
       const fipeFields = car.fipe
         ? {
             codigo_fipe: car.fipe.codigo_fipe,
@@ -170,8 +178,19 @@ function SignupPage() {
             fipe_mes_referencia: car.fipe.mes_referencia || null,
             placafipe_hash: car.fipe.placafipe_hash,
             fipe_updated_at: new Date().toISOString(),
+            modelo_fipe: car.fipe.modelo || null,
+            combustivel_fipe: car.fipe.combustivel || null,
+            ano_modelo: normalizeAnoModelo(car.fipe.ano_modelo),
+            codigo_marca: car.fipe.codigo_marca || null,
+            codigo_modelo: car.fipe.codigo_modelo || null,
+            vehicle_signature: buildVehicleSignature({
+              codigoFipe: car.fipe.codigo_fipe,
+              anoModelo: car.fipe.ano_modelo ?? car.ano,
+            }),
           }
         : {};
+
+      const cilindradasValue = parseCilindradas(car.cilindradas);
 
       const { data: inserted, error: vehErr } = await supabase
         .from("veiculos")
