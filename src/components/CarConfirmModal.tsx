@@ -126,6 +126,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
         chassi: chassi.trim(),
         km_atual: km ? Number(km.replace(/\D/g, "")) || null : null,
         fipe: selectedFipe,
+        cilindradas,
       });
     } finally {
       setSubmitting(false);
