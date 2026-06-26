@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CarConfirmModal, type CarConfirmPayload } from "@/components/CarConfirmModal";
 import { sanitizePlate, isValidPlate } from "@/lib/plate";
 import { lookupPlateViaPlacaFipe } from "@/lib/placafipe";
+import { buildVehicleSignature, normalizeAnoModelo } from "@/lib/vehicle-signature";
 import { getStoredRef, resolveReferrerId, clearStoredRef } from "@/lib/referral";
 import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
