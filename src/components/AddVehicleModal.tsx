@@ -39,6 +39,11 @@ type FipeFromLookup = {
   valor: number;
   mes_referencia: string;
   desvalorizometro: string;
+  modelo?: string;
+  combustivel?: string;
+  ano_modelo?: string;
+  codigo_marca?: string;
+  codigo_modelo?: string;
 } | null;
 
 export type AddedVehicle = {
