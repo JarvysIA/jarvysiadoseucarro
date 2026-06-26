@@ -9,9 +9,12 @@ export type PlacaFipeOption = {
   ano_modelo?: string;
   mes_referencia?: string;
   desvalorizometro: string; // hash usado pelo endpoint de histórico
+  codigo_marca?: string;
+  codigo_modelo?: string;
 };
 
 export type PlacaFipeVehicleInfo = {
+  cilindradas?: string;
   marca?: string;
   modelo?: string;
   ano?: string;
