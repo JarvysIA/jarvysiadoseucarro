@@ -372,6 +372,23 @@ export function AddVehicleModal({
       if (fipeMesRef) insertPayload.fipe_mes_referencia = fipeMesRef;
       if (codigoFipe) insertPayload.fipe_updated_at = new Date().toISOString();
 
+      // Build 3.3: campos técnicos vindos da versão FIPE escolhida + Placa FIPE.
+      if (fipeLookup?.modelo) insertPayload.modelo_fipe = fipeLookup.modelo;
+      if (fipeLookup?.combustivel) insertPayload.combustivel_fipe = fipeLookup.combustivel;
+      const anoModeloInt = normalizeAnoModelo(fipeLookup?.ano_modelo ?? data.ano);
+      if (anoModeloInt !== null) insertPayload.ano_modelo = anoModeloInt;
+      if (fipeLookup?.codigo_marca) insertPayload.codigo_marca = fipeLookup.codigo_marca;
+      if (fipeLookup?.codigo_modelo) insertPayload.codigo_modelo = fipeLookup.codigo_modelo;
+      const cilindradasInt = parseCilindradas(cilindradasFromLookup);
+      if (cilindradasInt !== null) insertPayload.cilindradas = cilindradasInt;
+      if (codigoFipe) {
+        const signature = buildVehicleSignature({
+          codigoFipe,
+          anoModelo: fipeLookup?.ano_modelo ?? data.ano,
+        });
+        if (signature) insertPayload.vehicle_signature = signature;
+      }
+
       const { data: inserted, error } = await supabase
         .from("veiculos")
         .insert(insertPayload as never)
