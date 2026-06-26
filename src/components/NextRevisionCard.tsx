@@ -75,10 +75,10 @@ export function NextRevisionCard({ kmAtual }: NextRevisionCardProps) {
           Próxima revisão
         </p>
         <p className="mt-1 text-sm font-semibold text-foreground">
-          {formatKm(milestone)} km
+          <span className="whitespace-nowrap">{formatKm(milestone)} km</span>
         </p>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Faltam {formatKm(remaining)} km
+          Faltam <span className="whitespace-nowrap">{formatKm(remaining)} km</span>
         </p>
       </div>
     </div>
