@@ -18,6 +18,7 @@ import { can } from "@/lib/plan-capabilities";
 import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
+import { NextRevisionCard } from "@/components/NextRevisionCard";
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
@@ -1084,6 +1085,10 @@ function VehicleStatusSection({
             );
           })}
         </div>
+
+        <NextRevisionCard kmAtual={kmAtual} />
+
+
 
         <FipeCard
           vehicleId={vehicleId}
