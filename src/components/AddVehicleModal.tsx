@@ -239,11 +239,17 @@ export function AddVehicleModal({
             valor: first.valor,
             mes_referencia: first.mes_referencia || "",
             desvalorizometro: first.desvalorizometro,
+            modelo: first.modelo,
+            combustivel: first.combustivel,
+            ano_modelo: first.ano_modelo,
+            codigo_marca: first.codigo_marca,
+            codigo_modelo: first.codigo_modelo,
           });
           setShowFipePicker(false);
           setNotFound(false);
           // Se houver informacoes_veiculo e os campos estiverem vazios, preenche.
           const info = r.informacoes_veiculo || {};
+          setCilindradasFromLookup(info.cilindradas ?? null);
           setData((d) => ({
             marca: d.marca || info.marca || "",
             modelo: d.modelo || info.modelo || "",
