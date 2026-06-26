@@ -59,6 +59,7 @@ export function CarConfirmModal({ open, plate, lookup, onConfirm }: Props) {
   const [cor, setCor] = useState("");
   const [motorizacao, setMotorizacao] = useState("");
   const [chassi, setChassi] = useState("");
+  const [cilindradas, setCilindradas] = useState<string | null>(null);
   const [km, setKm] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [fipeOptions, setFipeOptions] = useState<FipeOption[]>([]);
