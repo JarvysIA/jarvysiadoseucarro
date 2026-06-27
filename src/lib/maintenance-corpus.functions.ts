@@ -1,0 +1,237 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database, Json } from "@/integrations/supabase/types";
+
+const FORBIDDEN_KEYS = [
+  "user_id",
+  "vehicle_id",
+  "placa",
+  "chassi",
+  "numero_motor",
+  "cpf",
+  "documento",
+  "email",
+  "whatsapp",
+  "telefone",
+  "nome",
+];
+
+const SOURCE_TYPES = [
+  "jarvys_pdf_v1",
+  "manual_oficial",
+  "curadoria",
+  "terceiros",
+] as const;
+
+const emptyToNull = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? null : v;
+
+const optionalNullableString = z.preprocess(
+  emptyToNull,
+  z.string().trim().nullable().optional(),
+);
+
+const optionalNullableInt = z.preprocess(
+  (v) => (v === "" || v === undefined ? undefined : v),
+  z.number().int().nullable().optional(),
+);
+
+const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
+);
+
+const slugRegex = /^[a-z0-9][a-z0-9_-]*$/;
+
+const payloadSchema = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .min(1, "slug obrigatório")
+      .transform((s) => s.toLowerCase())
+      .refine((s) => slugRegex.test(s), "slug inválido"),
+    title: z.string().trim().min(1, "title obrigatório"),
+    brand: z
+      .string()
+      .trim()
+      .min(1, "brand obrigatória")
+      .transform((s) => s.toLowerCase()),
+    model_group: z
+      .string()
+      .trim()
+      .min(1, "model_group obrigatório")
+      .transform((s) => s.toLowerCase()),
+    generation_range: optionalNullableString,
+    year_start: optionalNullableInt.refine(
+      (v) => v == null || (v >= 1980 && v <= 2100),
+      "year_start fora do intervalo 1980..2100",
+    ),
+    year_end: optionalNullableInt.refine(
+      (v) => v == null || (v >= 1980 && v <= 2100),
+      "year_end fora do intervalo 1980..2100",
+    ),
+    mechanical_families_json: z.array(jsonValueSchema).optional(),
+    coverage_json: z.record(z.string(), jsonValueSchema).optional(),
+    source_type: z.enum(SOURCE_TYPES).optional(),
+    version: z.string().trim().min(1).optional(),
+    file_name: optionalNullableString,
+    storage_path: optionalNullableString,
+    extracted_text: z.preprocess(
+      (v) => (v === "" ? null : v),
+      z.string().nullable().optional(),
+    ),
+    summary_json: z.record(z.string(), jsonValueSchema).optional(),
+    quality_score: z.number().int().min(0).max(100).optional(),
+    reviewed_by_admin: z.boolean().optional(),
+    published: z.boolean().optional(),
+    notes: optionalNullableString,
+  })
+  .strict()
+  .superRefine((val, ctx) => {
+    if (
+      val.year_start != null &&
+      val.year_end != null &&
+      val.year_start > val.year_end
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "year_start deve ser <= year_end",
+        path: ["year_start"],
+      });
+    }
+  });
+
+export type UpsertMaintenanceCorpusInput = z.input<typeof payloadSchema>;
+
+const PRESENCE_KEYS = [
+  "slug",
+  "title",
+  "brand",
+  "model_group",
+  "generation_range",
+  "year_start",
+  "year_end",
+  "mechanical_families_json",
+  "coverage_json",
+  "source_type",
+  "version",
+  "file_name",
+  "storage_path",
+  "extracted_text",
+  "summary_json",
+  "quality_score",
+  "reviewed_by_admin",
+  "published",
+  "notes",
+] as const;
+
+type PresenceKey = (typeof PRESENCE_KEYS)[number];
+type PresenceMap = Partial<Record<PresenceKey, true>>;
+
+async function assertSuperAdmin(userId: string) {
+  const { supabaseAdmin } = await import(
+    "@/integrations/supabase/client.server"
+  );
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("is_super_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error("Falha ao verificar permissões.");
+  if (!data?.is_super_admin) throw new Error("Acesso negado.");
+}
+
+function assertNoForbiddenKeys(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+  const keys = Object.keys(raw as Record<string, unknown>).map((k) =>
+    k.toLowerCase(),
+  );
+  const bad = keys.filter((k) => FORBIDDEN_KEYS.includes(k));
+  if (bad.length > 0) {
+    throw new Error(`Campos não permitidos no payload: ${bad.join(", ")}.`);
+  }
+}
+
+export const upsertMaintenanceCorpusFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    const parsed = payloadSchema.parse(input);
+    const presentKeys: PresenceMap = {};
+    if (input && typeof input === "object" && !Array.isArray(input)) {
+      const raw = input as Record<string, unknown>;
+      for (const k of PRESENCE_KEYS) {
+        if (k in raw) presentKeys[k] = true;
+      }
+    }
+    return { parsed, presentKeys };
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { parsed, presentKeys } = data;
+
+    type CorpusInsert =
+      Database["public"]["Tables"]["jarvys_maintenance_corpus"]["Insert"];
+
+    // Obrigatórios sempre presentes.
+    const payload: CorpusInsert = {
+      slug: parsed.slug,
+      title: parsed.title,
+      brand: parsed.brand,
+      model_group: parsed.model_group,
+    };
+
+    // Nullable: incluir apenas se a chave estiver presente no input
+    // (null explícito limpa; ausência preserva).
+    if (presentKeys.generation_range)
+      payload.generation_range = parsed.generation_range ?? null;
+    if (presentKeys.year_start) payload.year_start = parsed.year_start ?? null;
+    if (presentKeys.year_end) payload.year_end = parsed.year_end ?? null;
+    if (presentKeys.file_name) payload.file_name = parsed.file_name ?? null;
+    if (presentKeys.storage_path)
+      payload.storage_path = parsed.storage_path ?? null;
+    if (presentKeys.extracted_text)
+      payload.extracted_text = parsed.extracted_text ?? null;
+    if (presentKeys.notes) payload.notes = parsed.notes ?? null;
+
+    // NOT NULL com default: só incluir quando enviados.
+    if (presentKeys.mechanical_families_json && parsed.mechanical_families_json)
+      payload.mechanical_families_json =
+        parsed.mechanical_families_json as unknown as Json;
+    if (presentKeys.coverage_json && parsed.coverage_json)
+      payload.coverage_json = parsed.coverage_json as Json;
+    if (presentKeys.summary_json && parsed.summary_json)
+      payload.summary_json = parsed.summary_json as Json;
+    if (presentKeys.source_type && parsed.source_type)
+      payload.source_type = parsed.source_type;
+    if (presentKeys.version && parsed.version) payload.version = parsed.version;
+    if (presentKeys.quality_score && parsed.quality_score !== undefined)
+      payload.quality_score = parsed.quality_score;
+    if (presentKeys.reviewed_by_admin && parsed.reviewed_by_admin !== undefined)
+      payload.reviewed_by_admin = parsed.reviewed_by_admin;
+    if (presentKeys.published && parsed.published !== undefined)
+      payload.published = parsed.published;
+
+    const { data: corpus, error } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .upsert(payload, { onConflict: "slug" })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return { corpus };
+  });
