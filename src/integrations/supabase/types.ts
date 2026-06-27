@@ -182,6 +182,81 @@ export type Database = {
           },
         ]
       }
+      jarvys_maintenance_corpus: {
+        Row: {
+          brand: string
+          coverage_json: Json
+          created_at: string
+          extracted_text: string | null
+          file_name: string | null
+          generation_range: string | null
+          id: string
+          mechanical_families_json: Json
+          model_group: string
+          notes: string | null
+          published: boolean
+          quality_score: number
+          reviewed_by_admin: boolean
+          slug: string
+          source_type: string
+          storage_path: string | null
+          summary_json: Json
+          title: string
+          updated_at: string
+          version: string
+          year_end: number | null
+          year_start: number | null
+        }
+        Insert: {
+          brand: string
+          coverage_json?: Json
+          created_at?: string
+          extracted_text?: string | null
+          file_name?: string | null
+          generation_range?: string | null
+          id?: string
+          mechanical_families_json?: Json
+          model_group: string
+          notes?: string | null
+          published?: boolean
+          quality_score?: number
+          reviewed_by_admin?: boolean
+          slug: string
+          source_type?: string
+          storage_path?: string | null
+          summary_json?: Json
+          title: string
+          updated_at?: string
+          version?: string
+          year_end?: number | null
+          year_start?: number | null
+        }
+        Update: {
+          brand?: string
+          coverage_json?: Json
+          created_at?: string
+          extracted_text?: string | null
+          file_name?: string | null
+          generation_range?: string | null
+          id?: string
+          mechanical_families_json?: Json
+          model_group?: string
+          notes?: string | null
+          published?: boolean
+          quality_score?: number
+          reviewed_by_admin?: boolean
+          slug?: string
+          source_type?: string
+          storage_path?: string | null
+          summary_json?: Json
+          title?: string
+          updated_at?: string
+          version?: string
+          year_end?: number | null
+          year_start?: number | null
+        }
+        Relationships: []
+      }
       logs_erro_bonificacao: {
         Row: {
           chave_pix: string | null
