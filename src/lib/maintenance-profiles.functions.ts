@@ -154,7 +154,10 @@ export const upsertMaintenanceProfileFn = createServerFn({ method: "POST" })
 
     const { parsed, hasMaintenancePlanKey } = data;
 
-    const upsertPayload: Record<string, unknown> = {
+    type ProfileInsert =
+      Database["public"]["Tables"]["vehicle_maintenance_profiles"]["Insert"];
+
+    const upsertPayload: ProfileInsert = {
       signature: parsed.signature,
       maintenance_family: parsed.maintenance_family ?? null,
       marca: parsed.marca ?? null,
