@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json, Database } from "@/integrations/supabase/types";
+import { safeParseMaintenancePlanJson } from "@/lib/maintenance-plan-validation";
 
 const FORBIDDEN_KEYS = [
   "placa",
