@@ -352,3 +352,69 @@ export const uploadMaintenanceCorpusPdfFn = createServerFn({ method: "POST" })
       sizeBytes: buffer.byteLength,
     };
   });
+
+// ---------------------------------------------------------------------------
+// getMaintenanceCorpusSignedDownloadFn
+// ---------------------------------------------------------------------------
+
+const signedDownloadPayloadSchema = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .min(1, "slug obrigatório")
+      .transform((s) => s.toLowerCase())
+      .refine((s) => slugRegex.test(s), "slug inválido"),
+    expiresIn: z
+      .number()
+      .int("expiresIn deve ser inteiro")
+      .min(60, "expiresIn mínimo: 60s")
+      .max(900, "expiresIn máximo: 900s")
+      .optional(),
+  })
+  .strict();
+
+export type GetMaintenanceCorpusSignedDownloadInput = z.input<
+  typeof signedDownloadPayloadSchema
+>;
+
+export const getMaintenanceCorpusSignedDownloadFn = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    return signedDownloadPayloadSchema.parse(input);
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { data: row, error: lookupError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .select("storage_path, file_name")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (lookupError) throw new Error("Falha ao localizar corpus.");
+    if (!row) throw new Error("Corpus não encontrado para este slug.");
+    if (!row.storage_path) throw new Error("Corpus não possui PDF enviado.");
+
+    const expiresIn = data.expiresIn ?? 300;
+
+    const { data: signed, error: signedError } = await supabaseAdmin.storage
+      .from("jarvys-corpus")
+      .createSignedUrl(row.storage_path, expiresIn);
+    if (signedError || !signed?.signedUrl) {
+      throw new Error("Falha ao gerar URL assinada do PDF.");
+    }
+
+    return {
+      signedUrl: signed.signedUrl,
+      storagePath: row.storage_path,
+      fileName: row.file_name ?? null,
+      expiresIn,
+    };
+  });
