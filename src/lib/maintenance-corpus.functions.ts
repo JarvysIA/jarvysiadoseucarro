@@ -418,3 +418,83 @@ export const getMaintenanceCorpusSignedDownloadFn = createServerFn({
       expiresIn,
     };
   });
+
+// ---------------------------------------------------------------------------
+// extractMaintenanceCorpusPdfTextFn
+// ---------------------------------------------------------------------------
+
+const MIN_EXTRACTED_TEXT_CHARS = 200;
+
+const extractPayloadSchema = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .min(1, "slug obrigatório")
+      .transform((s) => s.toLowerCase())
+      .refine((s) => slugRegex.test(s), "slug inválido"),
+  })
+  .strict();
+
+export type ExtractMaintenanceCorpusPdfTextInput = z.input<
+  typeof extractPayloadSchema
+>;
+
+export const extractMaintenanceCorpusPdfTextFn = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    return extractPayloadSchema.parse(input);
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+    const { extractPdfText } = await import(
+      "@/lib/maintenance-corpus-pdf.server"
+    );
+
+    const { data: row, error: lookupError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .select("slug, storage_path, file_name")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (lookupError) throw new Error("Falha ao localizar corpus.");
+    if (!row) throw new Error("Corpus não encontrado para este slug.");
+    if (!row.storage_path) throw new Error("Corpus não possui PDF enviado.");
+
+    const { data: blob, error: downloadError } = await supabaseAdmin.storage
+      .from("jarvys-corpus")
+      .download(row.storage_path);
+    if (downloadError || !blob) {
+      throw new Error("Falha ao baixar PDF do corpus.");
+    }
+
+    const arrayBuffer = await blob.arrayBuffer();
+    const result = await extractPdfText(arrayBuffer);
+
+    if (result.charCount < MIN_EXTRACTED_TEXT_CHARS) {
+      throw new Error(
+        "Texto extraído insuficiente. O PDF pode estar vazio, escaneado ou sem camada de texto.",
+      );
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .update({ extracted_text: result.text })
+      .eq("slug", row.slug);
+    if (updateError) {
+      throw new Error("Falha ao salvar texto extraído do corpus.");
+    }
+
+    return {
+      slug: row.slug,
+      charCount: result.charCount,
+      pageCount: result.pageCount,
+      fileName: row.file_name ?? null,
+    };
+  });
