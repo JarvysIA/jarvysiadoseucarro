@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json, Database } from "@/integrations/supabase/types";
+import { safeParseMaintenancePlanJson } from "@/lib/maintenance-plan-validation";
 
 const FORBIDDEN_KEYS = [
   "placa",
@@ -41,6 +42,35 @@ const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
+const maintenancePlanJsonField = z
+  .unknown()
+  .optional()
+  .transform((value, ctx) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
+    if (typeof value !== "object" || Array.isArray(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maintenance_plan_json inválido.",
+      });
+      return z.NEVER;
+    }
+
+    const result = safeParseMaintenancePlanJson(value);
+
+    if (!result.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maintenance_plan_json inválido.",
+        params: { issues: result.error.issues.slice(0, 5) },
+      });
+      return z.NEVER;
+    }
+
+    return result.data;
+  });
+
 const payloadSchema = z
   .object({
     signature: z.string().trim().min(1, "signature obrigatória"),
@@ -57,7 +87,7 @@ const payloadSchema = z
     sistema_distribuicao: z
       .enum(["correia_dentada", "corrente", "correia_banhada", "desconhecido"])
       .default("desconhecido"),
-    maintenance_plan_json: jsonValueSchema.nullable().optional(),
+    maintenance_plan_json: maintenancePlanJsonField,
     parts_profile_json: jsonValueSchema.nullable().optional(),
     source: z
       .enum(["manual", "ia", "fornecedor", "catalogo", "curadoria"])
@@ -107,9 +137,13 @@ export const upsertMaintenanceProfileFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
     assertNoForbiddenKeys(input);
     const parsed = payloadSchema.parse(input);
-    assertSerializable(parsed.maintenance_plan_json, "maintenance_plan_json");
     assertSerializable(parsed.parts_profile_json, "parts_profile_json");
-    return parsed;
+    const hasMaintenancePlanKey =
+      !!input &&
+      typeof input === "object" &&
+      !Array.isArray(input) &&
+      "maintenance_plan_json" in (input as Record<string, unknown>);
+    return { parsed, hasMaintenancePlanKey };
   })
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.userId);
@@ -118,25 +152,36 @@ export const upsertMaintenanceProfileFn = createServerFn({ method: "POST" })
       "@/integrations/supabase/client.server"
     );
 
-    const upsertPayload = {
-      signature: data.signature,
-      maintenance_family: data.maintenance_family ?? null,
-      marca: data.marca ?? null,
-      modelo_fipe: data.modelo_fipe ?? null,
-      versao: data.versao ?? null,
-      ano_modelo: data.ano_modelo ?? null,
-      combustivel: data.combustivel ?? null,
-      cilindradas: data.cilindradas ?? null,
-      valvulas: data.valvulas ?? null,
-      motor_textual: data.motor_textual ?? null,
-      transmissao: data.transmissao ?? null,
-      sistema_distribuicao: data.sistema_distribuicao,
-      maintenance_plan_json: (data.maintenance_plan_json ?? null) as Json | null,
-      parts_profile_json: (data.parts_profile_json ?? null) as Json | null,
-      source: data.source,
-      confidence: data.confidence,
-      reviewed_by_admin: data.reviewed_by_admin,
+    const { parsed, hasMaintenancePlanKey } = data;
+
+    type ProfileInsert =
+      Database["public"]["Tables"]["vehicle_maintenance_profiles"]["Insert"];
+
+    const upsertPayload: ProfileInsert = {
+      signature: parsed.signature,
+      maintenance_family: parsed.maintenance_family ?? null,
+      marca: parsed.marca ?? null,
+      modelo_fipe: parsed.modelo_fipe ?? null,
+      versao: parsed.versao ?? null,
+      ano_modelo: parsed.ano_modelo ?? null,
+      combustivel: parsed.combustivel ?? null,
+      cilindradas: parsed.cilindradas ?? null,
+      valvulas: parsed.valvulas ?? null,
+      motor_textual: parsed.motor_textual ?? null,
+      transmissao: parsed.transmissao ?? null,
+      sistema_distribuicao: parsed.sistema_distribuicao,
+      parts_profile_json: (parsed.parts_profile_json ?? null) as Json | null,
+      source: parsed.source,
+      confidence: parsed.confidence,
+      reviewed_by_admin: parsed.reviewed_by_admin,
     };
+
+    // Apenas inclui maintenance_plan_json no upsert se a chave estiver presente
+    // no input. Omitir a chave preserva o plano existente em upserts parciais.
+    if (hasMaintenancePlanKey) {
+      upsertPayload.maintenance_plan_json =
+        (parsed.maintenance_plan_json ?? null) as Json | null;
+    }
 
     const { data: profile, error } = await supabaseAdmin
       .from("vehicle_maintenance_profiles")
