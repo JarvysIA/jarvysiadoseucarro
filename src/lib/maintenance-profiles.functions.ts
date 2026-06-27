@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json, Database } from "@/integrations/supabase/types";
 
 const FORBIDDEN_KEYS = [
   "placa",
@@ -147,4 +147,27 @@ export const upsertMaintenanceProfileFn = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     return { profile };
+  });
+
+const getBySignatureSchema = z
+  .object({
+    signature: z.string().trim().min(1, "signature obrigatória"),
+  })
+  .strict();
+
+type MaintenanceProfileRow = Database["public"]["Tables"]["vehicle_maintenance_profiles"]["Row"];
+
+export const getMaintenanceProfileBySignatureFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => getBySignatureSchema.parse(input))
+  .handler(async ({ context, data }): Promise<{ profile: MaintenanceProfileRow | null }> => {
+    const { data: profile, error } = await context.supabase
+      .from("vehicle_maintenance_profiles")
+      .select("*")
+      .eq("signature", data.signature)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+
+    return { profile: (profile as MaintenanceProfileRow | null) ?? null };
   });
