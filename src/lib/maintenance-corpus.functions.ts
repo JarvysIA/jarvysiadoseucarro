@@ -498,3 +498,143 @@ export const extractMaintenanceCorpusPdfTextFn = createServerFn({
       fileName: row.file_name ?? null,
     };
   });
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.9 — buildMaintenanceCorpusSummaryFn
+// Gera summary_json básico por regex/heurísticas sobre extracted_text.
+// Não chama IA, não acessa storage, não altera extracted_text.
+// ─────────────────────────────────────────────────────────────
+
+const MIN_SUMMARY_TEXT_CHARS = 200;
+
+function normalizeTextForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+const SECTION_PATTERNS: Record<string, RegExp> = {
+  resumo_executivo: /resumo executivo/,
+  regras_fixas: /regras fixas|padrao jarvys/,
+  motorizacoes_pontos_criticos:
+    /motorizacoes( e pontos criticos)?|pontos criticos/,
+  cronograma_km:
+    /cronograma por (quilometragem|km)|10\.?000 a 100\.?000|110\.?000 a 200\.?000/,
+  intervalos_fixos: /itens por intervalo fixo|intervalo fixo/,
+  alertas_especificos: /alertas especificos/,
+  checklist_usado_sem_historico:
+    /checklist inicial para carro usado sem historico|carro usado sem historico|sem historico/,
+  fontes_base_tecnica: /fontes e base tecnica|base tecnica|(^|\n)\s*fontes\b/,
+};
+
+const KEYWORD_PATTERNS: Record<string, RegExp> = {
+  uso_severo:
+    /uso severo|condicoes severas|\bapp\b|\btaxi\b|\bfrota\b|\bcarga\b/,
+  correia_dentada: /correia dentada/,
+  corrente_comando: /corrente de comando/,
+  correia_banhada: /correia banhada/,
+  cambio_automatico: /cambio automatico|\batf\b/,
+  cvt: /\bcvt\b/,
+  automatizado: /dualogic|i-?motion|automatizado/,
+  diesel: /\bdiesel\b/,
+  hibrido: /hibrido/,
+  eletrico: /eletrico/,
+  alta_quilometragem:
+    /alta quilometragem|200\.?000 km|300\.?000 km|500\.?000 km/,
+};
+
+const summaryPayloadSchema = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .transform((s) => s.toLowerCase())
+      .pipe(
+        z
+          .string()
+          .min(1)
+          .max(120)
+          .refine((s) => slugRegex.test(s), "slug inválido"),
+      ),
+  })
+  .strict();
+
+export const buildMaintenanceCorpusSummaryFn = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    return summaryPayloadSchema.parse(input);
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { data: row, error: lookupError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .select("slug, extracted_text")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (lookupError) throw new Error("Falha ao localizar corpus.");
+    if (!row) throw new Error("Corpus não encontrado para este slug.");
+
+    const extractedText = (row.extracted_text ?? "").toString();
+    if (!extractedText.trim()) {
+      throw new Error("Corpus não possui texto extraído.");
+    }
+
+    const trimmed = extractedText.trim();
+    if (trimmed.length < MIN_SUMMARY_TEXT_CHARS) {
+      throw new Error("Texto extraído insuficiente para gerar resumo.");
+    }
+
+    const normalized = normalizeTextForSearch(extractedText);
+
+    const sectionsDetected: Record<string, boolean> = {};
+    for (const [key, rx] of Object.entries(SECTION_PATTERNS)) {
+      sectionsDetected[key] = rx.test(normalized);
+    }
+
+    const detectedKeywords: Record<string, boolean> = {};
+    for (const [key, rx] of Object.entries(KEYWORD_PATTERNS)) {
+      detectedKeywords[key] = rx.test(normalized);
+    }
+
+    const charCount = trimmed.length;
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+
+    const summaryJson: Json = {
+      schema_version: "1.0.0",
+      generated_by: "regex",
+      sections_detected: sectionsDetected,
+      detected_keywords: detectedKeywords,
+      text_stats: {
+        char_count: charCount,
+        word_count: wordCount,
+      },
+    };
+
+    const updatePayload: Database["public"]["Tables"]["jarvys_maintenance_corpus"]["Update"] =
+      { summary_json: summaryJson };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .update(updatePayload)
+      .eq("slug", row.slug);
+    if (updateError) {
+      throw new Error("Falha ao salvar resumo do corpus.");
+    }
+
+    return {
+      slug: row.slug,
+      charCount,
+      wordCount,
+      sectionsDetected,
+      detectedKeywords,
+    };
+  });
