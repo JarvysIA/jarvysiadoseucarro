@@ -511,6 +511,75 @@ export type Database = {
           },
         ]
       }
+      vehicle_maintenance_profiles: {
+        Row: {
+          ano_modelo: number | null
+          cilindradas: number | null
+          combustivel: string | null
+          confidence: number
+          created_at: string
+          id: string
+          maintenance_family: string | null
+          maintenance_plan_json: Json | null
+          marca: string | null
+          modelo_fipe: string | null
+          motor_textual: string | null
+          parts_profile_json: Json | null
+          reviewed_by_admin: boolean
+          signature: string
+          sistema_distribuicao: string
+          source: string
+          transmissao: string | null
+          updated_at: string
+          valvulas: number | null
+          versao: string | null
+        }
+        Insert: {
+          ano_modelo?: number | null
+          cilindradas?: number | null
+          combustivel?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          maintenance_family?: string | null
+          maintenance_plan_json?: Json | null
+          marca?: string | null
+          modelo_fipe?: string | null
+          motor_textual?: string | null
+          parts_profile_json?: Json | null
+          reviewed_by_admin?: boolean
+          signature: string
+          sistema_distribuicao?: string
+          source?: string
+          transmissao?: string | null
+          updated_at?: string
+          valvulas?: number | null
+          versao?: string | null
+        }
+        Update: {
+          ano_modelo?: number | null
+          cilindradas?: number | null
+          combustivel?: string | null
+          confidence?: number
+          created_at?: string
+          id?: string
+          maintenance_family?: string | null
+          maintenance_plan_json?: Json | null
+          marca?: string | null
+          modelo_fipe?: string | null
+          motor_textual?: string | null
+          parts_profile_json?: Json | null
+          reviewed_by_admin?: boolean
+          signature?: string
+          sistema_distribuicao?: string
+          source?: string
+          transmissao?: string | null
+          updated_at?: string
+          valvulas?: number | null
+          versao?: string | null
+        }
+        Relationships: []
+      }
       veiculos: {
         Row: {
           ano: string | null
