@@ -235,3 +235,120 @@ export const upsertMaintenanceCorpusFn = createServerFn({ method: "POST" })
 
     return { corpus };
   });
+
+// ---------------------------------------------------------------------------
+// uploadMaintenanceCorpusPdfFn
+// ---------------------------------------------------------------------------
+
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
+const BASE64_REGEX = /^[A-Za-z0-9+/=\r\n\s]+$/;
+
+const uploadPayloadSchema = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .min(1, "slug obrigatório")
+      .transform((s) => s.toLowerCase())
+      .refine((s) => slugRegex.test(s), "slug inválido"),
+    fileName: z
+      .string()
+      .trim()
+      .min(1, "fileName obrigatório")
+      .refine((n) => !n.includes("/") && !n.includes("\\") && !n.includes(".."),
+        "fileName inválido")
+      .refine((n) => n.toLowerCase().endsWith(".pdf"), "fileName deve terminar em .pdf"),
+    contentType: z
+      .string()
+      .refine((c) => c === "application/pdf", "contentType deve ser application/pdf"),
+    fileBase64: z
+      .string()
+      .min(1, "fileBase64 obrigatório")
+      .refine((b) => BASE64_REGEX.test(b), "fileBase64 inválido"),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive("sizeBytes deve ser positivo")
+      .max(MAX_PDF_BYTES, `Tamanho máximo: ${MAX_PDF_BYTES} bytes`),
+  })
+  .strict();
+
+export type UploadMaintenanceCorpusPdfInput = z.input<typeof uploadPayloadSchema>;
+
+export const uploadMaintenanceCorpusPdfFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    return uploadPayloadSchema.parse(input);
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    // 1. Exigir que o registro do corpus já exista.
+    const { data: existing, error: lookupError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .select("id")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (lookupError) throw new Error("Falha ao localizar corpus.");
+    if (!existing) throw new Error("Corpus não encontrado para este slug.");
+
+    // 2. Decodificar base64 server-side, conferir tamanho.
+    const cleanedBase64 = data.fileBase64.replace(/\s+/g, "");
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(cleanedBase64, "base64");
+    } catch {
+      throw new Error("fileBase64 inválido.");
+    }
+    if (buffer.byteLength === 0) {
+      throw new Error("Arquivo vazio.");
+    }
+    if (buffer.byteLength > MAX_PDF_BYTES) {
+      throw new Error("Arquivo excede o tamanho máximo.");
+    }
+    if (buffer.byteLength !== data.sizeBytes) {
+      throw new Error("sizeBytes não corresponde ao conteúdo enviado.");
+    }
+
+    // 3. Sanitizar fileName (apenas para coluna; storagePath é fixo).
+    const sanitizedFileName = data.fileName
+      .split(/[\\/]/)
+      .pop()!
+      .replace(/[^A-Za-z0-9._-]/g, "_")
+      .slice(0, 200);
+
+    // 4. Caminho fixo determinístico no bucket privado.
+    const storagePath = `corpus/${data.slug}/source.pdf`;
+
+    // 5. Upload server-side via service_role (bucket privado, upsert).
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from("jarvys-corpus")
+      .upload(storagePath, buffer, {
+        contentType: "application/pdf",
+        upsert: true,
+        cacheControl: "3600",
+      });
+    if (uploadError) throw new Error("Falha no upload do PDF.");
+
+    // 6. Atualizar registro do corpus; tratar erro de update.
+    const { error: updateError } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .update({ storage_path: storagePath, file_name: sanitizedFileName })
+      .eq("slug", data.slug);
+    if (updateError) {
+      throw new Error(
+        "Upload concluído, mas falhou ao atualizar o registro do corpus.",
+      );
+    }
+
+    return {
+      storagePath,
+      fileName: sanitizedFileName,
+      sizeBytes: buffer.byteLength,
+    };
+  });
