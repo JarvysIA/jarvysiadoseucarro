@@ -131,16 +131,8 @@ export const upsertMaintenanceProfileFn = createServerFn({ method: "POST" })
       motor_textual: data.motor_textual ?? null,
       transmissao: data.transmissao ?? null,
       sistema_distribuicao: data.sistema_distribuicao,
-      maintenance_plan_json:
-        (data.maintenance_plan_json ?? null) as
-          | Record<string, unknown>
-          | unknown[]
-          | null,
-      parts_profile_json:
-        (data.parts_profile_json ?? null) as
-          | Record<string, unknown>
-          | unknown[]
-          | null,
+      maintenance_plan_json: (data.maintenance_plan_json ?? null) as Json | null,
+      parts_profile_json: (data.parts_profile_json ?? null) as Json | null,
       source: data.source,
       confidence: data.confidence,
       reviewed_by_admin: data.reviewed_by_admin,
