@@ -42,6 +42,35 @@ const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   ]),
 );
 
+const maintenancePlanJsonField = z
+  .unknown()
+  .optional()
+  .transform((value, ctx) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
+    if (typeof value !== "object" || Array.isArray(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maintenance_plan_json inválido.",
+      });
+      return z.NEVER;
+    }
+
+    const result = safeParseMaintenancePlanJson(value);
+
+    if (!result.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maintenance_plan_json inválido.",
+        params: { issues: result.error.issues.slice(0, 5) },
+      });
+      return z.NEVER;
+    }
+
+    return result.data;
+  });
+
 const payloadSchema = z
   .object({
     signature: z.string().trim().min(1, "signature obrigatória"),
@@ -58,7 +87,7 @@ const payloadSchema = z
     sistema_distribuicao: z
       .enum(["correia_dentada", "corrente", "correia_banhada", "desconhecido"])
       .default("desconhecido"),
-    maintenance_plan_json: jsonValueSchema.nullable().optional(),
+    maintenance_plan_json: maintenancePlanJsonField,
     parts_profile_json: jsonValueSchema.nullable().optional(),
     source: z
       .enum(["manual", "ia", "fornecedor", "catalogo", "curadoria"])
