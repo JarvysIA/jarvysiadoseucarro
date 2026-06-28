@@ -407,3 +407,113 @@ export const selectMaintenanceCorpusForVehicleFn = createServerFn({
       },
     };
   });
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.23 — Variante admin/debug do seletor
+// Ignora published/reviewed_by_admin via supabaseAdmin, mas
+// somente para super-admin. Mesma lógica de score do 6.22.
+// Nunca retorna extracted_text, storage_path, file_name, notes
+// ou signed URL.
+// ─────────────────────────────────────────────────────────────
+
+async function assertSuperAdmin(userId: string) {
+  const { supabaseAdmin } = await import(
+    "@/integrations/supabase/client.server"
+  );
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("is_super_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw new Error("Falha ao verificar permissões.");
+  if (!data?.is_super_admin) throw new Error("Acesso negado.");
+}
+
+export const selectMaintenanceCorpusForVehicleAdminFn = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    assertNoForbiddenKeys(input);
+    return inputSchema.parse(input);
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const input = data;
+    const limit = input.limit ?? 5;
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("jarvys_maintenance_corpus")
+      .select(
+        "id, slug, title, brand, model_group, generation_range, year_start, year_end, mechanical_families_json, coverage_json, summary_json, quality_score, reviewed_by_admin, published, version",
+      )
+      .eq("brand", input.brand);
+
+    if (error) {
+      throw new Error("Falha ao consultar corpus.");
+    }
+
+    const candidates = (rows ?? []) as CorpusRow[];
+
+    const scored = candidates.map((row) => {
+      const { score, reasons } = scoreRow(row, input);
+      return {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        brand: row.brand,
+        model_group: row.model_group,
+        generation_range: row.generation_range,
+        year_start: row.year_start,
+        year_end: row.year_end,
+        score,
+        reasons,
+        quality_score: row.quality_score ?? 0,
+        reviewed_by_admin: row.reviewed_by_admin ?? false,
+        published: row.published ?? false,
+        version: row.version ?? "",
+      };
+    });
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.quality_score !== a.quality_score)
+        return b.quality_score - a.quality_score;
+      if (Number(b.reviewed_by_admin) !== Number(a.reviewed_by_admin)) {
+        return Number(b.reviewed_by_admin) - Number(a.reviewed_by_admin);
+      }
+      return a.title.localeCompare(b.title);
+    });
+
+    const matches = scored.slice(0, limit);
+
+    // normalizedInput montado APENAS a partir do input parseado (sem PII).
+    const normalizedInput = {
+      brand: input.brand,
+      model_group: input.model_group ?? null,
+      modelo_fipe: input.modelo_fipe ?? null,
+      versao: input.versao ?? null,
+      ano_modelo: input.ano_modelo ?? null,
+      combustivel: input.combustivel ?? null,
+      motor_textual: input.motor_textual ?? null,
+      cilindradas: input.cilindradas ?? null,
+      transmissao: input.transmissao ?? null,
+      sistema_distribuicao: input.sistema_distribuicao ?? null,
+      limit,
+    };
+
+    return {
+      matches,
+      debug: {
+        mode: "admin" as const,
+        normalizedInput,
+        totalCandidates: candidates.length,
+        returned: matches.length,
+      },
+    };
+  });
