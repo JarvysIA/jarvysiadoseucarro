@@ -507,6 +507,10 @@ async function buildTechnicalContext(
   if (documents.length > 0 && documents[0].score < 70) {
     warnings.push("score_baixo");
   }
+  if (isECvtTransmission(input.transmissao)) {
+    warnings.push("schema_sem_e_cvt_transmission_type");
+  }
+
   if (documents.some((d) => d.text_excerpt_char_count < 500)) {
     warnings.push("texto_curto_no_contexto");
   }
