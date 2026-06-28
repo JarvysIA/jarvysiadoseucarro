@@ -1336,3 +1336,515 @@ function SelectorTester() {
     </section>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.27 — Inspeção do Technical Context
+// Chama buildMaintenanceCorpusContextAdminFn e renderiza
+// resumo, warnings, vehicle_input, documents (com excerpt
+// limitado) e debug. Não chama IA. Não altera dados.
+// Não expõe storage_path, file_name, notes, signed URL nem
+// extracted_text completo — apenas o que a server function
+// retorna.
+// ─────────────────────────────────────────────────────────────
+
+type ContextDocument = {
+  slug: string;
+  title: string;
+  brand: string;
+  model_group: string;
+  generation_range: string | null;
+  year_start: number | null;
+  year_end: number | null;
+  score: number;
+  reasons: string[];
+  quality_score: number;
+  reviewed_by_admin: boolean;
+  published: boolean;
+  version: string;
+  coverage_json: unknown;
+  mechanical_families_json: unknown;
+  summary_json: unknown;
+  text_excerpt: string;
+  text_excerpt_char_count: number;
+};
+
+type ContextResult = {
+  technical_context: {
+    schema_version: string;
+    generated_by: string;
+    vehicle_input: Record<string, unknown>;
+    selection: {
+      totalCandidates: number;
+      returned: number;
+      limit: number;
+      maxCharsPerDocument: number;
+    };
+    documents: ContextDocument[];
+    warnings: string[];
+  };
+  debug: {
+    mode: "admin";
+    totalCandidates: number;
+    returned: number;
+  };
+};
+
+type ContextForm = SelectorForm & { maxCharsPerDocument: string };
+
+const EMPTY_CONTEXT_FORM: ContextForm = {
+  ...EMPTY_FORM,
+  limit: "3",
+  maxCharsPerDocument: "3000",
+};
+
+const WARNING_STYLES: Record<string, string> = {
+  sem_documentos:
+    "bg-destructive/10 border-destructive/30 text-destructive",
+  score_baixo: "bg-amber-50 border-amber-200 text-amber-800",
+  corpus_em_curadoria: "bg-sky-50 border-sky-200 text-sky-800",
+  corpus_nao_publicado: "bg-sky-50 border-sky-200 text-sky-800",
+  texto_curto_no_contexto: "bg-amber-50 border-amber-200 text-amber-800",
+};
+
+function ContextInspector() {
+  const [form, setForm] = useState<ContextForm>(EMPTY_CONTEXT_FORM);
+  const [expectedSlug, setExpectedSlug] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ContextResult | null>(null);
+
+  const contextFn = useServerFn(buildMaintenanceCorpusContextAdminFn);
+
+  function setField<K extends keyof ContextForm>(
+    key: K,
+    value: ContextForm[K],
+  ) {
+    setForm((p) => ({ ...p, [key]: value }));
+  }
+
+  function loadQuickCase(c: QuickCase) {
+    setForm({
+      ...c.form,
+      limit: "3",
+      maxCharsPerDocument: "3000",
+    });
+    setExpectedSlug(c.expectedSlug);
+    setError(null);
+    setResult(null);
+  }
+
+  function buildPayload() {
+    const s = (v: string) => (v.trim() === "" ? undefined : v.trim());
+    const n = (v: string) => {
+      const t = v.trim();
+      if (t === "") return undefined;
+      const num = Number(t);
+      return Number.isFinite(num) ? num : undefined;
+    };
+    const sd =
+      form.sistema_distribuicao === "" ? undefined : form.sistema_distribuicao;
+    return {
+      brand: form.brand.trim(),
+      model_group: s(form.model_group),
+      modelo_fipe: s(form.modelo_fipe),
+      versao: s(form.versao),
+      ano_modelo: n(form.ano_modelo),
+      combustivel: s(form.combustivel),
+      motor_textual: s(form.motor_textual),
+      cilindradas: n(form.cilindradas),
+      transmissao: s(form.transmissao),
+      sistema_distribuicao: sd,
+      limit: n(form.limit),
+      maxCharsPerDocument: n(form.maxCharsPerDocument),
+    };
+  }
+
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const payload = buildPayload();
+      if (!payload.brand) {
+        setError("brand é obrigatório.");
+        return;
+      }
+      const res = (await contextFn({ data: payload })) as ContextResult;
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const btn =
+    "px-3 py-2 rounded-md border border-border text-sm font-medium hover:bg-accent disabled:opacity-50";
+  const input =
+    "w-full rounded-md border border-border bg-background px-2 py-1 text-xs";
+
+  const tc = result?.technical_context;
+  const documents = tc?.documents ?? [];
+  const warnings = tc?.warnings ?? [];
+
+  return (
+    <section className="space-y-3 p-4 rounded-lg border border-border">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">Inspeção do Technical Context</h2>
+        <p className="text-xs text-muted-foreground">
+          Chama <code>buildMaintenanceCorpusContextAdminFn</code> (read-only,
+          super-admin). Sem IA. Não altera dados. Não retorna texto extraído
+          completo, storage_path, file_name, notes ou signed URL.
+        </p>
+      </header>
+
+      <div className="space-y-1">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          Casos rápidos
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_CASES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={btn}
+              onClick={() => loadQuickCase(c)}
+              disabled={busy}
+              title={`Esperado: ${c.expectedSlug}`}
+            >
+              {c.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={btn}
+            onClick={() => {
+              setForm(EMPTY_CONTEXT_FORM);
+              setExpectedSlug(null);
+              setError(null);
+              setResult(null);
+            }}
+            disabled={busy}
+          >
+            Limpar
+          </button>
+        </div>
+        {expectedSlug ? (
+          <div className="text-[11px] text-muted-foreground">
+            Top esperado: <code>{expectedSlug}</code>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <Field label="brand *">
+          <input
+            className={input}
+            value={form.brand}
+            onChange={(e) => setField("brand", e.target.value)}
+          />
+        </Field>
+        <Field label="model_group">
+          <input
+            className={input}
+            value={form.model_group}
+            onChange={(e) => setField("model_group", e.target.value)}
+          />
+        </Field>
+        <Field label="modelo_fipe">
+          <input
+            className={input}
+            value={form.modelo_fipe}
+            onChange={(e) => setField("modelo_fipe", e.target.value)}
+          />
+        </Field>
+        <Field label="versao">
+          <input
+            className={input}
+            value={form.versao}
+            onChange={(e) => setField("versao", e.target.value)}
+          />
+        </Field>
+        <Field label="ano_modelo">
+          <input
+            type="number"
+            className={input}
+            value={form.ano_modelo}
+            onChange={(e) => setField("ano_modelo", e.target.value)}
+          />
+        </Field>
+        <Field label="combustivel">
+          <input
+            className={input}
+            value={form.combustivel}
+            onChange={(e) => setField("combustivel", e.target.value)}
+          />
+        </Field>
+        <Field label="motor_textual">
+          <input
+            className={input}
+            value={form.motor_textual}
+            onChange={(e) => setField("motor_textual", e.target.value)}
+          />
+        </Field>
+        <Field label="cilindradas">
+          <input
+            type="number"
+            className={input}
+            value={form.cilindradas}
+            onChange={(e) => setField("cilindradas", e.target.value)}
+          />
+        </Field>
+        <Field label="transmissao">
+          <input
+            className={input}
+            value={form.transmissao}
+            onChange={(e) => setField("transmissao", e.target.value)}
+          />
+        </Field>
+        <Field label="sistema_distribuicao">
+          <select
+            className={input}
+            value={form.sistema_distribuicao}
+            onChange={(e) =>
+              setField(
+                "sistema_distribuicao",
+                e.target.value as SistemaDistribuicao,
+              )
+            }
+          >
+            <option value="">(vazio)</option>
+            <option value="correia_dentada">correia_dentada</option>
+            <option value="corrente">corrente</option>
+            <option value="correia_banhada">correia_banhada</option>
+            <option value="desconhecido">desconhecido</option>
+          </select>
+        </Field>
+        <Field label="limit (1..5)">
+          <input
+            type="number"
+            min={1}
+            max={5}
+            className={input}
+            value={form.limit}
+            onChange={(e) => setField("limit", e.target.value)}
+          />
+        </Field>
+        <Field label="maxCharsPerDocument (1000..6000)">
+          <input
+            type="number"
+            min={1000}
+            max={6000}
+            step={500}
+            className={input}
+            value={form.maxCharsPerDocument}
+            onChange={(e) => setField("maxCharsPerDocument", e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={btn + " bg-primary text-primary-foreground border-primary"}
+          onClick={run}
+          disabled={busy || !form.brand.trim()}
+        >
+          {busy ? "Montando…" : "Montar technical_context"}
+        </button>
+      </div>
+
+      {error ? (
+        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-2">
+          Erro: {error}
+        </div>
+      ) : null}
+
+      {tc ? (
+        <div className="space-y-3">
+          <div className="rounded-md border border-border p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <Stat label="schema_version" value={tc.schema_version} />
+            <Stat label="generated_by" value={tc.generated_by} />
+            <Stat
+              label="totalCandidates"
+              value={String(tc.selection.totalCandidates)}
+            />
+            <Stat label="returned" value={String(tc.selection.returned)} />
+            <Stat label="limit" value={String(tc.selection.limit)} />
+            <Stat
+              label="maxCharsPerDocument"
+              value={String(tc.selection.maxCharsPerDocument)}
+            />
+            <Stat label="documents" value={String(documents.length)} />
+            <Stat label="warnings" value={String(warnings.length)} />
+          </div>
+
+          {warnings.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {warnings.map((w) => (
+                <span
+                  key={w}
+                  className={
+                    "text-[11px] px-2 py-1 rounded border " +
+                    (WARNING_STYLES[w] ??
+                      "bg-muted border-border text-muted-foreground")
+                  }
+                >
+                  {w}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <details className="text-xs" open>
+            <summary className="cursor-pointer text-muted-foreground">
+              vehicle_input
+            </summary>
+            <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-muted-foreground">
+              {JSON.stringify(tc.vehicle_input, null, 2)}
+            </pre>
+          </details>
+
+          <div className="space-y-3">
+            {documents.length === 0 ? (
+              <div className="text-xs text-muted-foreground">
+                Nenhum documento retornado.
+              </div>
+            ) : (
+              documents.map((d, i) => {
+                const isExpected =
+                  expectedSlug != null && i === 0 && d.slug === expectedSlug;
+                const isMismatch =
+                  expectedSlug != null && i === 0 && d.slug !== expectedSlug;
+                return (
+                  <div
+                    key={d.slug + ":" + i}
+                    className="rounded-md border border-border p-3 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">
+                        #{i + 1}
+                      </span>
+                      <span className="text-sm font-semibold">{d.title}</span>
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-muted">
+                        {d.slug}
+                      </span>
+                      {isExpected ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          match esperado
+                        </span>
+                      ) : null}
+                      {isMismatch ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                          esperado: {expectedSlug}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                      <Stat label="brand" value={d.brand} />
+                      <Stat label="model_group" value={d.model_group} />
+                      <Stat
+                        label="generation_range"
+                        value={d.generation_range ?? "—"}
+                      />
+                      <Stat
+                        label="years"
+                        value={`${d.year_start ?? "—"} → ${d.year_end ?? "—"}`}
+                      />
+                      <Stat label="score" value={String(d.score)} />
+                      <Stat
+                        label="quality_score"
+                        value={String(d.quality_score)}
+                      />
+                      <Stat
+                        label="reviewed_by_admin"
+                        value={d.reviewed_by_admin ? "true" : "false"}
+                      />
+                      <Stat
+                        label="published"
+                        value={d.published ? "true" : "false"}
+                      />
+                      <Stat label="version" value={d.version || "—"} />
+                      <Stat
+                        label="text_excerpt_chars"
+                        value={String(d.text_excerpt_char_count)}
+                      />
+                    </div>
+
+                    {d.reasons.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {d.reasons.map((r) => (
+                          <span
+                            key={r}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        summary_json
+                      </summary>
+                      <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-muted-foreground">
+                        {JSON.stringify(d.summary_json, null, 2)}
+                      </pre>
+                    </details>
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        coverage_json
+                      </summary>
+                      <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-muted-foreground">
+                        {JSON.stringify(d.coverage_json, null, 2)}
+                      </pre>
+                    </details>
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        mechanical_families_json
+                      </summary>
+                      <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-muted-foreground">
+                        {JSON.stringify(d.mechanical_families_json, null, 2)}
+                      </pre>
+                    </details>
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground">
+                        text_excerpt ({d.text_excerpt_char_count} chars)
+                      </summary>
+                      <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-foreground">
+                        {d.text_excerpt}
+                      </pre>
+                    </details>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">
+              debug
+            </summary>
+            <pre className="whitespace-pre-wrap break-words text-muted-foreground">
+              {JSON.stringify(result?.debug, null, 2)}
+            </pre>
+          </details>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="font-mono break-all">{value}</div>
+    </div>
+  );
+}
