@@ -113,6 +113,32 @@ const inputSchema = z
 
 type ParsedInput = z.output<typeof inputSchema>;
 
+/**
+ * Detecta se a transmissão informada (ou marcadores híbridos equivalentes)
+ * representa um sistema e-CVT. Cobre variações de grafia e marcadores comuns:
+ * e-cvt, ecvt, e cvt, e_cvt, E-CVT, eCVT, Toyota Hybrid Synergy Drive,
+ * BYD DM-i, GWM híbrido, etc.
+ */
+function isECvtTransmission(input: unknown): boolean {
+  if (typeof input !== "string") return false;
+  const normalized = input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  if (/\becvt\b/.test(normalized)) return true;
+  if (/\be cvt\b/.test(normalized)) return true;
+  if (normalized.includes("hybrid synergy drive")) return true;
+  if (normalized.includes("synergy drive")) return true;
+  if (normalized.includes("dm i") || normalized.includes("dmi")) return true;
+  if (normalized.includes("byd") && normalized.includes("hibrid")) return true;
+  if (normalized.includes("gwm") && normalized.includes("hibrid")) return true;
+  if (normalized.includes("e cvt hibrid")) return true;
+  return false;
+}
+
 function assertNoForbiddenKeysDeep(raw: unknown, depth = 0): void {
   if (raw == null || depth > 4) return;
   if (Array.isArray(raw)) {
@@ -481,6 +507,10 @@ async function buildTechnicalContext(
   if (documents.length > 0 && documents[0].score < 70) {
     warnings.push("score_baixo");
   }
+  if (isECvtTransmission(input.transmissao)) {
+    warnings.push("schema_sem_e_cvt_transmission_type");
+  }
+
   if (documents.some((d) => d.text_excerpt_char_count < 500)) {
     warnings.push("texto_curto_no_contexto");
   }
@@ -648,8 +678,8 @@ const MAINTENANCE_PLAN_JSON_CONTRACT = `{
   }
 }`;
 
-function buildSystemPrompt(): string {
-  return [
+function buildSystemPrompt(opts: { isECvt: boolean } = { isECvt: false }): string {
+  const lines: string[] = [
     "Você é um especialista técnico em manutenção automotiva do Jarvys.",
     "Sua tarefa é gerar UM ÚNICO objeto JSON puro, válido contra o schema maintenance_plan_json do Jarvys (schema_version 1.0.0).",
     "",
@@ -693,17 +723,49 @@ function buildSystemPrompt(): string {
     "- Não misture enums em português de system_profile com enums em inglês dos items.",
     "- Se estiver em dúvida, use verificar_manual ou desconhecido. Nunca invente valores.",
     "",
+    "REGRA CRÍTICA SOBRE e-CVT:",
+    "- e-CVT NÃO é CVT convencional. Não normalize e-CVT para CVT convencional.",
+    '- Use "cvt" SOMENTE para CVT convencional (caixa de variação contínua mecânica/hidráulica não híbrida).',
+    '- NUNCA use "e-cvt" (com hífen) em nenhum campo enum do JSON final. O schema não aceita.',
+    '- Enquanto o schema NÃO aceitar "e_cvt", para veículos com e-CVT use OBRIGATORIAMENTE:',
+    '    system_profile.transmission_type = "desconhecido"',
+    '    system_profile.transmission_fluid_service_type = "desconhecido" (salvo se o technical_context ou manual disser EXPLICITAMENTE que existe fluido com intervalo de troca definido)',
+    '    vehicle_summary.transmissao = "desconhecido"',
+    "- Trate como e-CVT quando o veículo informar: e-CVT, eCVT, E-CVT, e_cvt, híbrido com e-CVT, Toyota Hybrid Synergy Drive, BYD DM-i, GWM híbrido ou sistema híbrido equivalente.",
+    "- Para e-CVT, NÃO recomende troca preventiva padrão de óleo do câmbio, filtro de câmbio, kit de câmbio ou manutenção de CVT convencional.",
+    "- Nos KMs típicos de revisão de câmbio, recomende INSPEÇÃO/DIAGNÓSTICO do sistema híbrido/e-CVT com scanner automotivo ou equipamento diagnóstico adequado.",
+    "- A recomendação deve mencionar: verificação de códigos de falha, parâmetros eletrônicos, funcionamento do conjunto híbrido/e-CVT, ruídos/anomalias e eventuais vazamentos quando aplicável.",
+    "- Só recomende troca de fluido em e-CVT se o technical_context ou manual informado disser EXPLICITAMENTE que existe fluido com intervalo de troca definido.",
+    "- Em histórico desconhecido ou alta quilometragem, recomende diagnóstico prévio com scanner/equipamento adequado antes de qualquer intervenção.",
+    "- Evite flush químico/agressivo.",
+    "- Para itens de transmissão em e-CVT, prefira:",
+    '    action = "diagnosticar" | "inspecionar" | "verificar"',
+    '    recommendation_type = "inspect_only" | "condition_based"',
+    '    shopping_classification = "service_only" | "inspect_before_buy"',
+    "- NUNCA gere bundle/item de compra segura para óleo/filtro/kit de e-CVT sem suporte EXPLÍCITO do technical_context.",
+    "",
     "REGRAS TÉCNICAS:",
     "- Use o technical_context fornecido como fonte principal e respeite os dados do veículo.",
     "- Se houver incerteza, prefira recomendações conservadoras; nunca invente dado específico não suportado pelo contexto.",
-    "- Para câmbio automático ou CVT, NUNCA recomende troca parcial do óleo do câmbio: recomende troca completa com máquina especializada, fluido correto e filtro quando elegível.",
+    "- Para câmbio automático ou CVT convencional, NUNCA recomende troca parcial do óleo do câmbio: recomende troca completa com máquina especializada, fluido correto e filtro quando elegível.",
     "- Em alta quilometragem ou histórico desconhecido, oriente diagnóstico prévio antes de troca completa.",
     "- Evite flush químico/agressivo.",
     "- Considere uso severo quando informado.",
     "",
     "ESTRUTURA OBRIGATÓRIA — copie EXATAMENTE as chaves abaixo. Substitua apenas os valores conforme o veículo e o technical_context. Não adicione chaves novas. Não remova chaves obrigatórias. Os arrays opcionais podem ser omitidos se não fizerem sentido para o veículo:",
     MAINTENANCE_PLAN_JSON_CONTRACT,
-  ].join("\n");
+  ];
+
+  if (opts.isECvt) {
+    lines.push(
+      "",
+      "DIRETIVA ESPECÍFICA PARA ESTE VEÍCULO:",
+      '- O veículo atual usa e-CVT. Defina OBRIGATORIAMENTE: system_profile.transmission_type = "desconhecido", system_profile.transmission_fluid_service_type = "desconhecido" (salvo suporte explícito do technical_context com intervalo definido) e vehicle_summary.transmissao = "desconhecido".',
+      "- Aplique TODAS as regras técnicas de e-CVT acima nos itens do plano: inspeção/diagnóstico com scanner em vez de troca preventiva padrão de óleo/filtro/kit de câmbio.",
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function buildUserPrompt(ctx: TechnicalContext): string {
@@ -895,7 +957,8 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
-    const systemPrompt = buildSystemPrompt();
+    const isECvt = baseWarnings.includes("schema_sem_e_cvt_transmission_type");
+    const systemPrompt = buildSystemPrompt({ isECvt });
     const userPrompt = buildUserPrompt(ctx);
 
     const ai = await callLovableAi(systemPrompt, userPrompt);
