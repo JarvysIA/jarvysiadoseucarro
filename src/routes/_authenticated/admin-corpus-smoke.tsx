@@ -2391,6 +2391,9 @@ function DryRunIaTester() {
                   />
                 ) : null}
               </div>
+
+              <PlanReviewPanel plan={plan} />
+
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground">
                   Plano validado (JSON)
