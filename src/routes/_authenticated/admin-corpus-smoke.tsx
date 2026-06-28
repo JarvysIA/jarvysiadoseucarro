@@ -2410,3 +2410,323 @@ function DryRunIaTester() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Build 6.36 — Revisão visual do plano IA validado
+// Renderiza apenas o `plan` já validado retornado pela server
+// function. Não exibe prompt, technical_context completo,
+// text_excerpt, extracted_text, storage_path, file_name, notes,
+// signed URL, JWT ou service_role. Não persiste nada.
+// ─────────────────────────────────────────────────────────────
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function asRecord(v: unknown): Record<string, unknown> | null {
+  return isRecord(v) ? v : null;
+}
+function asArray(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+function displayValue(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "string") return v.trim() === "" ? "—" : v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return "—";
+  }
+}
+
+const HIGHLIGHT_BADGES = new Set([
+  "correia_banhada",
+  "cvt",
+  "desconhecido",
+  "preventiva_recomendada",
+  "verificar_manual",
+]);
+
+function ProfileBadge({ value }: { value: unknown }) {
+  const text = displayValue(value);
+  const highlight = typeof value === "string" && HIGHLIGHT_BADGES.has(value);
+  const cls = highlight
+    ? "inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-mono text-amber-900"
+    : "inline-flex items-center rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-mono text-foreground";
+  return <span className={cls}>{text}</span>;
+}
+
+function KV({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-xs font-mono break-all">{displayValue(value)}</div>
+    </div>
+  );
+}
+
+function ReviewCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-background p-3 space-y-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
+function VehicleSummaryCard({ vs }: { vs: Record<string, unknown> | null }) {
+  const v = vs ?? {};
+  return (
+    <ReviewCard title="Resumo do veículo">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <KV label="display_name" value={v.display_name} />
+        <KV label="marca" value={v.marca} />
+        <KV label="modelo_fipe" value={v.modelo_fipe} />
+        <KV label="ano_modelo" value={v.ano_modelo} />
+        <KV label="combustivel" value={v.combustivel} />
+        <KV label="cilindradas" value={v.cilindradas} />
+        <KV label="motor_textual" value={v.motor_textual} />
+        <KV label="transmissao" value={v.transmissao} />
+      </div>
+    </ReviewCard>
+  );
+}
+
+function SystemProfileCard({ sp }: { sp: Record<string, unknown> | null }) {
+  const s = sp ?? {};
+  return (
+    <ReviewCard title="Perfil técnico">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            timing_system
+          </div>
+          <ProfileBadge value={s.timing_system} />
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            transmission_type
+          </div>
+          <ProfileBadge value={s.transmission_type} />
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            transmission_service_policy
+          </div>
+          <ProfileBadge value={s.transmission_service_policy} />
+        </div>
+        <div className="space-y-0.5">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            transmission_fluid_service_type
+          </div>
+          <ProfileBadge value={s.transmission_fluid_service_type} />
+        </div>
+      </div>
+    </ReviewCard>
+  );
+}
+
+function BaseRulesCard({ br }: { br: Record<string, unknown> | null }) {
+  const r = br ?? {};
+  return (
+    <ReviewCard title="Regras base">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <KV label="revision_interval_km" value={r.revision_interval_km} />
+        <KV
+          label="revision_interval_months"
+          value={r.revision_interval_months}
+        />
+        <KV label="max_planned_km" value={r.max_planned_km} />
+        <KV
+          label="severe_use_oil_interval_km"
+          value={r.severe_use_oil_interval_km}
+        />
+        <KV
+          label="severe_use_oil_interval_months"
+          value={r.severe_use_oil_interval_months}
+        />
+      </div>
+    </ReviewCard>
+  );
+}
+
+function MilestoneBlock({ ms, idx }: { ms: unknown; idx: number }) {
+  const m = asRecord(ms) ?? {};
+  const items = asArray(m.items);
+  return (
+    <div className="rounded border border-border bg-muted/20 p-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold">#{idx + 1}</span>
+        <span className="font-mono">{displayValue(m.km)} km</span>
+        <span className="text-muted-foreground">{displayValue(m.label)}</span>
+        {m.revision_number !== undefined ? (
+          <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-mono">
+            rev {displayValue(m.revision_number)}
+          </span>
+        ) : null}
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {items.length} item(ns)
+        </span>
+      </div>
+      {items.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead className="text-muted-foreground">
+              <tr className="border-b border-border">
+                <th className="text-left py-1 pr-2">item_key</th>
+                <th className="text-left py-1 pr-2">label</th>
+                <th className="text-left py-1 pr-2">category</th>
+                <th className="text-left py-1 pr-2">action</th>
+                <th className="text-left py-1 pr-2">recommendation</th>
+                <th className="text-left py-1 pr-2">shopping</th>
+                <th className="text-left py-1 pr-2">applies</th>
+                <th className="text-left py-1 pr-2">km</th>
+                <th className="text-left py-1 pr-2">months</th>
+                <th className="text-left py-1 pr-2">conf</th>
+                <th className="text-left py-1 pr-2">source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((raw, i) => {
+                const it = asRecord(raw) ?? {};
+                return (
+                  <tr key={`${idx}-${i}`} className="border-b border-border/50">
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.item_key)}</td>
+                    <td className="py-1 pr-2">{displayValue(it.label)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.category)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.action)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.recommendation_type)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.shopping_classification)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.applies)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.interval_km)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.interval_months)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.confidence)}</td>
+                    <td className="py-1 pr-2 font-mono">{displayValue(it.source_type)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-[11px] text-muted-foreground">
+          Sem items neste milestone.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OptionalJsonDetails({
+  label,
+  value,
+}: {
+  label: string;
+  value: unknown;
+}) {
+  if (value === undefined || value === null) return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const count = Array.isArray(value) ? ` (${value.length})` : "";
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer text-muted-foreground">
+        {label}
+        {count}
+      </summary>
+      <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-foreground">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
+function PlanReviewPanel({ plan }: { plan: unknown }) {
+  const [copyMsg, setCopyMsg] = useState<{ ok: boolean; text: string } | null>(
+    null,
+  );
+  const p = asRecord(plan);
+  if (!p) return null;
+
+  const vs = asRecord(p.vehicle_summary);
+  const sp = asRecord(p.system_profile);
+  const br = asRecord(p.base_rules);
+  const milestones = asArray(p.milestones);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(plan, null, 2));
+      setCopyMsg({ ok: true, text: "JSON copiado" });
+    } catch {
+      setCopyMsg({ ok: false, text: "Não foi possível copiar o JSON" });
+    }
+    setTimeout(() => setCopyMsg(null), 2000);
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-muted/10 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">
+          Revisão visual do plano validado
+        </h3>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="ml-auto px-2 py-1 rounded-md border border-border text-xs font-medium hover:bg-accent"
+        >
+          Copiar JSON validado
+        </button>
+        {copyMsg ? (
+          <span
+            className={
+              copyMsg.ok ? "text-xs text-emerald-700" : "text-xs text-red-700"
+            }
+          >
+            {copyMsg.text}
+          </span>
+        ) : null}
+      </div>
+
+      <VehicleSummaryCard vs={vs} />
+      <SystemProfileCard sp={sp} />
+      <BaseRulesCard br={br} />
+
+      <ReviewCard title={`Milestones (${milestones.length})`}>
+        {milestones.length === 0 ? (
+          <div className="text-xs text-muted-foreground">
+            Nenhum milestone retornado.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {milestones.map((ms, i) => (
+              <MilestoneBlock key={i} ms={ms} idx={i} />
+            ))}
+          </div>
+        )}
+      </ReviewCard>
+
+      <ReviewCard title="Seções opcionais">
+        <div className="space-y-2">
+          <OptionalJsonDetails label="fixed_intervals" value={p.fixed_intervals} />
+          <OptionalJsonDetails label="severe_use_rules" value={p.severe_use_rules} />
+          <OptionalJsonDetails label="age_based_alerts" value={p.age_based_alerts} />
+          <OptionalJsonDetails label="not_applicable_items" value={p.not_applicable_items} />
+          <OptionalJsonDetails label="purchase_bundles" value={p.purchase_bundles} />
+          <OptionalJsonDetails label="general_notes" value={p.general_notes} />
+          <OptionalJsonDetails label="safety_disclaimer" value={p.safety_disclaimer} />
+        </div>
+      </ReviewCard>
+    </div>
+  );
+}
+
+
