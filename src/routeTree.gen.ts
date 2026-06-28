@@ -22,6 +22,7 @@ import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedAdminCorpusSmokeRouteImport } from './routes/_authenticated/admin-corpus-smoke'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
@@ -91,6 +92,10 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -98,9 +103,9 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedAdminCorpusSmokeRoute =
   AuthenticatedAdminCorpusSmokeRouteImport.update({
-    id: '/_authenticated/admin-corpus-smoke',
+    id: '/admin-corpus-smoke',
     path: '/admin-corpus-smoke',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const ApiPublicHooksFipeMonthlyRefreshRoute =
   ApiPublicHooksFipeMonthlyRefreshRouteImport.update({
@@ -148,6 +153,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/app': typeof AppRoute
   '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
@@ -204,6 +210,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/app'
     | '/carteira'
     | '/dashboard'
@@ -223,6 +230,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AppRoute: typeof AppRoute
   CarteiraRoute: typeof CarteiraRoute
   DashboardRoute: typeof DashboardRoute
@@ -236,7 +244,6 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
   WelcomeRoute: typeof WelcomeRoute
-  AuthenticatedAdminCorpusSmokeRoute: typeof AuthenticatedAdminCorpusSmokeRoute
   ApiPublicHooksFipeMonthlyRefreshRoute: typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 
@@ -333,6 +340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -345,7 +359,7 @@ declare module '@tanstack/react-router' {
       path: '/admin-corpus-smoke'
       fullPath: '/admin-corpus-smoke'
       preLoaderRoute: typeof AuthenticatedAdminCorpusSmokeRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/hooks/fipe-monthly-refresh': {
       id: '/api/public/hooks/fipe-monthly-refresh'
@@ -357,8 +371,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminCorpusSmokeRoute: typeof AuthenticatedAdminCorpusSmokeRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminCorpusSmokeRoute: AuthenticatedAdminCorpusSmokeRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AppRoute: AppRoute,
   CarteiraRoute: CarteiraRoute,
   DashboardRoute: DashboardRoute,
@@ -372,7 +398,6 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
   WelcomeRoute: WelcomeRoute,
-  AuthenticatedAdminCorpusSmokeRoute: AuthenticatedAdminCorpusSmokeRoute,
   ApiPublicHooksFipeMonthlyRefreshRoute: ApiPublicHooksFipeMonthlyRefreshRoute,
 }
 export const routeTree = rootRouteImport
