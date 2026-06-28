@@ -691,6 +691,8 @@ function AdminCorpusSmokePage() {
         )}
       </section>
 
+      <SelectorTester />
+
       <section className="space-y-1">
         <h2 className="text-sm font-semibold">Log</h2>
         <div className="rounded-md border border-border bg-muted/30 p-3 max-h-[480px] overflow-auto text-xs font-mono space-y-2">
