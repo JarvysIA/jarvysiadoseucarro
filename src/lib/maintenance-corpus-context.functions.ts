@@ -487,6 +487,8 @@ export const buildMaintenanceCorpusContextAdminFn = createServerFn({
       sistema_distribuicao: input.sistema_distribuicao ?? null,
     };
 
+    const engine_oil_profile = buildEngineOilProfile(documents);
+
     return {
       technical_context: {
         schema_version: "1.0.0" as const,
@@ -500,6 +502,7 @@ export const buildMaintenanceCorpusContextAdminFn = createServerFn({
         },
         documents,
         warnings,
+        engine_oil_profile,
       },
       debug: {
         mode: "admin" as const,
@@ -508,3 +511,130 @@ export const buildMaintenanceCorpusContextAdminFn = createServerFn({
       },
     };
   });
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.38 — engine_oil_profile heurístico
+// Detecta de forma conservadora menções a filtro de óleo,
+// intervalos normais (10k/15k km, 12 meses) e intervalos de uso
+// severo (5k km, 6 meses) no extracted_text dos documentos
+// selecionados. NUNCA infere viscosidade, normas ou capacidade
+// em litros — esses campos permanecem nulos/vazios e geram
+// warnings explícitos. Intervalos detectados são marcados como
+// estimados a partir do cronograma geral (warning dedicado).
+// ─────────────────────────────────────────────────────────────
+
+type EngineOilProfile = {
+  schema_version: "1.0.0";
+  generated_by: "corpus_oil_heuristic";
+  status: "partial" | "insufficient";
+  viscosity: string | null;
+  specifications: string[];
+  quantity_liters: number | null;
+  filter_required: boolean | null;
+  replacement_interval_km: number | null;
+  replacement_interval_months: number | null;
+  severe_use_interval_km: number | null;
+  severe_use_interval_months: number | null;
+  requires_compatibility_confirmation: boolean;
+  do_not_match_by_viscosity_only: boolean;
+  shopping_safety: "inspect_before_buy" | "do_not_link";
+  confidence: "baixa" | "media" | "alta";
+  evidence: string[];
+  warnings: string[];
+};
+
+function buildEngineOilProfile(
+  documents: Array<{ text_excerpt: string }>,
+): EngineOilProfile {
+  const haystack = documents
+    .map((d) => (d.text_excerpt ?? "").toLowerCase())
+    .join("\n");
+
+  const evidence: string[] = [];
+  const warnings: string[] = [
+    "oleo_viscosidade_ausente_no_corpus",
+    "oleo_norma_ausente_no_corpus",
+    "oleo_quantidade_ausente_no_corpus",
+    "oleo_shopping_requer_confirmacao_manual",
+  ];
+
+  // Filtro de óleo
+  const hasFilter =
+    /filtro\s+de\s+[óo]leo/.test(haystack) ||
+    /filtro\s+do\s+[óo]leo/.test(haystack) ||
+    /filtro\s+oleo/.test(haystack);
+  const filter_required: boolean | null = hasFilter ? true : null;
+  if (hasFilter) evidence.push("filtro de óleo detectado");
+
+  // Intervalo normal em km — escolhe o menor (mais conservador)
+  const kmCandidates: number[] = [];
+  if (/\b10[\.\s]?000\s*km\b/.test(haystack) || /\b10\s*mil\s*km\b/.test(haystack)) {
+    kmCandidates.push(10000);
+  }
+  if (/\b15[\.\s]?000\s*km\b/.test(haystack) || /\b15\s*mil\s*km\b/.test(haystack)) {
+    kmCandidates.push(15000);
+  }
+  const replacement_interval_km =
+    kmCandidates.length > 0 ? Math.min(...kmCandidates) : null;
+  if (replacement_interval_km != null) {
+    evidence.push(`intervalo normal ${replacement_interval_km} km detectado`);
+  }
+
+  // Intervalo normal em meses
+  const hasMonths12 = /\b12\s*meses\b/.test(haystack) || /\b1\s*ano\b/.test(haystack);
+  const replacement_interval_months = hasMonths12 ? 12 : null;
+  if (replacement_interval_months != null) {
+    evidence.push("intervalo 12 meses detectado");
+  }
+
+  // Uso severo
+  const hasSevere =
+    /uso\s+severo/.test(haystack) ||
+    /condi[cç][aã]o\s+severa/.test(haystack) ||
+    /trajetos?\s+curtos/.test(haystack) ||
+    /tr[âa]nsito\s+intenso/.test(haystack);
+  let severe_use_interval_km: number | null = null;
+  let severe_use_interval_months: number | null = null;
+  if (hasSevere) {
+    evidence.push("uso severo detectado");
+    if (/\b5[\.\s]?000\s*km\b/.test(haystack)) {
+      severe_use_interval_km = 5000;
+      evidence.push("intervalo severo 5000 km detectado");
+    }
+    if (/\b6\s*meses\b/.test(haystack)) {
+      severe_use_interval_months = 6;
+      evidence.push("intervalo severo 6 meses detectado");
+    }
+  }
+
+  // Intervalo estimado a partir do cronograma geral
+  if (
+    replacement_interval_km != null ||
+    replacement_interval_months != null ||
+    severe_use_interval_km != null ||
+    severe_use_interval_months != null
+  ) {
+    warnings.push("oleo_intervalo_estimado_pelo_cronograma");
+  }
+
+  return {
+    schema_version: "1.0.0",
+    generated_by: "corpus_oil_heuristic",
+    status: "insufficient",
+    viscosity: null,
+    specifications: [],
+    quantity_liters: null,
+    filter_required,
+    replacement_interval_km,
+    replacement_interval_months,
+    severe_use_interval_km,
+    severe_use_interval_months,
+    requires_compatibility_confirmation: true,
+    do_not_match_by_viscosity_only: true,
+    shopping_safety: "inspect_before_buy",
+    confidence: "baixa",
+    evidence,
+    warnings,
+  };
+}
+

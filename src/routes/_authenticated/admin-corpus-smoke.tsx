@@ -1373,6 +1373,26 @@ type ContextDocument = {
   text_excerpt_char_count: number;
 };
 
+type EngineOilProfile = {
+  schema_version: string;
+  generated_by: string;
+  status: "partial" | "insufficient";
+  viscosity: string | null;
+  specifications: string[];
+  quantity_liters: number | null;
+  filter_required: boolean | null;
+  replacement_interval_km: number | null;
+  replacement_interval_months: number | null;
+  severe_use_interval_km: number | null;
+  severe_use_interval_months: number | null;
+  requires_compatibility_confirmation: boolean;
+  do_not_match_by_viscosity_only: boolean;
+  shopping_safety: "inspect_before_buy" | "do_not_link";
+  confidence: "baixa" | "media" | "alta";
+  evidence: string[];
+  warnings: string[];
+};
+
 type ContextResult = {
   technical_context: {
     schema_version: string;
@@ -1386,6 +1406,7 @@ type ContextResult = {
     };
     documents: ContextDocument[];
     warnings: string[];
+    engine_oil_profile?: EngineOilProfile;
   };
   debug: {
     mode: "admin";
@@ -1702,6 +1723,12 @@ function ContextInspector() {
             </div>
           ) : null}
 
+          {tc.engine_oil_profile ? (
+            <EngineOilProfileCard profile={tc.engine_oil_profile} />
+          ) : null}
+
+
+
           <details className="text-xs" open>
             <summary className="cursor-pointer text-muted-foreground">
               vehicle_input
@@ -1853,6 +1880,159 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function fmtNullable(v: string | number | boolean | null): string {
+  if (v === null) return "—";
+  if (typeof v === "boolean") return v ? "true" : "false";
+  return String(v);
+}
+
+function EngineOilProfileCard({ profile }: { profile: EngineOilProfile }) {
+  const insufficient = profile.status === "insufficient";
+  const inspect = profile.shopping_safety === "inspect_before_buy";
+  const needsConfirm = profile.requires_compatibility_confirmation;
+
+  return (
+    <div
+      className={
+        "rounded-md border p-3 space-y-3 " +
+        (insufficient
+          ? "border-amber-300 bg-amber-50/50"
+          : "border-border")
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Perfil de óleo do motor</h3>
+        <span
+          className={
+            "text-[11px] px-2 py-0.5 rounded border " +
+            (insufficient
+              ? "bg-amber-100 text-amber-800 border-amber-300"
+              : "bg-muted text-muted-foreground border-border")
+          }
+        >
+          status: {profile.status}
+        </span>
+        {inspect ? (
+          <span className="text-[11px] px-2 py-0.5 rounded border bg-rose-50 text-rose-800 border-rose-200">
+            shopping: inspect_before_buy
+          </span>
+        ) : null}
+        {needsConfirm ? (
+          <span className="text-[11px] px-2 py-0.5 rounded border bg-sky-50 text-sky-800 border-sky-200">
+            confirmação obrigatória
+          </span>
+        ) : null}
+        <span className="text-[11px] px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border">
+          confidence: {profile.confidence}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+        <Stat label="viscosity" value={fmtNullable(profile.viscosity)} />
+        <Stat
+          label="quantity_liters"
+          value={fmtNullable(profile.quantity_liters)}
+        />
+        <Stat
+          label="filter_required"
+          value={fmtNullable(profile.filter_required)}
+        />
+        <Stat
+          label="shopping_safety"
+          value={profile.shopping_safety}
+        />
+        <Stat
+          label="replacement_interval_km"
+          value={fmtNullable(profile.replacement_interval_km)}
+        />
+        <Stat
+          label="replacement_interval_months"
+          value={fmtNullable(profile.replacement_interval_months)}
+        />
+        <Stat
+          label="severe_use_interval_km"
+          value={fmtNullable(profile.severe_use_interval_km)}
+        />
+        <Stat
+          label="severe_use_interval_months"
+          value={fmtNullable(profile.severe_use_interval_months)}
+        />
+        <Stat
+          label="requires_compatibility_confirmation"
+          value={fmtNullable(profile.requires_compatibility_confirmation)}
+        />
+        <Stat
+          label="do_not_match_by_viscosity_only"
+          value={fmtNullable(profile.do_not_match_by_viscosity_only)}
+        />
+        <Stat label="generated_by" value={profile.generated_by} />
+        <Stat label="schema_version" value={profile.schema_version} />
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          specifications
+        </div>
+        {profile.specifications.length === 0 ? (
+          <div className="text-xs text-muted-foreground">—</div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {profile.specifications.map((s) => (
+              <span
+                key={s}
+                className="text-[11px] px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          evidence
+        </div>
+        {profile.evidence.length === 0 ? (
+          <div className="text-xs text-muted-foreground">—</div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {profile.evidence.map((e) => (
+              <span
+                key={e}
+                className="text-[11px] px-2 py-0.5 rounded border bg-emerald-50 text-emerald-800 border-emerald-200"
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          warnings
+        </div>
+        {profile.warnings.length === 0 ? (
+          <div className="text-xs text-muted-foreground">—</div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {profile.warnings.map((w) => (
+              <span
+                key={w}
+                className="text-[11px] px-2 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200"
+              >
+                {w}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // Build 6.31 — Dry-run IA do Plano de Manutenção
