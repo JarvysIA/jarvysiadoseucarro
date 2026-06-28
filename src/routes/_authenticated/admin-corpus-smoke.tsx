@@ -1853,3 +1853,557 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.31 — Dry-run IA do Plano de Manutenção
+// Chama generateMaintenancePlanFromCorpusDryRunFn (super-admin,
+// dry-run, sem persistência). Não chama upsert, não altera o
+// corpus, não publica nada. Exibe apenas o que a server function
+// retorna: valid, errors, warnings, ai.provider/model,
+// technical_context_debug e raw_preview (já truncado server-side).
+// Nunca exibe prompt, technical_context completo, text_excerpt,
+// extracted_text, storage_path, file_name, notes, signed URL,
+// JWT ou service_role.
+// ─────────────────────────────────────────────────────────────
+
+type DryRunForm = {
+  brand: string;
+  model_group: string;
+  modelo_fipe: string;
+  versao: string;
+  ano_modelo: string;
+  combustivel: string;
+  motor_textual: string;
+  cilindradas: string;
+  transmissao: string;
+  sistema_distribuicao: "" | "correia_dentada" | "corrente" | "correia_banhada" | "desconhecido";
+  km_atual: string;
+  uso_severo: boolean;
+  historico_desconhecido: boolean;
+  limit: string;
+  maxCharsPerDocument: string;
+};
+
+const EMPTY_DRY_RUN_FORM: DryRunForm = {
+  brand: "",
+  model_group: "",
+  modelo_fipe: "",
+  versao: "",
+  ano_modelo: "",
+  combustivel: "",
+  motor_textual: "",
+  cilindradas: "",
+  transmissao: "",
+  sistema_distribuicao: "",
+  km_atual: "100000",
+  uso_severo: false,
+  historico_desconhecido: true,
+  limit: "3",
+  maxCharsPerDocument: "3000",
+};
+
+type DryRunPreset = {
+  id: string;
+  label: string;
+  expectedSlug: string;
+  form: DryRunForm;
+};
+
+const DRY_RUN_PRESETS: DryRunPreset[] = QUICK_CASES.map((c) => ({
+  id: c.id,
+  label: c.label,
+  expectedSlug: c.expectedSlug,
+  form: {
+    ...EMPTY_DRY_RUN_FORM,
+    brand: c.form.brand,
+    model_group: c.form.model_group,
+    modelo_fipe: c.form.modelo_fipe,
+    versao: c.form.versao,
+    ano_modelo: c.form.ano_modelo,
+    combustivel: c.form.combustivel,
+    motor_textual: c.form.motor_textual,
+    cilindradas: c.form.cilindradas,
+    transmissao: c.form.transmissao,
+    sistema_distribuicao: c.form.sistema_distribuicao as DryRunForm["sistema_distribuicao"],
+  },
+}));
+
+type DryRunResultUi = {
+  valid: boolean;
+  plan: unknown;
+  errors: string[];
+  warnings: string[];
+  ai: { provider: string | null; model: string | null; usage?: unknown };
+  technical_context_debug: {
+    totalCandidates: number;
+    returned: number;
+    documents: Array<{
+      slug: string;
+      title: string;
+      score: number;
+      reasons: string[];
+      text_excerpt_char_count: number;
+    }>;
+  };
+  raw_preview?: string;
+};
+
+function DryRunIaTester() {
+  const [form, setForm] = useState<DryRunForm>(EMPTY_DRY_RUN_FORM);
+  const [expectedSlug, setExpectedSlug] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DryRunResultUi | null>(null);
+
+  const dryRunFn = useServerFn(generateMaintenancePlanFromCorpusDryRunFn);
+
+  function setField<K extends keyof DryRunForm>(key: K, value: DryRunForm[K]) {
+    setForm((p) => ({ ...p, [key]: value }));
+  }
+
+  function loadPreset(p: DryRunPreset) {
+    setForm(p.form);
+    setExpectedSlug(p.expectedSlug);
+    setError(null);
+    setResult(null);
+  }
+
+  function buildPayload() {
+    const s = (v: string) => (v.trim() === "" ? undefined : v.trim());
+    const n = (v: string) => {
+      const t = v.trim();
+      if (t === "") return undefined;
+      const num = Number(t);
+      return Number.isFinite(num) ? num : undefined;
+    };
+    return {
+      brand: form.brand.trim(),
+      model_group: s(form.model_group),
+      modelo_fipe: s(form.modelo_fipe),
+      versao: s(form.versao),
+      ano_modelo: n(form.ano_modelo),
+      combustivel: s(form.combustivel),
+      motor_textual: s(form.motor_textual),
+      cilindradas: n(form.cilindradas),
+      transmissao: s(form.transmissao),
+      sistema_distribuicao:
+        form.sistema_distribuicao === "" ? undefined : form.sistema_distribuicao,
+      km_atual: n(form.km_atual),
+      uso_severo: form.uso_severo,
+      historico_desconhecido: form.historico_desconhecido,
+      limit: n(form.limit),
+      maxCharsPerDocument: n(form.maxCharsPerDocument),
+      mode: "strict_json" as const,
+    };
+  }
+
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const payload = buildPayload();
+      if (!payload.brand) {
+        setError("brand é obrigatório.");
+        return;
+      }
+      const res = (await dryRunFn({ data: payload })) as DryRunResultUi;
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const btn =
+    "px-3 py-2 rounded-md border border-border text-sm font-medium hover:bg-accent disabled:opacity-50";
+  const input =
+    "w-full rounded-md border border-border bg-background px-2 py-1 text-xs";
+
+  const debug = result?.technical_context_debug;
+  const documents = debug?.documents ?? [];
+  const warnings = result?.warnings ?? [];
+  const errors = result?.errors ?? [];
+  const plan = result?.plan as Record<string, unknown> | null | undefined;
+
+  function arrCount(v: unknown): number | null {
+    return Array.isArray(v) ? v.length : null;
+  }
+
+  const planSchemaVersion =
+    plan && typeof plan === "object" && "schema_version" in plan
+      ? String((plan as Record<string, unknown>).schema_version ?? "")
+      : null;
+  const planMilestones = plan
+    ? arrCount((plan as Record<string, unknown>).milestones) ??
+      arrCount((plan as Record<string, unknown>).revisoes)
+    : null;
+  const planAlerts = plan
+    ? arrCount((plan as Record<string, unknown>).alertas) ??
+      arrCount((plan as Record<string, unknown>).alerts)
+    : null;
+  const planSevere = plan
+    ? arrCount((plan as Record<string, unknown>).regras_uso_severo) ??
+      arrCount((plan as Record<string, unknown>).severe_use_rules)
+    : null;
+
+  return (
+    <section className="space-y-3 p-4 rounded-lg border border-border">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">
+          Dry-run IA do Plano de Manutenção
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Chama <code>generateMaintenancePlanFromCorpusDryRunFn</code>{" "}
+          (super-admin). Não persiste nada. Não altera corpus, profiles,
+          quality_score ou reviewed_by_admin. Não expõe prompt, technical_context
+          completo, text_excerpt, extracted_text, storage_path, file_name,
+          notes, signed URL, JWT ou service_role.
+        </p>
+        <div className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1">
+          Dry-run: este teste não salva nada no banco.
+        </div>
+      </header>
+
+      <div className="flex flex-wrap gap-2">
+        {DRY_RUN_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={btn}
+            onClick={() => loadPreset(p)}
+            disabled={busy}
+            title={`Esperado: ${p.expectedSlug}`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={btn}
+          onClick={() => {
+            setForm(EMPTY_DRY_RUN_FORM);
+            setExpectedSlug(null);
+            setError(null);
+            setResult(null);
+          }}
+          disabled={busy}
+        >
+          Limpar
+        </button>
+      </div>
+
+      {expectedSlug ? (
+        <div className="text-xs text-muted-foreground">
+          Top esperado: <code>{expectedSlug}</code>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <Field label="brand *">
+          <input
+            className={input}
+            value={form.brand}
+            onChange={(e) => setField("brand", e.target.value)}
+          />
+        </Field>
+        <Field label="model_group">
+          <input
+            className={input}
+            value={form.model_group}
+            onChange={(e) => setField("model_group", e.target.value)}
+          />
+        </Field>
+        <Field label="modelo_fipe">
+          <input
+            className={input}
+            value={form.modelo_fipe}
+            onChange={(e) => setField("modelo_fipe", e.target.value)}
+          />
+        </Field>
+        <Field label="versao">
+          <input
+            className={input}
+            value={form.versao}
+            onChange={(e) => setField("versao", e.target.value)}
+          />
+        </Field>
+        <Field label="ano_modelo">
+          <input
+            className={input}
+            value={form.ano_modelo}
+            onChange={(e) => setField("ano_modelo", e.target.value)}
+          />
+        </Field>
+        <Field label="combustivel">
+          <input
+            className={input}
+            value={form.combustivel}
+            onChange={(e) => setField("combustivel", e.target.value)}
+          />
+        </Field>
+        <Field label="motor_textual">
+          <input
+            className={input}
+            value={form.motor_textual}
+            onChange={(e) => setField("motor_textual", e.target.value)}
+          />
+        </Field>
+        <Field label="cilindradas">
+          <input
+            className={input}
+            value={form.cilindradas}
+            onChange={(e) => setField("cilindradas", e.target.value)}
+          />
+        </Field>
+        <Field label="transmissao">
+          <input
+            className={input}
+            value={form.transmissao}
+            onChange={(e) => setField("transmissao", e.target.value)}
+          />
+        </Field>
+        <Field label="sistema_distribuicao">
+          <select
+            className={input}
+            value={form.sistema_distribuicao}
+            onChange={(e) =>
+              setField(
+                "sistema_distribuicao",
+                e.target.value as DryRunForm["sistema_distribuicao"],
+              )
+            }
+          >
+            <option value="">(vazio)</option>
+            <option value="correia_dentada">correia_dentada</option>
+            <option value="corrente">corrente</option>
+            <option value="correia_banhada">correia_banhada</option>
+            <option value="desconhecido">desconhecido</option>
+          </select>
+        </Field>
+        <Field label="km_atual">
+          <input
+            className={input}
+            value={form.km_atual}
+            onChange={(e) => setField("km_atual", e.target.value)}
+          />
+        </Field>
+        <Field label="limit (1..5)">
+          <input
+            className={input}
+            value={form.limit}
+            onChange={(e) => setField("limit", e.target.value)}
+          />
+        </Field>
+        <Field label="maxCharsPerDocument (1000..6000)">
+          <input
+            className={input}
+            value={form.maxCharsPerDocument}
+            onChange={(e) =>
+              setField("maxCharsPerDocument", e.target.value)
+            }
+          />
+        </Field>
+        <Field label="mode">
+          <input className={input} value="strict_json" disabled />
+        </Field>
+        <Field label="uso_severo">
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={form.uso_severo}
+              onChange={(e) => setField("uso_severo", e.target.checked)}
+            />
+            ativado
+          </label>
+        </Field>
+        <Field label="historico_desconhecido">
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={form.historico_desconhecido}
+              onChange={(e) =>
+                setField("historico_desconhecido", e.target.checked)
+              }
+            />
+            ativado
+          </label>
+        </Field>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className={btn}
+          onClick={run}
+          disabled={busy || !form.brand.trim()}
+        >
+          {busy ? "Gerando…" : "Gerar plano dry-run"}
+        </button>
+      </div>
+
+      {error ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-xs p-2">
+          {error}
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="space-y-3">
+          <div
+            className={
+              "rounded-md border p-3 text-xs " +
+              (result.valid
+                ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                : "border-destructive/40 bg-destructive/10 text-destructive")
+            }
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <Stat label="valid" value={result.valid ? "true" : "false"} />
+              <Stat label="errors" value={String(errors.length)} />
+              <Stat label="warnings" value={String(warnings.length)} />
+              <Stat label="ai.provider" value={result.ai.provider ?? "—"} />
+              <Stat label="ai.model" value={result.ai.model ?? "—"} />
+            </div>
+          </div>
+
+          {errors.length > 0 ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-xs p-2 space-y-1">
+              <div className="font-semibold">Errors</div>
+              <ul className="list-disc pl-4 space-y-0.5">
+                {errors.map((er, i) => (
+                  <li key={i} className="break-words">
+                    {er}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {warnings.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {warnings.map((w) => {
+                const cls =
+                  WARNING_STYLES[w] ??
+                  "bg-muted text-muted-foreground border-border";
+                return (
+                  <span
+                    key={w}
+                    className={
+                      "text-[11px] px-2 py-0.5 rounded border " + cls
+                    }
+                  >
+                    {w}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Technical context (debug)</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              <Stat
+                label="totalCandidates"
+                value={String(debug?.totalCandidates ?? 0)}
+              />
+              <Stat label="returned" value={String(debug?.returned ?? 0)} />
+              <Stat label="documents" value={String(documents.length)} />
+            </div>
+            {documents.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sem documentos.</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((d, i) => {
+                  const matchOk =
+                    expectedSlug != null && i === 0 && d.slug === expectedSlug;
+                  return (
+                    <div
+                      key={d.slug + i}
+                      className="rounded-md border border-border p-2 space-y-1"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <code className="text-xs">{d.slug}</code>
+                        <span className="text-xs text-muted-foreground">
+                          score {d.score}
+                        </span>
+                        {matchOk ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            match esperado
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.title}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        text_excerpt_char_count: {d.text_excerpt_char_count}
+                      </div>
+                      {d.reasons.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {d.reasons.map((r) => (
+                            <span
+                              key={r}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {result.raw_preview ? (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                raw_preview (truncado)
+              </summary>
+              <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-muted-foreground">
+                {result.raw_preview}
+              </pre>
+            </details>
+          ) : null}
+
+          {result.valid && plan ? (
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Plano validado</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {planSchemaVersion ? (
+                  <Stat label="schema_version" value={planSchemaVersion} />
+                ) : null}
+                {planMilestones != null ? (
+                  <Stat label="milestones" value={String(planMilestones)} />
+                ) : null}
+                {planAlerts != null ? (
+                  <Stat label="alertas" value={String(planAlerts)} />
+                ) : null}
+                {planSevere != null ? (
+                  <Stat
+                    label="regras_uso_severo"
+                    value={String(planSevere)}
+                  />
+                ) : null}
+              </div>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Plano validado (JSON)
+                </summary>
+                <pre className="whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-2 text-foreground">
+                  {JSON.stringify(plan, null, 2)}
+                </pre>
+              </details>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
