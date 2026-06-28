@@ -113,6 +113,32 @@ const inputSchema = z
 
 type ParsedInput = z.output<typeof inputSchema>;
 
+/**
+ * Detecta se a transmissão informada (ou marcadores híbridos equivalentes)
+ * representa um sistema e-CVT. Cobre variações de grafia e marcadores comuns:
+ * e-cvt, ecvt, e cvt, e_cvt, E-CVT, eCVT, Toyota Hybrid Synergy Drive,
+ * BYD DM-i, GWM híbrido, etc.
+ */
+function isECvtTransmission(input: unknown): boolean {
+  if (typeof input !== "string") return false;
+  const normalized = input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+  if (!normalized) return false;
+  if (/\becvt\b/.test(normalized)) return true;
+  if (/\be cvt\b/.test(normalized)) return true;
+  if (normalized.includes("hybrid synergy drive")) return true;
+  if (normalized.includes("synergy drive")) return true;
+  if (normalized.includes("dm i") || normalized.includes("dmi")) return true;
+  if (normalized.includes("byd") && normalized.includes("hibrid")) return true;
+  if (normalized.includes("gwm") && normalized.includes("hibrid")) return true;
+  if (normalized.includes("e cvt hibrid")) return true;
+  return false;
+}
+
 function assertNoForbiddenKeysDeep(raw: unknown, depth = 0): void {
   if (raw == null || depth > 4) return;
   if (Array.isArray(raw)) {
