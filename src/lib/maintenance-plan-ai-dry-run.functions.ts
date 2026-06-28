@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeParseMaintenancePlanJson } from "./maintenance-plan-validation";
+import type { MaintenancePlanJson } from "./maintenance-plan-schema";
 
 // ─────────────────────────────────────────────────────────────
 // Build 6.30 — Gerador IA dry-run de maintenance_plan_json.
