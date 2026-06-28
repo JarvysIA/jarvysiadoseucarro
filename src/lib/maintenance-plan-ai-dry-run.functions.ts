@@ -744,6 +744,38 @@ function buildSystemPrompt(opts: { isECvt: boolean } = { isECvt: false }): strin
     '    shopping_classification = "service_only" | "inspect_before_buy"',
     "- NUNCA gere bundle/item de compra segura para óleo/filtro/kit de e-CVT sem suporte EXPLÍCITO do technical_context.",
     "",
+    "REGRA CRÍTICA DE CRONOGRAMA POR MILESTONES (10k–200k):",
+    "- O array milestones DEVE conter EXATAMENTE as 20 revisões obrigatórias, em km, na ordem crescente:",
+    "    10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000, 200000.",
+    "- Mínimo absoluto: milestones.length >= 20. Primeira = 10000 km. Última = 200000 km. Passo fixo = 10000 km.",
+    "- revision_number = km / 10000 (ex.: 10000→1, 60000→6, 100000→10, 200000→20).",
+    '- label sugerido: "Revisão de {N}.000 km" (ex.: "Revisão de 60.000 km").',
+    "- CADA milestone obrigatória DEVE conter pelo menos 1 item em items[]. Nunca emita milestone sem itens.",
+    "- O km_atual do veículo é APENAS contexto. NÃO use km_atual para limitar, truncar, pular ou omitir milestones. NÃO gere apenas a próxima revisão. NÃO omita revisões anteriores. O plano deve ser SEMPRE o cronograma completo.",
+    "- Distribuição típica de itens (use o technical_context para refinar):",
+    "    * Toda revisão (10k em 10k): óleo do motor, filtro de óleo, inspeções básicas (freios, suspensão, arrefecimento, luzes), checagem/rodízio/calibragem de pneus quando aplicável.",
+    "    * Revisões alternadas (20k/30k/40k): filtro de ar do motor, filtro de cabine, filtro de combustível, limpeza/verificação de TBI, inspeção de correias, fluido de freio por tempo/km.",
+    "    * Marcos maiores: velas, correia poly V/acessórios, líquido de arrefecimento, fluido de freio, correia dentada/kit sincronismo (quando aplicável), correia banhada (inspeção/diagnóstico), óleo de câmbio automático/CVT convencional (troca completa com máquina), diagnóstico de automatizado/dupla embreagem/PowerShift, diagnóstico híbrido/e-CVT, inspeções de alta quilometragem.",
+    "",
+    "REGRAS CRÍTICAS DE COMPATIBILIDADE TÉCNICA:",
+    '- timing_system = "corrente": NUNCA gere item nem bundle de troca de correia dentada/kit sincronismo. Em alta km pode haver inspeção de corrente.',
+    '- timing_system = "correia_dentada": gere troca preventiva em milestone(s) coerente(s) (tipicamente 60k–100k conforme contexto). category = "motor". action = "trocar" ou "troca_preventiva_recomendada". Em dúvida, prefira recomendação conservadora.',
+    '- timing_system = "correia_banhada": item crítico. Prefira inspeção/diagnóstico preventivo (action = "inspecionar"/"diagnosticar"). NÃO tratar como correia dentada comum.',
+    "- Elétrico puro: NÃO gere óleo de motor, filtro de óleo, velas, correia dentada, kit sincronismo nem qualquer item de motor a combustão.",
+    "- Híbrido com motor a combustão: pode haver óleo do motor e filtro de óleo; trate o sistema híbrido com inspeções/diagnóstico quando aplicável.",
+    "- Câmbio automático/CVT convencional/automatizado/dupla embreagem/PowerShift: NUNCA recomende troca parcial. Manutenção de fluido = troca COMPLETA com máquina, fluido correto, filtro quando aplicável. Em alta km/histórico desconhecido, oriente diagnóstico prévio. Evite flush químico/agressivo.",
+    "",
+    "REGRAS CRÍTICAS DE ÓLEO DO MOTOR (engine_oil_profile):",
+    "- Use o technical_context.engine_oil_profile quando disponível.",
+    '- Se engine_oil_profile.status = "insufficient": NÃO invente viscosidade (SAE), NÃO invente norma (API/ACEA/Dexos/Fiat), NÃO invente quantidade em litros. Ainda assim, mantenha "oleo_motor" e "filtro_oleo" em milestones para veículos a combustão.',
+    '- Label sugerido nesse caso: "Óleo do motor — especificação a confirmar conforme manual". Filtro: "Filtro de óleo".',
+    '- Para óleo do motor com perfil insuficiente, use shopping_classification = "inspect_before_buy". NUNCA "safe_to_buy".',
+    "- Este build NÃO precisa gerar links/SKU de shopping. Foco é o cronograma técnico.",
+    "",
+    "PURCHASE BUNDLES (não são foco deste build):",
+    "- Bundles podem existir, mas não invente SKU/URL/afiliado/viscosidade/norma/quantidade.",
+    "- Não crie chaves fora do schema. Não inclua bundle de correia dentada se timing_system != correia_dentada. Não inclua bundle de CVT para e-CVT.",
+    "",
     "REGRAS TÉCNICAS:",
     "- Use o technical_context fornecido como fonte principal e respeite os dados do veículo.",
     "- Se houver incerteza, prefira recomendações conservadoras; nunca invente dado específico não suportado pelo contexto.",
@@ -752,8 +784,9 @@ function buildSystemPrompt(opts: { isECvt: boolean } = { isECvt: false }): strin
     "- Evite flush químico/agressivo.",
     "- Considere uso severo quando informado.",
     "",
-    "ESTRUTURA OBRIGATÓRIA — copie EXATAMENTE as chaves abaixo. Substitua apenas os valores conforme o veículo e o technical_context. Não adicione chaves novas. Não remova chaves obrigatórias. Os arrays opcionais podem ser omitidos se não fizerem sentido para o veículo:",
+    "ESTRUTURA OBRIGATÓRIA — o JSON abaixo é um MOLDE ESTRUTURAL com apenas 1 milestone como amostra. A SAÍDA REAL DEVE conter as 20 milestones obrigatórias (10k até 200k). Copie EXATAMENTE as chaves; substitua valores conforme o veículo e o technical_context. Não adicione chaves novas. Não remova chaves obrigatórias. Arrays opcionais podem ser omitidos se não fizerem sentido:",
     MAINTENANCE_PLAN_JSON_CONTRACT,
+
   ];
 
   if (opts.isECvt) {
@@ -929,6 +962,54 @@ function buildDebug(ctx: TechnicalContext) {
   };
 }
 
+// Build 6.39 — validação determinística do cronograma 10k–200k.
+// Garante que o plano contenha todas as 20 milestones obrigatórias e que
+// cada uma tenha pelo menos 1 item. Roda DEPOIS do safeParseMaintenancePlanJson.
+const REQUIRED_MILESTONE_KMS: readonly number[] = [
+  10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000,
+  110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
+  200000,
+];
+
+function validateMilestoneSchedule(plan: {
+  milestones: ReadonlyArray<{ km: number; items: ReadonlyArray<unknown> }>;
+}): string[] {
+  const errors: string[] = [];
+  const byKm = new Map<number, { items: ReadonlyArray<unknown> }>();
+  for (const m of plan.milestones) {
+    if (!byKm.has(m.km)) byKm.set(m.km, m);
+  }
+
+  const missing: number[] = [];
+  const emptyItems: number[] = [];
+  for (const km of REQUIRED_MILESTONE_KMS) {
+    const m = byKm.get(km);
+    if (!m) {
+      missing.push(km);
+      continue;
+    }
+    if (!Array.isArray(m.items) || m.items.length === 0) {
+      emptyItems.push(km);
+    }
+  }
+
+  if (missing.length > 0) {
+    errors.push(
+      `Cronograma incompleto: milestones obrigatórias ausentes: ${missing.join(", ")} km.`,
+    );
+  }
+  if (plan.milestones.length < REQUIRED_MILESTONE_KMS.length) {
+    errors.push(
+      `Cronograma incompleto: esperado milestones.length >= ${REQUIRED_MILESTONE_KMS.length}, recebido ${plan.milestones.length}.`,
+    );
+  }
+  for (const km of emptyItems) {
+    errors.push(`Milestone ${km} km sem itens.`);
+  }
+  return errors;
+}
+
+
 export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
   method: "POST",
 })
@@ -1010,6 +1091,19 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
+    const scheduleErrors = validateMilestoneSchedule(validation.data);
+    if (scheduleErrors.length > 0) {
+      return {
+        valid: false,
+        plan: null,
+        errors: scheduleErrors,
+        warnings: baseWarnings,
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+        technical_context_debug: buildDebug(ctx),
+        raw_preview: preview,
+      };
+    }
+
     return {
       valid: true,
       plan: validation.data,
@@ -1019,4 +1113,5 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
+
   });
