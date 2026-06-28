@@ -23,6 +23,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedAdminCorpusSmokeRouteImport } from './routes/_authenticated/admin-corpus-smoke'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
 
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -95,6 +96,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminCorpusSmokeRoute =
+  AuthenticatedAdminCorpusSmokeRouteImport.update({
+    id: '/_authenticated/admin-corpus-smoke',
+    path: '/admin-corpus-smoke',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksFipeMonthlyRefreshRoute =
   ApiPublicHooksFipeMonthlyRefreshRouteImport.update({
     id: '/api/public/hooks/fipe-monthly-refresh',
@@ -117,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesByTo {
@@ -134,6 +142,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesById {
@@ -152,6 +161,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
+  '/_authenticated/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRouteTypes {
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/admin-corpus-smoke'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/admin-corpus-smoke'
     | '/api/public/hooks/fipe-monthly-refresh'
   id:
     | '__root__'
@@ -205,6 +217,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/splash'
     | '/welcome'
+    | '/_authenticated/admin-corpus-smoke'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesById: FileRoutesById
 }
@@ -223,6 +236,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
   WelcomeRoute: typeof WelcomeRoute
+  AuthenticatedAdminCorpusSmokeRoute: typeof AuthenticatedAdminCorpusSmokeRoute
   ApiPublicHooksFipeMonthlyRefreshRoute: typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 
@@ -326,6 +340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin-corpus-smoke': {
+      id: '/_authenticated/admin-corpus-smoke'
+      path: '/admin-corpus-smoke'
+      fullPath: '/admin-corpus-smoke'
+      preLoaderRoute: typeof AuthenticatedAdminCorpusSmokeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/fipe-monthly-refresh': {
       id: '/api/public/hooks/fipe-monthly-refresh'
       path: '/api/public/hooks/fipe-monthly-refresh'
@@ -351,18 +372,9 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
   WelcomeRoute: WelcomeRoute,
+  AuthenticatedAdminCorpusSmokeRoute: AuthenticatedAdminCorpusSmokeRoute,
   ApiPublicHooksFipeMonthlyRefreshRoute: ApiPublicHooksFipeMonthlyRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
