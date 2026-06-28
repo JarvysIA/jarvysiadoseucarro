@@ -9,6 +9,7 @@ import {
   extractMaintenanceCorpusPdfTextFn,
   buildMaintenanceCorpusSummaryFn,
 } from "@/lib/maintenance-corpus.functions";
+import { selectMaintenanceCorpusForVehicleAdminFn } from "@/lib/maintenance-corpus-selection.functions";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
