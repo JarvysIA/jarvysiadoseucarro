@@ -9,6 +9,7 @@ import {
   extractMaintenanceCorpusPdfTextFn,
   buildMaintenanceCorpusSummaryFn,
 } from "@/lib/maintenance-corpus.functions";
+import { selectMaintenanceCorpusForVehicleAdminFn } from "@/lib/maintenance-corpus-selection.functions";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
@@ -690,6 +691,8 @@ function AdminCorpusSmokePage() {
         )}
       </section>
 
+      <SelectorTester />
+
       <section className="space-y-1">
         <h2 className="text-sm font-semibold">Log</h2>
         <div className="rounded-md border border-border bg-muted/30 p-3 max-h-[480px] overflow-auto text-xs font-mono space-y-2">
@@ -775,5 +778,558 @@ function StatusBadge({ status }: { status: ItemStatus }) {
     <span className={`text-[10px] px-2 py-0.5 rounded-full border ${v.cls}`}>
       {v.label}
     </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.24 — Smoke test admin do seletor de corpus
+// Chama selectMaintenanceCorpusForVehicleAdminFn e renderiza
+// ranking + debug. Não altera dados. Não expõe campos
+// sensíveis (a função admin já não retorna extracted_text,
+// storage_path, file_name, notes ou signed URL).
+// ─────────────────────────────────────────────────────────────
+
+type SistemaDistribuicao =
+  | ""
+  | "correia_dentada"
+  | "corrente"
+  | "correia_banhada"
+  | "desconhecido";
+
+type SelectorForm = {
+  brand: string;
+  model_group: string;
+  modelo_fipe: string;
+  versao: string;
+  ano_modelo: string;
+  combustivel: string;
+  motor_textual: string;
+  cilindradas: string;
+  transmissao: string;
+  sistema_distribuicao: SistemaDistribuicao;
+  limit: string;
+};
+
+const EMPTY_FORM: SelectorForm = {
+  brand: "",
+  model_group: "",
+  modelo_fipe: "",
+  versao: "",
+  ano_modelo: "",
+  combustivel: "",
+  motor_textual: "",
+  cilindradas: "",
+  transmissao: "",
+  sistema_distribuicao: "",
+  limit: "5",
+};
+
+type QuickCase = {
+  id: string;
+  label: string;
+  expectedSlug: string;
+  form: SelectorForm;
+};
+
+const QUICK_CASES: QuickCase[] = [
+  {
+    id: "fiat-argo",
+    label: "Fiat Argo",
+    expectedSlug: "fiat-argo-v1-2",
+    form: {
+      brand: "fiat",
+      model_group: "argo",
+      modelo_fipe: "ARGO",
+      versao: "1.0 FIREFLY FLEX MANUAL",
+      ano_modelo: "2023",
+      combustivel: "flex",
+      motor_textual: "1.0 firefly",
+      cilindradas: "1000",
+      transmissao: "manual",
+      sistema_distribuicao: "corrente",
+      limit: "5",
+    },
+  },
+  {
+    id: "peugeot-208",
+    label: "Peugeot 208",
+    expectedSlug: "peugeot-208-v1-2",
+    form: {
+      brand: "peugeot",
+      model_group: "208",
+      modelo_fipe: "208",
+      versao: "1.2 PURETECH FLEX MANUAL",
+      ano_modelo: "2023",
+      combustivel: "flex",
+      motor_textual: "1.2 puretech",
+      cilindradas: "1200",
+      transmissao: "manual",
+      sistema_distribuicao: "correia_banhada",
+      limit: "5",
+    },
+  },
+  {
+    id: "chevrolet-onix",
+    label: "Chevrolet Onix",
+    expectedSlug: "chevrolet-onix-v1-2",
+    form: {
+      brand: "chevrolet",
+      model_group: "onix",
+      modelo_fipe: "ONIX",
+      versao: "1.0 TURBO FLEX AUTOMATICO",
+      ano_modelo: "2023",
+      combustivel: "flex",
+      motor_textual: "1.0 turbo",
+      cilindradas: "1000",
+      transmissao: "automatico",
+      sistema_distribuicao: "correia_banhada",
+      limit: "5",
+    },
+  },
+  {
+    id: "toyota-hilux",
+    label: "Toyota Hilux",
+    expectedSlug: "toyota-hilux-v1-2",
+    form: {
+      brand: "toyota",
+      model_group: "hilux",
+      modelo_fipe: "HILUX",
+      versao: "2.8 DIESEL AUTOMATICA",
+      ano_modelo: "2022",
+      combustivel: "diesel",
+      motor_textual: "2.8 diesel",
+      cilindradas: "2800",
+      transmissao: "automatico",
+      sistema_distribuicao: "corrente",
+      limit: "5",
+    },
+  },
+  {
+    id: "toyota-corolla-cross",
+    label: "Toyota Corolla Cross",
+    expectedSlug: "toyota-corolla-cross-v1-2",
+    form: {
+      brand: "toyota",
+      model_group: "corolla-cross",
+      modelo_fipe: "COROLLA CROSS",
+      versao: "1.8 HYBRID CVT",
+      ano_modelo: "2024",
+      combustivel: "hibrido",
+      motor_textual: "1.8 hybrid",
+      cilindradas: "1800",
+      transmissao: "cvt",
+      sistema_distribuicao: "corrente",
+      limit: "5",
+    },
+  },
+  {
+    id: "byd-song-plus-dm-i",
+    label: "BYD Song Plus DM-i",
+    expectedSlug: "byd-song-plus-dm-i-v1-2",
+    form: {
+      brand: "byd",
+      model_group: "song-plus-dm-i",
+      modelo_fipe: "SONG PLUS DM-I",
+      versao: "1.5 HIBRIDO PLUG-IN",
+      ano_modelo: "2025",
+      combustivel: "hibrido",
+      motor_textual: "1.5 plug-in hybrid",
+      cilindradas: "1500",
+      transmissao: "e-cvt",
+      sistema_distribuicao: "desconhecido",
+      limit: "5",
+    },
+  },
+  {
+    id: "bmw-serie-3",
+    label: "BMW Série 3",
+    expectedSlug: "bmw-serie-3-v1-2",
+    form: {
+      brand: "bmw",
+      model_group: "serie-3",
+      modelo_fipe: "SERIE 3",
+      versao: "320i 2.0 TURBO AUTOMATICA",
+      ano_modelo: "2021",
+      combustivel: "gasolina",
+      motor_textual: "2.0 turbo",
+      cilindradas: "2000",
+      transmissao: "automatico",
+      sistema_distribuicao: "corrente",
+      limit: "5",
+    },
+  },
+];
+
+type SelectorMatch = {
+  id: string;
+  slug: string;
+  title: string;
+  brand: string;
+  model_group: string;
+  generation_range: string | null;
+  year_start: number | null;
+  year_end: number | null;
+  score: number;
+  reasons: string[];
+  quality_score: number;
+  reviewed_by_admin: boolean;
+  published: boolean;
+  version: string;
+};
+
+type SelectorResult = {
+  matches: SelectorMatch[];
+  debug: {
+    mode: "admin";
+    normalizedInput: Record<string, unknown>;
+    totalCandidates: number;
+    returned: number;
+  };
+};
+
+function SelectorTester() {
+  const [form, setForm] = useState<SelectorForm>(EMPTY_FORM);
+  const [expectedSlug, setExpectedSlug] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<SelectorResult | null>(null);
+
+  const selectFn = useServerFn(selectMaintenanceCorpusForVehicleAdminFn);
+
+  function setField<K extends keyof SelectorForm>(
+    key: K,
+    value: SelectorForm[K],
+  ) {
+    setForm((p) => ({ ...p, [key]: value }));
+  }
+
+  function loadQuickCase(c: QuickCase) {
+    setForm(c.form);
+    setExpectedSlug(c.expectedSlug);
+    setError(null);
+    setResult(null);
+  }
+
+  function buildPayload() {
+    const s = (v: string) => (v.trim() === "" ? undefined : v.trim());
+    const n = (v: string) => {
+      const t = v.trim();
+      if (t === "") return undefined;
+      const num = Number(t);
+      return Number.isFinite(num) ? num : undefined;
+    };
+    const sd =
+      form.sistema_distribuicao === "" ? undefined : form.sistema_distribuicao;
+    const lim = n(form.limit);
+    return {
+      brand: form.brand.trim(),
+      model_group: s(form.model_group),
+      modelo_fipe: s(form.modelo_fipe),
+      versao: s(form.versao),
+      ano_modelo: n(form.ano_modelo),
+      combustivel: s(form.combustivel),
+      motor_textual: s(form.motor_textual),
+      cilindradas: n(form.cilindradas),
+      transmissao: s(form.transmissao),
+      sistema_distribuicao: sd,
+      limit: lim,
+    };
+  }
+
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const payload = buildPayload();
+      if (!payload.brand) {
+        setError("brand é obrigatório.");
+        return;
+      }
+      const res = (await selectFn({ data: payload })) as SelectorResult;
+      setResult(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const top = result?.matches[0];
+  const slugMismatch =
+    expectedSlug && top ? top.slug !== expectedSlug : false;
+  const lowScore = top ? top.score < 50 : false;
+  const empty = result ? result.matches.length === 0 : false;
+
+  const btn =
+    "px-3 py-2 rounded-md border border-border text-sm font-medium hover:bg-accent disabled:opacity-50";
+  const input =
+    "w-full rounded-md border border-border bg-background px-2 py-1 text-xs";
+
+  return (
+    <section className="space-y-3 p-4 rounded-lg border border-border">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">Teste de Seleção de Corpus</h2>
+        <p className="text-xs text-muted-foreground">
+          Chama <code>selectMaintenanceCorpusForVehicleAdminFn</code>{" "}
+          (read-only, super-admin, ignora published/reviewed). Não altera
+          dados. Não retorna texto extraído, storage_path, file_name, notes ou
+          signed URL.
+        </p>
+      </header>
+
+      <div className="space-y-1">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+          Casos rápidos
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_CASES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={btn}
+              onClick={() => loadQuickCase(c)}
+              disabled={busy}
+              title={`Esperado: ${c.expectedSlug}`}
+            >
+              {c.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={btn}
+            onClick={() => {
+              setForm(EMPTY_FORM);
+              setExpectedSlug(null);
+              setError(null);
+              setResult(null);
+            }}
+            disabled={busy}
+          >
+            Limpar
+          </button>
+        </div>
+        {expectedSlug ? (
+          <div className="text-[11px] text-muted-foreground">
+            Top esperado: <code>{expectedSlug}</code>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <Field label="brand *">
+          <input
+            className={input}
+            value={form.brand}
+            onChange={(e) => setField("brand", e.target.value)}
+          />
+        </Field>
+        <Field label="model_group">
+          <input
+            className={input}
+            value={form.model_group}
+            onChange={(e) => setField("model_group", e.target.value)}
+          />
+        </Field>
+        <Field label="modelo_fipe">
+          <input
+            className={input}
+            value={form.modelo_fipe}
+            onChange={(e) => setField("modelo_fipe", e.target.value)}
+          />
+        </Field>
+        <Field label="versao">
+          <input
+            className={input}
+            value={form.versao}
+            onChange={(e) => setField("versao", e.target.value)}
+          />
+        </Field>
+        <Field label="ano_modelo">
+          <input
+            type="number"
+            className={input}
+            value={form.ano_modelo}
+            onChange={(e) => setField("ano_modelo", e.target.value)}
+          />
+        </Field>
+        <Field label="combustivel">
+          <input
+            className={input}
+            value={form.combustivel}
+            onChange={(e) => setField("combustivel", e.target.value)}
+          />
+        </Field>
+        <Field label="motor_textual">
+          <input
+            className={input}
+            value={form.motor_textual}
+            onChange={(e) => setField("motor_textual", e.target.value)}
+          />
+        </Field>
+        <Field label="cilindradas">
+          <input
+            type="number"
+            className={input}
+            value={form.cilindradas}
+            onChange={(e) => setField("cilindradas", e.target.value)}
+          />
+        </Field>
+        <Field label="transmissao">
+          <input
+            className={input}
+            value={form.transmissao}
+            onChange={(e) => setField("transmissao", e.target.value)}
+          />
+        </Field>
+        <Field label="sistema_distribuicao">
+          <select
+            className={input}
+            value={form.sistema_distribuicao}
+            onChange={(e) =>
+              setField(
+                "sistema_distribuicao",
+                e.target.value as SistemaDistribuicao,
+              )
+            }
+          >
+            <option value="">(vazio)</option>
+            <option value="correia_dentada">correia_dentada</option>
+            <option value="corrente">corrente</option>
+            <option value="correia_banhada">correia_banhada</option>
+            <option value="desconhecido">desconhecido</option>
+          </select>
+        </Field>
+        <Field label="limit (1..5)">
+          <input
+            type="number"
+            min={1}
+            max={5}
+            className={input}
+            value={form.limit}
+            onChange={(e) => setField("limit", e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={btn + " bg-primary text-primary-foreground border-primary"}
+          onClick={run}
+          disabled={busy || !form.brand.trim()}
+        >
+          {busy ? "Testando…" : "Testar seleção admin"}
+        </button>
+      </div>
+
+      {error ? (
+        <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-2">
+          Erro: {error}
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="space-y-3">
+          {empty ? (
+            <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-2 py-2">
+              Nenhum match retornado.
+            </div>
+          ) : null}
+          {slugMismatch && top ? (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-2">
+              Top esperado: <code>{expectedSlug}</code> — recebido:{" "}
+              <code>{top.slug}</code>
+            </div>
+          ) : null}
+          {lowScore && top ? (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-2">
+              Score baixo no top match: {top.score}
+            </div>
+          ) : null}
+
+          {top ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 space-y-1">
+              <div className="text-[11px] uppercase tracking-wide text-emerald-700">
+                Top match
+              </div>
+              <div className="text-sm font-semibold">
+                {top.slug}{" "}
+                <span className="text-xs text-muted-foreground">
+                  score={top.score}
+                </span>
+              </div>
+              <div className="text-xs text-foreground">{top.title}</div>
+              {top.reasons.length > 0 ? (
+                <ul className="text-[11px] text-muted-foreground list-disc pl-5">
+                  {top.reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="overflow-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-2">#</th>
+                  <th className="text-left p-2">slug</th>
+                  <th className="text-right p-2">score</th>
+                  <th className="text-left p-2">title</th>
+                  <th className="text-left p-2">brand</th>
+                  <th className="text-left p-2">model_group</th>
+                  <th className="text-left p-2">gen</th>
+                  <th className="text-right p-2">y_start</th>
+                  <th className="text-right p-2">y_end</th>
+                  <th className="text-right p-2">qs</th>
+                  <th className="text-center p-2">rev</th>
+                  <th className="text-center p-2">pub</th>
+                  <th className="text-left p-2">version</th>
+                  <th className="text-left p-2">reasons</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.matches.map((m, i) => (
+                  <tr key={m.id} className="border-t border-border">
+                    <td className="p-2">{i + 1}</td>
+                    <td className="p-2 font-mono">{m.slug}</td>
+                    <td className="p-2 text-right">{m.score}</td>
+                    <td className="p-2">{m.title}</td>
+                    <td className="p-2">{m.brand}</td>
+                    <td className="p-2">{m.model_group}</td>
+                    <td className="p-2">{m.generation_range ?? "—"}</td>
+                    <td className="p-2 text-right">{m.year_start ?? "—"}</td>
+                    <td className="p-2 text-right">{m.year_end ?? "—"}</td>
+                    <td className="p-2 text-right">{m.quality_score}</td>
+                    <td className="p-2 text-center">
+                      {m.reviewed_by_admin ? "✓" : "—"}
+                    </td>
+                    <td className="p-2 text-center">
+                      {m.published ? "✓" : "—"}
+                    </td>
+                    <td className="p-2 font-mono">{m.version}</td>
+                    <td className="p-2 text-muted-foreground">
+                      {m.reasons.join(", ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">
+              debug
+            </summary>
+            <pre className="whitespace-pre-wrap break-words text-muted-foreground">
+              {JSON.stringify(result.debug, null, 2)}
+            </pre>
+          </details>
+        </div>
+      ) : null}
+    </section>
   );
 }
