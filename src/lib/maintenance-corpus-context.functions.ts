@@ -119,6 +119,14 @@ function assertNoForbiddenKeysDeep(raw: unknown, depth = 0): void {
   for (const v of Object.values(obj)) assertNoForbiddenKeysDeep(v, depth + 1);
 }
 
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue }
+  | JsonValue[];
+
 type CorpusRowBase = {
   id: string;
   slug: string;
@@ -128,9 +136,9 @@ type CorpusRowBase = {
   generation_range: string | null;
   year_start: number | null;
   year_end: number | null;
-  mechanical_families_json: unknown;
-  coverage_json: unknown;
-  summary_json: unknown;
+  mechanical_families_json: JsonValue;
+  coverage_json: JsonValue;
+  summary_json: JsonValue;
   quality_score: number | null;
   reviewed_by_admin: boolean | null;
   published: boolean | null;
