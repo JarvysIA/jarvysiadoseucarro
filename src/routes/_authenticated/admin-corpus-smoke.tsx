@@ -1373,6 +1373,26 @@ type ContextDocument = {
   text_excerpt_char_count: number;
 };
 
+type EngineOilProfile = {
+  schema_version: string;
+  generated_by: string;
+  status: "partial" | "insufficient";
+  viscosity: string | null;
+  specifications: string[];
+  quantity_liters: number | null;
+  filter_required: boolean | null;
+  replacement_interval_km: number | null;
+  replacement_interval_months: number | null;
+  severe_use_interval_km: number | null;
+  severe_use_interval_months: number | null;
+  requires_compatibility_confirmation: boolean;
+  do_not_match_by_viscosity_only: boolean;
+  shopping_safety: "inspect_before_buy" | "do_not_link";
+  confidence: "baixa" | "media" | "alta";
+  evidence: string[];
+  warnings: string[];
+};
+
 type ContextResult = {
   technical_context: {
     schema_version: string;
@@ -1386,6 +1406,7 @@ type ContextResult = {
     };
     documents: ContextDocument[];
     warnings: string[];
+    engine_oil_profile?: EngineOilProfile;
   };
   debug: {
     mode: "admin";
