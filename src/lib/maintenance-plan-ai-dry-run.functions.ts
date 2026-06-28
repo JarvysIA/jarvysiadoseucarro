@@ -649,13 +649,13 @@ async function callLovableAi(
 
 type DryRunResult = {
   valid: boolean;
-  plan: unknown | null;
+  plan: JsonValue | null;
   errors: string[];
   warnings: string[];
   ai: {
     provider: string | null;
     model: string | null;
-    usage?: unknown;
+    usage?: JsonValue;
   };
   technical_context_debug: {
     totalCandidates: number;
