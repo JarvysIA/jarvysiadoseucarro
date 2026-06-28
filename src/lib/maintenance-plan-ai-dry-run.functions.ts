@@ -1029,6 +1029,80 @@ function validateMilestoneSchedule(plan: {
   return errors;
 }
 
+// Build 6.39A — validação determinística do baseline obrigatório por milestone.
+// - Combustão (flex/gasolina/etanol/diesel/híbrido c/ motor a combustão):
+//   oleo_motor + filtro_oleo em TODAS as 20 milestones (10k–200k);
+//   filtro_ar_motor + filtro_cabine + filtro_combustivel nas milestones pares.
+// - Elétrico puro: validação é pulada (não há baseline de combustão).
+const EVEN_MILESTONE_KMS: readonly number[] = [
+  20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000,
+];
+const BASELINE_ALL_ITEM_KEYS: readonly string[] = ["oleo_motor", "filtro_oleo"];
+const BASELINE_EVEN_ITEM_KEYS: readonly string[] = [
+  "filtro_ar_motor",
+  "filtro_cabine",
+  "filtro_combustivel",
+];
+
+function normalizeForBaseline(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function isPureElectricVehicle(plan: MaintenancePlanJson): boolean {
+  const combustivel = normalizeForBaseline(plan.vehicle_summary.combustivel);
+  const motor = normalizeForBaseline(plan.vehicle_summary.motor_textual);
+  const haystack = `${combustivel} ${motor}`;
+
+  // Marcadores de motor a combustão / híbrido com motor a combustão.
+  const combustionMarkers =
+    /(flex|gasolina|etanol|alcool|diesel|hibrido|hybrid|hev|phev|mhev|dm-?i|hsd|combustao)/;
+  if (combustionMarkers.test(haystack)) return false;
+
+  // Marcadores exclusivamente elétricos.
+  const electricMarkers = /(eletrico|electric|\bev\b|\bbev\b)/;
+  return electricMarkers.test(combustivel) || electricMarkers.test(motor);
+}
+
+function validateBaselineItems(plan: MaintenancePlanJson): string[] {
+  if (isPureElectricVehicle(plan)) return [];
+
+  const errors: string[] = [];
+  const byKm = new Map<number, Set<string>>();
+  for (const m of plan.milestones) {
+    if (!byKm.has(m.km)) {
+      byKm.set(m.km, new Set(m.items.map((it) => it.item_key)));
+    }
+  }
+
+  for (const km of REQUIRED_MILESTONE_KMS) {
+    const keys = byKm.get(km);
+    if (!keys) continue; // already reported by validateMilestoneSchedule
+    for (const required of BASELINE_ALL_ITEM_KEYS) {
+      if (!keys.has(required)) {
+        errors.push(`Cronograma inválido: milestone ${km} km sem ${required}.`);
+      }
+    }
+  }
+
+  for (const km of EVEN_MILESTONE_KMS) {
+    const keys = byKm.get(km);
+    if (!keys) continue;
+    for (const required of BASELINE_EVEN_ITEM_KEYS) {
+      if (!keys.has(required)) {
+        errors.push(`Cronograma inválido: milestone ${km} km sem ${required}.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+
+
 
 export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
   method: "POST",
