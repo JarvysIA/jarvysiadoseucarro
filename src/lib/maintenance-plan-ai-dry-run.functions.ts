@@ -632,10 +632,12 @@ async function callLovableAi(
 
   let json: {
     choices?: Array<{ message?: { content?: string } }>;
-    usage?: unknown;
+    usage?: JsonValue;
   };
   try {
-    json = (await resp.json()) as typeof json;
+    const parsed: unknown = await resp.json();
+    // Normaliza para JsonValue serializável (remove referências não-serializáveis).
+    json = JSON.parse(JSON.stringify(parsed)) as typeof json;
   } catch {
     return { ok: false, error: "Resposta da IA não pôde ser lida." };
   }
