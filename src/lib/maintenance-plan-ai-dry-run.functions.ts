@@ -957,7 +957,8 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
-    const systemPrompt = buildSystemPrompt();
+    const isECvt = baseWarnings.includes("schema_sem_e_cvt_transmission_type");
+    const systemPrompt = buildSystemPrompt({ isECvt });
     const userPrompt = buildUserPrompt(ctx);
 
     const ai = await callLovableAi(systemPrompt, userPrompt);
