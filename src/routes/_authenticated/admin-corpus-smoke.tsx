@@ -1723,6 +1723,12 @@ function ContextInspector() {
             </div>
           ) : null}
 
+          {tc.engine_oil_profile ? (
+            <EngineOilProfileCard profile={tc.engine_oil_profile} />
+          ) : null}
+
+
+
           <details className="text-xs" open>
             <summary className="cursor-pointer text-muted-foreground">
               vehicle_input
