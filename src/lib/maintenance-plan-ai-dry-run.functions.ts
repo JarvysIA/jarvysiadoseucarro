@@ -511,19 +511,190 @@ async function buildTechnicalContext(
   };
 }
 
+// Molde JSON literal compatível com MaintenancePlanJson (schema 1.0.0).
+// JSON puro — sem comentários. Explicações ficam fora, no prompt textual.
+const MAINTENANCE_PLAN_JSON_CONTRACT = `{
+  "schema_version": "1.0.0",
+  "vehicle_summary": {
+    "display_name": "Marca Modelo Versão Ano",
+    "marca": "Marca",
+    "modelo_fipe": "Modelo Versão",
+    "ano_modelo": 2023,
+    "combustivel": "Flex",
+    "cilindradas": 1000,
+    "motor_textual": "1.0 Turbo Flex",
+    "valvulas": 12,
+    "transmissao": "manual"
+  },
+  "base_rules": {
+    "revision_interval_km": 10000,
+    "revision_interval_months": 12,
+    "max_planned_km": 200000,
+    "severe_use_oil_interval_km": 5000,
+    "severe_use_oil_interval_months": 6
+  },
+  "system_profile": {
+    "timing_system": "corrente",
+    "transmission_type": "manual",
+    "transmission_service_policy": "troca_programada",
+    "transmission_fluid_service_type": "somente_fluido"
+  },
+  "milestones": [
+    {
+      "km": 10000,
+      "label": "1ª revisão — 10.000 km",
+      "revision_number": 1,
+      "items": [
+        {
+          "item_key": "oleo_motor",
+          "label": "Óleo do motor",
+          "category": "motor",
+          "action": "trocar",
+          "recommendation_type": "required",
+          "shopping_classification": "bundle_preferred",
+          "applies": true,
+          "interval_km": 10000,
+          "interval_months": 12,
+          "confidence": 90,
+          "source_type": "manual"
+        },
+        {
+          "item_key": "filtro_oleo",
+          "label": "Filtro de óleo",
+          "category": "filtros",
+          "action": "trocar",
+          "recommendation_type": "required",
+          "shopping_classification": "bundle_preferred",
+          "applies": true,
+          "confidence": 90,
+          "source_type": "manual"
+        }
+      ],
+      "purchase_bundle_keys": ["kit_troca_oleo_motor"]
+    }
+  ],
+  "fixed_intervals": [
+    {
+      "item_key": "palhetas",
+      "label": "Palhetas do limpador",
+      "category": "conforto",
+      "action": "trocar",
+      "interval_months": 12,
+      "shopping_classification": "safe_to_buy",
+      "recommendation_type": "recommended",
+      "applies": true,
+      "confidence": 80,
+      "source_type": "experiencia_preventiva"
+    }
+  ],
+  "severe_use_rules": [
+    {
+      "item_key": "oleo_motor",
+      "label": "Óleo do motor — uso severo",
+      "description": "Reduzir intervalo em uso severo.",
+      "interval_km": 5000,
+      "interval_months": 6,
+      "recommendation_type": "preventive_recommended",
+      "source_type": "experiencia_preventiva",
+      "confidence": 80
+    }
+  ],
+  "age_based_alerts": [
+    {
+      "item_key": "bateria",
+      "label": "Bateria",
+      "trigger_age_years": 3,
+      "recommendation_type": "inspect_only",
+      "shopping_classification": "inspect_before_buy",
+      "reason": "Vida útil média ~3 anos.",
+      "source_type": "experiencia_preventiva",
+      "confidence": 80
+    }
+  ],
+  "not_applicable_items": [
+    {
+      "item_key": "kit_correia_dentada",
+      "label": "Kit correia dentada",
+      "reason": "Motor com corrente de comando.",
+      "source_type": "manual",
+      "confidence": 90
+    }
+  ],
+  "purchase_bundles": [
+    {
+      "bundle_key": "kit_troca_oleo_motor",
+      "label": "Kit troca de óleo do motor",
+      "description": "Óleo recomendado + filtro de óleo.",
+      "bundle_type": "kit_troca_oleo_motor",
+      "item_keys": ["oleo_motor", "filtro_oleo"],
+      "category": "motor",
+      "shopping_classification": "safe_to_buy",
+      "preferred_search_query_template": "kit troca óleo {modelo} {motor} {ano_modelo}",
+      "required_item_keys": ["oleo_motor", "filtro_oleo"],
+      "requires_compatibility_confirmation": false,
+      "confidence": 85,
+      "source_type": "catalogo"
+    }
+  ],
+  "general_notes": ["Plano gerado por IA em modo dry-run."],
+  "safety_disclaimer": "Sempre confirme com profissional de confiança antes de executar serviços.",
+  "metadata": {
+    "generated_at": "2026-06-28T00:00:00.000Z",
+    "generated_by": "ia",
+    "source": "ia",
+    "overall_confidence": 80,
+    "reviewed_by_admin": false,
+    "schema_notes": ["dry-run"]
+  }
+}`;
+
 function buildSystemPrompt(): string {
   return [
     "Você é um especialista técnico em manutenção automotiva do Jarvys.",
-    "Gere SOMENTE JSON puro válido contra o schema maintenance_plan_json do Jarvys.",
-    "Nunca inclua texto, comentários ou markdown antes ou depois do JSON.",
-    "Use o technical_context fornecido como fonte principal e respeite os dados do veículo.",
-    "Se houver incerteza, prefira recomendações conservadoras.",
-    "Nunca invente dado específico não suportado pelo contexto.",
-    "Para câmbio automático ou CVT, NUNCA recomende troca parcial do óleo do câmbio: recomende troca completa com máquina especializada, fluido correto e filtro quando elegível.",
-    "Em alta quilometragem ou histórico desconhecido, oriente diagnóstico prévio antes de troca completa.",
-    "Evite flush químico/agressivo.",
-    "Considere uso severo quando informado.",
-    "Saída obrigatoriamente em um único objeto JSON.",
+    "Sua tarefa é gerar UM ÚNICO objeto JSON puro, válido contra o schema maintenance_plan_json do Jarvys (schema_version 1.0.0).",
+    "",
+    "REGRAS DE SAÍDA (obrigatórias):",
+    "- Retorne SOMENTE JSON puro. Sem markdown. Sem cercas ```. Sem comentários. Sem texto antes ou depois.",
+    '- O campo "schema_version" deve ser exatamente a string "1.0.0".',
+    "- Use APENAS as chaves definidas pelo schema. O schema é strict: qualquer chave fora do contrato invalida a saída.",
+    "- NUNCA use chaves inventadas como: maintenance_policy, critical_alerts, immediate_recovery_service, future_schedule, brand, model, version, year, engine, transmission, current_km, distribution, ou qualquer outra fora do schema.",
+    "",
+    "CAMPOS OBRIGATÓRIOS NA RAIZ:",
+    "- schema_version, vehicle_summary, base_rules, system_profile, milestones, metadata.",
+    "- Opcionais: fixed_intervals, severe_use_rules, age_based_alerts, not_applicable_items, purchase_bundles, general_notes, safety_disclaimer.",
+    "",
+    "ESTRUTURA DE CAMPOS:",
+    '- vehicle_summary exige "display_name" (string). Demais (marca, modelo_fipe, ano_modelo, combustivel, cilindradas, motor_textual, valvulas, transmissao) são opcionais, mas preencha quando o contexto permitir.',
+    "- base_rules exige revision_interval_km e revision_interval_months (inteiros positivos). Pode incluir max_planned_km, severe_use_oil_interval_km, severe_use_oil_interval_months.",
+    "- system_profile exige timing_system, transmission_type, transmission_service_policy, transmission_fluid_service_type.",
+    "- milestones é um array com pelo menos 1 marco. Cada marco exige km (inteiro positivo), label e items (≥1).",
+    "- Cada item de milestone exige: item_key, label, category, action, recommendation_type, shopping_classification, applies (boolean).",
+    '- Se recommendation_type for "not_applicable", então applies DEVE ser false E shopping_classification DEVE ser "not_applicable".',
+    "- metadata exige generated_at (ISO string), generated_by, source.",
+    "",
+    "ENUMS PERMITIDOS (use apenas estes valores):",
+    "- timing_system: correia_dentada | corrente | correia_banhada | desconhecido",
+    "- transmission_type: manual | automatico | cvt | automatizado | dupla_embreagem | desconhecido",
+    "- transmission_service_policy: troca_programada | preventiva_recomendada | sem_troca_programada | verificar_manual | desconhecido",
+    "- transmission_fluid_service_type: somente_fluido | fluido_e_um_filtro | fluido_e_dois_filtros | fluido_filtro_junta | filtro_interno_nao_servicavel | sem_troca_programada | desconhecido",
+    "- category: motor | filtros | ignicao | arrefecimento | freios | suspensao | direcao | pneus | transmissao | eletrica | carroceria | diagnostico | conforto | outros",
+    "- action: trocar | verificar | inspecionar | limpar | regular | completar | diagnosticar | resetar_aviso | troca_preventiva_recomendada | nao_aplicavel",
+    "- recommendation_type: required | recommended | preventive_recommended | inspect_only | condition_based | not_applicable | unknown",
+    "- shopping_classification: safe_to_buy | service_only | inspect_before_buy | bundle_preferred | do_not_link | not_applicable | unknown",
+    "- bundle_type: kit_troca_oleo_motor | kit_filtros | kit_revisao_completa | kit_correia_dentada | kit_correia_acessorios | kit_cambio_manual | kit_cambio_automatico | kit_freio | kit_arrefecimento | kit_ignicao | outro",
+    "- source_type (item/bundle/metadata.source): manual | ia | curadoria | catalogo | fornecedor | experiencia_preventiva | sistema",
+    "- metadata.generated_by: ia | manual | curadoria | sistema",
+    "",
+    "REGRAS TÉCNICAS:",
+    "- Use o technical_context fornecido como fonte principal e respeite os dados do veículo.",
+    "- Se houver incerteza, prefira recomendações conservadoras; nunca invente dado específico não suportado pelo contexto.",
+    "- Para câmbio automático ou CVT, NUNCA recomende troca parcial do óleo do câmbio: recomende troca completa com máquina especializada, fluido correto e filtro quando elegível.",
+    "- Em alta quilometragem ou histórico desconhecido, oriente diagnóstico prévio antes de troca completa.",
+    "- Evite flush químico/agressivo.",
+    "- Considere uso severo quando informado.",
+    "",
+    "ESTRUTURA OBRIGATÓRIA — copie EXATAMENTE as chaves abaixo. Substitua apenas os valores conforme o veículo e o technical_context. Não adicione chaves novas. Não remova chaves obrigatórias. Os arrays opcionais podem ser omitidos se não fizerem sentido para o veículo:",
+    MAINTENANCE_PLAN_JSON_CONTRACT,
   ].join("\n");
 }
 
