@@ -1091,6 +1091,19 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
+    const scheduleErrors = validateMilestoneSchedule(validation.data);
+    if (scheduleErrors.length > 0) {
+      return {
+        valid: false,
+        plan: null,
+        errors: scheduleErrors,
+        warnings: baseWarnings,
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+        technical_context_debug: buildDebug(ctx),
+        raw_preview: preview,
+      };
+    }
+
     return {
       valid: true,
       plan: validation.data,
@@ -1100,4 +1113,5 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
+
   });
