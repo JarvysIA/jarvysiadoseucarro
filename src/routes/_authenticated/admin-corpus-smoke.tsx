@@ -10,6 +10,7 @@ import {
   buildMaintenanceCorpusSummaryFn,
 } from "@/lib/maintenance-corpus.functions";
 import { selectMaintenanceCorpusForVehicleAdminFn } from "@/lib/maintenance-corpus-selection.functions";
+import { buildMaintenanceCorpusContextAdminFn } from "@/lib/maintenance-corpus-context.functions";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
