@@ -652,7 +652,7 @@ async function callLovableAi(
 
 type DryRunResult = {
   valid: boolean;
-  plan: JsonValue | null;
+  plan: MaintenancePlanJson | null;
   errors: string[];
   warnings: string[];
   ai: {
@@ -745,7 +745,7 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
         plan: null,
         errors: ["Resposta da IA não é JSON válido."],
         warnings: baseWarnings,
-        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
@@ -762,7 +762,7 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
         plan: null,
         errors,
         warnings: baseWarnings,
-        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
@@ -770,10 +770,10 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
 
     return {
       valid: true,
-      plan: validation.data as unknown as JsonValue,
+      plan: validation.data,
       errors: [],
       warnings: baseWarnings,
-      ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
+      ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
