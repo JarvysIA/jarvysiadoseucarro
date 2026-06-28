@@ -962,6 +962,54 @@ function buildDebug(ctx: TechnicalContext) {
   };
 }
 
+// Build 6.39 — validação determinística do cronograma 10k–200k.
+// Garante que o plano contenha todas as 20 milestones obrigatórias e que
+// cada uma tenha pelo menos 1 item. Roda DEPOIS do safeParseMaintenancePlanJson.
+const REQUIRED_MILESTONE_KMS: readonly number[] = [
+  10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000,
+  110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
+  200000,
+];
+
+function validateMilestoneSchedule(plan: {
+  milestones: ReadonlyArray<{ km: number; items: ReadonlyArray<unknown> }>;
+}): string[] {
+  const errors: string[] = [];
+  const byKm = new Map<number, { items: ReadonlyArray<unknown> }>();
+  for (const m of plan.milestones) {
+    if (!byKm.has(m.km)) byKm.set(m.km, m);
+  }
+
+  const missing: number[] = [];
+  const emptyItems: number[] = [];
+  for (const km of REQUIRED_MILESTONE_KMS) {
+    const m = byKm.get(km);
+    if (!m) {
+      missing.push(km);
+      continue;
+    }
+    if (!Array.isArray(m.items) || m.items.length === 0) {
+      emptyItems.push(km);
+    }
+  }
+
+  if (missing.length > 0) {
+    errors.push(
+      `Cronograma incompleto: milestones obrigatórias ausentes: ${missing.join(", ")} km.`,
+    );
+  }
+  if (plan.milestones.length < REQUIRED_MILESTONE_KMS.length) {
+    errors.push(
+      `Cronograma incompleto: esperado milestones.length >= ${REQUIRED_MILESTONE_KMS.length}, recebido ${plan.milestones.length}.`,
+    );
+  }
+  for (const km of emptyItems) {
+    errors.push(`Milestone ${km} km sem itens.`);
+  }
+  return errors;
+}
+
+
 export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
   method: "POST",
 })
