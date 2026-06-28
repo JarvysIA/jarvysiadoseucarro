@@ -576,7 +576,7 @@ type AiCallResult =
   | {
       ok: true;
       content: string;
-      usage: unknown;
+      usage: JsonValue;
     }
   | {
       ok: false;
@@ -742,7 +742,7 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
         plan: null,
         errors: ["Resposta da IA não é JSON válido."],
         warnings: baseWarnings,
-        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
@@ -759,7 +759,7 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
         plan: null,
         errors,
         warnings: baseWarnings,
-        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
@@ -767,10 +767,10 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
 
     return {
       valid: true,
-      plan: validation.data,
+      plan: validation.data as unknown as JsonValue,
       errors: [],
       warnings: baseWarnings,
-      ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+      ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage as JsonValue },
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
