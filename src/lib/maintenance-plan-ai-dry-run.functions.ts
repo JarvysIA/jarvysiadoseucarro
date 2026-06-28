@@ -757,6 +757,26 @@ function buildSystemPrompt(opts: { isECvt: boolean } = { isECvt: false }): strin
     "    * Revisões alternadas (20k/30k/40k): filtro de ar do motor, filtro de cabine, filtro de combustível, limpeza/verificação de TBI, inspeção de correias, fluido de freio por tempo/km.",
     "    * Marcos maiores: velas, correia poly V/acessórios, líquido de arrefecimento, fluido de freio, correia dentada/kit sincronismo (quando aplicável), correia banhada (inspeção/diagnóstico), óleo de câmbio automático/CVT convencional (troca completa com máquina), diagnóstico de automatizado/dupla embreagem/PowerShift, diagnóstico híbrido/e-CVT, inspeções de alta quilometragem.",
     "",
+    "REGRA CRÍTICA DE BASELINE POR MILESTONE (Build 6.39A):",
+    "1) VEÍCULOS A COMBUSTÃO (flex, gasolina, etanol, diesel e híbrido com motor a combustão):",
+    "   - TODAS as 20 milestones obrigatórias (10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000, 200000 km) DEVEM conter:",
+    '       item_key="oleo_motor"',
+    '       item_key="filtro_oleo"',
+    "   - Itens maiores (checklist, arrefecimento, câmbio, correia, velas, freios, diagnóstico) entram ALÉM do baseline. NUNCA substituem óleo/filtro.",
+    "   - A milestone de 100000 km também DEVE conter oleo_motor e filtro_oleo (não substituir por checklist).",
+    "2) REVISÕES PARES (20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000 km) em veículo a combustão DEVEM conter também o kit de filtros como itens INDIVIDUAIS:",
+    '       item_key="filtro_ar_motor"',
+    '       item_key="filtro_cabine"',
+    '       item_key="filtro_combustivel"',
+    '   - NÃO colapsar os três em um único item genérico "kit_filtros". purchase_bundles pode agrupar separadamente, mas milestones.items DEVE listar os três itens individuais.',
+    '   - Se houver dúvida se o filtro de combustível é externo/substituível no veículo, AINDA ASSIM incluir item_key="filtro_combustivel" na milestone par, com label conservador "Filtro de combustível — confirmar aplicação conforme versão" e shopping_classification="inspect_before_buy".',
+    "3) ELÉTRICO PURO: NÃO aplicar baseline de combustão. NÃO emitir nenhum dos seguintes item_key: oleo_motor, filtro_oleo, filtro_ar_motor, filtro_combustivel, velas, correia_dentada, kit_sincronismo.",
+    "4) HÍBRIDO COM MOTOR A COMBUSTÃO: aplicar baseline normal (óleo/filtro em todas, kit filtros nas pares). Manter regra e-CVT (transmissão tratada com inspeção/diagnóstico, sem CVT convencional).",
+    '5) ÓLEO COM engine_oil_profile.status="insufficient":',
+    '   - O item oleo_motor deve usar: label="Óleo do motor — especificação a confirmar conforme manual", shopping_classification="inspect_before_buy", action="trocar", recommendation_type="required", applies=true.',
+    "   - NÃO inventar viscosidade (SAE), norma (API/ACEA/Dexos/Fiat), quantidade em litros ou marca.",
+    "",
+
     "REGRAS CRÍTICAS DE COMPATIBILIDADE TÉCNICA:",
     '- timing_system = "corrente": NUNCA gere item nem bundle de troca de correia dentada/kit sincronismo. Em alta km pode haver inspeção de corrente.',
     '- timing_system = "correia_dentada": gere troca preventiva em milestone(s) coerente(s) (tipicamente 60k–100k conforme contexto). category = "motor". action = "trocar" ou "troca_preventiva_recomendada". Em dúvida, prefira recomendação conservadora.',
@@ -1009,6 +1029,80 @@ function validateMilestoneSchedule(plan: {
   return errors;
 }
 
+// Build 6.39A — validação determinística do baseline obrigatório por milestone.
+// - Combustão (flex/gasolina/etanol/diesel/híbrido c/ motor a combustão):
+//   oleo_motor + filtro_oleo em TODAS as 20 milestones (10k–200k);
+//   filtro_ar_motor + filtro_cabine + filtro_combustivel nas milestones pares.
+// - Elétrico puro: validação é pulada (não há baseline de combustão).
+const EVEN_MILESTONE_KMS: readonly number[] = [
+  20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000,
+];
+const BASELINE_ALL_ITEM_KEYS: readonly string[] = ["oleo_motor", "filtro_oleo"];
+const BASELINE_EVEN_ITEM_KEYS: readonly string[] = [
+  "filtro_ar_motor",
+  "filtro_cabine",
+  "filtro_combustivel",
+];
+
+function normalizeForBaseline(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+function isPureElectricVehicle(plan: MaintenancePlanJson): boolean {
+  const combustivel = normalizeForBaseline(plan.vehicle_summary.combustivel);
+  const motor = normalizeForBaseline(plan.vehicle_summary.motor_textual);
+  const haystack = `${combustivel} ${motor}`;
+
+  // Marcadores de motor a combustão / híbrido com motor a combustão.
+  const combustionMarkers =
+    /(flex|gasolina|etanol|alcool|diesel|hibrido|hybrid|hev|phev|mhev|dm-?i|hsd|combustao)/;
+  if (combustionMarkers.test(haystack)) return false;
+
+  // Marcadores exclusivamente elétricos.
+  const electricMarkers = /(eletrico|electric|\bev\b|\bbev\b)/;
+  return electricMarkers.test(combustivel) || electricMarkers.test(motor);
+}
+
+function validateBaselineItems(plan: MaintenancePlanJson): string[] {
+  if (isPureElectricVehicle(plan)) return [];
+
+  const errors: string[] = [];
+  const byKm = new Map<number, Set<string>>();
+  for (const m of plan.milestones) {
+    if (!byKm.has(m.km)) {
+      byKm.set(m.km, new Set(m.items.map((it) => it.item_key)));
+    }
+  }
+
+  for (const km of REQUIRED_MILESTONE_KMS) {
+    const keys = byKm.get(km);
+    if (!keys) continue; // already reported by validateMilestoneSchedule
+    for (const required of BASELINE_ALL_ITEM_KEYS) {
+      if (!keys.has(required)) {
+        errors.push(`Cronograma inválido: milestone ${km} km sem ${required}.`);
+      }
+    }
+  }
+
+  for (const km of EVEN_MILESTONE_KMS) {
+    const keys = byKm.get(km);
+    if (!keys) continue;
+    for (const required of BASELINE_EVEN_ITEM_KEYS) {
+      if (!keys.has(required)) {
+        errors.push(`Cronograma inválido: milestone ${km} km sem ${required}.`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+
+
 
 export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
   method: "POST",
@@ -1103,6 +1197,21 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
         raw_preview: preview,
       };
     }
+
+    const baselineErrors = validateBaselineItems(validation.data);
+    if (baselineErrors.length > 0) {
+      return {
+        valid: false,
+        plan: null,
+        errors: baselineErrors,
+        warnings: baseWarnings,
+        ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
+        technical_context_debug: buildDebug(ctx),
+        raw_preview: preview,
+      };
+    }
+
+
 
     return {
       valid: true,
