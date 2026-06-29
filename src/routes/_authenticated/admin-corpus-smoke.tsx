@@ -2574,6 +2574,8 @@ function DryRunIaTester() {
 
               <PlanReviewPanel plan={plan} />
 
+              <NextMilestonePanel plan={plan} />
+
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground">
                   Plano validado (JSON)
