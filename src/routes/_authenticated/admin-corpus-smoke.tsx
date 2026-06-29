@@ -19,7 +19,7 @@ import {
 import {
  buildNextRevisionPayload,
  type NextRevisionPayload,
-} from "@/lib/maintenance-next-milestone";
+} from "@/lib/maintenance-next-revision-payload";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
