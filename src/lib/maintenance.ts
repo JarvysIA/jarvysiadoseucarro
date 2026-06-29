@@ -38,9 +38,9 @@ export const ITEM_DEFAULTS: Record<
   { nome: string; validade_km: number; validade_meses: number }
 > = {
   oleo: { nome: "Óleo e Filtro do Motor", validade_km: 10000, validade_meses: 12 },
-  filtros: { nome: "Filtros (Ar/Cabine/Combustível)", validade_km: 15000, validade_meses: 12 },
+  filtros: { nome: "Filtros (Ar/Cabine/Combustível)", validade_km: 20000, validade_meses: 24 },
   pneus: { nome: "Pneus", validade_km: 50000, validade_meses: 60 },
-  pastilhas: { nome: "Pastilhas de Freio", validade_km: 30000, validade_meses: 36 },
+  pastilhas: { nome: "Pastilhas de Freio", validade_km: 30000, validade_meses: 18 },
   arrefecimento: { nome: "Arrefecimento", validade_km: 40000, validade_meses: 24 },
 };
 
