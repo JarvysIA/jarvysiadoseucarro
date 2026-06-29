@@ -20,6 +20,7 @@ import {
  buildNextRevisionPayload,
  type NextRevisionPayload,
 } from "@/lib/maintenance-next-revision-payload";
+import { buildMaintenanceShoppingSearchPayload } from "@/lib/maintenance-shopping-search";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
