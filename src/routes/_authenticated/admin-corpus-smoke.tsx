@@ -3167,9 +3167,213 @@ function NextMilestonePanel({ plan }: { plan: unknown }) {
           </div>
         )}
       </div>
+
+      <NextRevisionPayloadSubPanel
+        plan={plan}
+        kmInput={kmInput}
+        dismissedInput={dismissedInput}
+      />
     </section>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.41 — Sub-painel admin do payload limpo da próxima revisão.
+// Apenas admin/debug. Não é UI final de usuário e não será
+// reaproveitado na Dashboard final.
+// ─────────────────────────────────────────────────────────────
+
+function severityBadgeClass(sev: NextRevisionPayload["revision"]["severity"]): string {
+  switch (sev) {
+    case "due":
+      return "bg-destructive/15 text-destructive border-destructive/30";
+    case "attention":
+      return "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300";
+    case "high_mileage":
+      return "bg-blue-500/15 text-blue-700 border-blue-500/30 dark:text-blue-300";
+    case "neutral":
+    default:
+      return "bg-muted text-foreground border-border";
+  }
+}
+
+function NextRevisionPayloadSubPanel({
+  plan,
+  kmInput,
+  dismissedInput,
+}: {
+  plan: unknown;
+  kmInput: string;
+  dismissedInput: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const payload: NextRevisionPayload = useMemo(() => {
+    const kmNum = Number(kmInput);
+    const dismissed = parseKmCsv(dismissedInput);
+    return buildNextRevisionPayload(
+      plan,
+      Number.isFinite(kmNum) ? kmNum : NaN,
+      { dismissedRevisionKms: dismissed },
+    );
+  }, [plan, kmInput, dismissedInput]);
+
+  const json = useMemo(() => JSON.stringify(payload, null, 2), [payload]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <section className="mt-4 rounded border border-dashed border-border bg-background p-3">
+      <header className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <h5 className="text-sm font-semibold text-foreground">
+            Payload limpo (Build 6.41) — admin/debug
+          </h5>
+          <p className="text-[11px] text-muted-foreground">
+            Sub-painel apenas para inspeção. Não é UI final de usuário.
+          </p>
+        </div>
+        <span
+          className={`rounded border px-2 py-0.5 text-[11px] font-medium ${severityBadgeClass(payload.revision.severity)}`}
+        >
+          {payload.revision.severity}
+        </span>
+      </header>
+
+      <div className="mb-2 rounded border border-border bg-card px-3 py-2">
+        <p className="text-sm font-semibold text-foreground">
+          {payload.userMessages.title}
+        </p>
+        {payload.userMessages.subtitle !== null ? (
+          <p className="text-xs text-muted-foreground">
+            {payload.userMessages.subtitle}
+          </p>
+        ) : null}
+      </div>
+
+      {payload.userMessages.highMileageTitle !== null ? (
+        <div className="mb-2 rounded border border-blue-500/30 bg-blue-500/10 px-3 py-2">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+            {payload.userMessages.highMileageTitle}
+          </p>
+          <p className="text-[11px] text-blue-900/80 dark:text-blue-200/90">
+            {payload.userMessages.highMileageMessage}
+          </p>
+        </div>
+      ) : null}
+
+      {payload.userMessages.safetyMessage !== null ? (
+        <div className="mb-2 rounded border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+          {payload.userMessages.safetyMessage}
+        </div>
+      ) : null}
+
+      <div className="mb-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+        <Stat
+          label="itemsToShow"
+          value={String(payload.itemsToShow.length)}
+        />
+        <Stat
+          label="shoppingCandidates"
+          value={String(payload.itemsShoppingCandidates.length)}
+        />
+        <Stat
+          label="serviceOnly"
+          value={String(payload.itemsServiceOnly.length)}
+        />
+        <Stat
+          label="inspectBeforeBuy"
+          value={String(payload.itemsInspectBeforeBuy.length)}
+        />
+      </div>
+
+      {payload.itemsToShow.length > 0 ? (
+        <div className="mb-2 overflow-x-auto">
+          <table className="w-full border-collapse text-[11px]">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="px-2 py-1">item_key</th>
+                <th className="px-2 py-1">kind</th>
+                <th className="px-2 py-1">userNote</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payload.itemsToShow.map((it, i) => (
+                <tr
+                  key={`${it.itemKey}-${i}`}
+                  className="border-b border-border/50 align-top"
+                >
+                  <td className="px-2 py-1 font-mono">{it.itemKey}</td>
+                  <td className="px-2 py-1">{it.kind}</td>
+                  <td className="px-2 py-1">{it.userNote ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mb-2 text-[11px] text-muted-foreground">
+          Nenhum item visível para esta revisão.
+        </p>
+      )}
+
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded border border-border bg-background px-2 py-1 text-[11px] text-foreground hover:bg-muted"
+        >
+          {copied ? "Copiado!" : "Copiar payload JSON"}
+        </button>
+      </div>
+
+      <details className="rounded border border-border bg-muted/20 p-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-muted-foreground">
+          debug + payload JSON completo
+        </summary>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+          <Stat label="sourceStatus" value={payload.debug.sourceStatus} />
+          <Stat
+            label="sourceMode"
+            value={nmDisplay(payload.debug.sourceMode)}
+          />
+          <Stat
+            label="baseReferenceKm"
+            value={nmDisplay(payload.debug.baseReferenceKm)}
+          />
+          <Stat
+            label="warnings"
+            value={String(payload.debug.warnings.length)}
+          />
+        </div>
+        {payload.debug.warnings.length > 0 ? (
+          <ul className="mt-2 flex flex-wrap gap-1">
+            {payload.debug.warnings.map((w, i) => (
+              <li
+                key={`${w}-${i}`}
+                className="rounded border border-border bg-background px-2 py-0.5 text-[11px] text-foreground"
+              >
+                {w}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <pre className="mt-2 max-h-96 overflow-auto rounded border border-border bg-background p-2 text-[10px] leading-snug text-foreground">
+          {json}
+        </pre>
+      </details>
+    </section>
+  );
+}
+
 
 
 
