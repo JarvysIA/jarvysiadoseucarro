@@ -2,7 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeParseMaintenancePlanJson } from "./maintenance-plan-validation";
-import type { MaintenancePlanJson } from "./maintenance-plan-schema";
+import type {
+  MaintenancePlanItem,
+  MaintenancePlanJson,
+} from "./maintenance-plan-schema";
 
 // ─────────────────────────────────────────────────────────────
 // Build 6.30 — Gerador IA dry-run de maintenance_plan_json.
@@ -1104,10 +1107,413 @@ function validateBaselineItems(plan: MaintenancePlanJson): string[] {
 
 
 
+// ─────────────────────────────────────────────────────────────
+// Build 6.42C — Camada determinística Jarvys.
+// Aplica baseline obrigatório (óleo + filtros), itens críticos
+// (câmbio automático convencional, sincronismo) e bloqueios de
+// segurança (corrente, correia banhada, e-CVT) após o parse Zod
+// e antes das validações de schedule/baseline. Não inventa itens
+// complementares (velas, bobinas, poly V, bomba d'água, pastilhas,
+// fluido de freio, arrefecimento, suspensão) — estes seguem
+// responsabilidade da IA/corpus.
+// ─────────────────────────────────────────────────────────────
+
+const AUTOMATIC_DETERMINISTIC_KMS: readonly number[] = [
+  40000, 80000, 120000, 160000, 200000,
+];
+const TIMING_BELT_KMS: readonly number[] = [60000, 120000, 180000];
+const WET_BELT_DIAGNOSIS_KMS: readonly number[] = [
+  60000, 100000, 150000, 200000,
+];
+const ECVT_DIAGNOSIS_KMS: readonly number[] = [100000, 200000];
+
+const TIMING_ITEM_KEY_TOKENS = [
+  "kit_sincronismo",
+  "sincronismo",
+  "kit_correia_dentada",
+  "correia_dentada",
+];
+
+function normalizeForJarvys(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+}
+
+function itemMatchesAny(
+  item: MaintenancePlanItem,
+  keyTokens: readonly string[],
+  labelTokens: readonly string[] = [],
+): boolean {
+  const key = normalizeForJarvys(item.item_key).replace(/\s+/g, "_");
+  const label = normalizeForJarvys(item.label);
+  for (const t of keyTokens) {
+    const nt = normalizeForJarvys(t).replace(/\s+/g, "_");
+    if (key === nt || key.includes(nt)) return true;
+  }
+  for (const t of labelTokens) {
+    if (label.includes(normalizeForJarvys(t))) return true;
+  }
+  return false;
+}
+
+function hasOleoMotor(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(it, ["oleo_motor"], ["oleo motor", "oleo do motor"]),
+  );
+}
+function hasFiltroOleo(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(
+      it,
+      ["filtro_oleo"],
+      ["filtro de oleo", "filtro oleo"],
+    ),
+  );
+}
+function hasFiltroAr(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(it, ["filtro_ar_motor", "filtro_ar"], ["filtro de ar"]),
+  );
+}
+function hasFiltroCabine(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(it, ["filtro_cabine"], ["filtro de cabine", "filtro ar condicionado"]),
+  );
+}
+function hasFiltroCombustivel(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(it, ["filtro_combustivel"], ["filtro de combustivel"]),
+  );
+}
+function hasCambioAutomatico(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(
+      it,
+      [
+        "oleo_cambio_automatico",
+        "kit_cambio_automatico",
+        "oleo_cambio",
+        "fluido_cambio",
+      ],
+      ["oleo cambio", "fluido de cambio", "oleo do cambio", "atf"],
+    ),
+  );
+}
+function hasTimingItem(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) => itemMatchesAny(it, TIMING_ITEM_KEY_TOKENS));
+}
+function hasWetBeltDiagnosis(items: MaintenancePlanItem[]): boolean {
+  return items.some((it) =>
+    itemMatchesAny(
+      it,
+      ["diagnostico_correia_banhada", "correia_banhada"],
+      ["correia banhada"],
+    ),
+  );
+}
+function planHasECvtDiagnosis(plan: MaintenancePlanJson): boolean {
+  return plan.milestones.some((m) =>
+    m.items.some((it) =>
+      itemMatchesAny(
+        it,
+        ["diagnostico_e_cvt", "e_cvt", "ecvt"],
+        ["e-cvt", "ecvt", "sistema hibrido", "hybrid synergy"],
+      ),
+    ),
+  );
+}
+
+function isCombustionVehicle(plan: MaintenancePlanJson): boolean {
+  if (isPureElectricVehicle(plan)) return false;
+  const haystack = normalizeForJarvys(
+    `${plan.vehicle_summary.combustivel ?? ""} ${plan.vehicle_summary.motor_textual ?? ""}`,
+  );
+  if (
+    /(flex|gasolina|etanol|alcool|diesel|hibrid|hybrid|hev|phev|mhev|dm i|dmi|hsd)/.test(
+      haystack,
+    )
+  ) {
+    return true;
+  }
+  const cc = plan.vehicle_summary.cilindradas;
+  return typeof cc === "number" && cc > 0;
+}
+
+function isECvtVehicle(plan: MaintenancePlanJson): boolean {
+  if (isECvtTransmission(plan.vehicle_summary.transmissao)) return true;
+  const motor = normalizeForJarvys(plan.vehicle_summary.motor_textual);
+  if (/(e cvt|ecvt|hsd|dm i|dmi|hybrid synergy)/.test(motor)) return true;
+  return false;
+}
+
+function isConventionalAutomatic(plan: MaintenancePlanJson): boolean {
+  if (isECvtVehicle(plan)) return false;
+  const t = plan.system_profile.transmission_type;
+  return (
+    t === "automatico" ||
+    t === "cvt" ||
+    t === "automatizado" ||
+    t === "dupla_embreagem"
+  );
+}
+
+// Builders — usam `as unknown as MaintenancePlanItem` para permitir o
+// marcador `source_type: "regra_jarvys"` exigido pelo Build 6.42C, que
+// não faz parte do enum Zod canônico. O plano não é re-validado depois
+// desta etapa, então isso é seguro e mantém a origem rastreável.
+function buildOleoMotor(): MaintenancePlanItem {
+  return {
+    item_key: "oleo_motor",
+    label: "Óleo do motor — especificação a confirmar conforme manual",
+    category: "motor",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "inspect_before_buy",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildFiltroOleo(): MaintenancePlanItem {
+  return {
+    item_key: "filtro_oleo",
+    label: "Filtro de óleo",
+    category: "filtros",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "bundle_preferred",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildFiltroAr(): MaintenancePlanItem {
+  return {
+    item_key: "filtro_ar_motor",
+    label: "Filtro de ar do motor",
+    category: "filtros",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "safe_to_buy",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildFiltroCabine(): MaintenancePlanItem {
+  return {
+    item_key: "filtro_cabine",
+    label: "Filtro de cabine",
+    category: "filtros",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "safe_to_buy",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildFiltroCombustivel(): MaintenancePlanItem {
+  return {
+    item_key: "filtro_combustivel",
+    label: "Filtro de combustível — confirmar aplicação conforme versão",
+    category: "filtros",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "inspect_before_buy",
+    applies: true,
+    confidence: 85,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildOleoCambioAutomatico(): MaintenancePlanItem {
+  return {
+    item_key: "oleo_cambio_automatico",
+    label:
+      "Óleo e filtro do câmbio automático — troca completa com equipamento especializado",
+    category: "transmissao",
+    action: "troca_preventiva_recomendada",
+    recommendation_type: "preventive_recommended",
+    shopping_classification: "inspect_before_buy",
+    applies: true,
+    confidence: 85,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildKitSincronismo(): MaintenancePlanItem {
+  return {
+    item_key: "kit_sincronismo",
+    label: "Kit sincronismo / correia dentada",
+    category: "motor",
+    action: "trocar",
+    recommendation_type: "required",
+    shopping_classification: "inspect_before_buy",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildDiagnosticoCorreiaBanhada(): MaintenancePlanItem {
+  return {
+    item_key: "diagnostico_correia_banhada",
+    label: "Inspeção crítica da correia banhada a óleo",
+    category: "motor",
+    action: "diagnosticar",
+    recommendation_type: "preventive_recommended",
+    shopping_classification: "service_only",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+function buildDiagnosticoECvt(): MaintenancePlanItem {
+  return {
+    item_key: "diagnostico_e_cvt",
+    label: "Diagnóstico do sistema híbrido/e-CVT",
+    category: "transmissao",
+    action: "diagnosticar",
+    recommendation_type: "condition_based",
+    shopping_classification: "service_only",
+    applies: true,
+    confidence: 90,
+    source_type: "regra_jarvys",
+  } as unknown as MaintenancePlanItem;
+}
+
+function disableTimingItem(item: MaintenancePlanItem): MaintenancePlanItem {
+  return {
+    ...item,
+    applies: false,
+    recommendation_type: "not_applicable",
+    shopping_classification: "not_applicable",
+  };
+}
+
+function applyJarvysDeterministicMaintenanceRules(
+  plan: MaintenancePlanJson,
+): { plan: MaintenancePlanJson; warnings: string[] } {
+  const warnings: string[] = [];
+
+  if (isPureElectricVehicle(plan)) {
+    // Elétrico puro: a camada determinística não toca em nada.
+    return { plan, warnings };
+  }
+
+  const combustion = isCombustionVehicle(plan);
+  const eCvt = isECvtVehicle(plan);
+  const convAuto = isConventionalAutomatic(plan);
+  const timing = plan.system_profile.timing_system;
+  const evenSet = new Set<number>(EVEN_MILESTONE_KMS);
+  const autoSet = new Set<number>(AUTOMATIC_DETERMINISTIC_KMS);
+  const timingBeltSet = new Set<number>(TIMING_BELT_KMS);
+  const wetBeltSet = new Set<number>(WET_BELT_DIAGNOSIS_KMS);
+  const eCvtSet = new Set<number>(ECVT_DIAGNOSIS_KMS);
+
+  const nextMilestones = plan.milestones.map((m) => {
+    const items: MaintenancePlanItem[] = m.items.map((it) => ({ ...it }));
+
+    // Parte 3 (mutação) — bloqueio de dentada em corrente / correia banhada.
+    if (timing === "corrente" || timing === "correia_banhada") {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (
+          itemMatchesAny(it, TIMING_ITEM_KEY_TOKENS) &&
+          it.applies !== false
+        ) {
+          items[i] = disableTimingItem(it);
+          warnings.push(`jarvys_rule_disabled:${m.km}:${it.item_key}`);
+        }
+      }
+    }
+
+    if (combustion) {
+      // Parte 1 — baseline em TODAS as milestones.
+      if (!hasOleoMotor(items)) {
+        items.push(buildOleoMotor());
+        warnings.push(`jarvys_rule_added:${m.km}:oleo_motor`);
+      }
+      if (!hasFiltroOleo(items)) {
+        items.push(buildFiltroOleo());
+        warnings.push(`jarvys_rule_added:${m.km}:filtro_oleo`);
+      }
+
+      // Parte 1 — kit filtros nas milestones pares.
+      if (evenSet.has(m.km)) {
+        if (!hasFiltroAr(items)) {
+          items.push(buildFiltroAr());
+          warnings.push(`jarvys_rule_added:${m.km}:filtro_ar_motor`);
+        }
+        if (!hasFiltroCabine(items)) {
+          items.push(buildFiltroCabine());
+          warnings.push(`jarvys_rule_added:${m.km}:filtro_cabine`);
+        }
+        if (!hasFiltroCombustivel(items)) {
+          items.push(buildFiltroCombustivel());
+          warnings.push(`jarvys_rule_added:${m.km}:filtro_combustivel`);
+        }
+      }
+
+      // Parte 2 — câmbio automático convencional.
+      if (convAuto && autoSet.has(m.km) && !hasCambioAutomatico(items)) {
+        items.push(buildOleoCambioAutomatico());
+        warnings.push(`jarvys_rule_added:${m.km}:oleo_cambio_automatico`);
+      }
+
+      // Parte 3 — sincronismo determinístico (apenas correia dentada seca).
+      if (
+        timing === "correia_dentada" &&
+        timingBeltSet.has(m.km) &&
+        !hasTimingItem(items)
+      ) {
+        items.push(buildKitSincronismo());
+        warnings.push(`jarvys_rule_added:${m.km}:kit_sincronismo`);
+      }
+
+      // Parte 3 — diagnóstico de correia banhada.
+      if (
+        timing === "correia_banhada" &&
+        wetBeltSet.has(m.km) &&
+        !hasWetBeltDiagnosis(items)
+      ) {
+        items.push(buildDiagnosticoCorreiaBanhada());
+        warnings.push(`jarvys_rule_added:${m.km}:diagnostico_correia_banhada`);
+      }
+    }
+
+    return { ...m, items };
+  });
+
+  // Parte 2 — diagnóstico e-CVT (decisão a partir do plano agregado).
+  if (combustion && eCvt && !planHasECvtDiagnosis({ ...plan, milestones: nextMilestones })) {
+    for (let i = 0; i < nextMilestones.length; i++) {
+      const m = nextMilestones[i];
+      if (eCvtSet.has(m.km)) {
+        nextMilestones[i] = {
+          ...m,
+          items: [...m.items, buildDiagnosticoECvt()],
+        };
+        warnings.push(`jarvys_rule_added:${m.km}:diagnostico_e_cvt`);
+      }
+    }
+  }
+
+  return {
+    plan: { ...plan, milestones: nextMilestones },
+    warnings,
+  };
+}
+
+
 export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
   method: "POST",
 })
   .middleware([requireSupabaseAuth])
+
   .inputValidator((input: unknown) => {
     assertNoForbiddenKeysDeep(input);
     return inputSchema.parse(input);
@@ -1185,42 +1591,47 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
-    const scheduleErrors = validateMilestoneSchedule(validation.data);
+    const deterministic = applyJarvysDeterministicMaintenanceRules(
+      validation.data,
+    );
+    const planAfterRules = deterministic.plan;
+    const combinedWarnings = [...baseWarnings, ...deterministic.warnings];
+
+    const scheduleErrors = validateMilestoneSchedule(planAfterRules);
     if (scheduleErrors.length > 0) {
       return {
         valid: false,
         plan: null,
         errors: scheduleErrors,
-        warnings: baseWarnings,
+        warnings: combinedWarnings,
         ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
     }
 
-    const baselineErrors = validateBaselineItems(validation.data);
+    const baselineErrors = validateBaselineItems(planAfterRules);
     if (baselineErrors.length > 0) {
       return {
         valid: false,
         plan: null,
         errors: baselineErrors,
-        warnings: baseWarnings,
+        warnings: combinedWarnings,
         ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
     }
 
-
-
     return {
       valid: true,
-      plan: validation.data,
+      plan: planAfterRules,
       errors: [],
-      warnings: baseWarnings,
+      warnings: combinedWarnings,
       ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
+
 
   });
