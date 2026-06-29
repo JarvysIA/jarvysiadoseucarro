@@ -20,6 +20,7 @@ import {
  buildNextRevisionPayload,
  type NextRevisionPayload,
 } from "@/lib/maintenance-next-revision-payload";
+import { buildMaintenanceShoppingSearchPayload } from "@/lib/maintenance-shopping-search";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
@@ -3370,9 +3371,193 @@ function NextRevisionPayloadSubPanel({
           {json}
         </pre>
       </details>
+
+      <ShoppingSearchPreviewPanel revisionPayload={payload} />
     </section>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.42B — Preview admin das buscas de Shopping.
+// Renderiza shoppingPayload sem gerar URLs, afiliado, ou persistir.
+// ─────────────────────────────────────────────────────────────
+
+function ShoppingSearchPreviewPanel({
+  revisionPayload,
+}: {
+  revisionPayload: unknown;
+}) {
+  const shoppingPayload = useMemo(
+    () => buildMaintenanceShoppingSearchPayload(revisionPayload),
+    [revisionPayload],
+  );
+
+  return (
+    <section className="mt-4 rounded border border-dashed border-border bg-background p-3">
+      <header className="mb-2">
+        <h5 className="text-sm font-semibold text-foreground">
+          Buscas de Shopping — Build 6.42
+        </h5>
+        <p className="text-[11px] text-muted-foreground">
+          Prévia das buscas que futuramente serão convertidas em links do
+          Mercado Livre. Nenhuma URL ou afiliado é gerado neste build.
+        </p>
+      </header>
+
+      <div className="mb-3 grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-5">
+        <Stat label="ok" value={shoppingPayload.ok ? "true" : "false"} />
+        <Stat
+          label="vehicleSearchName"
+          value={shoppingPayload.vehicleSearchName !== "" ? shoppingPayload.vehicleSearchName : "—"}
+        />
+        <Stat label="groups" value={String(shoppingPayload.groups.length)} />
+        <Stat label="linkGroups" value={String(shoppingPayload.linkGroups.length)} />
+        <Stat label="serviceGroups" value={String(shoppingPayload.serviceGroups.length)} />
+      </div>
+
+      {!shoppingPayload.ok ? (
+        <div className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+          <p className="font-semibold">
+            Payload de Shopping indisponível para esta revisão.
+          </p>
+          {shoppingPayload.debug.warnings.length > 0 ? (
+            <ul className="mt-1 list-disc pl-4">
+              {shoppingPayload.debug.warnings.map((w, i) => (
+                <li key={`${w}-${i}`}>{w}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <div className="mb-3">
+            <h6 className="mb-1 text-[12px] font-semibold text-foreground">
+              Grupos com link futuro (Mercado Livre — Build 6.43)
+            </h6>
+            {shoppingPayload.linkGroups.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Nenhum grupo de peça/link futuro encontrado.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {shoppingPayload.linkGroups.map((g) => (
+                  <li
+                    key={g.groupKey}
+                    className="rounded border border-border bg-card p-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[12px] font-semibold text-foreground">
+                        {g.title}
+                      </span>
+                      <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                        {g.type}
+                      </span>
+                      <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                        {g.groupKey}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] font-mono text-foreground">
+                      Query: {g.searchQuery ?? "—"}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Itens: {g.items.map((i) => i.itemKey).join(", ") || "—"}
+                    </p>
+                    {g.compatibilityNote !== null ? (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {g.compatibilityNote}
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {g.userNote}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="mb-3">
+            <h6 className="mb-1 text-[12px] font-semibold text-foreground">
+              Grupos de serviço (sem link)
+            </h6>
+            {shoppingPayload.serviceGroups.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Nenhum grupo de serviço encontrado.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {shoppingPayload.serviceGroups.map((g) => (
+                  <li
+                    key={g.groupKey}
+                    className="rounded border border-border bg-card p-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[12px] font-semibold text-foreground">
+                        {g.title}
+                      </span>
+                      <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                        {g.type}
+                      </span>
+                      <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                        {g.groupKey}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {g.userNote}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+
+      <div className="mb-2 rounded border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+        <p>{shoppingPayload.footerMessages.cartMessage}</p>
+        <p>{shoppingPayload.footerMessages.compatibilityMessage}</p>
+      </div>
+
+      <details className="rounded border border-border bg-muted/20 p-2">
+        <summary className="cursor-pointer text-[11px] font-semibold text-muted-foreground">
+          debug shopping (warnings, grouped/ungrouped item keys)
+        </summary>
+        <div className="mt-2 space-y-2 text-[11px]">
+          <div>
+            <p className="font-semibold text-foreground">warnings</p>
+            {shoppingPayload.debug.warnings.length === 0 ? (
+              <p className="text-muted-foreground">—</p>
+            ) : (
+              <ul className="flex flex-wrap gap-1">
+                {shoppingPayload.debug.warnings.map((w, i) => (
+                  <li
+                    key={`${w}-${i}`}
+                    className="rounded border border-border bg-background px-2 py-0.5"
+                  >
+                    {w}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">groupedItemKeys</p>
+            <p className="font-mono text-muted-foreground">
+              {shoppingPayload.debug.groupedItemKeys.join(", ") || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">ungroupedItemKeys</p>
+            <p className="font-mono text-muted-foreground">
+              {shoppingPayload.debug.ungroupedItemKeys.join(", ") || "—"}
+            </p>
+          </div>
+        </div>
+      </details>
+    </section>
+  );
+}
+
 
 
 
