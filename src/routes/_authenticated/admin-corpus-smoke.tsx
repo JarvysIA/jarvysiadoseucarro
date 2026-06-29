@@ -13,8 +13,12 @@ import { selectMaintenanceCorpusForVehicleAdminFn } from "@/lib/maintenance-corp
 import { buildMaintenanceCorpusContextAdminFn } from "@/lib/maintenance-corpus-context.functions";
 import { generateMaintenancePlanFromCorpusDryRunFn } from "@/lib/maintenance-plan-ai-dry-run.functions";
 import {
-  getNextMilestone,
-  type NextMilestoneResult,
+ getNextMilestone,
+ type NextMilestoneResult,
+} from "@/lib/maintenance-next-milestone";
+import {
+ buildNextRevisionPayload,
+ type NextRevisionPayload,
 } from "@/lib/maintenance-next-milestone";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
