@@ -1591,42 +1591,47 @@ export const generateMaintenancePlanFromCorpusDryRunFn = createServerFn({
       };
     }
 
-    const scheduleErrors = validateMilestoneSchedule(validation.data);
+    const deterministic = applyJarvysDeterministicMaintenanceRules(
+      validation.data,
+    );
+    const planAfterRules = deterministic.plan;
+    const combinedWarnings = [...baseWarnings, ...deterministic.warnings];
+
+    const scheduleErrors = validateMilestoneSchedule(planAfterRules);
     if (scheduleErrors.length > 0) {
       return {
         valid: false,
         plan: null,
         errors: scheduleErrors,
-        warnings: baseWarnings,
+        warnings: combinedWarnings,
         ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
     }
 
-    const baselineErrors = validateBaselineItems(validation.data);
+    const baselineErrors = validateBaselineItems(planAfterRules);
     if (baselineErrors.length > 0) {
       return {
         valid: false,
         plan: null,
         errors: baselineErrors,
-        warnings: baseWarnings,
+        warnings: combinedWarnings,
         ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
         technical_context_debug: buildDebug(ctx),
         raw_preview: preview,
       };
     }
 
-
-
     return {
       valid: true,
-      plan: validation.data,
+      plan: planAfterRules,
       errors: [],
-      warnings: baseWarnings,
+      warnings: combinedWarnings,
       ai: { provider: AI_PROVIDER, model: AI_MODEL, usage: ai.usage },
       technical_context_debug: buildDebug(ctx),
       raw_preview: preview,
     };
+
 
   });
