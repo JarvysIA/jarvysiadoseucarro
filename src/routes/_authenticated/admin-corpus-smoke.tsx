@@ -12,6 +12,10 @@ import {
 import { selectMaintenanceCorpusForVehicleAdminFn } from "@/lib/maintenance-corpus-selection.functions";
 import { buildMaintenanceCorpusContextAdminFn } from "@/lib/maintenance-corpus-context.functions";
 import { generateMaintenancePlanFromCorpusDryRunFn } from "@/lib/maintenance-plan-ai-dry-run.functions";
+import {
+  getNextMilestone,
+  type NextMilestoneResult,
+} from "@/lib/maintenance-next-milestone";
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
@@ -2574,6 +2578,8 @@ function DryRunIaTester() {
 
               <PlanReviewPanel plan={plan} />
 
+              <NextMilestonePanel plan={plan} />
+
               <details className="text-xs">
                 <summary className="cursor-pointer text-muted-foreground">
                   Plano validado (JSON)
@@ -2908,5 +2914,258 @@ function PlanReviewPanel({ plan }: { plan: unknown }) {
     </div>
   );
 }
+
+
+// ─────────────────────────────────────────────────────────────
+// Build 6.40 — Painel admin/debug de "Próxima revisão calculada"
+// Apenas leitura. Sem persistência, sem IA, sem banco.
+// Usa o plano IA já validado (in-memory) e o helper puro
+// getNextMilestone para simular o cálculo da próxima revisão.
+// dismissedRevisionKms é só simulação local (CSV).
+// ─────────────────────────────────────────────────────────────
+
+function parseKmCsv(input: string): number[] {
+  if (typeof input !== "string") return [];
+  const out: number[] = [];
+  for (const part of input.split(/[,\s]+/)) {
+    const t = part.trim();
+    if (t === "") continue;
+    const n = Number(t);
+    if (Number.isFinite(n) && n > 0) out.push(Math.floor(n));
+  }
+  return out;
+}
+
+function nmDisplay(v: unknown): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "string") return v.trim() === "" ? "—" : v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return "—";
+  }
+}
+
+function formatKm(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return "—";
+  return `${n.toLocaleString("pt-BR")} km`;
+}
+
+function NextMilestonePanel({ plan }: { plan: unknown }) {
+  const [kmInput, setKmInput] = useState<string>("57000");
+  const [dismissedInput, setDismissedInput] = useState<string>("");
+
+  const result: NextMilestoneResult = useMemo(() => {
+    const kmNum = Number(kmInput);
+    const dismissed = parseKmCsv(dismissedInput);
+    return getNextMilestone(plan, Number.isFinite(kmNum) ? kmNum : NaN, {
+      dismissedRevisionKms: dismissed,
+    });
+  }, [plan, kmInput, dismissedInput]);
+
+  const items = Array.isArray(result.items) ? result.items : [];
+
+  let banner: { tone: "warn" | "info" | "danger"; text: string } | null = null;
+  if (result.alertStatus === "upcoming") {
+    banner = {
+      tone: "warn",
+      text: `Faltam ${formatKm(result.distanceKm)} para a revisão de ${formatKm(result.targetKm)}.`,
+    };
+  } else if (result.alertStatus === "due") {
+    banner = {
+      tone: "warn",
+      text: `Chegou a revisão de ${formatKm(result.targetKm)}.`,
+    };
+  } else if (result.alertStatus === "due_grace") {
+    banner = {
+      tone: "warn",
+      text: `Revisão de ${formatKm(result.targetKm)} ainda pendente.`,
+    };
+  }
+
+  const showLastWarning =
+    result.alertStatus === "due_grace" &&
+    result.kmSinceCurrentCycle !== null &&
+    result.kmSinceCurrentCycle === result.postDueReminderKm;
+
+  return (
+    <section className="mt-4 rounded border border-border bg-card p-3">
+      <header className="mb-2">
+        <h4 className="text-sm font-semibold text-foreground">
+          Próxima revisão calculada (helper puro — sem persistência)
+        </h4>
+        <p className="text-[11px] text-muted-foreground">
+          Simulação local do helper <code>getNextMilestone</code>. Não altera o
+          plano nem o banco.
+        </p>
+      </header>
+
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-muted-foreground">km_atual (simulado)</span>
+          <input
+            type="number"
+            min={0}
+            step={1000}
+            value={kmInput}
+            onChange={(e) => setKmInput(e.target.value)}
+            className="rounded border border-input bg-background px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-muted-foreground">
+            dismissedRevisionKms (CSV, só simulação)
+          </span>
+          <input
+            type="text"
+            placeholder="ex.: 60000, 70000"
+            value={dismissedInput}
+            onChange={(e) => setDismissedInput(e.target.value)}
+            className="rounded border border-input bg-background px-2 py-1 text-sm"
+          />
+        </label>
+      </div>
+
+      {banner !== null ? (
+        <div
+          className="mb-2 rounded border border-border bg-muted/40 px-3 py-2 text-xs text-foreground"
+          role="status"
+        >
+          {banner.text}
+        </div>
+      ) : null}
+
+      {showLastWarning ? (
+        <div
+          className="mb-2 rounded border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground"
+          role="status"
+        >
+          Último aviso desta revisão. Em build futuro, aqui haverá o botão
+          “Não lembrar novamente”.
+        </div>
+      ) : null}
+
+      {result.mode === "recurring" ? (
+        <div className="mb-2 rounded border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+          Km acima do plano base 10k–200k. Próxima revisão calculada por ciclo
+          recorrente preventivo do Jarvys (baseReferenceKm ={" "}
+          {formatKm(result.baseReferenceKm)}).
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+        <Stat label="status" value={result.status} />
+        <Stat label="mode" value={nmDisplay(result.mode)} />
+        <Stat label="alertStatus" value={result.alertStatus} />
+        <Stat
+          label="isInAlertWindow"
+          value={String(result.isInAlertWindow)}
+        />
+        <Stat
+          label="alertThresholdKm"
+          value={String(result.alertThresholdKm)}
+        />
+        <Stat
+          label="postDueReminderKm"
+          value={String(result.postDueReminderKm)}
+        />
+        <Stat label="kmAtual" value={String(result.kmAtual)} />
+        <Stat label="currentCycleKm" value={nmDisplay(result.currentCycleKm)} />
+        <Stat
+          label="kmSinceCurrentCycle"
+          value={nmDisplay(result.kmSinceCurrentCycle)}
+        />
+        <Stat label="targetKm" value={nmDisplay(result.targetKm)} />
+        <Stat label="distanceKm" value={nmDisplay(result.distanceKm)} />
+        <Stat label="isDismissed" value={String(result.isDismissed)} />
+        <Stat label="previousKm" value={nmDisplay(result.previousKm)} />
+        <Stat label="baseReferenceKm" value={nmDisplay(result.baseReferenceKm)} />
+        <Stat
+          label="milestones"
+          value={`${result.completedMilestones} / ${result.totalMilestones}`}
+        />
+      </div>
+
+      {result.warnings.length > 0 ? (
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+            warnings
+          </p>
+          <ul className="mt-1 flex flex-wrap gap-1">
+            {result.warnings.map((w, i) => (
+              <li
+                key={`${w}-${i}`}
+                className="rounded border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground"
+              >
+                {w}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="mt-3">
+        <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+          itens da revisão alvo {result.targetKm !== null ? `(${formatKm(result.targetKm)})` : ""}
+        </p>
+        {items.length === 0 ? (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Nenhum item disponível para esta revisão.
+          </p>
+        ) : (
+          <div className="mt-1 overflow-x-auto">
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="px-2 py-1">item_key</th>
+                  <th className="px-2 py-1">label</th>
+                  <th className="px-2 py-1">category</th>
+                  <th className="px-2 py-1">action</th>
+                  <th className="px-2 py-1">recommendation_type</th>
+                  <th className="px-2 py-1">shopping_classification</th>
+                  <th className="px-2 py-1">applies</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, i) => {
+                  const rec =
+                    typeof it === "object" && it !== null && !Array.isArray(it)
+                      ? (it as Record<string, unknown>)
+                      : {};
+                  return (
+                    <tr
+                      key={`${nmDisplay(rec["item_key"])}-${i}`}
+                      className="border-b border-border/50 align-top"
+                    >
+                      <td className="px-2 py-1 font-mono">
+                        {nmDisplay(rec["item_key"])}
+                      </td>
+                      <td className="px-2 py-1">{nmDisplay(rec["label"])}</td>
+                      <td className="px-2 py-1">
+                        {nmDisplay(rec["category"])}
+                      </td>
+                      <td className="px-2 py-1">{nmDisplay(rec["action"])}</td>
+                      <td className="px-2 py-1">
+                        {nmDisplay(rec["recommendation_type"])}
+                      </td>
+                      <td className="px-2 py-1">
+                        {nmDisplay(rec["shopping_classification"])}
+                      </td>
+                      <td className="px-2 py-1">
+                        {nmDisplay(rec["applies"])}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 
 
