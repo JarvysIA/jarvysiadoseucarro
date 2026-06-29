@@ -1,57 +1,42 @@
-## Build 6.39A — Baseline obrigatório por milestone no dry-run IA
+# Build 6.41A — Auditoria dos cards de saúde atuais x Plano Jarvys
 
-**Arquivo único alterado:** `src/lib/maintenance-plan-ai-dry-run.functions.ts`
-**Zero persistência. Zero alteração em schema/UI/banco.**
+## Escopo
 
-### Alteração 1 — Prompt: nova seção `REGRA CRÍTICA DE BASELINE POR MILESTONE`
+Build 100% documental. Único arquivo criado:
+`.lovable/build-6.41A-health-cards-vs-jarvys-plan-audit.md`.
 
-Inserida em `buildSystemPrompt()` logo após a seção de cronograma 10k–200k, com 5 subseções:
+Zero alteração de código funcional, zero banco, zero migration, zero IA, zero OCR, zero embedding, zero link Mercado Livre.
 
-1. **Combustão (flex/gasolina/etanol/diesel/híbrido com motor a combustão):** todas as 20 milestones devem conter `oleo_motor` e `filtro_oleo`. Itens maiores entram além — nunca substituem. Reforço explícito de que 100.000 km também leva óleo/filtro.
-2. **Revisões pares (20k–200k):** devem conter `filtro_ar_motor`, `filtro_cabine`, `filtro_combustivel` como itens individuais (proibido colapsar em `kit_filtros`). `purchase_bundles` pode agrupar separadamente.
-3. **Filtro de combustível incerto:** ainda incluir o item na milestone par, com label `"Filtro de combustível — confirmar aplicação conforme versão"` e `shopping_classification="inspect_before_buy"`. **Não tratar como erro técnico nesta fase.**
-4. **Elétrico puro:** proibido emitir `oleo_motor`, `filtro_oleo`, `filtro_ar_motor`, `filtro_combustivel`, `velas`, `correia_dentada`, `kit_sincronismo`.
-5. **Híbrido com motor a combustão:** elegível ao baseline; manter regra e-CVT.
-6. **Óleo com `engine_oil_profile.status="insufficient"`:** label conservador, `shopping_classification="inspect_before_buy"`, `action="trocar"`, `recommendation_type="required"`, `applies=true`. Proibido inventar viscosidade/norma/litros/marca.
+## Exploração já feita
 
-### Alteração 2 — Validação determinística pós-schema
+Confirmei os componentes/helpers que alimentam os cards atuais:
 
-Nova função `validateBaselineItems(plan)` chamada após `validateMilestoneSchedule()`, somente para veículos elegíveis (combustão).
+- `src/lib/maintenance.ts` — `ITEM_DEFAULTS` (intervalos hardcoded: óleo 10k/12m, filtros 15k/12m, pneus 50k/60m, pastilhas 30k/36m, arrefecimento 40k/24m), `buildMaintenanceItems()` (usa overrides reais do banco + fallback determinístico), `computeStatus()` (km vs tempo, pior caso).
+- `src/lib/predictive-maintenance.ts` — `nextMilestone`, `MILESTONE_STEP=10_000`, `ALERT_WINDOW=3_000`, sem teto, sem dismissal, sem itens.
+- `src/components/NextRevisionCard.tsx` — apenas alerta, props `{ kmAtual }`.
+- `src/components/MaintenancePanel.tsx` — sheet de detalhe por item, lê `MaintComputed`, lista `expenses`, dispara OCR/`parseReceiptFn` e save de despesa.
+- `src/routes/app.tsx` — Home renderiza grade de 4 itens (`oleo`, `filtros`, `pastilhas`, `arrefecimento`) consumindo `km_ultima_troca_*` da tabela `veiculos` + `NextRevisionCard`.
+- Tabela `veiculos`: colunas `km_atual`, `km_ultima_troca_oleo|filtros|pastilhas|arrefecimento` mantidas pela trigger `atualizar_revisao_veiculo` a cada nova despesa.
+- Tabela `despesas`: categoria PT (Revisão, Manutenção, Óleo, Filtros, Pastilhas, Arrefecimento via `ITEM_TO_CATEGORIA`).
 
-**Heurística de elegibilidade** sobre `vehicle_summary.combustivel` + `motor_textual` (normalizados):
-- Match exclusivo de `elétrico|eletrico|electric|ev|bev` sem indício de híbrido/combustão → **pular validação** (elétrico puro).
-- Caso contrário (flex, gasolina, etanol, diesel, híbrido, hybrid, hev, phev, dm-i, hsd) → **aplicar baseline**.
+Restantes (correia, bateria, fluido de freio, câmbio, filtro de combustível isolado) não têm card próprio nem coluna no banco — entram como pendência no relatório.
 
-**Constantes:**
-- `EVEN_MILESTONE_KMS = [20000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000]`
-- `BASELINE_ALL = ["oleo_motor", "filtro_oleo"]`
-- `BASELINE_EVEN = ["filtro_ar_motor", "filtro_cabine", "filtro_combustivel"]`
+## Estrutura do relatório
 
-**Erros emitidos (literais):**
-- `Cronograma inválido: milestone {km} km sem oleo_motor.`
-- `Cronograma inválido: milestone {km} km sem filtro_oleo.`
-- `Cronograma inválido: milestone {km} km sem filtro_ar_motor.`
-- `Cronograma inválido: milestone {km} km sem filtro_cabine.`
-- `Cronograma inválido: milestone {km} km sem filtro_combustivel.`
+Seguir exatamente a estrutura solicitada:
 
-Em caso de falha: `{ valid: false, plan: null, errors, warnings: baseWarnings, ai, technical_context_debug, raw_preview }` — mesmo shape já usado pelos retornos existentes.
+1. Resumo executivo
+2. Inventário dos cards/componentes encontrados (NextRevisionCard, grade de 4 itens em `app.tsx`, MaintenancePanel)
+3. NextRevisionCard atual (props, helper, MILESTONE_STEP=10k, ALERT_WINDOW=3k, sem teto/dismissal/itens)
+4. Cards de saúde por item/sistema (tabela: item × intervalo × fonte × hardcoded? × usa histórico? × conflito com Jarvys)
+5. Tabelas e campos envolvidos (`veiculos.km_atual`, `veiculos.km_ultima_troca_*`, `despesas.categoria/data/valor`, trigger `atualizar_revisao_veiculo`)
+6. Como lançamentos do usuário afetam os cards (OCR → `parseReceiptFn` → `despesas` → trigger atualiza `veiculos.km_ultima_troca_*` → `buildMaintenanceItems` lê override → `computeStatus` recalcula semáforo)
+7. Divergências com o Plano Jarvys (filtros 15k vs pares/20k = relevante; óleo 10k = sem divergência; pastilhas 30k e arrefecimento 40k vs base 10k–200k = média; correia/bateria/fluido freio ausentes; câmbio ausente; filtro combustível agrupado)
+8. Recomendação de arquitetura futura (Plano Jarvys como fonte técnica → cruzar com `km_ultima_troca_*` e despesas recentes → cards de saúde mantêm estado vivo; payload de próxima revisão filtra itens já feitos)
+9. Riscos (quebrar Home autenticada, perder atualização via trigger, duplicar alertas, links para item recém-trocado)
+10. Próximos builds recomendados (6.41B integração Plano×Histórico×Saúde; 6.42 search queries; 6.43 helper URL ML com afiliado)
+11. Garantias do build (lista das 11 garantias confirmadas)
 
-> Observação: o item `filtro_combustivel`, quando incerto, ainda precisa estar presente (com label conservador + `inspect_before_buy`). Sua **ausência** continua sendo erro; apenas a aplicação real/SKU não é cobrada nesta fase.
+## Verificação
 
-### Invariantes
-
-Sem mexer em: contrato de retorno, `safeParseMaintenancePlanJson`, `callLovableAi`, `stripJsonFences`, PII guard, `assertSuperAdmin`, `requireSupabaseAuth`, `technical_context_debug`, `raw_preview`, Shopping, banco, UI. Sem `as any`. Sem schema paralelo.
-
-### Verificação
-
-`bunx tsgo --noEmit` → 0 erros.
-
-### Teste manual em `/admin-corpus-smoke`
-
-- **Fiat Argo:** `valid=true`, 20 milestones, todas com óleo+filtro, pares com kit de filtros, 100k com óleo/filtro/kit além do checklist, óleo sem viscosidade inventada e `inspect_before_buy` quando `engine_oil_profile` insuficiente.
-- **Chevrolet Onix:** baseline aplicado, kit filtros nas pares, correia banhada como inspeção/diagnóstico (não correia dentada comum).
-- **BYD Song Plus DM-i:** baseline aplicado (híbrido com motor a combustão), e-CVT preservado (sem CVT convencional, sem bundle de óleo de câmbio CVT).
-
-### Retorno ao usuário
-
-Arquivo alterado, regras adicionadas, validação determinística, confirmação pares com kit filtros, elétrico puro como exceção, zero persistência, resultado do typecheck, instruções de teste.
+Como o único arquivo é markdown, sem typecheck. Mensagem final curta confirmando criação do relatório, zero alterações de código/banco/IA/OCR/embedding/links, e resumo dos principais achados (intervalos hardcoded em `maintenance.ts`, fluxo OCR→trigger→override, divergência relevante em filtros).
