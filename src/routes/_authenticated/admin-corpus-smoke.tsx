@@ -3574,4 +3574,335 @@ function ShoppingSearchPreviewPanel({
 
 
 
+// ─────────────────────────────────────────────────────────────
+// Build 6.42D — Painel admin do motor determinístico Jarvys.
+// Permite simular qualquer km real (inclui ciclo infinito >200k)
+// para 4 perfis técnicos. Sem persistência; sem IA; sem rede.
+// ─────────────────────────────────────────────────────────────
+
+type JarvysProfilePreset = {
+  id: string;
+  label: string;
+  profile: JarvysVehicleProfile;
+};
+
+const JARVYS_PRESETS: ReadonlyArray<JarvysProfilePreset> = [
+  {
+    id: "combustao_dentada",
+    label: "Combustão + correia dentada (manual)",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "correia_dentada",
+      transmissionKind: "manual",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "combustao_corrente_auto",
+    label: "Combustão + corrente + câmbio automático",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "corrente",
+      transmissionKind: "automatico",
+      steeringKind: "hidraulica",
+    },
+  },
+  {
+    id: "hibrido_ecvt",
+    label: "Híbrido + e-CVT (Toyota/HSD)",
+    profile: {
+      fuelKind: "hibrido_combustao",
+      timingSystem: "corrente",
+      transmissionKind: "e_cvt",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "eletrico_puro",
+    label: "Elétrico puro",
+    profile: {
+      fuelKind: "eletrico_puro",
+      timingSystem: "desconhecido",
+      transmissionKind: "desconhecido",
+      steeringKind: "eletrica",
+    },
+  },
+];
+
+const JARVYS_KM_QUICK_PICKS: ReadonlyArray<number> = [
+  10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000,
+  110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
+  200000, 210000, 220000, 260000, 300000, 320000, 400000, 410000, 430000,
+];
+
+const FUEL_OPTIONS: ReadonlyArray<JarvysFuelKind> = [
+  "combustao",
+  "hibrido_combustao",
+  "eletrico_puro",
+];
+const TIMING_OPTIONS: ReadonlyArray<TimingSystem> = [
+  "correia_dentada",
+  "corrente",
+  "correia_banhada",
+  "desconhecido",
+];
+const TRANSMISSION_OPTIONS: ReadonlyArray<JarvysTransmissionKind> = [
+  "manual",
+  "automatico",
+  "cvt",
+  "automatizado",
+  "dupla_embreagem",
+  "e_cvt",
+  "desconhecido",
+];
+const STEERING_OPTIONS: ReadonlyArray<JarvysSteeringKind> = [
+  "hidraulica",
+  "eletrica",
+  "desconhecida",
+];
+
+function JarvysScheduleMatrixPanel() {
+  const [presetId, setPresetId] = useState<string>(JARVYS_PRESETS[0].id);
+  const preset =
+    JARVYS_PRESETS.find((p) => p.id === presetId) ?? JARVYS_PRESETS[0];
+  const [profile, setProfile] = useState<JarvysVehicleProfile>(preset.profile);
+  const [kmReal, setKmReal] = useState<number>(60000);
+
+  // Atualiza perfil quando muda preset.
+  useEffect(() => {
+    setProfile(preset.profile);
+  }, [preset.id]);
+
+  const milestone = useMemo(
+    () => buildJarvysMilestone(kmReal, profile),
+    [kmReal, profile],
+  );
+  const mapping = useMemo(() => mapRealKmToBaseKm(kmReal), [kmReal]);
+
+  return (
+    <section className="rounded-lg border border-border p-4 space-y-3">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">
+          Build 6.42D — Motor determinístico Jarvys (ciclo infinito)
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Helper puro: gera a matriz oficial 10k–200k e projeta qualquer km real
+          via{" "}
+          <code>baseKm = ((realKm − 10000) % 200000) + 10000</code>. Não
+          persiste nada. Não chama IA.
+        </p>
+      </header>
+
+      <div className="flex flex-wrap gap-2">
+        {JARVYS_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => setPresetId(p.id)}
+            className={`rounded border px-2 py-1 text-xs ${
+              p.id === presetId
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background hover:bg-accent"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <label className="space-y-1">
+          <span className="block text-[10px] uppercase text-muted-foreground">
+            fuelKind
+          </span>
+          <select
+            className="w-full rounded border border-border bg-background px-2 py-1"
+            value={profile.fuelKind}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                fuelKind: e.target.value as JarvysFuelKind,
+              }))
+            }
+          >
+            {FUEL_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block text-[10px] uppercase text-muted-foreground">
+            timingSystem
+          </span>
+          <select
+            className="w-full rounded border border-border bg-background px-2 py-1"
+            value={profile.timingSystem}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                timingSystem: e.target.value as TimingSystem,
+              }))
+            }
+          >
+            {TIMING_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block text-[10px] uppercase text-muted-foreground">
+            transmissionKind
+          </span>
+          <select
+            className="w-full rounded border border-border bg-background px-2 py-1"
+            value={profile.transmissionKind}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                transmissionKind: e.target.value as JarvysTransmissionKind,
+              }))
+            }
+          >
+            {TRANSMISSION_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block text-[10px] uppercase text-muted-foreground">
+            steeringKind
+          </span>
+          <select
+            className="w-full rounded border border-border bg-background px-2 py-1"
+            value={profile.steeringKind}
+            onChange={(e) =>
+              setProfile((p) => ({
+                ...p,
+                steeringKind: e.target.value as JarvysSteeringKind,
+              }))
+            }
+          >
+            {STEERING_OPTIONS.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <label className="block text-xs">
+          <span className="block text-[10px] uppercase text-muted-foreground">
+            km real
+          </span>
+          <input
+            type="number"
+            step={10000}
+            min={10000}
+            className="mt-1 w-full rounded border border-border bg-background px-2 py-1"
+            value={kmReal}
+            onChange={(e) => setKmReal(Number(e.target.value) || 10000)}
+          />
+        </label>
+        <div className="flex flex-wrap gap-1">
+          {JARVYS_KM_QUICK_PICKS.map((km) => (
+            <button
+              key={km}
+              type="button"
+              onClick={() => setKmReal(km)}
+              className={`rounded border px-2 py-0.5 text-[10px] ${
+                km === kmReal
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background hover:bg-accent"
+              }`}
+            >
+              {(km / 1000).toLocaleString("pt-BR")}k
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded border border-border bg-muted/30 p-2 text-[11px]">
+        <Stat
+          label="revisionKmReal"
+          value={milestone.revisionKmReal.toLocaleString("pt-BR")}
+        />
+        <Stat
+          label="revisionKmBase"
+          value={milestone.revisionKmBase.toLocaleString("pt-BR")}
+        />
+        <Stat label="cycleIndex" value={String(milestone.cycleIndex)} />
+        <Stat
+          label="revisionNumber"
+          value={String(milestone.revisionNumber)}
+        />
+        <Stat
+          label="isHighMileage"
+          value={milestone.isHighMileage ? "true" : "false"}
+        />
+      </div>
+
+      <div className="rounded border border-border p-2">
+        <p className="text-xs font-semibold">
+          {milestone.label} — {milestone.items.length} itens
+        </p>
+        {milestone.notes.length > 0 ? (
+          <ul className="mt-1 space-y-0.5 text-[11px] text-amber-700 dark:text-amber-300">
+            {milestone.notes.map((n, i) => (
+              <li key={i}>• {n}</li>
+            ))}
+          </ul>
+        ) : null}
+        {milestone.items.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sem itens — matriz de combustão bloqueada para este perfil.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-[11px]">
+            {milestone.items.map((it, i) => (
+              <li
+                key={i}
+                className="rounded border border-border bg-background p-1.5"
+              >
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  {it.item_key} · {it.category} · {it.action} ·{" "}
+                  {it.recommendation_type} · {it.shopping_classification}{" "}
+                  {it.applies ? "" : "· applies=false"}
+                </div>
+                <div className="text-foreground">{it.label}</div>
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  group_key={String(it.group_key)} · requires_confirmation=
+                  {it.requires_confirmation ? "true" : "false"}
+                </div>
+                {it.notes && it.notes.length > 0 ? (
+                  <ul className="mt-0.5 text-[10px] text-muted-foreground">
+                    {it.notes.map((n, j) => (
+                      <li key={j}>↳ {n}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <details className="text-[11px]">
+        <summary className="cursor-pointer text-muted-foreground">
+          mapRealKmToBaseKm({kmReal.toLocaleString("pt-BR")})
+        </summary>
+        <pre className="mt-1 rounded border border-border bg-background p-2 text-foreground">
+          {JSON.stringify(mapping, null, 2)}
+        </pre>
+      </details>
+    </section>
+  );
+}
 
