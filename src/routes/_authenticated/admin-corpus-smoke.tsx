@@ -21,6 +21,16 @@ import {
  type NextRevisionPayload,
 } from "@/lib/maintenance-next-revision-payload";
 import { buildMaintenanceShoppingSearchPayload } from "@/lib/maintenance-shopping-search";
+import {
+  buildJarvysMilestone,
+  mapRealKmToBaseKm,
+  type JarvysFuelKind,
+  type JarvysSteeringKind,
+  type JarvysTransmissionKind,
+  type JarvysVehicleProfile,
+} from "@/lib/maintenance-jarvys-schedule-rules";
+import type { TimingSystem } from "@/lib/maintenance-plan-schema";
+
 
 export const Route = createFileRoute("/_authenticated/admin-corpus-smoke")({
   head: () => ({
