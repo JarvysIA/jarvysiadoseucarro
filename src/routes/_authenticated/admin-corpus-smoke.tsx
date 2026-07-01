@@ -3885,7 +3885,31 @@ function JarvysScheduleMatrixPanel() {
             </button>
           ))}
         </div>
+        {profile.fuelKind === "eletrico_puro" ? (
+          <div className="rounded border border-sky-300 bg-sky-50 p-2 dark:border-sky-700 dark:bg-sky-950/40">
+            <p className="text-[10px] font-semibold uppercase text-sky-900 dark:text-sky-100">
+              KMs oficiais de teste EV — Build 6.42D.2
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {EV_TEST_KM_QUICK_PICKS.map((km) => (
+                <button
+                  key={km}
+                  type="button"
+                  onClick={() => setKmReal(km)}
+                  className={`rounded border px-2 py-0.5 text-[10px] ${
+                    km === kmReal
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-sky-300 bg-background hover:bg-sky-100 dark:border-sky-700 dark:hover:bg-sky-900/40"
+                  }`}
+                >
+                  {(km / 1000).toLocaleString("pt-BR")}k
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
+
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded border border-border bg-muted/30 p-2 text-[11px]">
         <Stat
