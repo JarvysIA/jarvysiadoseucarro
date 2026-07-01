@@ -3976,7 +3976,35 @@ function JarvysScheduleMatrixPanel() {
         )}
       </div>
 
+      {profile.fuelKind === "eletrico_puro"
+        ? (() => {
+            const hits = milestone.items
+              .map((it) => it.item_key)
+              .filter((k) => EV_FORBIDDEN_ITEM_KEYS.includes(k));
+            const ok = hits.length === 0;
+            return (
+              <div
+                className={`rounded border p-2 text-[11px] ${
+                  ok
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100"
+                    : "border-red-500 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
+                }`}
+              >
+                <p className="font-semibold">
+                  Verificação de bloqueio de combustão (preset EV)
+                </p>
+                <p className="mt-0.5">
+                  {ok
+                    ? "OK: 0 itens de combustão"
+                    : `FALHA: item de combustão detectado (${hits.join(", ")})`}
+                </p>
+              </div>
+            );
+          })()
+        : null}
+
       <details className="text-[11px]">
+
         <summary className="cursor-pointer text-muted-foreground">
           mapRealKmToBaseKm({kmReal.toLocaleString("pt-BR")})
         </summary>
