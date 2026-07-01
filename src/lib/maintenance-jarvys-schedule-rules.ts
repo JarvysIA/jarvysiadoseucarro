@@ -975,11 +975,6 @@ export function buildJarvysMilestone(
   const items = getJarvysBaseMilestoneItems(baseKm, profile);
   const notes: string[] = [];
   if (cycleIndex >= 1) notes.push(HIGH_MILEAGE_NOTE);
-  if (profile.fuelKind === "eletrico_puro") {
-    notes.push(
-      "Veículo 100% elétrico: motor determinístico Jarvys não emite itens de combustão. Plano elétrico completo será tratado em build futuro.",
-    );
-  }
   const revisionKmReal = Math.max(
     JARVYS_BASE_CYCLE_MIN_KM,
     Math.round(realKm / JARVYS_BASE_CYCLE_STEP_KM) * JARVYS_BASE_CYCLE_STEP_KM,
