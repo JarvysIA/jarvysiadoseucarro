@@ -553,7 +553,133 @@ const ITEMS = {
       group_key: "poly_v_kit",
       requires_confirmation: true,
     }),
+  // ─── Itens exclusivos elétrico puro (Build 6.42D.1) ───
+  filtro_cabine_ev: (): JarvysItem =>
+    mk({
+      item_key: "filtro_cabine",
+      label: "Filtro de cabine (ar-condicionado) — veículo elétrico",
+      category: "filtros",
+      action: "trocar",
+      recommendation_type: "required",
+      shopping_classification: "safe_to_buy",
+      group_key: "filtros_kit",
+      requires_confirmation: true,
+      notes: [
+        "Confirme a aplicação correta pelo modelo, ano e versão antes da compra.",
+      ],
+    }),
+  fluido_freio_ev: (): JarvysItem =>
+    mk({
+      item_key: "fluido_freio",
+      label: "Fluido de freio (DOT conforme manual) — veículo elétrico",
+      category: "freios",
+      action: "trocar",
+      recommendation_type: "required",
+      shopping_classification: "safe_to_buy",
+      group_key: null,
+      requires_confirmation: true,
+      notes: [
+        "Confirme a especificação correta do fluido de freio no manual do veículo antes da compra.",
+      ],
+    }),
+  aditivo_arrefecimento_ev: (): JarvysItem =>
+    mk({
+      item_key: "aditivo_arrefecimento",
+      label:
+        "Aditivo do sistema de arrefecimento (bateria/inversor) — veículo elétrico",
+      category: "arrefecimento",
+      action: "trocar",
+      recommendation_type: "preventive_recommended",
+      shopping_classification: "inspect_before_buy",
+      group_key: "arrefecimento_kit",
+      requires_confirmation: true,
+      notes: [
+        "Confirme se o veículo utiliza sistema de arrefecimento líquido e a especificação correta do fluido antes da compra ou serviço.",
+      ],
+    }),
+  limpeza_arrefecimento_ev: (): JarvysItem =>
+    mk({
+      item_key: "limpeza_arrefecimento",
+      label:
+        "Limpeza do sistema de arrefecimento (bateria/inversor) — serviço especializado",
+      category: "arrefecimento",
+      action: "limpar",
+      recommendation_type: "preventive_recommended",
+      shopping_classification: "service_only",
+      group_key: null,
+      requires_confirmation: false,
+      notes: [
+        "Confirme se o veículo utiliza sistema de arrefecimento líquido antes do serviço. Realizar em oficina capacitada para veículos elétricos.",
+      ],
+    }),
+  oleo_caixa_reducao: (): JarvysItem =>
+    mk({
+      item_key: "oleo_caixa_reducao",
+      label: "Óleo da caixa de redução (transmissão do veículo elétrico)",
+      category: "transmissao",
+      action: "trocar",
+      recommendation_type: "preventive_recommended",
+      shopping_classification: "inspect_before_buy",
+      group_key: null,
+      requires_confirmation: true,
+      notes: [
+        "Confirme a especificação correta pelo manual/chassi. A troca deve ser realizada em Auto Center especializado ou oficina capacitada para veículos elétricos.",
+      ],
+    }),
 };
+
+// ─────────────────────────────────────────────────────────────
+// Matriz elétrica (Build 6.42D.1)
+// ─────────────────────────────────────────────────────────────
+
+function baseFactoriesForKmEV(km: number): ItemFactory[] {
+  const list: ItemFactory[] = [ITEMS.alinhamento_balanceamento];
+  const isEvery20 = km > 0 && km % 20000 === 0;
+  const isEvery30 = km > 0 && km % 30000 === 0;
+  const isEvery40 = km > 0 && km % 40000 === 0;
+  const isSuspensionKm =
+    km === 70000 ||
+    km === 90000 ||
+    km === 110000 ||
+    km === 130000 ||
+    km === 150000 ||
+    km === 170000 ||
+    km === 190000;
+
+  // Regra editorial: 130k NÃO recebe filtro de cabine/fluido freio/sangria,
+  // apesar de não ser múltiplo de 20k já é blindado por isEvery20 (130 % 20 = 10).
+  if (isEvery20) {
+    list.push(
+      ITEMS.filtro_cabine_ev,
+      ITEMS.fluido_freio_ev,
+      ITEMS.sangria_freio,
+    );
+  }
+  if (isEvery30) {
+    list.push(ITEMS.aditivo_arrefecimento_ev, ITEMS.limpeza_arrefecimento_ev);
+  }
+  if (isEvery40) {
+    list.push(ITEMS.oleo_caixa_reducao);
+  }
+  if (isSuspensionKm) {
+    list.push(ITEMS.inspecao_suspensao);
+  }
+  return list;
+}
+
+function getJarvysBaseMilestoneItemsEV(baseKm: number): JarvysItem[] {
+  const factories = baseFactoriesForKmEV(baseKm);
+  const seen = new Set<string>();
+  const items: JarvysItem[] = [];
+  for (const f of factories) {
+    const item = f();
+    if (seen.has(item.item_key)) continue;
+    seen.add(item.item_key);
+    items.push(item);
+  }
+  return items;
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // Matriz base (perfil aplica filtros)
