@@ -941,7 +941,9 @@ export function getJarvysBaseMilestoneItems(
   baseKm: number,
   profile: JarvysVehicleProfile,
 ): JarvysItem[] {
-  if (profile.fuelKind === "eletrico_puro") return [];
+  if (profile.fuelKind === "eletrico_puro") {
+    return getJarvysBaseMilestoneItemsEV(baseKm);
+  }
 
   const factories: ItemFactory[] = [
     ...baseFactoriesForKm(baseKm),
