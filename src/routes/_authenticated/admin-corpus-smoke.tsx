@@ -3753,6 +3753,21 @@ function JarvysScheduleMatrixPanel() {
         ))}
       </div>
 
+      {preset.reference ? (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-[11px] text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100">
+          <p className="font-semibold">
+            Referência do preset — {preset.reference.marca}{" "}
+            {preset.reference.modelo}
+          </p>
+          <p className="mt-0.5">
+            combustível: {preset.reference.combustivel} · câmbio:{" "}
+            {preset.reference.cambio} · direção: {preset.reference.direcao}
+          </p>
+        </div>
+      ) : null}
+
+
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <label className="space-y-1">
           <span className="block text-[10px] uppercase text-muted-foreground">
