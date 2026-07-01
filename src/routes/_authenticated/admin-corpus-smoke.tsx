@@ -3580,10 +3580,19 @@ function ShoppingSearchPreviewPanel({
 // para 4 perfis técnicos. Sem persistência; sem IA; sem rede.
 // ─────────────────────────────────────────────────────────────
 
+type JarvysPresetReference = {
+  marca: string;
+  modelo: string;
+  combustivel: string;
+  cambio: string;
+  direcao: string;
+};
+
 type JarvysProfilePreset = {
   id: string;
   label: string;
   profile: JarvysVehicleProfile;
+  reference?: JarvysPresetReference;
 };
 
 const JARVYS_PRESETS: ReadonlyArray<JarvysProfilePreset> = [
@@ -3619,12 +3628,19 @@ const JARVYS_PRESETS: ReadonlyArray<JarvysProfilePreset> = [
   },
   {
     id: "eletrico_puro",
-    label: "Elétrico puro",
+    label: "Elétrico puro — teste Jarvys (BYD Dolphin)",
     profile: {
       fuelKind: "eletrico_puro",
       timingSystem: "desconhecido",
       transmissionKind: "desconhecido",
       steeringKind: "eletrica",
+    },
+    reference: {
+      marca: "BYD",
+      modelo: "Dolphin",
+      combustivel: "elétrico puro",
+      cambio: "caixa de redução",
+      direcao: "elétrica",
     },
   },
 ];
@@ -3634,6 +3650,33 @@ const JARVYS_KM_QUICK_PICKS: ReadonlyArray<number> = [
   110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
   200000, 210000, 220000, 260000, 300000, 320000, 400000, 410000, 430000,
 ];
+
+// Build 6.42D.2: KMs oficiais de auditoria visual para o preset EV.
+const EV_TEST_KM_QUICK_PICKS: ReadonlyArray<number> = [
+  10000, 20000, 30000, 40000, 60000, 80000, 120000, 130000, 200000, 220000,
+  260000, 410000,
+];
+
+// Build 6.42D.2: item_keys reais do helper que representam manutenção
+// de combustão. Nunca podem aparecer em preset EV (eletrico_puro).
+const EV_FORBIDDEN_ITEM_KEYS: ReadonlyArray<string> = [
+  "oleo_motor",
+  "filtro_oleo",
+  "filtro_ar_motor",
+  "filtro_combustivel",
+  "velas_ignicao",
+  "limpeza_tbi_bicos",
+  "kit_sincronismo",
+  "inspecao_corrente_comando",
+  "correia_banhada",
+  "inspecao_correia_banhada",
+  "correia_poly_v",
+  "oleo_cambio_manual",
+  "oleo_cambio_automatico",
+  "diagnostico_e_cvt",
+  "oleo_direcao_hidraulica",
+];
+
 
 const FUEL_OPTIONS: ReadonlyArray<JarvysFuelKind> = [
   "combustao",
@@ -3709,6 +3752,21 @@ function JarvysScheduleMatrixPanel() {
           </button>
         ))}
       </div>
+
+      {preset.reference ? (
+        <div className="rounded border border-emerald-300 bg-emerald-50 p-2 text-[11px] text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100">
+          <p className="font-semibold">
+            Referência do preset — {preset.reference.marca}{" "}
+            {preset.reference.modelo}
+          </p>
+          <p className="mt-0.5">
+            combustível: {preset.reference.combustivel} · câmbio:{" "}
+            {preset.reference.cambio} · direção: {preset.reference.direcao}
+          </p>
+        </div>
+      ) : null}
+
+
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <label className="space-y-1">
@@ -3827,7 +3885,31 @@ function JarvysScheduleMatrixPanel() {
             </button>
           ))}
         </div>
+        {profile.fuelKind === "eletrico_puro" ? (
+          <div className="rounded border border-sky-300 bg-sky-50 p-2 dark:border-sky-700 dark:bg-sky-950/40">
+            <p className="text-[10px] font-semibold uppercase text-sky-900 dark:text-sky-100">
+              KMs oficiais de teste EV — Build 6.42D.2
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {EV_TEST_KM_QUICK_PICKS.map((km) => (
+                <button
+                  key={km}
+                  type="button"
+                  onClick={() => setKmReal(km)}
+                  className={`rounded border px-2 py-0.5 text-[10px] ${
+                    km === kmReal
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-sky-300 bg-background hover:bg-sky-100 dark:border-sky-700 dark:hover:bg-sky-900/40"
+                  }`}
+                >
+                  {(km / 1000).toLocaleString("pt-BR")}k
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
+
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded border border-border bg-muted/30 p-2 text-[11px]">
         <Stat
@@ -3894,7 +3976,35 @@ function JarvysScheduleMatrixPanel() {
         )}
       </div>
 
+      {profile.fuelKind === "eletrico_puro"
+        ? (() => {
+            const hits = milestone.items
+              .map((it) => it.item_key)
+              .filter((k) => EV_FORBIDDEN_ITEM_KEYS.includes(k));
+            const ok = hits.length === 0;
+            return (
+              <div
+                className={`rounded border p-2 text-[11px] ${
+                  ok
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100"
+                    : "border-red-500 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/40 dark:text-red-100"
+                }`}
+              >
+                <p className="font-semibold">
+                  Verificação de bloqueio de combustão (preset EV)
+                </p>
+                <p className="mt-0.5">
+                  {ok
+                    ? "OK: 0 itens de combustão"
+                    : `FALHA: item de combustão detectado (${hits.join(", ")})`}
+                </p>
+              </div>
+            );
+          })()
+        : null}
+
       <details className="text-[11px]">
+
         <summary className="cursor-pointer text-muted-foreground">
           mapRealKmToBaseKm({kmReal.toLocaleString("pt-BR")})
         </summary>
