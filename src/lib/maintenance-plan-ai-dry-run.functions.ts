@@ -1142,14 +1142,9 @@ function applyJarvysDeterministicMaintenanceRules(
 ): { plan: MaintenancePlanJson; warnings: string[] } {
   const warnings: string[] = [];
 
-  // Elétrico puro: helper bloqueia matriz de combustão. Preservamos as
-  // milestones emitidas pela IA (validateBaselineItems já ignora elétrico)
-  // para não quebrar `validateMilestoneSchedule`. Plano elétrico completo
-  // fica para build futuro.
-  if (isPureElectricVehicle(plan)) {
-    warnings.push("jarvys_eletrico_puro_matriz_combustao_bloqueada");
-    return { plan, warnings };
-  }
+  // Build 6.42D.1: matriz determinística agora cobre também elétrico puro.
+  // O roteamento por fuelKind acontece dentro do helper (getJarvysBaseMilestoneItems).
+
 
   const profile = inferJarvysProfileFromPlan(plan);
   warnings.push(
