@@ -3580,10 +3580,19 @@ function ShoppingSearchPreviewPanel({
 // para 4 perfis técnicos. Sem persistência; sem IA; sem rede.
 // ─────────────────────────────────────────────────────────────
 
+type JarvysPresetReference = {
+  marca: string;
+  modelo: string;
+  combustivel: string;
+  cambio: string;
+  direcao: string;
+};
+
 type JarvysProfilePreset = {
   id: string;
   label: string;
   profile: JarvysVehicleProfile;
+  reference?: JarvysPresetReference;
 };
 
 const JARVYS_PRESETS: ReadonlyArray<JarvysProfilePreset> = [
@@ -3619,12 +3628,19 @@ const JARVYS_PRESETS: ReadonlyArray<JarvysProfilePreset> = [
   },
   {
     id: "eletrico_puro",
-    label: "Elétrico puro",
+    label: "Elétrico puro — teste Jarvys (BYD Dolphin)",
     profile: {
       fuelKind: "eletrico_puro",
       timingSystem: "desconhecido",
       transmissionKind: "desconhecido",
       steeringKind: "eletrica",
+    },
+    reference: {
+      marca: "BYD",
+      modelo: "Dolphin",
+      combustivel: "elétrico puro",
+      cambio: "caixa de redução",
+      direcao: "elétrica",
     },
   },
 ];
@@ -3634,6 +3650,33 @@ const JARVYS_KM_QUICK_PICKS: ReadonlyArray<number> = [
   110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
   200000, 210000, 220000, 260000, 300000, 320000, 400000, 410000, 430000,
 ];
+
+// Build 6.42D.2: KMs oficiais de auditoria visual para o preset EV.
+const EV_TEST_KM_QUICK_PICKS: ReadonlyArray<number> = [
+  10000, 20000, 30000, 40000, 60000, 80000, 120000, 130000, 200000, 220000,
+  260000, 410000,
+];
+
+// Build 6.42D.2: item_keys reais do helper que representam manutenção
+// de combustão. Nunca podem aparecer em preset EV (eletrico_puro).
+const EV_FORBIDDEN_ITEM_KEYS: ReadonlyArray<string> = [
+  "oleo_motor",
+  "filtro_oleo",
+  "filtro_ar_motor",
+  "filtro_combustivel",
+  "velas_ignicao",
+  "limpeza_tbi_bicos",
+  "kit_sincronismo",
+  "inspecao_corrente_comando",
+  "correia_banhada",
+  "inspecao_correia_banhada",
+  "correia_poly_v",
+  "oleo_cambio_manual",
+  "oleo_cambio_automatico",
+  "diagnostico_e_cvt",
+  "oleo_direcao_hidraulica",
+];
+
 
 const FUEL_OPTIONS: ReadonlyArray<JarvysFuelKind> = [
   "combustao",
