@@ -4507,12 +4507,13 @@ function JarvysMatrixOverviewPanel() {
                                 <li key={i}>{n}</li>
                               ))}
                             </ul>
-                          ) : null}
-                        </div>
-                      </details>
+                  <tr className="border-b border-border">
+                    <td colSpan={19} className="px-2 py-1">
+                      {/* detail row keyed via parent Fragment */}
                     </td>
                   </tr>
-                </>
+                </Fragment>
+
               );
             })}
           </tbody>
