@@ -4019,3 +4019,506 @@ function JarvysScheduleMatrixPanel() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Build 6.42E — Matriz visual Jarvys por milestone
+// Painel puramente admin/visual: consome buildJarvysMilestone
+// para 8 perfis técnicos em uma malha de KMs (10k–200k + ciclo
+// infinito 220k/260k/410k). Não altera helper, dry-run, banco,
+// nem qualquer UI real do usuário.
+// ─────────────────────────────────────────────────────────────
+
+type JarvysMatrixProfilePreset = {
+  id: string;
+  label: string;
+  profile: JarvysVehicleProfile;
+};
+
+const JARVYS_MATRIX_PROFILES: ReadonlyArray<JarvysMatrixProfilePreset> = [
+  {
+    id: "comb_dentada_manual",
+    label: "Combustão + correia dentada + manual",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "correia_dentada",
+      transmissionKind: "manual",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "comb_dentada_auto",
+    label: "Combustão + correia dentada + automático",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "correia_dentada",
+      transmissionKind: "automatico",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "comb_corrente_manual",
+    label: "Combustão + corrente + manual",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "corrente",
+      transmissionKind: "manual",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "comb_corrente_auto",
+    label: "Combustão + corrente + automático",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "corrente",
+      transmissionKind: "automatico",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "comb_banhada_manual",
+    label: "Combustão + correia banhada + manual",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "correia_banhada",
+      transmissionKind: "manual",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "comb_banhada_auto",
+    label: "Combustão + correia banhada + automático",
+    profile: {
+      fuelKind: "combustao",
+      timingSystem: "correia_banhada",
+      transmissionKind: "automatico",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "hibrido_ecvt",
+    label: "Híbrido combustão + e-CVT",
+    profile: {
+      fuelKind: "hibrido_combustao",
+      timingSystem: "corrente",
+      transmissionKind: "e_cvt",
+      steeringKind: "eletrica",
+    },
+  },
+  {
+    id: "eletrico_puro",
+    label: "Elétrico puro",
+    profile: {
+      fuelKind: "eletrico_puro",
+      timingSystem: "desconhecido",
+      transmissionKind: "desconhecido",
+      steeringKind: "eletrica",
+    },
+  },
+];
+
+const MATRIX_KMS: ReadonlyArray<number> = [
+  10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000,
+  110000, 120000, 130000, 140000, 150000, 160000, 170000, 180000, 190000,
+  200000, 220000, 260000, 410000,
+];
+
+// item_keys de câmbio automático/CVT convencional — proibidos em manual e e-CVT.
+const AUTO_TRANSMISSION_ITEM_KEYS: ReadonlyArray<string> = [
+  "oleo_cambio_automatico",
+  "filtro_cambio_automatico",
+  "oleo_cvt",
+];
+
+// item_keys de sincronismo por correia dentada seca — proibidos em corrente e banhada.
+const DRY_TIMING_BELT_ITEM_KEYS: ReadonlyArray<string> = [
+  "kit_sincronismo",
+  "correia_dentada",
+];
+
+type MatrixCategoryCounts = {
+  oleoMotor: number;
+  filtros: number;
+  freio: number;
+  arrefecimento: number;
+  ignicao: number;
+  cambio: number;
+  sincronismo: number;
+  direcao: number;
+  suspensao: number;
+  ev: number;
+  shopping: number;
+  serviceOnly: number;
+  requiresConfirmation: number;
+};
+
+function classifyMatrixItem(item: {
+  item_key: string;
+  category: string;
+  group_key: string | null;
+}): Array<keyof MatrixCategoryCounts> {
+  const buckets: Array<keyof MatrixCategoryCounts> = [];
+  const k = item.item_key;
+  const cat = item.category;
+  const g = item.group_key;
+
+  if (k === "oleo_motor" || k === "filtro_oleo") buckets.push("oleoMotor");
+  if (g === "filtros_kit" || cat === "filtros") buckets.push("filtros");
+  if (cat === "freios") buckets.push("freio");
+  if (cat === "arrefecimento") buckets.push("arrefecimento");
+  if (
+    cat === "ignicao" ||
+    k === "velas_ignicao" ||
+    k === "limpeza_tbi_bicos"
+  )
+    buckets.push("ignicao");
+  if (cat === "transmissao") buckets.push("cambio");
+  if (
+    g === "sincronismo_kit" ||
+    g === "poly_v_kit" ||
+    k.includes("correia") ||
+    k.includes("corrente") ||
+    k === "kit_sincronismo"
+  )
+    buckets.push("sincronismo");
+  if (cat === "direcao" || k.includes("direcao")) buckets.push("direcao");
+  if (cat === "suspensao" || k.includes("suspensao")) buckets.push("suspensao");
+  if (k === "oleo_caixa_reducao" || k === "aditivo_arrefecimento")
+    buckets.push("ev");
+  return buckets;
+}
+
+type MatrixAlert = { level: "falha" | "alerta"; msg: string };
+
+function detectProfileViolations(
+  profile: JarvysVehicleProfile,
+  milestone: {
+    revisionKmBase: number;
+    items: ReadonlyArray<{ item_key: string; group_key: string | null }>;
+  },
+): MatrixAlert[] {
+  const alerts: MatrixAlert[] = [];
+  const keys = milestone.items.map((i) => i.item_key);
+  const groups = milestone.items.map((i) => i.group_key);
+
+  // EV
+  if (profile.fuelKind === "eletrico_puro") {
+    const forbidden = keys.filter((k) => EV_FORBIDDEN_ITEM_KEYS.includes(k));
+    if (forbidden.length > 0) {
+      alerts.push({
+        level: "falha",
+        msg: `Item de combustão em EV: ${Array.from(new Set(forbidden)).join(", ")}`,
+      });
+    }
+    if (
+      milestone.revisionKmBase === 130000 &&
+      keys.includes("filtro_cabine")
+    ) {
+      alerts.push({
+        level: "falha",
+        msg: "filtro_cabine em base 130k (EV segue múltiplos de 20k)",
+      });
+    }
+  }
+
+  // Corrente — nunca kit dentada seca
+  if (profile.timingSystem === "corrente") {
+    const bad = keys.filter((k) => DRY_TIMING_BELT_ITEM_KEYS.includes(k));
+    if (bad.length > 0 || groups.includes("sincronismo_kit")) {
+      alerts.push({
+        level: "falha",
+        msg: "kit sincronismo/correia dentada em motor corrente",
+      });
+    }
+  }
+
+  // Correia banhada — nunca kit dentada seca
+  if (profile.timingSystem === "correia_banhada") {
+    const bad = keys.filter((k) => DRY_TIMING_BELT_ITEM_KEYS.includes(k));
+    if (bad.length > 0) {
+      alerts.push({
+        level: "falha",
+        msg: "kit sincronismo/correia dentada seca em motor correia banhada",
+      });
+    }
+  }
+
+  // e-CVT — nunca óleo câmbio automático/CVT convencional
+  if (profile.transmissionKind === "e_cvt") {
+    const bad = keys.filter((k) => AUTO_TRANSMISSION_ITEM_KEYS.includes(k));
+    if (bad.length > 0) {
+      alerts.push({
+        level: "falha",
+        msg: `óleo câmbio automático/CVT em e-CVT: ${bad.join(", ")}`,
+      });
+    }
+  }
+
+  // Manual — nunca óleo/filtro câmbio automático
+  if (profile.transmissionKind === "manual") {
+    const bad = keys.filter((k) => AUTO_TRANSMISSION_ITEM_KEYS.includes(k));
+    if (bad.length > 0) {
+      alerts.push({
+        level: "falha",
+        msg: `óleo câmbio automático em câmbio manual: ${bad.join(", ")}`,
+      });
+    }
+  }
+
+  // Direção elétrica — nunca óleo direção hidráulica
+  if (profile.steeringKind === "eletrica") {
+    if (keys.includes("oleo_direcao_hidraulica")) {
+      alerts.push({
+        level: "falha",
+        msg: "óleo direção hidráulica em direção elétrica",
+      });
+    }
+  }
+
+  // Combustão/híbrido — baseline óleo + filtro em todo marco
+  if (
+    profile.fuelKind === "combustao" ||
+    profile.fuelKind === "hibrido_combustao"
+  ) {
+    if (!keys.includes("oleo_motor") || !keys.includes("filtro_oleo")) {
+      alerts.push({
+        level: "alerta",
+        msg: "baseline ausente (oleo_motor/filtro_oleo)",
+      });
+    }
+  }
+
+  return alerts;
+}
+
+function JarvysMatrixOverviewPanel() {
+  const [profileId, setProfileId] = useState<string>(
+    JARVYS_MATRIX_PROFILES[0].id,
+  );
+  const preset =
+    JARVYS_MATRIX_PROFILES.find((p) => p.id === profileId) ??
+    JARVYS_MATRIX_PROFILES[0];
+
+  const rows = useMemo(() => {
+    return MATRIX_KMS.map((km) => {
+      const m = buildJarvysMilestone(km, preset.profile);
+      const counts: MatrixCategoryCounts = {
+        oleoMotor: 0,
+        filtros: 0,
+        freio: 0,
+        arrefecimento: 0,
+        ignicao: 0,
+        cambio: 0,
+        sincronismo: 0,
+        direcao: 0,
+        suspensao: 0,
+        ev: 0,
+        shopping: 0,
+        serviceOnly: 0,
+        requiresConfirmation: 0,
+      };
+      for (const it of m.items) {
+        const buckets = classifyMatrixItem(it);
+        for (const b of buckets) counts[b] += 1;
+        if (
+          it.shopping_classification === "safe_to_buy" ||
+          it.shopping_classification === "inspect_before_buy"
+        )
+          counts.shopping += 1;
+        if (it.shopping_classification === "service_only")
+          counts.serviceOnly += 1;
+        if (it.requires_confirmation) counts.requiresConfirmation += 1;
+      }
+      const alerts = detectProfileViolations(preset.profile, m);
+      return { km, milestone: m, counts, alerts };
+    });
+  }, [preset.id]);
+
+  const totalAlerts = rows.reduce((acc, r) => acc + r.alerts.length, 0);
+  const hasFalha = rows.some((r) =>
+    r.alerts.some((a) => a.level === "falha"),
+  );
+
+  return (
+    <section className="mt-8 space-y-4 rounded-lg border border-border bg-card p-4 text-sm">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">
+          Matriz visual Jarvys por milestone — Build 6.42E
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Mesa de conferência técnica: consome apenas buildJarvysMilestone.
+          Sem IA, sem persistência, sem afiliado. A homologação EV oficial
+          continua no painel acima (Build 6.42D.2).
+        </p>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Perfil técnico
+        </label>
+        <select
+          value={profileId}
+          onChange={(e) => setProfileId(e.target.value)}
+          className="rounded border border-input bg-background px-2 py-1 text-sm"
+        >
+          {JARVYS_MATRIX_PROFILES.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <span
+          className={`ml-auto rounded px-2 py-0.5 text-xs font-semibold ${
+            hasFalha
+              ? "bg-destructive/15 text-destructive"
+              : totalAlerts > 0
+                ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
+                : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+          }`}
+        >
+          {hasFalha
+            ? `FALHA: ${totalAlerts} alerta(s)`
+            : totalAlerts > 0
+              ? `ALERTA: ${totalAlerts} aviso(s)`
+              : "OK: sem violações"}
+        </span>
+      </div>
+
+      <div className="overflow-auto">
+        <table className="w-full min-w-[1400px] border-collapse text-xs">
+          <thead className="sticky top-0 bg-muted/50">
+            <tr className="text-left [&_th]:border-b [&_th]:border-border [&_th]:px-2 [&_th]:py-1.5 [&_th]:font-medium">
+              <th>KM real</th>
+              <th>KM base</th>
+              <th>Ciclo</th>
+              <th>Alta km</th>
+              <th>Total</th>
+              <th>Óleo</th>
+              <th>Filtros</th>
+              <th>Freio</th>
+              <th>Arref.</th>
+              <th>Ignição</th>
+              <th>Câmbio</th>
+              <th>Sincron.</th>
+              <th>Direção</th>
+              <th>Suspensão</th>
+              <th>EV</th>
+              <th>Shop</th>
+              <th>Serv.</th>
+              <th>Conf.</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const level = r.alerts.some((a) => a.level === "falha")
+                ? "falha"
+                : r.alerts.length > 0
+                  ? "alerta"
+                  : "ok";
+              return (
+                <>
+                  <tr
+                    key={r.km}
+                    className="border-b border-border/50 align-top [&_td]:px-2 [&_td]:py-1"
+                  >
+                    <td className="font-mono">{r.km.toLocaleString()}</td>
+                    <td className="font-mono">
+                      {r.milestone.revisionKmBase.toLocaleString()}
+                    </td>
+                    <td className="font-mono">{r.milestone.cycleIndex}</td>
+                    <td>
+                      {r.milestone.isHighMileage ? (
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-700 dark:text-amber-400">
+                          sim
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="font-mono">{r.milestone.items.length}</td>
+                    <td>{r.counts.oleoMotor}</td>
+                    <td>{r.counts.filtros}</td>
+                    <td>{r.counts.freio}</td>
+                    <td>{r.counts.arrefecimento}</td>
+                    <td>{r.counts.ignicao}</td>
+                    <td>{r.counts.cambio}</td>
+                    <td>{r.counts.sincronismo}</td>
+                    <td>{r.counts.direcao}</td>
+                    <td>{r.counts.suspensao}</td>
+                    <td>{r.counts.ev}</td>
+                    <td>{r.counts.shopping}</td>
+                    <td>{r.counts.serviceOnly}</td>
+                    <td>{r.counts.requiresConfirmation}</td>
+                    <td>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                          level === "falha"
+                            ? "bg-destructive/15 text-destructive"
+                            : level === "alerta"
+                              ? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
+                              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                        }`}
+                      >
+                        {level.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr key={`${r.km}-detail`} className="border-b border-border">
+                    <td colSpan={19} className="px-2 py-1">
+                      <details>
+                        <summary className="cursor-pointer text-xs text-muted-foreground">
+                          Itens ({r.milestone.items.length}) · notas (
+                          {r.milestone.notes.length})
+                          {r.alerts.length > 0
+                            ? ` · alertas (${r.alerts.length})`
+                            : ""}
+                        </summary>
+                        <div className="mt-2 space-y-1">
+                          {r.alerts.length > 0 ? (
+                            <ul className="space-y-0.5">
+                              {r.alerts.map((a, i) => (
+                                <li
+                                  key={i}
+                                  className={`text-[11px] ${
+                                    a.level === "falha"
+                                      ? "text-destructive"
+                                      : "text-yellow-700 dark:text-yellow-400"
+                                  }`}
+                                >
+                                  {a.level.toUpperCase()}: {a.msg}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                          <div className="flex flex-wrap gap-1">
+                            {r.milestone.items.map((it, i) => (
+                              <span
+                                key={i}
+                                className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]"
+                                title={`${it.category} · ${it.shopping_classification}`}
+                              >
+                                {it.item_key}
+                              </span>
+                            ))}
+                          </div>
+                          {r.milestone.notes.length > 0 ? (
+                            <ul className="mt-1 list-inside list-disc text-[11px] text-muted-foreground">
+                              {r.milestone.notes.map((n, i) => (
+                                <li key={i}>{n}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
