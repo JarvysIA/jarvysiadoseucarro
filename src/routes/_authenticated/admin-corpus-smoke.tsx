@@ -753,6 +753,9 @@ function AdminCorpusSmokePage() {
       </section>
 
       <JarvysScheduleMatrixPanel />
+
+      <JarvysMatrixOverviewPanel />
+
     </div>
 
   );
