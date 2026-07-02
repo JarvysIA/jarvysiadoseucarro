@@ -4416,11 +4416,11 @@ function JarvysMatrixOverviewPanel() {
                   ? "alerta"
                   : "ok";
               return (
-                <>
+                <Fragment key={r.km}>
                   <tr
-                    key={r.km}
                     className="border-b border-border/50 align-top [&_td]:px-2 [&_td]:py-1"
                   >
+
                     <td className="font-mono">{r.km.toLocaleString()}</td>
                     <td className="font-mono">
                       {r.milestone.revisionKmBase.toLocaleString()}
