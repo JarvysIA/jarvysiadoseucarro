@@ -13,6 +13,20 @@
 // Não altera o helper. Se algum assert de nota editorial falhar, a
 // mensagem indica a lacuna sem tocar em produção.
 
+// Runner: bun test. Sem instalar `bun-types` (build 6.42F veta dependências
+// novas), declaramos localmente as três APIs usadas.
+declare module "bun:test" {
+  export const describe: (name: string, fn: () => void) => void;
+  export const test: (name: string, fn: () => void | Promise<void>) => void;
+  export const expect: (value: unknown) => {
+    toBe: (expected: unknown) => void;
+    toContain: (expected: unknown) => void;
+    not: {
+      toBe: (expected: unknown) => void;
+      toContain: (expected: unknown) => void;
+    };
+  };
+}
 import { describe, test, expect } from "bun:test";
 import {
   HIGH_MILEAGE_NOTE,
