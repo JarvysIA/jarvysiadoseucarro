@@ -756,6 +756,8 @@ function AdminCorpusSmokePage() {
 
       <JarvysMatrixOverviewPanel />
 
+      <MercadoLivreAffiliatePreviewPanel />
+
     </div>
 
   );
