@@ -4526,3 +4526,132 @@ function JarvysMatrixOverviewPanel() {
   );
 }
 
+
+// ─── Build 6.43 · Mercado Livre affiliate preview ─────────────────────────
+
+import { BadgeCheck, Search, ShoppingCart } from "lucide-react";
+import {
+  MERCADO_LIVRE_SHOPPING_WARNINGS,
+  buildMercadoLivreAffiliateSearchUrl,
+  type MercadoLivreAffiliateSearchResult,
+} from "@/lib/mercado-livre-affiliate-links";
+
+const ML_PREVIEW_EXAMPLES: readonly string[] = [
+  "kit sincronismo palio 1.0 fire 2012",
+  "óleo e filtro C3 1.4 GLX ano 2008",
+  "velas e cabos gol 1.6 2015",
+  "pastilhas de freio compass 2.0 2020",
+];
+
+function MercadoLivreAffiliatePreviewPanel() {
+  const [query, setQuery] = useState<string>(
+    "óleo e filtro C3 1.4 GLX ano 2008",
+  );
+
+  const result = useMemo<
+    | { ok: true; value: MercadoLivreAffiliateSearchResult }
+    | { ok: false; error: string }
+  >(() => {
+    try {
+      return { ok: true, value: buildMercadoLivreAffiliateSearchUrl({ query }) };
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : "unknown_error",
+      };
+    }
+  }, [query]);
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <header className="mb-3">
+        <h2 className="text-base font-semibold">
+          Mercado Livre — preview de link afiliado (Build 6.43)
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Helper puro. Gera busca dinâmica com parâmetros afiliados validados
+          por clique. Não persiste, não chama IA, não altera Home/Shopping.
+        </p>
+      </header>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        {ML_PREVIEW_EXAMPLES.map((ex) => (
+          <button
+            key={ex}
+            type="button"
+            onClick={() => setQuery(ex)}
+            className="rounded border border-border bg-background px-2 py-1 text-xs hover:bg-muted"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+
+      <label className="mb-3 block text-xs font-medium">
+        Query
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="mt-1 w-full rounded border border-border bg-background px-2 py-1.5 text-sm"
+          placeholder="Ex.: óleo e filtro C3 1.4 GLX ano 2008"
+        />
+      </label>
+
+      {result.ok ? (
+        <div className="space-y-2 rounded-md border border-border bg-background p-3 text-xs">
+          <div>
+            <span className="font-semibold">query:</span>{" "}
+            <span className="font-mono">{result.value.query}</span>
+          </div>
+          <div>
+            <span className="font-semibold">slug:</span>{" "}
+            <span className="font-mono">{result.value.slug}</span>
+          </div>
+          <div className="break-all">
+            <span className="font-semibold">url:</span>{" "}
+            <a
+              href={result.value.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-primary underline"
+            >
+              {result.value.url}
+            </a>
+          </div>
+          <div>
+            <span className="font-semibold">trackingStatus:</span>{" "}
+            <span className="font-mono">{result.value.trackingStatus}</span>
+          </div>
+          <div>
+            <span className="font-semibold">affiliate:</span>{" "}
+            <span className="font-mono">
+              matt_word={result.value.affiliate.matt_word} · matt_tool=
+              {result.value.affiliate.matt_tool} · forceInApp=
+              {result.value.affiliate.forceInApp}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-xs text-destructive">
+          Query inválida: <span className="font-mono">{result.error}</span>
+        </div>
+      )}
+
+      <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-3 text-xs">
+        <div className="flex items-start gap-2">
+          <ShoppingCart className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>As melhores ofertas pra revisar seu carro</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Search className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>{MERCADO_LIVRE_SHOPPING_WARNINGS.compatibility.replace(/^🔎\s*/, "")}</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+          <span>{MERCADO_LIVRE_SHOPPING_WARNINGS.officialStores}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
