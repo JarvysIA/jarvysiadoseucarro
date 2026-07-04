@@ -1,6 +1,8 @@
 // Build 6.43 — Testes do helper Mercado Livre afiliado.
+// Usa apenas describe/test/expect(toBe/toContain) para bater com o shim
+// ambient de bun:test criado no Build 6.42F.
 
-import { describe, expect, it } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import {
   MERCADO_LIVRE_AFFILIATE_PARAMS,
   MERCADO_LIVRE_BASE_SEARCH_URL,
@@ -8,40 +10,50 @@ import {
   buildMercadoLivreAffiliateSearchUrl,
 } from "../mercado-livre-affiliate-links";
 
+function expectThrowsEmptyQuery(fn: () => unknown): void {
+  let thrown: unknown = null;
+  try {
+    fn();
+  } catch (e) {
+    thrown = e;
+  }
+  expect(thrown instanceof Error).toBe(true);
+  expect((thrown as Error).message).toBe("empty_query");
+}
+
 describe("buildMercadoLivreAffiliateSearchUrl — slug", () => {
-  it("remove acentos e normaliza pontos", () => {
+  test("remove acentos e normaliza pontos", () => {
     const r = buildMercadoLivreAffiliateSearchUrl({
       query: "óleo e filtro C3 1.4 GLX ano 2008",
     });
     expect(r.slug).toBe("oleo-e-filtro-c3-1-4-glx-ano-2008");
   });
 
-  it("colapsa símbolos, barras, vírgulas, parênteses e espaços múltiplos", () => {
+  test("colapsa símbolos, barras, vírgulas, parênteses e espaços múltiplos", () => {
     const r = buildMercadoLivreAffiliateSearchUrl({
       query: "  Kit   sincronismo,,  Palio/1.0 (fire)  2012!! ",
     });
     expect(r.slug).toBe("kit-sincronismo-palio-1-0-fire-2012");
-    // Nunca deve conter hífens duplicados nem pontas com hífen.
     expect(r.slug.includes("--")).toBe(false);
     expect(r.slug.startsWith("-")).toBe(false);
     expect(r.slug.endsWith("-")).toBe(false);
   });
 
-  it("lança empty_query para string vazia", () => {
-    expect(() => buildMercadoLivreAffiliateSearchUrl({ query: "" })).toThrow(
-      "empty_query",
+  test("lança empty_query para string vazia", () => {
+    expectThrowsEmptyQuery(() =>
+      buildMercadoLivreAffiliateSearchUrl({ query: "" }),
     );
   });
 
-  it("lança empty_query para query apenas com símbolos", () => {
-    expect(() =>
+  test("lança empty_query para query apenas com símbolos", () => {
+    expectThrowsEmptyQuery(() =>
       buildMercadoLivreAffiliateSearchUrl({ query: "!!! --- ///" }),
-    ).toThrow("empty_query");
+    );
   });
 });
 
 describe("buildMercadoLivreAffiliateSearchUrl — URL", () => {
-  it("contém base + slug + parâmetros afiliados", () => {
+  test("contém base + slug + parâmetros afiliados", () => {
     const r = buildMercadoLivreAffiliateSearchUrl({
       query: "pastilhas de freio compass 2.0 2020",
     });
@@ -51,14 +63,14 @@ describe("buildMercadoLivreAffiliateSearchUrl — URL", () => {
     expect(r.url).toContain("forceInApp=true");
   });
 
-  it("é idempotente para a mesma query", () => {
+  test("é idempotente para a mesma query", () => {
     const a = buildMercadoLivreAffiliateSearchUrl({ query: "velas gol 1.6" });
     const b = buildMercadoLivreAffiliateSearchUrl({ query: "velas gol 1.6" });
     expect(a.url).toBe(b.url);
     expect(a.slug).toBe(b.slug);
   });
 
-  it("caso real validado com clique confirmado", () => {
+  test("caso real validado com clique confirmado", () => {
     const r = buildMercadoLivreAffiliateSearchUrl({
       query: "óleo e filtro C3 1.4 GLX ano 2008",
     });
@@ -67,20 +79,21 @@ describe("buildMercadoLivreAffiliateSearchUrl — URL", () => {
     );
   });
 
-  it("trackingStatus e affiliate params corretos", () => {
+  test("trackingStatus e affiliate params corretos", () => {
     const r = buildMercadoLivreAffiliateSearchUrl({ query: "óleo motor" });
     expect(r.trackingStatus).toBe("validated_click_pending_sale");
-    expect(r.affiliate).toEqual(MERCADO_LIVRE_AFFILIATE_PARAMS);
+    expect(r.affiliate.matt_word).toBe(MERCADO_LIVRE_AFFILIATE_PARAMS.matt_word);
+    expect(r.affiliate.matt_tool).toBe(MERCADO_LIVRE_AFFILIATE_PARAMS.matt_tool);
+    expect(r.affiliate.forceInApp).toBe(
+      MERCADO_LIVRE_AFFILIATE_PARAMS.forceInApp,
+    );
   });
 });
 
 describe("MERCADO_LIVRE_SHOPPING_WARNINGS", () => {
-  it("contém as 3 chaves esperadas com textos exatos", () => {
-    expect(Object.keys(MERCADO_LIVRE_SHOPPING_WARNINGS).sort()).toEqual([
-      "compatibility",
-      "offers",
-      "officialStores",
-    ]);
+  test("contém as 3 chaves esperadas com textos exatos", () => {
+    const keys = Object.keys(MERCADO_LIVRE_SHOPPING_WARNINGS).sort().join(",");
+    expect(keys).toBe("compatibility,offers,officialStores");
     expect(MERCADO_LIVRE_SHOPPING_WARNINGS.offers).toBe(
       "🛒 As melhores ofertas pra revisar seu carro",
     );
