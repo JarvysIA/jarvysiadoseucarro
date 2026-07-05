@@ -141,30 +141,24 @@ async function tryResolveWithAi(
   }
 }
 
-function hasMinimumDataForAi(v: {
-  marca?: string | null;
-  modelo?: string | null;
-  modelo_fipe?: string | null;
-  ano?: number | null;
-  ano_modelo?: number | null;
-  combustivel_fipe?: string | null;
-}): boolean {
+function hasMinimumDataForAi(v: AiTechnicalProfileInput): boolean {
   const brandOrModel = Boolean(
-    (v.marca && v.marca.trim()) || (v.modelo && v.modelo.trim()),
+    (v.marca && String(v.marca).trim()) ||
+      (v.modelo && String(v.modelo).trim()),
   );
   const modelIdentity = Boolean(
-    (v.modelo_fipe && v.modelo_fipe.trim()) ||
-      (v.modelo && v.modelo.trim()),
+    (v.modelo_fipe && String(v.modelo_fipe).trim()) ||
+      (v.modelo && String(v.modelo).trim()),
   );
-  const year = Boolean(
+  const yearOk =
     (typeof v.ano === "number" && v.ano > 0) ||
-      (typeof v.ano_modelo === "number" && v.ano_modelo > 0),
-  );
+    (typeof v.ano === "string" && v.ano.trim().length > 0) ||
+    (typeof v.ano_modelo === "number" && v.ano_modelo > 0);
   const fuelHint = Boolean(
-    (v.combustivel_fipe && v.combustivel_fipe.trim()) ||
-      (v.modelo_fipe && v.modelo_fipe.trim()),
+    (v.combustivel_fipe && String(v.combustivel_fipe).trim()) ||
+      (v.modelo_fipe && String(v.modelo_fipe).trim()),
   );
-  return brandOrModel && modelIdentity && year && fuelHint;
+  return brandOrModel && modelIdentity && yearOk && fuelHint;
 }
 
 /**
