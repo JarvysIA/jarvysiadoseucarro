@@ -758,6 +758,8 @@ function AdminCorpusSmokePage() {
 
       <MercadoLivreAffiliatePreviewPanel />
 
+      <MercadoLivreMaintenanceReviewPreviewPanel />
+
     </div>
 
   );
@@ -4646,6 +4648,165 @@ function MercadoLivreAffiliatePreviewPanel() {
         <div className="flex items-start gap-2">
           <Search className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
           <span>{MERCADO_LIVRE_SHOPPING_WARNINGS.compatibility.replace(/^🔎\s*/, "")}</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+          <span>{MERCADO_LIVRE_SHOPPING_WARNINGS.officialStores}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+// ─── Build 6.44 · Mercado Livre maintenance review preview ────────────────
+
+import {
+  Disc3,
+  Droplet,
+  Snowflake,
+  Wind,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { buildMaintenanceMercadoLivreShoppingLink } from "@/lib/maintenance-mercado-livre-shopping";
+
+const ML_REVIEW_VEHICLE = {
+  brand: "Citroën",
+  model: "C3",
+  version: "GLX",
+  engine: "1.4",
+  year: 2008,
+} as const;
+
+type ReviewItem = {
+  itemTitle: string;
+  itemDescription: string;
+  icon: LucideIcon;
+};
+
+const ML_REVIEW_ITEMS: readonly ReviewItem[] = [
+  {
+    itemTitle: "Troca do kit sincronismo",
+    itemDescription: "Correia dentada, tensor e rolamentos",
+    icon: Wrench,
+  },
+  {
+    itemTitle: "Óleo e filtro de óleo",
+    itemDescription: "Óleo do motor + filtro de óleo",
+    icon: Droplet,
+  },
+  {
+    itemTitle: "Velas e cabos",
+    itemDescription: "Velas de ignição e cabos de vela",
+    icon: Zap,
+  },
+  {
+    itemTitle: "Kit filtros",
+    itemDescription: "Filtro de ar, cabine e combustível",
+    icon: Wind,
+  },
+  {
+    itemTitle: "Aditivo de arrefecimento",
+    itemDescription: "Aditivo + limpeza do sistema",
+    icon: Snowflake,
+  },
+  {
+    itemTitle: "Pastilhas de freio",
+    itemDescription: "Pastilhas dianteiras/traseiras conforme aplicação",
+    icon: Disc3,
+  },
+];
+
+function MercadoLivreMaintenanceReviewPreviewPanel() {
+  const vehicleLabel = `${ML_REVIEW_VEHICLE.brand} ${ML_REVIEW_VEHICLE.model} ${ML_REVIEW_VEHICLE.version} ${ML_REVIEW_VEHICLE.engine} ano ${ML_REVIEW_VEHICLE.year}`;
+
+  const cards = ML_REVIEW_ITEMS.map((it) => {
+    const link = buildMaintenanceMercadoLivreShoppingLink({
+      itemTitle: it.itemTitle,
+      itemDescription: it.itemDescription,
+      vehicle: {
+        brand: ML_REVIEW_VEHICLE.brand,
+        model: ML_REVIEW_VEHICLE.model,
+        version: ML_REVIEW_VEHICLE.version,
+        engine: ML_REVIEW_VEHICLE.engine,
+        year: ML_REVIEW_VEHICLE.year,
+      },
+    });
+    return { ...it, link };
+  });
+
+  return (
+    <section className="mt-8 rounded-lg border border-border bg-card p-4">
+      <h2 className="text-lg font-semibold">Revisão 60.000 km</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Preview de revisão preventiva com links Mercado Livre
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{vehicleLabel}</p>
+
+      <div className="mt-4 space-y-3">
+        {cards.map(({ itemTitle, itemDescription, icon: Icon, link }) => (
+          <div
+            key={itemTitle}
+            className="rounded-md border border-border bg-background p-3"
+          >
+            <div className="flex items-start gap-3">
+              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+              <div className="flex-1">
+                <div className="text-sm font-medium">{itemTitle}</div>
+                <div className="text-xs text-muted-foreground">
+                  {itemDescription}
+                </div>
+              </div>
+            </div>
+
+            <a
+              href={link.mercadoLivre.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              Ver ofertas no Mercado Livre
+            </a>
+
+            <details className="mt-2 text-[10px] text-muted-foreground">
+              <summary className="cursor-pointer">debug</summary>
+              <div className="mt-1 space-y-0.5 font-mono">
+                <div>
+                  <span className="font-semibold">searchQuery:</span>{" "}
+                  {link.searchQuery}
+                </div>
+                <div>
+                  <span className="font-semibold">slug:</span>{" "}
+                  {link.mercadoLivre.slug}
+                </div>
+                <div>
+                  <span className="font-semibold">trackingStatus:</span>{" "}
+                  {link.mercadoLivre.trackingStatus}
+                </div>
+                <div className="break-all">
+                  <span className="font-semibold">url:</span>{" "}
+                  {link.mercadoLivre.url}
+                </div>
+              </div>
+            </details>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-3 text-xs">
+        <div className="flex items-start gap-2">
+          <ShoppingCart className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>
+            {MERCADO_LIVRE_SHOPPING_WARNINGS.offers.replace(/^🛒\s*/, "")}
+          </span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Search className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>
+            {MERCADO_LIVRE_SHOPPING_WARNINGS.compatibility.replace(/^🔎\s*/, "")}
+          </span>
         </div>
         <div className="flex items-start gap-2">
           <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
