@@ -1,4 +1,5 @@
 // Build 6.50A — Testes do helper puro de perfil técnico Jarvys.
+// Usa apenas matchers toBe/toContain expostos pelo shim bun-test.d.ts.
 
 import { describe, expect, test } from "bun:test";
 
@@ -38,10 +39,10 @@ describe("normalizeFuelKind", () => {
   });
 
   test("vazio/lixo → null", () => {
-    expect(normalizeFuelKind("")).toBeNull();
-    expect(normalizeFuelKind(null)).toBeNull();
-    expect(normalizeFuelKind(undefined)).toBeNull();
-    expect(normalizeFuelKind("xyz zzz")).toBeNull();
+    expect(normalizeFuelKind("")).toBe(null);
+    expect(normalizeFuelKind(null)).toBe(null);
+    expect(normalizeFuelKind(undefined)).toBe(null);
+    expect(normalizeFuelKind("xyz zzz")).toBe(null);
   });
 });
 
@@ -128,12 +129,10 @@ describe("resolveVehicleTechnicalProfile", () => {
     expect(r.source).toBe("corpus_curado");
     expect(r.canUseFullSchedule).toBe(true);
     expect(r.shouldBlockSensitiveShoppingLinks).toBe(false);
-    expect(r.profile).toEqual({
-      fuelKind: "combustao",
-      timingSystem: "correia_dentada",
-      transmissionKind: "manual",
-      steeringKind: "desconhecida",
-    });
+    expect(r.profile?.fuelKind).toBe("combustao");
+    expect(r.profile?.timingSystem).toBe("correia_dentada");
+    expect(r.profile?.transmissionKind).toBe("manual");
+    expect(r.profile?.steeringKind).toBe("desconhecida");
   });
 
   test("MEDIUM — corpus sem review, fuel + (timing OU transmission)", () => {
@@ -160,28 +159,22 @@ describe("resolveVehicleTechnicalProfile", () => {
     expect(r.canUseFullSchedule).toBe(false);
     expect(r.shouldBlockSensitiveShoppingLinks).toBe(true);
     expect(r.profile?.fuelKind).toBe("combustao");
-    expect(r.missingFields).toEqual(
-      expect.arrayContaining([
-        "timingSystem",
-        "transmissionKind",
-        "steeringKind",
-      ]),
-    );
+    expect(r.missingFields).toContain("timingSystem");
+    expect(r.missingFields).toContain("transmissionKind");
+    expect(r.missingFields).toContain("steeringKind");
   });
 
   test("SEM DADOS — profile null, source desconhecido", () => {
     const r = resolveVehicleTechnicalProfile({});
-    expect(r.profile).toBeNull();
+    expect(r.profile).toBe(null);
     expect(r.source).toBe("desconhecido");
     expect(r.confidence).toBe("low");
     expect(r.canUseFullSchedule).toBe(false);
     expect(r.shouldBlockSensitiveShoppingLinks).toBe(true);
-    expect(r.missingFields).toEqual([
-      "fuelKind",
-      "timingSystem",
-      "transmissionKind",
-      "steeringKind",
-    ]);
+    expect(r.missingFields).toContain("fuelKind");
+    expect(r.missingFields).toContain("timingSystem");
+    expect(r.missingFields).toContain("transmissionKind");
+    expect(r.missingFields).toContain("steeringKind");
   });
 
   test("corpus.combustivel tem prioridade sobre combustivelFipe", () => {
@@ -202,7 +195,7 @@ describe("resolveVehicleTechnicalProfile", () => {
 describe("JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE", () => {
   test("é string não vazia e contém frase-chave", () => {
     expect(typeof JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE).toBe("string");
-    expect(JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE.length).toBeGreaterThan(0);
+    expect(JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE.length > 0).toBe(true);
     expect(
       JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE.toLowerCase(),
     ).toContain("não conseguimos confirmar");
