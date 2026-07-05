@@ -762,7 +762,7 @@ function AdminCorpusSmokePage() {
 
       <JarvysRealReviewShoppingPreviewPanel />
 
-
+      <MaintenanceReviewShoppingSheetPreviewPanel />
 
     </div>
 
