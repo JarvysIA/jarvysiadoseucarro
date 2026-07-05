@@ -8,6 +8,7 @@ import {
   type PlacaFipeOption,
 } from "@/lib/placafipe";
 import { claimArchivedVehicleFn, inheritVehicleImageFn } from "@/lib/vehicles.functions";
+import { resolveAndSaveVehicleTechnicalProfileFn } from "@/lib/vehicle-technical-profile.functions";
 import { buildVehicleSignature, normalizeAnoModelo } from "@/lib/vehicle-signature";
 
 function parseCilindradas(raw: string | null | undefined): number | null {
