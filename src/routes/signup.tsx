@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { fireWelcomeWebhook, normalizePhoneBR } from "@/lib/welcome-webhook";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
+import { resolveAndSaveVehicleTechnicalProfileFn } from "@/lib/vehicle-technical-profile.functions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Cadastro — Jarvys" }] }),
