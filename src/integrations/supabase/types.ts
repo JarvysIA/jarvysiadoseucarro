@@ -678,6 +678,10 @@ export type Database = {
           history_locked: boolean
           id: string
           image_url: string | null
+          jarvys_technical_profile: Json | null
+          jarvys_technical_profile_confidence: string | null
+          jarvys_technical_profile_source: string | null
+          jarvys_technical_profile_updated_at: string | null
           km_atual: number | null
           km_ultima_troca_arrefecimento: number | null
           km_ultima_troca_filtros: number | null
@@ -715,6 +719,10 @@ export type Database = {
           history_locked?: boolean
           id?: string
           image_url?: string | null
+          jarvys_technical_profile?: Json | null
+          jarvys_technical_profile_confidence?: string | null
+          jarvys_technical_profile_source?: string | null
+          jarvys_technical_profile_updated_at?: string | null
           km_atual?: number | null
           km_ultima_troca_arrefecimento?: number | null
           km_ultima_troca_filtros?: number | null
@@ -752,6 +760,10 @@ export type Database = {
           history_locked?: boolean
           id?: string
           image_url?: string | null
+          jarvys_technical_profile?: Json | null
+          jarvys_technical_profile_confidence?: string | null
+          jarvys_technical_profile_source?: string | null
+          jarvys_technical_profile_updated_at?: string | null
           km_atual?: number | null
           km_ultima_troca_arrefecimento?: number | null
           km_ultima_troca_filtros?: number | null
