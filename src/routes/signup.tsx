@@ -235,6 +235,26 @@ function SignupPage() {
         }
       }
 
+      // Step 3.2: resolve e salva perfil técnico Jarvys (resiliente)
+      if (inserted?.id) {
+        try {
+          const result = await resolveAndSaveVehicleTechnicalProfileFn({
+            data: { vehicleId: inserted.id },
+          });
+          if (!result.ok) {
+            console.warn(
+              "[JarvysTechnicalProfile] Falha ao resolver perfil técnico no signup",
+              result,
+            );
+          }
+        } catch (error) {
+          console.warn(
+            "[JarvysTechnicalProfile] Erro inesperado ao resolver perfil técnico no signup",
+            error,
+          );
+        }
+      }
+
       // Step 4: normaliza telefone (E.164) e persiste no profile
       const whatsappE164 = normalizePhoneBR(form.phone);
       if (whatsappE164) {
