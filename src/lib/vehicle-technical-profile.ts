@@ -93,7 +93,7 @@ export function normalizeFuelKind(
   }
 
   // 2) Elétrico puro
-  if (/\bev\b|\bbev\b|eletric/.test(s)) {
+  if (/\bev\b|\bbev\b|eletric|electric/.test(s)) {
     return "eletrico_puro";
   }
 
