@@ -764,6 +764,8 @@ function AdminCorpusSmokePage() {
 
       <MaintenanceReviewShoppingSheetPreviewPanel />
 
+      <Build650EMockedSavedProfileSchedulePanel />
+
     </div>
 
   );
@@ -5071,6 +5073,220 @@ function MaintenanceReviewShoppingSheetPreviewPanel() {
         jarvysProfile={jarvysProfile}
         shoppingVehicle={shoppingVehicle}
         showDebug={true}
+      />
+    </section>
+  );
+}
+
+
+// ─── Build 6.50E — Cronograma mockado por perfil técnico salvo ────────────
+
+const BUILD_650E_MOCK = {
+  vehicleLabel: "Hyundai i30 2.0 automático ano 2012",
+  plate: "MTX0E96",
+  currentKm: 85_000,
+  initialRevisionKm: 90_000,
+  technicalProfileConfidence: "medium",
+  technicalProfileSource: "ia_resolvida",
+  jarvysProfile: {
+    fuelKind: "combustao",
+    timingSystem: "correia_dentada",
+    transmissionKind: "automatico",
+    steeringKind: "eletrica",
+  } satisfies JarvysVehicleProfile,
+  shoppingVehicle: {
+    brand: "Hyundai",
+    model: "i30",
+    version: "2.0 automático",
+    engine: "2.0",
+    year: 2012,
+  },
+} as const;
+
+const BUILD_650E_MIN_KM = 10_000;
+const BUILD_650E_STEP_KM = 10_000;
+
+function build650eFormatKm(km: number): string {
+  return km.toLocaleString("pt-BR");
+}
+
+function Build650EMockedSavedProfileSchedulePanel() {
+  const [selectedRevisionKm, setSelectedRevisionKm] = useState<number>(
+    BUILD_650E_MOCK.initialRevisionKm,
+  );
+  const [sheetOpen, setSheetOpen] = useState<boolean>(false);
+
+  const milestone = useMemo(
+    () =>
+      buildJarvysMilestone(
+        selectedRevisionKm,
+        BUILD_650E_MOCK.jarvysProfile,
+      ),
+    [selectedRevisionKm],
+  );
+
+  const visualGroups = useMemo(
+    () => buildJarvysVisualGroups(milestone.items),
+    [milestone.items],
+  );
+
+  const canGoLeft = selectedRevisionKm > BUILD_650E_MIN_KM;
+  const isBeforeCurrent = selectedRevisionKm < BUILD_650E_MOCK.currentKm;
+
+  return (
+    <section className="mt-6 rounded-lg border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold">
+        Build 6.50E — Cronograma mockado por perfil técnico salvo
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Painel inline mockado. Não consulta banco, placa, FIPE ou IA. A placa
+        MTX0E96 é apenas string visual de referência.
+      </p>
+
+      <div className="mt-3 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+        <div>
+          <span className="font-semibold">Veículo:</span>{" "}
+          {BUILD_650E_MOCK.vehicleLabel}
+        </div>
+        <div>
+          <span className="font-semibold">Placa (referência):</span>{" "}
+          {BUILD_650E_MOCK.plate}
+        </div>
+        <div>
+          <span className="font-semibold">Km atual:</span>{" "}
+          {build650eFormatKm(BUILD_650E_MOCK.currentKm)} km
+        </div>
+        <div>
+          <span className="font-semibold">confidence:</span>{" "}
+          {BUILD_650E_MOCK.technicalProfileConfidence}
+        </div>
+        <div>
+          <span className="font-semibold">source:</span>{" "}
+          {BUILD_650E_MOCK.technicalProfileSource}
+        </div>
+      </div>
+
+      <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-muted/40 p-2 text-[11px] font-mono">
+{JSON.stringify(BUILD_650E_MOCK.jarvysProfile, null, 2)}
+      </pre>
+
+      <div className="mt-4 flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-2 py-2">
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedRevisionKm((km) =>
+              Math.max(BUILD_650E_MIN_KM, km - BUILD_650E_STEP_KM),
+            )
+          }
+          disabled={!canGoLeft}
+          aria-label="Revisão anterior"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ‹
+        </button>
+        <div className="text-sm font-semibold">
+          Revisão de {build650eFormatKm(selectedRevisionKm)} km
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedRevisionKm((km) => km + BUILD_650E_STEP_KM)
+          }
+          aria-label="Próxima revisão"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground transition hover:bg-accent"
+        >
+          ›
+        </button>
+      </div>
+
+      {isBeforeCurrent && (
+        <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+          Esta revisão é anterior ao km atual informado. Ela pode ser útil para
+          veículos seminovos, histórico desconhecido ou revisão preventiva de
+          segurança.
+        </div>
+      )}
+
+      {milestone.isHighMileage && (
+        <div className="mt-3 rounded-md border border-border bg-secondary/60 p-2 text-[11px] text-secondary-foreground">
+          Ciclo recorrente pós 200.000 km
+        </div>
+      )}
+
+      <div className="mt-4">
+        <MaintenanceReviewShoppingList
+          groups={visualGroups}
+          vehicle={BUILD_650E_MOCK.shoppingVehicle}
+          showDebug
+        />
+      </div>
+
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          Abrir Sheet com este mock
+        </button>
+      </div>
+
+      <details className="mt-4 text-[10px] text-muted-foreground">
+        <summary className="cursor-pointer">debug geral</summary>
+        <div className="mt-1 space-y-0.5 font-mono">
+          <div>
+            <span className="font-semibold">selectedRevisionKm:</span>{" "}
+            {selectedRevisionKm.toLocaleString("pt-BR")}
+          </div>
+          <div>
+            <span className="font-semibold">revisionKmReal:</span>{" "}
+            {milestone.revisionKmReal.toLocaleString("pt-BR")}
+          </div>
+          <div>
+            <span className="font-semibold">revisionKmBase:</span>{" "}
+            {milestone.revisionKmBase.toLocaleString("pt-BR")}
+          </div>
+          <div>
+            <span className="font-semibold">cycleIndex:</span>{" "}
+            {milestone.cycleIndex}
+          </div>
+          <div>
+            <span className="font-semibold">isHighMileage:</span>{" "}
+            {String(milestone.isHighMileage)}
+          </div>
+          <div>
+            <span className="font-semibold">revisionNumber:</span>{" "}
+            {milestone.revisionNumber}
+          </div>
+          <div>
+            <span className="font-semibold">label:</span> {milestone.label}
+          </div>
+          <div>
+            <span className="font-semibold">items.length:</span>{" "}
+            {milestone.items.length}
+          </div>
+          <div>
+            <span className="font-semibold">visualGroups.length:</span>{" "}
+            {visualGroups.length}
+          </div>
+          {milestone.notes.length > 0 && (
+            <div className="break-all">
+              <span className="font-semibold">notes:</span>{" "}
+              {milestone.notes.join(" | ")}
+            </div>
+          )}
+        </div>
+      </details>
+
+      <MaintenanceReviewShoppingSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        vehicleLabel={BUILD_650E_MOCK.vehicleLabel}
+        currentKm={BUILD_650E_MOCK.currentKm}
+        initialRevisionKm={BUILD_650E_MOCK.initialRevisionKm}
+        jarvysProfile={BUILD_650E_MOCK.jarvysProfile}
+        shoppingVehicle={BUILD_650E_MOCK.shoppingVehicle}
+        showDebug
       />
     </section>
   );
