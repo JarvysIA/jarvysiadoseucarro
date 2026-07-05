@@ -758,6 +758,8 @@ function AdminCorpusSmokePage() {
 
       <MercadoLivreAffiliatePreviewPanel />
 
+      <MercadoLivreMaintenanceReviewPreviewPanel />
+
     </div>
 
   );
