@@ -169,7 +169,9 @@ describe("buildJarvysVisualGroups — fallback individual e service_only", () =>
     ])[0]!;
     expect(g.isServiceOnly).toBe(false);
     expect(g.hasMixedServiceItems).toBe(true);
-    expect(g.serviceItemLabels).toEqual(["Discos de freio (retificar)"]);
+    expect((g.serviceItemLabels ?? []).join("|")).toBe(
+      "Discos de freio (retificar)",
+    );
   });
 });
 
