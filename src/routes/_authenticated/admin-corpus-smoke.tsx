@@ -4896,30 +4896,6 @@ function JarvysRealReviewShoppingPreviewPanel() {
     .map((i) => i.item_key)
     .filter((k) => !groupedItemKeys.has(k));
 
-  const groupCards = visualGroups.map((group) => {
-    const buyable = group.sourceItems.filter(
-      (it) => it.shopping_classification !== "service_only",
-    );
-    const serviceItems = group.sourceItems.filter(
-      (it) => it.shopping_classification === "service_only",
-    );
-    const showButton = !group.isServiceOnly && buyable.length > 0;
-    const link = showButton
-      ? buildMaintenanceMercadoLivreShoppingLink({
-          itemTitle: group.linkItemTitle,
-          itemDescription: group.description,
-          vehicle: {
-            brand: JARVYS_REAL_VEHICLE.brand,
-            model: JARVYS_REAL_VEHICLE.model,
-            version: JARVYS_REAL_VEHICLE.version,
-            engine: JARVYS_REAL_VEHICLE.engine,
-            year: JARVYS_REAL_VEHICLE.year,
-          },
-        })
-      : null;
-    return { group, buyable, serviceItems, link };
-  });
-
   return (
     <section className="mt-8 rounded-lg border border-border bg-card p-4">
       <div className="mb-3">
