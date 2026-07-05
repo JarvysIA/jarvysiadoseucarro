@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { fireWelcomeWebhook, normalizePhoneBR } from "@/lib/welcome-webhook";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
+import { resolveAndSaveVehicleTechnicalProfileFn } from "@/lib/vehicle-technical-profile.functions";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Cadastro — Jarvys" }] }),
@@ -231,6 +232,26 @@ function SignupPage() {
           }
         } catch (e) {
           console.warn("[signup] consultarHistoricoFipe falhou", e);
+        }
+      }
+
+      // Step 3.2: resolve e salva perfil técnico Jarvys (resiliente)
+      if (inserted?.id) {
+        try {
+          const result = await resolveAndSaveVehicleTechnicalProfileFn({
+            data: { vehicleId: inserted.id },
+          });
+          if (!result.ok) {
+            console.warn(
+              "[JarvysTechnicalProfile] Falha ao resolver perfil técnico no signup",
+              result,
+            );
+          }
+        } catch (error) {
+          console.warn(
+            "[JarvysTechnicalProfile] Erro inesperado ao resolver perfil técnico no signup",
+            error,
+          );
         }
       }
 
