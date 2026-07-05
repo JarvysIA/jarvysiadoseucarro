@@ -190,17 +190,10 @@ describe("buildJarvysVisualGroups — ordem e anti-duplicidade", () => {
         recommendation_type: "inspect_only",
       }),
     ];
-    const kinds = buildJarvysVisualGroups(items).map((g) => g.kind);
-    expect(kinds).toEqual([
-      "oil_and_oil_filter",
-      "filters_kit",
-      "brake_pads_discs",
-      "timing_kit",
-      "spark_plugs_cables",
-      "coolant_additive",
-      "individual",
-      "service_only",
-    ]);
+    const kinds = buildJarvysVisualGroups(items).map((g) => g.kind).join(",");
+    expect(kinds).toBe(
+      "oil_and_oil_filter,filters_kit,brake_pads_discs,timing_kit,spark_plugs_cables,coolant_additive,individual,service_only",
+    );
   });
 
   test("item consumido não reaparece como fallback", () => {
