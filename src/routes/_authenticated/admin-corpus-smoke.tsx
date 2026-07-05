@@ -5021,3 +5021,57 @@ function JarvysRealReviewShoppingPreviewPanel() {
   );
 }
 
+
+// ─── Build 6.48 — Preview do Sheet Revisão + Mercado Livre ────────────────
+
+import { MaintenanceReviewShoppingSheet } from "@/components/maintenance/MaintenanceReviewShoppingSheet";
+
+function MaintenanceReviewShoppingSheetPreviewPanel() {
+  const [open, setOpen] = useState<boolean>(false);
+
+  const jarvysProfile: JarvysVehicleProfile = {
+    fuelKind: "combustao" as JarvysFuelKind,
+    timingSystem: "correia_dentada" as TimingSystem,
+    transmissionKind: "manual" as JarvysTransmissionKind,
+    steeringKind: "hidraulica" as JarvysSteeringKind,
+  };
+
+  const shoppingVehicle = {
+    brand: "Citroën",
+    model: "C3",
+    version: "GLX",
+    engine: "1.4",
+    year: 2008,
+  };
+
+  return (
+    <section className="mt-6 rounded-lg border border-border bg-card p-4">
+      <h2 className="text-sm font-semibold">
+        Build 6.48 — Sheet Revisão + Mercado Livre (preview)
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Componente reutilizável isolado. Não integrado à Home neste build.
+      </p>
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+        >
+          Abrir Sheet Revisão + Mercado Livre
+        </button>
+      </div>
+
+      <MaintenanceReviewShoppingSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        vehicleLabel="Citroën C3 GLX 1.4 ano 2008"
+        currentKm={85_000}
+        initialRevisionKm={90_000}
+        jarvysProfile={jarvysProfile}
+        shoppingVehicle={shoppingVehicle}
+        showDebug={true}
+      />
+    </section>
+  );
+}
