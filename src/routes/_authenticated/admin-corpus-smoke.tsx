@@ -760,6 +760,10 @@ function AdminCorpusSmokePage() {
 
       <MercadoLivreMaintenanceReviewPreviewPanel />
 
+      <JarvysRealReviewShoppingPreviewPanel />
+
+
+
     </div>
 
   );
