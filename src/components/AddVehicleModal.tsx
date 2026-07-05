@@ -437,6 +437,26 @@ export function AddVehicleModal({
           console.warn("[consultarHistoricoFipe]", e);
         }
       }
+      // Resolve e salva perfil técnico Jarvys (resiliente).
+      if (inserted?.id) {
+        try {
+          const result = await resolveAndSaveVehicleTechnicalProfileFn({
+            data: { vehicleId: inserted.id },
+          });
+          if (!result.ok) {
+            console.warn(
+              "[JarvysTechnicalProfile] Falha ao resolver perfil técnico no AddVehicleModal",
+              result,
+            );
+          }
+        } catch (error) {
+          console.warn(
+            "[JarvysTechnicalProfile] Erro inesperado ao resolver perfil técnico no AddVehicleModal",
+            error,
+          );
+        }
+      }
+
       toast.success("Veículo adicionado!");
       onAdded({
         id: inserted.id,
