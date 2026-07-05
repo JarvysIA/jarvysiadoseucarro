@@ -4820,3 +4820,294 @@ function MercadoLivreMaintenanceReviewPreviewPanel() {
     </section>
   );
 }
+
+
+// ─── Build 6.45 · Real Jarvys milestone shopping preview ──────────────────
+
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { JarvysItem } from "@/lib/maintenance-jarvys-schedule-rules";
+
+const JARVYS_REAL_VEHICLE = {
+  brand: "Citroën",
+  model: "C3",
+  version: "GLX",
+  engine: "1.4",
+  year: 2008,
+} as const;
+
+const JARVYS_REAL_PROFILE: JarvysVehicleProfile = {
+  fuelKind: "combustao",
+  timingSystem: "correia_dentada",
+  transmissionKind: "manual",
+  steeringKind: "hidraulica",
+};
+
+const JARVYS_REAL_CURRENT_KM = 85_000;
+const JARVYS_REAL_STEP_KM = 10_000;
+const JARVYS_REAL_MIN_REVISION_KM = 10_000;
+const JARVYS_REAL_INITIAL_REVISION_KM = 90_000;
+
+function formatKmPtBr(km: number): string {
+  return `${km.toLocaleString("pt-BR")} km`;
+}
+
+function serviceBadgeLabel(item: JarvysItem): string {
+  return item.recommendation_type === "inspect_only"
+    ? "Inspeção em oficina"
+    : "Serviço especializado";
+}
+
+function JarvysRealReviewShoppingPreviewPanel() {
+  const [selectedRevisionKm, setSelectedRevisionKm] = useState<number>(
+    JARVYS_REAL_INITIAL_REVISION_KM,
+  );
+
+  const vehicleLabel =
+    `${JARVYS_REAL_VEHICLE.brand} ${JARVYS_REAL_VEHICLE.model} ` +
+    `${JARVYS_REAL_VEHICLE.version} ${JARVYS_REAL_VEHICLE.engine} ` +
+    `ano ${JARVYS_REAL_VEHICLE.year}`;
+
+  const milestone = useMemo(
+    () => buildJarvysMilestone(selectedRevisionKm, JARVYS_REAL_PROFILE),
+    [selectedRevisionKm],
+  );
+
+  const prevDisabled = selectedRevisionKm <= JARVYS_REAL_MIN_REVISION_KM;
+  const isPastReview = selectedRevisionKm < JARVYS_REAL_CURRENT_KM;
+
+  const goPrev = () => {
+    setSelectedRevisionKm((km) =>
+      Math.max(JARVYS_REAL_MIN_REVISION_KM, km - JARVYS_REAL_STEP_KM),
+    );
+  };
+  const goNext = () => {
+    setSelectedRevisionKm((km) => km + JARVYS_REAL_STEP_KM);
+  };
+
+  const cards = milestone.items.map((item) => {
+    const description =
+      item.notes && item.notes.length > 0 ? item.notes.join(" • ") : undefined;
+    const isServiceOnly = item.shopping_classification === "service_only";
+    const link = !isServiceOnly
+      ? buildMaintenanceMercadoLivreShoppingLink({
+          itemTitle: item.label,
+          itemDescription: description,
+          vehicle: {
+            brand: JARVYS_REAL_VEHICLE.brand,
+            model: JARVYS_REAL_VEHICLE.model,
+            version: JARVYS_REAL_VEHICLE.version,
+            engine: JARVYS_REAL_VEHICLE.engine,
+            year: JARVYS_REAL_VEHICLE.year,
+          },
+        })
+      : null;
+    return { item, description, isServiceOnly, link };
+  });
+
+  return (
+    <section className="mt-8 rounded-lg border border-border bg-card p-4">
+      <div className="mb-3">
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Preview real Jarvys + Mercado Livre
+        </div>
+      </div>
+
+      <h2 className="text-lg font-semibold">{vehicleLabel}</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Km atual informado: {formatKmPtBr(JARVYS_REAL_CURRENT_KM)}
+      </p>
+
+      <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-border bg-background p-2">
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={prevDisabled}
+          aria-label="Revisão anterior"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="text-sm font-medium">
+          Revisão {formatKmPtBr(selectedRevisionKm)}
+        </div>
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label="Próxima revisão"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-foreground hover:bg-muted"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {isPastReview && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          Esta revisão é anterior ao km atual informado. Ela pode ser útil para
+          veículos seminovos, histórico desconhecido ou revisão preventiva de
+          segurança.
+        </p>
+      )}
+
+      <p className="mt-4 text-xs font-medium text-foreground">
+        Itens recomendados para esta revisão
+      </p>
+
+      <div className="mt-2 space-y-3">
+        {cards.length === 0 && (
+          <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+            Nenhum item recomendado pelo motor Jarvys para este marco.
+          </div>
+        )}
+        {cards.map(({ item, description, isServiceOnly, link }) => (
+          <div
+            key={item.item_key}
+            className="rounded-md border border-border bg-background p-3"
+          >
+            <div className="text-sm font-medium">{item.label}</div>
+            {description && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {description}
+              </div>
+            )}
+
+            {isServiceOnly ? (
+              <div className="mt-3">
+                <Badge variant="secondary">{serviceBadgeLabel(item)}</Badge>
+              </div>
+            ) : link ? (
+              <a
+                href={link.mercadoLivre.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+              >
+                Ver ofertas no Mercado Livre
+              </a>
+            ) : null}
+
+            <details className="mt-2 text-[10px] text-muted-foreground">
+              <summary className="cursor-pointer">debug</summary>
+              <div className="mt-1 space-y-0.5 font-mono">
+                <div>
+                  <span className="font-semibold">item_key:</span>{" "}
+                  {item.item_key}
+                </div>
+                <div>
+                  <span className="font-semibold">category:</span>{" "}
+                  {item.category}
+                </div>
+                <div>
+                  <span className="font-semibold">action:</span> {item.action}
+                </div>
+                <div>
+                  <span className="font-semibold">recommendation_type:</span>{" "}
+                  {item.recommendation_type}
+                </div>
+                <div>
+                  <span className="font-semibold">
+                    shopping_classification:
+                  </span>{" "}
+                  {item.shopping_classification}
+                </div>
+                <div>
+                  <span className="font-semibold">group_key:</span>{" "}
+                  {String(item.group_key)}
+                </div>
+                <div>
+                  <span className="font-semibold">requires_confirmation:</span>{" "}
+                  {String(item.requires_confirmation)}
+                </div>
+                {link && (
+                  <>
+                    <div>
+                      <span className="font-semibold">searchQuery:</span>{" "}
+                      {link.searchQuery}
+                    </div>
+                    <div>
+                      <span className="font-semibold">slug:</span>{" "}
+                      {link.mercadoLivre.slug}
+                    </div>
+                    <div>
+                      <span className="font-semibold">trackingStatus:</span>{" "}
+                      {link.mercadoLivre.trackingStatus}
+                    </div>
+                    <div className="break-all">
+                      <span className="font-semibold">url:</span>{" "}
+                      {link.mercadoLivre.url}
+                    </div>
+                  </>
+                )}
+              </div>
+            </details>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-3 text-xs">
+        <div className="flex items-start gap-2">
+          <ShoppingCart className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>
+            {MERCADO_LIVRE_SHOPPING_WARNINGS.offers.replace(/^🛒\s*/, "")}
+          </span>
+        </div>
+        <div className="flex items-start gap-2">
+          <Search className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+          <span>
+            {MERCADO_LIVRE_SHOPPING_WARNINGS.compatibility.replace(/^🔎\s*/, "")}
+          </span>
+        </div>
+        <div className="flex items-start gap-2">
+          <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+          <span>{MERCADO_LIVRE_SHOPPING_WARNINGS.officialStores}</span>
+        </div>
+      </div>
+
+      <details className="mt-3 text-[10px] text-muted-foreground">
+        <summary className="cursor-pointer">debug geral</summary>
+        <div className="mt-1 space-y-0.5 font-mono">
+          <div>
+            <span className="font-semibold">selectedRevisionKm:</span>{" "}
+            {selectedRevisionKm}
+          </div>
+          <div>
+            <span className="font-semibold">revisionKmReal:</span>{" "}
+            {milestone.revisionKmReal}
+          </div>
+          <div>
+            <span className="font-semibold">revisionKmBase:</span>{" "}
+            {milestone.revisionKmBase}
+          </div>
+          <div>
+            <span className="font-semibold">cycleIndex:</span>{" "}
+            {milestone.cycleIndex}
+          </div>
+          <div>
+            <span className="font-semibold">isHighMileage:</span>{" "}
+            {String(milestone.isHighMileage)}
+          </div>
+          <div>
+            <span className="font-semibold">revisionNumber:</span>{" "}
+            {milestone.revisionNumber}
+          </div>
+          <div>
+            <span className="font-semibold">label:</span> {milestone.label}
+          </div>
+          <div>
+            <span className="font-semibold">items.length:</span>{" "}
+            {milestone.items.length}
+          </div>
+          <div className="break-all">
+            <span className="font-semibold">profile:</span>{" "}
+            {JSON.stringify(JARVYS_REAL_PROFILE)}
+          </div>
+          {milestone.notes.length > 0 && (
+            <div className="break-all">
+              <span className="font-semibold">notes:</span>{" "}
+              {milestone.notes.join(" | ")}
+            </div>
+          )}
+        </div>
+      </details>
+    </section>
+  );
+}
