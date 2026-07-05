@@ -4826,6 +4826,8 @@ function MercadoLivreMaintenanceReviewPreviewPanel() {
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { JarvysItem } from "@/lib/maintenance-jarvys-schedule-rules";
+import { buildJarvysVisualGroups } from "@/lib/maintenance-visual-groups";
+import { MaintenanceReviewShoppingList } from "@/components/maintenance/MaintenanceReviewShoppingList";
 
 const JARVYS_REAL_VEHICLE = {
   brand: "Citroën",
