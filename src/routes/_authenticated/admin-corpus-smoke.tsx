@@ -4884,14 +4884,28 @@ function JarvysRealReviewShoppingPreviewPanel() {
     setSelectedRevisionKm((km) => km + JARVYS_REAL_STEP_KM);
   };
 
-  const cards = milestone.items.map((item) => {
-    const description =
-      item.notes && item.notes.length > 0 ? item.notes.join(" • ") : undefined;
-    const isServiceOnly = item.shopping_classification === "service_only";
-    const link = !isServiceOnly
+  const visualGroups = buildJarvysVisualGroups(milestone.items);
+
+  const groupedItemKeys = new Set<string>();
+  for (const g of visualGroups) {
+    for (const it of g.sourceItems) groupedItemKeys.add(it.item_key);
+  }
+  const ungroupedItemKeys = milestone.items
+    .map((i) => i.item_key)
+    .filter((k) => !groupedItemKeys.has(k));
+
+  const groupCards = visualGroups.map((group) => {
+    const buyable = group.sourceItems.filter(
+      (it) => it.shopping_classification !== "service_only",
+    );
+    const serviceItems = group.sourceItems.filter(
+      (it) => it.shopping_classification === "service_only",
+    );
+    const showButton = !group.isServiceOnly && buyable.length > 0;
+    const link = showButton
       ? buildMaintenanceMercadoLivreShoppingLink({
-          itemTitle: item.label,
-          itemDescription: description,
+          itemTitle: group.linkItemTitle,
+          itemDescription: group.description,
           vehicle: {
             brand: JARVYS_REAL_VEHICLE.brand,
             model: JARVYS_REAL_VEHICLE.model,
@@ -4901,7 +4915,7 @@ function JarvysRealReviewShoppingPreviewPanel() {
           },
         })
       : null;
-    return { item, description, isServiceOnly, link };
+    return { group, buyable, serviceItems, link };
   });
 
   return (
@@ -4953,96 +4967,117 @@ function JarvysRealReviewShoppingPreviewPanel() {
       </p>
 
       <div className="mt-2 space-y-3">
-        {cards.length === 0 && (
+        {groupCards.length === 0 && (
           <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
             Nenhum item recomendado pelo motor Jarvys para este marco.
           </div>
         )}
-        {cards.map(({ item, description, isServiceOnly, link }) => (
-          <div
-            key={item.item_key}
-            className="rounded-md border border-border bg-background p-3"
-          >
-            <div className="text-sm font-medium">{item.label}</div>
-            {description && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                {description}
+        {groupCards.map(({ group, buyable, serviceItems, link }) => {
+          const Icon = group.icon;
+          return (
+            <div
+              key={group.groupKey}
+              className="rounded-md border border-border bg-background p-3"
+            >
+              <div className="flex items-start gap-2">
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{group.title}</div>
+                  {group.description && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {group.description}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
 
-            {isServiceOnly ? (
-              <div className="mt-3">
-                <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                  {serviceBadgeLabel(item)}
-                </span>
-              </div>
-            ) : link ? (
-              <a
-                href={link.mercadoLivre.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
-              >
-                Ver ofertas no Mercado Livre
-              </a>
-            ) : null}
+              {group.isServiceOnly ? (
+                <div className="mt-3">
+                  <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                    {group.serviceBadgeLabel ?? "Serviço especializado"}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {link && (
+                    <a
+                      href={link.mercadoLivre.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                    >
+                      Ver ofertas no Mercado Livre
+                    </a>
+                  )}
+                  {serviceItems.length > 0 && (
+                    <div className="mt-2 text-[11px] text-muted-foreground">
+                      Também recomendado como serviço:{" "}
+                      {serviceItems.map((s) => s.label).join(", ")}
+                    </div>
+                  )}
+                </>
+              )}
 
-            <details className="mt-2 text-[10px] text-muted-foreground">
-              <summary className="cursor-pointer">debug</summary>
-              <div className="mt-1 space-y-0.5 font-mono">
-                <div>
-                  <span className="font-semibold">item_key:</span>{" "}
-                  {item.item_key}
-                </div>
-                <div>
-                  <span className="font-semibold">category:</span>{" "}
-                  {item.category}
-                </div>
-                <div>
-                  <span className="font-semibold">action:</span> {item.action}
-                </div>
-                <div>
-                  <span className="font-semibold">recommendation_type:</span>{" "}
-                  {item.recommendation_type}
-                </div>
-                <div>
-                  <span className="font-semibold">
-                    shopping_classification:
-                  </span>{" "}
-                  {item.shopping_classification}
-                </div>
-                <div>
-                  <span className="font-semibold">group_key:</span>{" "}
-                  {String(item.group_key)}
-                </div>
-                <div>
-                  <span className="font-semibold">requires_confirmation:</span>{" "}
-                  {String(item.requires_confirmation)}
-                </div>
-                {link && (
-                  <>
+              <details className="mt-2 text-[10px] text-muted-foreground">
+                <summary className="cursor-pointer">debug</summary>
+                <div className="mt-1 space-y-0.5 font-mono">
+                  <div>
+                    <span className="font-semibold">groupTitle:</span>{" "}
+                    {group.title}
+                  </div>
+                  <div>
+                    <span className="font-semibold">groupKey:</span>{" "}
+                    {group.groupKey}
+                  </div>
+                  <div>
+                    <span className="font-semibold">sourceItemKeys:</span>{" "}
+                    {group.sourceItems.map((i) => i.item_key).join(", ")}
+                  </div>
+                  <div>
+                    <span className="font-semibold">sourceLabels:</span>{" "}
+                    {group.sourceItems.map((i) => i.label).join(", ")}
+                  </div>
+                  <div>
+                    <span className="font-semibold">
+                      shoppingClassification:
+                    </span>{" "}
+                    {group.isServiceOnly
+                      ? "service_only"
+                      : buyable.length === group.sourceItems.length
+                        ? "buyable"
+                        : "mixed"}
+                  </div>
+                  {group.serviceBadgeLabel && (
                     <div>
-                      <span className="font-semibold">searchQuery:</span>{" "}
-                      {link.searchQuery}
+                      <span className="font-semibold">serviceBadgeLabel:</span>{" "}
+                      {group.serviceBadgeLabel}
                     </div>
-                    <div>
-                      <span className="font-semibold">slug:</span>{" "}
-                      {link.mercadoLivre.slug}
-                    </div>
-                    <div>
-                      <span className="font-semibold">trackingStatus:</span>{" "}
-                      {link.mercadoLivre.trackingStatus}
-                    </div>
-                    <div className="break-all">
-                      <span className="font-semibold">url:</span>{" "}
-                      {link.mercadoLivre.url}
-                    </div>
-                  </>
-                )}
-              </div>
-            </details>
-          </div>
-        ))}
+                  )}
+                  {link && (
+                    <>
+                      <div>
+                        <span className="font-semibold">searchQuery:</span>{" "}
+                        {link.searchQuery}
+                      </div>
+                      <div>
+                        <span className="font-semibold">slug:</span>{" "}
+                        {link.mercadoLivre.slug}
+                      </div>
+                      <div>
+                        <span className="font-semibold">trackingStatus:</span>{" "}
+                        {link.mercadoLivre.trackingStatus}
+                      </div>
+                      <div className="break-all">
+                        <span className="font-semibold">url:</span>{" "}
+                        {link.mercadoLivre.url}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </details>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-4 space-y-2 rounded-md border border-border bg-muted/40 p-3 text-xs">
@@ -5098,6 +5133,18 @@ function JarvysRealReviewShoppingPreviewPanel() {
             <span className="font-semibold">items.length:</span>{" "}
             {milestone.items.length}
           </div>
+          <div>
+            <span className="font-semibold">visualGroups.length:</span>{" "}
+            {visualGroups.length}
+          </div>
+          <div className="break-all">
+            <span className="font-semibold">groupedItemKeys:</span>{" "}
+            {Array.from(groupedItemKeys).join(", ")}
+          </div>
+          <div className="break-all">
+            <span className="font-semibold">ungroupedItemKeys:</span>{" "}
+            {ungroupedItemKeys.join(", ")}
+          </div>
           <div className="break-all">
             <span className="font-semibold">profile:</span>{" "}
             {JSON.stringify(JARVYS_REAL_PROFILE)}
@@ -5112,4 +5159,270 @@ function JarvysRealReviewShoppingPreviewPanel() {
       </details>
     </section>
   );
+}
+
+// ─── Build 6.45A · Visual/comercial grouping of real Jarvys items ─────────
+
+type JarvysVisualGroupIcon = React.ComponentType<{ className?: string }>;
+
+type JarvysVisualGroup = {
+  groupKey: string;
+  title: string;
+  description?: string;
+  linkItemTitle: string;
+  icon: JarvysVisualGroupIcon;
+  sourceItems: JarvysItem[];
+  isServiceOnly: boolean;
+  serviceBadgeLabel?: string;
+  sortOrder: number;
+};
+
+function normalizeJarvysText(v: string): string {
+  return v
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[_\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function itemHaystack(item: JarvysItem): string {
+  return `${normalizeJarvysText(item.item_key)} ${normalizeJarvysText(item.label)}`;
+}
+
+function itemMatchesAny(item: JarvysItem, needles: string[]): boolean {
+  const hay = itemHaystack(item);
+  return needles.some((n) => hay.includes(n));
+}
+
+function finalizeGroupServiceState(group: JarvysVisualGroup): JarvysVisualGroup {
+  if (group.sourceItems.length === 0) return group;
+  const allService = group.sourceItems.every(
+    (it) => it.shopping_classification === "service_only",
+  );
+  if (!allService) return group;
+  const anyInspect = group.sourceItems.some(
+    (it) => it.recommendation_type === "inspect_only",
+  );
+  return {
+    ...group,
+    isServiceOnly: true,
+    serviceBadgeLabel: anyInspect ? "Inspeção em oficina" : "Serviço especializado",
+  };
+}
+
+function buildJarvysVisualGroups(items: JarvysItem[]): JarvysVisualGroup[] {
+  const consumed = new Set<string>();
+  const groups: JarvysVisualGroup[] = [];
+
+  const take = (predicate: (it: JarvysItem) => boolean): JarvysItem[] => {
+    const matched: JarvysItem[] = [];
+    for (const it of items) {
+      if (consumed.has(it.item_key)) continue;
+      if (predicate(it)) {
+        matched.push(it);
+        consumed.add(it.item_key);
+      }
+    }
+    return matched;
+  };
+
+  // 1) Óleo e filtro de óleo
+  {
+    const oil = take((it) => itemMatchesAny(it, ["oleo motor", "oleo do motor"]));
+    const oilFilter = take((it) =>
+      itemMatchesAny(it, ["filtro oleo", "filtro de oleo"]),
+    );
+    const src = [...oil, ...oilFilter];
+    if (src.length > 0) {
+      let description: string;
+      if (oil.length > 0 && oilFilter.length > 0) {
+        description = "Óleo do motor + filtro de óleo";
+      } else if (oil.length > 0) {
+        description = "Óleo do motor";
+      } else {
+        description = "Filtro de óleo";
+      }
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "oleo_e_filtro_oleo",
+          title: "Óleo e filtro de óleo",
+          description,
+          linkItemTitle: "Óleo e filtro de óleo",
+          icon: Droplet,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 1,
+        }),
+      );
+    }
+  }
+
+  // 2) Kit filtros (ar + cabine + combustível)
+  {
+    const ar = take((it) => itemMatchesAny(it, ["filtro ar"]));
+    const cabine = take((it) => itemMatchesAny(it, ["filtro cabine"]));
+    const combustivel = take((it) => itemMatchesAny(it, ["filtro combustivel"]));
+    const src = [...ar, ...cabine, ...combustivel];
+    if (src.length > 0) {
+      const parts: string[] = [];
+      if (ar.length > 0) parts.push("ar");
+      if (cabine.length > 0) parts.push("cabine");
+      if (combustivel.length > 0) parts.push("combustível");
+      let description: string;
+      if (parts.length === 3) {
+        description = "Filtro de ar, cabine e combustível";
+      } else if (parts.length === 2) {
+        description = `Filtro de ${parts[0]} e ${parts[1]}`;
+      } else {
+        description = `Filtro de ${parts[0]}`;
+      }
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "kit_filtros",
+          title: "Kit filtros",
+          description,
+          linkItemTitle: "Kit filtros",
+          icon: Wind,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 2,
+        }),
+      );
+    }
+  }
+
+  // 3) Pastilhas / discos de freio
+  {
+    const pastilhas = take(
+      (it) => itemMatchesAny(it, ["pastilha"]) && itemHaystack(it).includes("freio"),
+    );
+    const discos = take(
+      (it) => itemMatchesAny(it, ["disco"]) && itemHaystack(it).includes("freio"),
+    );
+    const src = [...pastilhas, ...discos];
+    if (src.length > 0) {
+      let title: string;
+      if (pastilhas.length > 0 && discos.length > 0) {
+        title = "Pastilhas e discos de freio";
+      } else if (pastilhas.length > 0) {
+        title = "Pastilhas de freio";
+      } else {
+        title = "Discos de freio";
+      }
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "freio_pastilhas_discos",
+          title,
+          description: "Componentes de freio conforme aplicação",
+          linkItemTitle: title,
+          icon: Disc3,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 3,
+        }),
+      );
+    }
+  }
+
+  // 4) Kit sincronismo
+  {
+    const src = take((it) =>
+      itemMatchesAny(it, [
+        "correia dentada",
+        "kit sincronismo",
+        "sincronismo",
+        "tensor",
+        "rolamento",
+      ]),
+    );
+    if (src.length > 0) {
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "kit_sincronismo",
+          title: "Troca do kit sincronismo",
+          description: "Correia dentada, tensor e rolamentos",
+          linkItemTitle: "Kit sincronismo",
+          icon: Wrench,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 4,
+        }),
+      );
+    }
+  }
+
+  // 5) Velas e cabos
+  {
+    const src = take((it) =>
+      itemMatchesAny(it, ["vela", "cabo vela", "cabo de vela", "bobina"]),
+    );
+    if (src.length > 0) {
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "velas_e_cabos",
+          title: "Velas e cabos",
+          description: "Velas de ignição e cabos de vela",
+          linkItemTitle: "Velas e cabos",
+          icon: Zap,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 5,
+        }),
+      );
+    }
+  }
+
+  // 6) Aditivo de arrefecimento
+  {
+    const src = take((it) =>
+      itemMatchesAny(it, [
+        "aditivo",
+        "arrefecimento",
+        "liquido arrefecimento",
+        "liquido de arrefecimento",
+      ]),
+    );
+    if (src.length > 0) {
+      groups.push(
+        finalizeGroupServiceState({
+          groupKey: "aditivo_arrefecimento",
+          title: "Aditivo de arrefecimento",
+          description: "Aditivo + limpeza do sistema",
+          linkItemTitle: "Aditivo de arrefecimento",
+          icon: Snowflake,
+          sourceItems: src,
+          isServiceOnly: false,
+          sortOrder: 6,
+        }),
+      );
+    }
+  }
+
+  // 7 / 8) Fallback individual
+  for (const it of items) {
+    if (consumed.has(it.item_key)) continue;
+    consumed.add(it.item_key);
+    const isServiceOnly = it.shopping_classification === "service_only";
+    const description =
+      it.notes && it.notes.length > 0 ? it.notes.join(" • ") : undefined;
+    groups.push({
+      groupKey: `individual_${it.item_key}`,
+      title: it.label,
+      description,
+      linkItemTitle: it.label,
+      icon: Wrench,
+      sourceItems: [it],
+      isServiceOnly,
+      serviceBadgeLabel: isServiceOnly
+        ? it.recommendation_type === "inspect_only"
+          ? "Inspeção em oficina"
+          : "Serviço especializado"
+        : undefined,
+      sortOrder: isServiceOnly ? 8 : 7,
+    });
+  }
+
+  return groups.sort((a, b) => a.sortOrder - b.sortOrder);
 }
