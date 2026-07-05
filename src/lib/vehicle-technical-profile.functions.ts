@@ -5,8 +5,14 @@ import {
   resolveVehicleTechnicalProfile,
   type JarvysTechnicalProfileConfidence,
   type JarvysTechnicalProfileSource,
+  type ResolvedVehicleTechnicalProfile,
   type VehicleMaintenanceCorpusProfile,
 } from "@/lib/vehicle-technical-profile";
+import {
+  buildAiPrompt,
+  validateAiResolvedTechnicalProfile,
+  type AiTechnicalProfileInput,
+} from "@/lib/vehicle-technical-profile-ai";
 import type { JarvysVehicleProfile } from "@/lib/maintenance-jarvys-schedule-rules";
 
 export type ResolveAndSaveResultOk = {
@@ -38,15 +44,136 @@ export type ResolveAndSaveVehicleTechnicalProfileResult =
   | ResolveAndSaveResultOk
   | ResolveAndSaveResultErr;
 
+// ─────────────────────────────────────────────────────────────
+// IA fallback (server-side) — chama Lovable AI Gateway.
+// Retorna ResolvedVehicleTechnicalProfile pronto se IA validar,
+// ou null para o chamador manter o resultado local (low).
+// ─────────────────────────────────────────────────────────────
+
+async function tryResolveWithAi(
+  aiInput: AiTechnicalProfileInput,
+): Promise<ResolvedVehicleTechnicalProfile | null> {
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) {
+    console.warn(
+      "[JarvysTechnicalProfile:ai] LOVABLE_API_KEY ausente — pulando IA.",
+    );
+    return null;
+  }
+
+  const { system, user } = buildAiPrompt(aiInput);
+
+  try {
+    const resp = await fetch(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(15000),
+      },
+    );
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      console.warn(
+        "[JarvysTechnicalProfile:ai] gateway error",
+        resp.status,
+        t,
+      );
+      return null;
+    }
+
+    const json = (await resp.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = json.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      console.warn("[JarvysTechnicalProfile:ai] resposta vazia");
+      return null;
+    }
+
+    const validated = validateAiResolvedTechnicalProfile(content);
+    if (!validated.ok) {
+      console.warn(
+        "[JarvysTechnicalProfile:ai] resposta inválida:",
+        validated.reason,
+      );
+      return null;
+    }
+
+    if (validated.confidence !== "medium") {
+      // IA declarou low — não persistimos como ia_resolvida.
+      console.warn(
+        "[JarvysTechnicalProfile:ai] IA retornou confidence=low; mantendo fallback local.",
+        validated.warnings,
+      );
+      return null;
+    }
+
+    return {
+      profile: validated.profile,
+      confidence: "medium",
+      source: "ia_resolvida",
+      reasons: [
+        "Perfil técnico resolvido por IA a partir dos dados FIPE/modelo.",
+        ...validated.evidence,
+        ...validated.warnings.map((w) => `Aviso IA: ${w}`),
+      ],
+      missingFields: [],
+      canUseFullSchedule: true,
+      shouldBlockSensitiveShoppingLinks: true,
+    };
+  } catch (err) {
+    console.warn("[JarvysTechnicalProfile:ai] exceção na chamada IA", err);
+    return null;
+  }
+}
+
+function hasMinimumDataForAi(v: AiTechnicalProfileInput): boolean {
+  const brandOrModel = Boolean(
+    (v.marca && String(v.marca).trim()) ||
+      (v.modelo && String(v.modelo).trim()),
+  );
+  const modelIdentity = Boolean(
+    (v.modelo_fipe && String(v.modelo_fipe).trim()) ||
+      (v.modelo && String(v.modelo).trim()),
+  );
+  const yearOk =
+    (typeof v.ano === "number" && v.ano > 0) ||
+    (typeof v.ano === "string" && v.ano.trim().length > 0) ||
+    (typeof v.ano_modelo === "number" && v.ano_modelo > 0);
+  const fuelHint = Boolean(
+    (v.combustivel_fipe && String(v.combustivel_fipe).trim()) ||
+      (v.modelo_fipe && String(v.modelo_fipe).trim()),
+  );
+  return brandOrModel && modelIdentity && yearOk && fuelHint;
+}
+
 /**
  * Resolve e persiste o perfil técnico Jarvys de um veículo do usuário
- * autenticado. Orquestra apenas: auth → leitura → helper puro → update.
- * Regras de confidence/source vivem em `resolveVehicleTechnicalProfile`.
+ * autenticado. Orquestra: auth → leitura → helper puro → IA fallback → update.
+ *
+ * A IA classifica APENAS o perfil técnico (fuelKind, timingSystem,
+ * transmissionKind, steeringKind). NUNCA gera cronograma, peças, intervalos
+ * ou links. O cronograma continua 100% determinístico pelo motor Jarvys.
  *
  * Segurança:
  * - Exige usuário autenticado via `requireSupabaseAuth`.
  * - Leitura via `context.supabase` (RLS aplicado).
  * - Update via `supabaseAdmin` sempre filtrando por `id + user_id`.
+ * - Falha da IA nunca bloqueia o cadastro.
  */
 export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
   method: "POST",
@@ -131,14 +258,44 @@ export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
           }
         }
 
-        // 3) Resolução pura (helper 6.50A).
-        const resolved = resolveVehicleTechnicalProfile({
-          combustivelFipe: vehicle.combustivel_fipe,
-          vehicleSignature: vehicle.vehicle_signature,
-          corpusProfile,
-        });
+        // 3) Resolução pura (helper 6.50A/6.50D).
+        let resolved: ResolvedVehicleTechnicalProfile =
+          resolveVehicleTechnicalProfile({
+            combustivelFipe: vehicle.combustivel_fipe,
+            vehicleSignature: vehicle.vehicle_signature,
+            corpusProfile,
+          });
 
-        // 4) Persistência: sempre grava confidence/source/updated_at, mesmo
+        // 4) IA fallback quando resolução local não é suficiente.
+        if (!resolved.canUseFullSchedule) {
+          const aiInput: AiTechnicalProfileInput = {
+            marca: vehicle.marca,
+            modelo: vehicle.modelo,
+            modelo_fipe: vehicle.modelo_fipe,
+            ano: vehicle.ano,
+            ano_modelo: vehicle.ano_modelo,
+            combustivel_fipe: vehicle.combustivel_fipe,
+            motorizacao: vehicle.motorizacao,
+            cilindradas: vehicle.cilindradas,
+            codigo_fipe: null,
+            codigo_marca: vehicle.codigo_marca,
+            codigo_modelo: vehicle.codigo_modelo,
+            vehicle_signature: vehicle.vehicle_signature,
+          };
+
+          if (hasMinimumDataForAi(aiInput)) {
+            const aiResolved = await tryResolveWithAi(aiInput);
+            if (aiResolved) {
+              resolved = aiResolved;
+            }
+          } else {
+            extraReasons.push(
+              "Dados FIPE/modelo insuficientes para IA classificar.",
+            );
+          }
+        }
+
+        // 5) Persistência: sempre grava confidence/source/updated_at, mesmo
         // com profile null (marca que o veículo já foi analisado).
         const updatePayload = {
           jarvys_technical_profile: resolved.profile as unknown as null,
