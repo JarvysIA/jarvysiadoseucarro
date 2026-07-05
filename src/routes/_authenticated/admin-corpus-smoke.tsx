@@ -4972,7 +4972,9 @@ function JarvysRealReviewShoppingPreviewPanel() {
 
             {isServiceOnly ? (
               <div className="mt-3">
-                <Badge variant="secondary">{serviceBadgeLabel(item)}</Badge>
+                <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+                  {serviceBadgeLabel(item)}
+                </span>
               </div>
             ) : link ? (
               <a
