@@ -45,6 +45,7 @@ export type JarvysTransmissionKind =
   | "automatizado"
   | "dupla_embreagem"
   | "e_cvt"
+  | "caixa_reducao"
   | "desconhecido";
 
 export type JarvysSteeringKind = "hidraulica" | "eletrica" | "desconhecida";

@@ -1,16 +1,17 @@
-// Build 6.50A — Helper puro de normalização/resolução do perfil técnico Jarvys.
+// Build 6.50D — Helper puro de normalização/resolução do perfil técnico Jarvys.
 //
 // Zero I/O: sem Supabase, sem React, sem fetch, sem IA, sem banco, sem side
 // effects. Transforma DNA técnico (FIPE + corpus `vehicle_maintenance_profiles`)
 // em um `JarvysVehicleProfile` normalizado + metadados de confiança/origem.
 //
-// Consumido futuramente por:
-//   - resolveAndSaveVehicleTechnicalProfileFn (server-fn, Build 6.50B)
-//   - cadastro (signup + AddVehicleModal, Build 6.50C)
-//   - backfill admin (Build 6.50D)
-//   - Home / NextRevisionCard / MaintenanceReviewShoppingSheet (Build 6.51)
-//
-// Neste build o helper apenas EXISTE. Nada é integrado ainda.
+// Regra 6.50D:
+// - Normalizadores retornam `null` quando não conseguem resolver (não mais
+//   "desconhecido/desconhecida").
+// - Perfil final salvo NUNCA contém valores desconhecidos: se qualquer campo
+//   obrigatório faltar, `profile` = null e o resultado é low.
+// - "desconhecido"/"desconhecida" permanecem nos enums TS apenas por
+//   compatibilidade interna do motor determinístico; a IA fallback
+//   (server-side) tenta completar antes de cair em low.
 
 import type {
   JarvysFuelKind,
@@ -31,7 +32,8 @@ export type JarvysTechnicalProfileSource =
   | "corpus_ia"
   | "derivado_fipe"
   | "desconhecido"
-  | "manual_admin";
+  | "manual_admin"
+  | "ia_resolvida";
 
 export type VehicleMaintenanceCorpusProfile = {
   signature?: string | null;
@@ -78,7 +80,7 @@ function normalize(input?: string | null): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Normalizadores
+// Normalizadores (retornam null quando não resolvem)
 // ─────────────────────────────────────────────────────────────
 
 export function normalizeFuelKind(
@@ -107,10 +109,13 @@ export function normalizeFuelKind(
 
 export function normalizeTransmissionKind(
   input?: string | null,
-): JarvysTransmissionKind {
+): JarvysTransmissionKind | null {
   const s = normalize(input);
-  if (!s) return "desconhecido";
+  if (!s) return null;
 
+  if (/caixa[-\s]?de[-\s]?reducao|caixa[-\s]?reducao|reduction[-\s]?gear|\breducao\b/.test(s)) {
+    return "caixa_reducao";
+  }
   if (/\bdsg\b|powershift|\bdct\b|dupla[-\s]?embreagem|dupla/.test(s)) {
     return "dupla_embreagem";
   }
@@ -130,15 +135,18 @@ export function normalizeTransmissionKind(
     return "manual";
   }
 
-  return "desconhecido";
+  return null;
 }
 
 export function normalizeTimingSystem(
   input?: string | null,
-): TimingSystem {
+): TimingSystem | null {
   const s = normalize(input);
-  if (!s) return "desconhecido";
+  if (!s) return null;
 
+  if (/nao[-\s]?aplicavel|not[-\s]?applicable|n\/a/.test(s)) {
+    return "nao_aplicavel";
+  }
   if (/banhad|wet[-\s]?belt/.test(s)) {
     return "correia_banhada";
   }
@@ -149,14 +157,14 @@ export function normalizeTimingSystem(
     return "correia_dentada";
   }
 
-  return "desconhecido";
+  return null;
 }
 
 export function normalizeSteeringKind(
   input?: string | null,
-): JarvysSteeringKind {
+): JarvysSteeringKind | null {
   const s = normalize(input);
-  if (!s) return "desconhecida";
+  if (!s) return null;
 
   if (/eletric|eletroassist/.test(s)) {
     return "eletrica";
@@ -165,7 +173,7 @@ export function normalizeSteeringKind(
     return "hidraulica";
   }
 
-  return "desconhecida";
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -181,17 +189,11 @@ export function resolveVehicleTechnicalProfile(
     normalizeFuelKind(corpus?.combustivel) ??
     normalizeFuelKind(input.combustivelFipe);
 
-  const timingSystem = normalizeTimingSystem(corpus?.sistema_distribuicao);
-  const transmissionKind = normalizeTransmissionKind(corpus?.transmissao);
-  const steeringKind: JarvysSteeringKind = "desconhecida";
-
-  const reasons: string[] = [];
-
-  // Sem fuelKind identificável → não conseguimos montar perfil confiável.
+  // fuel desconhecido → nada a fazer localmente.
   if (fuelKind === null) {
-    reasons.push(
+    const reasons: string[] = [
       "Combustível não identificado a partir de FIPE nem do corpus técnico.",
-    );
+    ];
     if (!corpus) reasons.push("Sem corpus técnico associado à assinatura.");
     return {
       profile: null,
@@ -209,74 +211,94 @@ export function resolveVehicleTechnicalProfile(
     };
   }
 
-  const profile: JarvysVehicleProfile = {
-    fuelKind,
-    timingSystem,
-    transmissionKind,
-    steeringKind,
-  };
+  // Resolve timing/transmission/steering, com regras especiais de EV.
+  let timingSystem = normalizeTimingSystem(corpus?.sistema_distribuicao);
+  let transmissionKind = normalizeTransmissionKind(corpus?.transmissao);
+  const steeringKind = normalizeSteeringKind(null); // corpus atual não expõe
+
+  if (fuelKind === "eletrico_puro") {
+    if (timingSystem === null) timingSystem = "nao_aplicavel";
+    if (transmissionKind === null) transmissionKind = "caixa_reducao";
+  }
 
   const missingFields: ResolvedVehicleTechnicalProfile["missingFields"] = [];
-  if (timingSystem === "desconhecido") missingFields.push("timingSystem");
-  if (transmissionKind === "desconhecido")
-    missingFields.push("transmissionKind");
-  if (steeringKind === "desconhecida") missingFields.push("steeringKind");
+  if (timingSystem === null) missingFields.push("timingSystem");
+  if (transmissionKind === null) missingFields.push("transmissionKind");
+  if (steeringKind === null) missingFields.push("steeringKind");
 
-  reasons.push(`Combustível identificado como "${fuelKind}".`);
+  const reasons: string[] = [
+    `Combustível identificado como "${fuelKind}".`,
+  ];
 
-  const timingKnown = timingSystem !== "desconhecido";
-  const transmissionKnown = transmissionKind !== "desconhecido";
+  // Perfil incompleto → NÃO persistir profile. IA fallback (server-fn) decide.
+  if (missingFields.length > 0) {
+    reasons.push(
+      `Campos ainda desconhecidos: ${missingFields.join(", ")}.`,
+    );
+    if (!corpus) {
+      reasons.push("Sem corpus técnico associado à assinatura.");
+    }
+    reasons.push(
+      "Perfil incompleto — cronograma completo bloqueado até IA/admin resolver.",
+    );
+    return {
+      profile: null,
+      confidence: "low",
+      source: corpus ? "corpus_ia" : "derivado_fipe",
+      reasons,
+      missingFields,
+      canUseFullSchedule: false,
+      shouldBlockSensitiveShoppingLinks: true,
+    };
+  }
+
+  // Neste ponto todos os campos estão resolvidos e não são "desconhecido".
+  const profile: JarvysVehicleProfile = {
+    fuelKind,
+    timingSystem: timingSystem as TimingSystem,
+    transmissionKind: transmissionKind as JarvysTransmissionKind,
+    steeringKind: steeringKind as JarvysSteeringKind,
+  };
+
   const reviewed = corpus?.reviewed_by_admin === true;
 
-  // HIGH — corpus curado por admin + timing + transmission conhecidos
-  if (reviewed && timingKnown && transmissionKnown) {
+  if (reviewed) {
     reasons.push("Corpus técnico curado por admin (reviewed_by_admin).");
     return {
       profile,
       confidence: "high",
       source: "corpus_curado",
       reasons,
-      missingFields,
+      missingFields: [],
       canUseFullSchedule: true,
       shouldBlockSensitiveShoppingLinks: false,
     };
   }
 
-  // MEDIUM — corpus existe (sem review) e pelo menos timing OU transmission
-  if (corpus && !reviewed && (timingKnown || transmissionKnown)) {
+  if (corpus) {
     reasons.push(
       "Corpus técnico disponível sem revisão de admin; usar com cautela.",
     );
-    if (missingFields.length > 0) {
-      reasons.push(
-        `Campos ainda desconhecidos: ${missingFields.join(", ")}.`,
-      );
-    }
     return {
       profile,
       confidence: "medium",
       source: "corpus_ia",
       reasons,
-      missingFields,
+      missingFields: [],
       canUseFullSchedule: true,
       shouldBlockSensitiveShoppingLinks: true,
     };
   }
 
-  // LOW — só FIPE utilizável (ou corpus sem informação estrutural)
-  reasons.push(
-    "Perfil derivado apenas de FIPE; sistema de distribuição, câmbio e direção não confirmados.",
-  );
-  reasons.push(
-    "Cronograma completo bloqueado; recomendar validação antes de compras sensíveis.",
-  );
+  // Perfil completo sem corpus (ex: EV derivado só de FIPE) — medium/derivado.
+  reasons.push("Perfil montado a partir de FIPE + regras de EV.");
   return {
     profile,
-    confidence: "low",
+    confidence: "medium",
     source: "derivado_fipe",
     reasons,
-    missingFields,
-    canUseFullSchedule: false,
+    missingFields: [],
+    canUseFullSchedule: true,
     shouldBlockSensitiveShoppingLinks: true,
   };
 }

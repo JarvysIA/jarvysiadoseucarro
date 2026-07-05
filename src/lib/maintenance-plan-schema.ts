@@ -36,6 +36,7 @@ export type TimingSystem =
   | "correia_dentada"
   | "corrente"
   | "correia_banhada"
+  | "nao_aplicavel"
   | "desconhecido";
 
 /** Tipo de transmissão. */

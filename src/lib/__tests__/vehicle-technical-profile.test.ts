@@ -1,4 +1,4 @@
-// Build 6.50A — Testes do helper puro de perfil técnico Jarvys.
+// Build 6.50D — Testes do helper puro de perfil técnico Jarvys.
 // Usa apenas matchers toBe/toContain expostos pelo shim bun-test.d.ts.
 
 import { describe, expect, test } from "bun:test";
@@ -76,10 +76,15 @@ describe("normalizeTransmissionKind", () => {
     expect(normalizeTransmissionKind("DCT")).toBe("dupla_embreagem");
   });
 
-  test("vazio → desconhecido", () => {
-    expect(normalizeTransmissionKind("")).toBe("desconhecido");
-    expect(normalizeTransmissionKind(null)).toBe("desconhecido");
-    expect(normalizeTransmissionKind(undefined)).toBe("desconhecido");
+  test("caixa de redução → caixa_reducao", () => {
+    expect(normalizeTransmissionKind("caixa de redução")).toBe("caixa_reducao");
+    expect(normalizeTransmissionKind("reduction gear")).toBe("caixa_reducao");
+  });
+
+  test("vazio → null", () => {
+    expect(normalizeTransmissionKind("")).toBe(null);
+    expect(normalizeTransmissionKind(null)).toBe(null);
+    expect(normalizeTransmissionKind(undefined)).toBe(null);
   });
 });
 
@@ -96,9 +101,13 @@ describe("normalizeTimingSystem", () => {
     );
     expect(normalizeTimingSystem("wet belt")).toBe("correia_banhada");
   });
-  test("vazio → desconhecido", () => {
-    expect(normalizeTimingSystem("")).toBe("desconhecido");
-    expect(normalizeTimingSystem(null)).toBe("desconhecido");
+  test("não aplicável", () => {
+    expect(normalizeTimingSystem("não aplicável")).toBe("nao_aplicavel");
+    expect(normalizeTimingSystem("N/A")).toBe("nao_aplicavel");
+  });
+  test("vazio → null", () => {
+    expect(normalizeTimingSystem("")).toBe(null);
+    expect(normalizeTimingSystem(null)).toBe(null);
   });
 });
 
@@ -110,14 +119,15 @@ describe("normalizeSteeringKind", () => {
     expect(normalizeSteeringKind("elétrica")).toBe("eletrica");
     expect(normalizeSteeringKind("eletroassistida")).toBe("eletrica");
   });
-  test("vazio → desconhecida", () => {
-    expect(normalizeSteeringKind("")).toBe("desconhecida");
-    expect(normalizeSteeringKind(null)).toBe("desconhecida");
+  test("vazio → null", () => {
+    expect(normalizeSteeringKind("")).toBe(null);
+    expect(normalizeSteeringKind(null)).toBe(null);
   });
 });
 
 describe("resolveVehicleTechnicalProfile", () => {
-  test("HIGH — corpus curado por admin com timing + transmission", () => {
+  test("LOW — corpus curado sem steering conhecido → profile null", () => {
+    // Corpus atual não expõe steeringKind → resolver puro sempre incompleto.
     const corpus: VehicleMaintenanceCorpusProfile = {
       combustivel: "flex",
       sistema_distribuicao: "correia dentada",
@@ -125,17 +135,13 @@ describe("resolveVehicleTechnicalProfile", () => {
       reviewed_by_admin: true,
     };
     const r = resolveVehicleTechnicalProfile({ corpusProfile: corpus });
-    expect(r.confidence).toBe("high");
-    expect(r.source).toBe("corpus_curado");
-    expect(r.canUseFullSchedule).toBe(true);
-    expect(r.shouldBlockSensitiveShoppingLinks).toBe(false);
-    expect(r.profile?.fuelKind).toBe("combustao");
-    expect(r.profile?.timingSystem).toBe("correia_dentada");
-    expect(r.profile?.transmissionKind).toBe("manual");
-    expect(r.profile?.steeringKind).toBe("desconhecida");
+    expect(r.profile).toBe(null);
+    expect(r.confidence).toBe("low");
+    expect(r.canUseFullSchedule).toBe(false);
+    expect(r.missingFields).toContain("steeringKind");
   });
 
-  test("MEDIUM — corpus sem review, fuel + (timing OU transmission)", () => {
+  test("LOW — corpus sem review e sem transmissão → profile null", () => {
     const corpus: VehicleMaintenanceCorpusProfile = {
       combustivel: "flex",
       sistema_distribuicao: "corrente",
@@ -143,22 +149,21 @@ describe("resolveVehicleTechnicalProfile", () => {
       reviewed_by_admin: false,
     };
     const r = resolveVehicleTechnicalProfile({ corpusProfile: corpus });
-    expect(r.confidence).toBe("medium");
+    expect(r.profile).toBe(null);
+    expect(r.confidence).toBe("low");
     expect(r.source).toBe("corpus_ia");
-    expect(r.canUseFullSchedule).toBe(true);
-    expect(r.shouldBlockSensitiveShoppingLinks).toBe(true);
-    expect(r.profile?.timingSystem).toBe("corrente");
-    expect(r.profile?.transmissionKind).toBe("desconhecido");
+    expect(r.canUseFullSchedule).toBe(false);
     expect(r.missingFields).toContain("transmissionKind");
+    expect(r.missingFields).toContain("steeringKind");
   });
 
-  test("LOW — só combustivelFipe flex", () => {
+  test("LOW — só combustivelFipe flex → profile null, derivado_fipe", () => {
     const r = resolveVehicleTechnicalProfile({ combustivelFipe: "flex" });
+    expect(r.profile).toBe(null);
     expect(r.confidence).toBe("low");
     expect(r.source).toBe("derivado_fipe");
     expect(r.canUseFullSchedule).toBe(false);
     expect(r.shouldBlockSensitiveShoppingLinks).toBe(true);
-    expect(r.profile?.fuelKind).toBe("combustao");
     expect(r.missingFields).toContain("timingSystem");
     expect(r.missingFields).toContain("transmissionKind");
     expect(r.missingFields).toContain("steeringKind");
@@ -172,8 +177,14 @@ describe("resolveVehicleTechnicalProfile", () => {
     expect(r.canUseFullSchedule).toBe(false);
     expect(r.shouldBlockSensitiveShoppingLinks).toBe(true);
     expect(r.missingFields).toContain("fuelKind");
-    expect(r.missingFields).toContain("timingSystem");
-    expect(r.missingFields).toContain("transmissionKind");
+  });
+
+  test("EV puro só FIPE — ainda cai em low (falta steering)", () => {
+    const r = resolveVehicleTechnicalProfile({ combustivelFipe: "elétrico" });
+    // EV injeta timing=nao_aplicavel + transmission=caixa_reducao, mas
+    // steeringKind não tem fonte → perfil incompleto.
+    expect(r.profile).toBe(null);
+    expect(r.confidence).toBe("low");
     expect(r.missingFields).toContain("steeringKind");
   });
 
@@ -187,8 +198,10 @@ describe("resolveVehicleTechnicalProfile", () => {
         reviewed_by_admin: true,
       },
     });
-    expect(r.profile?.fuelKind).toBe("hibrido_combustao");
-    expect(r.confidence).toBe("high");
+    // fuel priorizado, mas steering desconhecido → low.
+    expect(r.confidence).toBe("low");
+    expect(r.profile).toBe(null);
+    expect(r.missingFields).toContain("steeringKind");
   });
 });
 
