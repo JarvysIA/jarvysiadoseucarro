@@ -764,6 +764,8 @@ function AdminCorpusSmokePage() {
 
       <MaintenanceReviewShoppingSheetPreviewPanel />
 
+      <Build650EMockedSavedProfileSchedulePanel />
+
     </div>
 
   );
