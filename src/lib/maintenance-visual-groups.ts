@@ -85,6 +85,10 @@ function isCriticalGroup(kind: JarvysVisualGroupKind, sourceItems: JarvysItem[])
   return false;
 }
 
+export function isJarvysVisualGroupCritical(group: JarvysVisualGroup): boolean {
+  return isCriticalGroup(group.kind, group.sourceItems);
+}
+
 // ─── Finalização de grupo (service_only puro / misto) ────────────────────
 
 type DraftGroup = Omit<
