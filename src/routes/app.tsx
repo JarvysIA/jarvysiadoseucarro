@@ -249,7 +249,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento,jarvys_technical_profile,jarvys_technical_profile_confidence,jarvys_technical_profile_source,jarvys_technical_profile_updated_at,modelo_fipe,combustivel_fipe,ano_modelo,codigo_fipe,motorizacao,cilindradas")
           .eq("user_id", userId)
           .eq("status", "ativo")
           .order("created_at", { ascending: true }),
