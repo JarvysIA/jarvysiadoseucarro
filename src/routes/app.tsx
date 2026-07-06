@@ -199,6 +199,80 @@ function AppPage() {
     openLimitModal();
   };
 
+  const reloadVehicles = useCallback(async (userId: string) => {
+    const [{ data: prof }, { data: veics }, { data: activations }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("veiculos")
+        .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento,jarvys_technical_profile,jarvys_technical_profile_confidence,jarvys_technical_profile_source,jarvys_technical_profile_updated_at,modelo_fipe,combustivel_fipe,ano_modelo,codigo_fipe,motorizacao,cilindradas")
+        .eq("user_id", userId)
+        .eq("status", "ativo")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("pagamentos_pix")
+        .select("veiculo_id")
+        .eq("user_id", userId)
+        .eq("status", "pago")
+        .eq("tipo_produto", "ativacao")
+        .not("veiculo_id", "is", null),
+    ]);
+    setProfile(prof as Profile | null);
+    cachedProfile = (prof as Profile | null) ?? null;
+    const mapped: UserVehicle[] = ((veics ?? []) as DbVehicle[]).map((v) => {
+      const marca = v.marca?.trim() || "";
+      const modelo = v.modelo?.trim() || "";
+      const ano = v.ano?.trim() || "";
+      const cor = v.cor?.trim() || "—";
+      return {
+        id: v.id,
+        marca,
+        modelo,
+        year: ano || "—",
+        color: cor,
+        plate: v.placa,
+        km: v.km_atual ?? 0,
+        chassi: (v.chassi || "").trim(),
+        fotoUrl: v.foto_url || null,
+        kmUltimaTrocaOleo: v.km_ultima_troca_oleo,
+        kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
+        kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
+        kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
+        jarvysTechnicalProfile: normalizeSavedJarvysTechnicalProfile(
+          v.jarvys_technical_profile,
+        ),
+        jarvysTechnicalProfileConfidence:
+          (v.jarvys_technical_profile_confidence as
+            | "low"
+            | "medium"
+            | "high"
+            | null) ?? null,
+        jarvysTechnicalProfileSource: v.jarvys_technical_profile_source ?? null,
+        modeloFipe: v.modelo_fipe ?? null,
+        motorizacao: v.motorizacao ?? null,
+        cilindradas: v.cilindradas ?? null,
+        anoModelo: v.ano_modelo ?? null,
+      };
+    });
+    setVehicles(mapped);
+    cachedVehicles = mapped;
+    const activeIds = new Set(mapped.map((m) => m.id));
+    const actSet = new Set<string>();
+    for (const row of (activations ?? []) as { veiculo_id: string | null }[]) {
+      if (row.veiculo_id && activeIds.has(row.veiculo_id)) actSet.add(row.veiculo_id);
+    }
+    setActivatedVehicleIds(actSet);
+    if (mapped.length) {
+      const saved = getActiveVehicleId();
+      const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
+      setSelectedId((prev) => prev || (idx >= 0 ? mapped[idx].id : mapped[0].id));
+    }
+    setLoadingProfile(false);
+  }, []);
+
   const handleAdded = (v: AddedVehicle) => {
     const newVehicle: UserVehicle = {
       id: v.id,
@@ -232,6 +306,16 @@ function AppPage() {
       );
       el?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     }, 50);
+    // Build 6.51A: refetch dos veículos após o cadastro para trazer o
+    // `jarvys_technical_profile*` já salvo pelo resolver técnico. Sem IA,
+    // sem FIPE, sem corpus — apenas releitura da mesma query.
+    void (async () => {
+      const { data: session } = await supabase.auth.getSession();
+      const uid = session.session?.user.id;
+      if (!uid) return;
+      await reloadVehicles(uid);
+      setSelectedId(v.id);
+    })();
   };
 
   useEffect(() => {
@@ -241,79 +325,10 @@ function AppPage() {
         navigate({ to: "/welcome", replace: true });
         return;
       }
-      const userId = session.session.user.id;
-      const [{ data: prof }, { data: veics }, { data: activations }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id,nome,status_usuario,permite_indicacao,trial_inicio,referrer_id,is_super_admin")
-          .eq("id", userId)
-          .maybeSingle(),
-        supabase
-          .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento,jarvys_technical_profile,jarvys_technical_profile_confidence,jarvys_technical_profile_source,jarvys_technical_profile_updated_at,modelo_fipe,combustivel_fipe,ano_modelo,codigo_fipe,motorizacao,cilindradas")
-          .eq("user_id", userId)
-          .eq("status", "ativo")
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("pagamentos_pix")
-          .select("veiculo_id")
-          .eq("user_id", userId)
-          .eq("status", "pago")
-          .eq("tipo_produto", "ativacao")
-          .not("veiculo_id", "is", null),
-      ]);
-      setProfile(prof as Profile | null);
-      cachedProfile = (prof as Profile | null) ?? null;
-      const mapped: UserVehicle[] = ((veics ?? []) as DbVehicle[]).map((v) => {
-        const marca = v.marca?.trim() || "";
-        const modelo = v.modelo?.trim() || "";
-        const ano = v.ano?.trim() || "";
-        const cor = v.cor?.trim() || "—";
-        return {
-          id: v.id,
-          marca,
-          modelo,
-          year: ano || "—",
-          color: cor,
-          plate: v.placa,
-          km: v.km_atual ?? 0,
-          chassi: (v.chassi || "").trim(),
-          fotoUrl: v.foto_url || null,
-          kmUltimaTrocaOleo: v.km_ultima_troca_oleo,
-          kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
-          kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
-          kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
-          jarvysTechnicalProfile:
-            (v.jarvys_technical_profile as JarvysVehicleProfile | null) ?? null,
-          jarvysTechnicalProfileConfidence:
-            (v.jarvys_technical_profile_confidence as
-              | "low"
-              | "medium"
-              | "high"
-              | null) ?? null,
-          jarvysTechnicalProfileSource: v.jarvys_technical_profile_source ?? null,
-          modeloFipe: v.modelo_fipe ?? null,
-          motorizacao: v.motorizacao ?? null,
-          cilindradas: v.cilindradas ?? null,
-          anoModelo: v.ano_modelo ?? null,
-        };
-      });
-      setVehicles(mapped);
-      cachedVehicles = mapped;
-      const activeIds = new Set(mapped.map((m) => m.id));
-      const actSet = new Set<string>();
-      for (const row of (activations ?? []) as { veiculo_id: string | null }[]) {
-        if (row.veiculo_id && activeIds.has(row.veiculo_id)) actSet.add(row.veiculo_id);
-      }
-      setActivatedVehicleIds(actSet);
-      if (mapped.length) {
-        const saved = getActiveVehicleId();
-        const idx = saved ? mapped.findIndex((v) => v.id === saved) : -1;
-        setSelectedId((prev) => prev || (idx >= 0 ? mapped[idx].id : mapped[0].id));
-      }
-      setLoadingProfile(false);
+      await reloadVehicles(session.session.user.id);
     })();
-  }, [navigate]);
+  }, [navigate, reloadVehicles]);
+
 
   useEffect(() => {
     const el = scrollerRef.current;
