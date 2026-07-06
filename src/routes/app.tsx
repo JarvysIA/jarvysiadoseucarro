@@ -584,6 +584,30 @@ function AppPage() {
             km_ultima_troca_pastilhas: selected.kmUltimaTrocaPastilhas,
             km_ultima_troca_arrefecimento: selected.kmUltimaTrocaArrefecimento,
           }}
+          jarvysProfile={selected.jarvysTechnicalProfile}
+          technicalProfileConfidence={selected.jarvysTechnicalProfileConfidence}
+          vehicleLabel={
+            [
+              selected.marca,
+              selected.modeloFipe ?? selected.modelo,
+              selected.anoModelo ?? selected.year,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() || "Veículo"
+          }
+          shoppingVehicle={{
+            brand: selected.marca ?? "",
+            model: selected.modelo ?? "",
+            version: selected.modeloFipe ?? selected.motorizacao ?? undefined,
+            engine:
+              selected.motorizacao ??
+              (selected.cilindradas
+                ? `${(selected.cilindradas / 1000).toFixed(1)}`
+                : undefined),
+            year:
+              Number(selected.anoModelo ?? selected.year) || undefined,
+          }}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
