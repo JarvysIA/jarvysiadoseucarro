@@ -32,6 +32,7 @@ import { nextMilestone } from "@/lib/predictive-maintenance";
 import {
   hasUsableConfidence,
   isUsableJarvysTechnicalProfile,
+  normalizeSavedJarvysTechnicalProfile,
 } from "@/lib/vehicle-technical-profile-guards";
 import { JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE } from "@/lib/vehicle-technical-profile";
 import type { JarvysVehicleProfile } from "@/lib/maintenance-jarvys-schedule-rules";
