@@ -66,6 +66,29 @@ function itemMatchesAny(item: JarvysItem, needles: string[]): boolean {
   return needles.some((n) => hay.includes(n));
 }
 
+// ─── Criticidade ─────────────────────────────────────────────────────────
+
+const CRITICAL_ITEM_KEYS = new Set([
+  "oleo_cambio_automatico",
+  "oleo_caixa_reducao",
+  "correia_banhada",
+  "inspecao_correia_banhada",
+  "inspecao_corrente_comando",
+]);
+
+function isCriticalGroup(kind: JarvysVisualGroupKind, sourceItems: JarvysItem[]): boolean {
+  if (kind === "oil_and_oil_filter") return true;
+  if (kind === "timing_kit") return true;
+  if (kind === "individual" || kind === "service_only") {
+    return sourceItems.some((it) => CRITICAL_ITEM_KEYS.has(it.item_key));
+  }
+  return false;
+}
+
+export function isJarvysVisualGroupCritical(group: JarvysVisualGroup): boolean {
+  return isCriticalGroup(group.kind, group.sourceItems);
+}
+
 // ─── Finalização de grupo (service_only puro / misto) ────────────────────
 
 type DraftGroup = Omit<

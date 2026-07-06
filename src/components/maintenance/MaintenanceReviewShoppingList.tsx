@@ -8,6 +8,7 @@ import {
   Disc3,
   Droplet,
   Search,
+  ShieldAlert,
   ShoppingCart,
   Snowflake,
   Wind,
@@ -20,6 +21,7 @@ import type {
   JarvysVisualGroup,
   JarvysVisualGroupIcon,
 } from "@/lib/maintenance-visual-groups";
+import { isJarvysVisualGroupCritical } from "@/lib/maintenance-visual-groups";
 import {
   buildMaintenanceMercadoLivreShoppingLink,
   type MaintenanceShoppingVehicle,
@@ -71,7 +73,15 @@ export function MaintenanceReviewShoppingList({
               <div className="flex items-start gap-2">
                 <Icon className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{group.title}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium">{group.title}</div>
+                    {isJarvysVisualGroupCritical(group) && (
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200/60 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+                        <ShieldAlert className="h-3 w-3" />
+                        Item crítico
+                      </span>
+                    )}
+                  </div>
                   {group.description && (
                     <div className="mt-1 text-xs text-muted-foreground">
                       {group.description}
