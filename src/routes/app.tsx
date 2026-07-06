@@ -282,6 +282,19 @@ function AppPage() {
           kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
           kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
           kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
+          jarvysTechnicalProfile:
+            (v.jarvys_technical_profile as JarvysVehicleProfile | null) ?? null,
+          jarvysTechnicalProfileConfidence:
+            (v.jarvys_technical_profile_confidence as
+              | "low"
+              | "medium"
+              | "high"
+              | null) ?? null,
+          jarvysTechnicalProfileSource: v.jarvys_technical_profile_source ?? null,
+          modeloFipe: v.modelo_fipe ?? null,
+          motorizacao: v.motorizacao ?? null,
+          cilindradas: v.cilindradas ?? null,
+          anoModelo: v.ano_modelo ?? null,
         };
       });
       setVehicles(mapped);
