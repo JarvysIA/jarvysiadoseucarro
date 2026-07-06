@@ -39,6 +39,7 @@ export type JarvysVisualGroup = {
   sourceItemKeys: string[];
   sourceLabels: string[];
   isServiceOnly: boolean;
+  isCritical: boolean;
   serviceBadgeLabel?: JarvysVisualGroupServiceBadge;
   hasMixedServiceItems?: boolean;
   serviceItemLabels?: string[];
