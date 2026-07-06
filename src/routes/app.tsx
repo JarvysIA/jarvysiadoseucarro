@@ -1194,7 +1194,33 @@ function VehicleStatusSection({
           })}
         </div>
 
-        <NextRevisionCard kmAtual={kmAtual} />
+        <NextRevisionCard kmAtual={kmAtual} onClick={handleOpenReviewDetails} />
+
+        {hasUsableProfile && kmAtual && kmAtual > 0 ? (
+          <MaintenanceReviewShoppingSheet
+            open={isReviewSheetOpen}
+            onClose={() => setIsReviewSheetOpen(false)}
+            vehicleLabel={vehicleLabel}
+            currentKm={kmAtual}
+            initialRevisionKm={nextMilestone(kmAtual)}
+            jarvysProfile={jarvysProfile as JarvysVehicleProfile}
+            shoppingVehicle={shoppingVehicle}
+          />
+        ) : null}
+
+        <Dialog open={isFallbackOpen} onOpenChange={setIsFallbackOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Próxima revisão</DialogTitle>
+              <DialogDescription>{fallbackMessage}</DialogDescription>
+            </DialogHeader>
+            <div className="mt-2 flex justify-end">
+              <Button type="button" onClick={() => setIsFallbackOpen(false)}>
+                Entendi
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
 
 
