@@ -602,6 +602,7 @@ function AppPage() {
           }}
           jarvysProfile={selected.jarvysTechnicalProfile}
           technicalProfileConfidence={selected.jarvysTechnicalProfileConfidence}
+          technicalProfileSource={selected.jarvysTechnicalProfileSource}
           vehicleLabel={
             [
               selected.marca,
