@@ -213,6 +213,13 @@ function AppPage() {
       kmUltimaTrocaFiltros: null,
       kmUltimaTrocaPastilhas: null,
       kmUltimaTrocaArrefecimento: null,
+      jarvysTechnicalProfile: null,
+      jarvysTechnicalProfileConfidence: null,
+      jarvysTechnicalProfileSource: null,
+      modeloFipe: null,
+      motorizacao: null,
+      cilindradas: null,
+      anoModelo: null,
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
