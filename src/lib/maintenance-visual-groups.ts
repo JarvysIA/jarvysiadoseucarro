@@ -137,7 +137,6 @@ function finalizeGroup(draft: DraftGroup): JarvysVisualGroup {
     sourceItemKeys: sourceItems.map((it) => it.item_key),
     sourceLabels: sourceItems.map((it) => it.label),
     isServiceOnly,
-    isCritical: isCriticalGroup(kind, sourceItems),
     serviceBadgeLabel,
     hasMixedServiceItems: hasMixedServiceItems ? true : undefined,
     serviceItemLabels: hasMixedServiceItems
