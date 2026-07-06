@@ -372,7 +372,6 @@ export function buildJarvysVisualGroups(
       sourceItemKeys: [it.item_key],
       sourceLabels: [it.label],
       isServiceOnly,
-      isCritical: isCriticalGroup(kind, [it]),
       serviceBadgeLabel,
       hasMixedServiceItems: undefined,
       serviceItemLabels: undefined,
