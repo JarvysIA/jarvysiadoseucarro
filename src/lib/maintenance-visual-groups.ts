@@ -67,6 +67,25 @@ function itemMatchesAny(item: JarvysItem, needles: string[]): boolean {
   return needles.some((n) => hay.includes(n));
 }
 
+// ─── Criticidade ─────────────────────────────────────────────────────────
+
+const CRITICAL_ITEM_KEYS = new Set([
+  "oleo_cambio_automatico",
+  "oleo_caixa_reducao",
+  "correia_banhada",
+  "inspecao_correia_banhada",
+  "inspecao_corrente_comando",
+]);
+
+function isCriticalGroup(kind: JarvysVisualGroupKind, sourceItems: JarvysItem[]): boolean {
+  if (kind === "oil_and_oil_filter") return true;
+  if (kind === "timing_kit") return true;
+  if (kind === "individual" || kind === "service_only") {
+    return sourceItems.some((it) => CRITICAL_ITEM_KEYS.has(it.item_key));
+  }
+  return false;
+}
+
 // ─── Finalização de grupo (service_only puro / misto) ────────────────────
 
 type DraftGroup = Omit<
@@ -119,6 +138,7 @@ function finalizeGroup(draft: DraftGroup): JarvysVisualGroup {
     sourceItemKeys: sourceItems.map((it) => it.item_key),
     sourceLabels: sourceItems.map((it) => it.label),
     isServiceOnly,
+    isCritical: isCriticalGroup(kind, sourceItems),
     serviceBadgeLabel,
     hasMixedServiceItems: hasMixedServiceItems ? true : undefined,
     serviceItemLabels: hasMixedServiceItems
@@ -354,6 +374,7 @@ export function buildJarvysVisualGroups(
       sourceItemKeys: [it.item_key],
       sourceLabels: [it.label],
       isServiceOnly,
+      isCritical: isCriticalGroup(kind, [it]),
       serviceBadgeLabel,
       hasMixedServiceItems: undefined,
       serviceItemLabels: undefined,
