@@ -19,6 +19,23 @@ import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
 import { NextRevisionCard } from "@/components/NextRevisionCard";
+import { MaintenanceReviewShoppingSheet } from "@/components/maintenance/MaintenanceReviewShoppingSheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { nextMilestone } from "@/lib/predictive-maintenance";
+import {
+  hasUsableConfidence,
+  isUsableJarvysTechnicalProfile,
+} from "@/lib/vehicle-technical-profile-guards";
+import { JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE } from "@/lib/vehicle-technical-profile";
+import type { JarvysVehicleProfile } from "@/lib/maintenance-jarvys-schedule-rules";
+import type { MaintenanceShoppingVehicle } from "@/lib/maintenance-mercado-livre-shopping";
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
@@ -90,6 +107,16 @@ type DbVehicle = {
   km_ultima_troca_filtros: number | null;
   km_ultima_troca_pastilhas: number | null;
   km_ultima_troca_arrefecimento: number | null;
+  jarvys_technical_profile: unknown;
+  jarvys_technical_profile_confidence: string | null;
+  jarvys_technical_profile_source: string | null;
+  jarvys_technical_profile_updated_at: string | null;
+  modelo_fipe: string | null;
+  combustivel_fipe: string | null;
+  ano_modelo: string | null;
+  codigo_fipe: string | null;
+  motorizacao: string | null;
+  cilindradas: number | null;
 };
 
 type UserVehicle = {
@@ -106,6 +133,13 @@ type UserVehicle = {
   kmUltimaTrocaFiltros: number | null;
   kmUltimaTrocaPastilhas: number | null;
   kmUltimaTrocaArrefecimento: number | null;
+  jarvysTechnicalProfile: JarvysVehicleProfile | null;
+  jarvysTechnicalProfileConfidence: "low" | "medium" | "high" | null;
+  jarvysTechnicalProfileSource: string | null;
+  modeloFipe: string | null;
+  motorizacao: string | null;
+  cilindradas: number | null;
+  anoModelo: string | null;
 };
 
 // Cache em memória para renderização instantânea ao voltar para a Home
@@ -179,6 +213,13 @@ function AppPage() {
       kmUltimaTrocaFiltros: null,
       kmUltimaTrocaPastilhas: null,
       kmUltimaTrocaArrefecimento: null,
+      jarvysTechnicalProfile: null,
+      jarvysTechnicalProfileConfidence: null,
+      jarvysTechnicalProfileSource: null,
+      modeloFipe: null,
+      motorizacao: null,
+      cilindradas: null,
+      anoModelo: null,
     };
     setVehicles((prev) => [...prev, newVehicle]);
     setSelectedId(v.id);
@@ -208,7 +249,7 @@ function AppPage() {
           .maybeSingle(),
         supabase
           .from("veiculos")
-          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento")
+          .select("id,placa,marca,modelo,ano,cor,km_atual,chassi,foto_url,km_ultima_troca_oleo,km_ultima_troca_filtros,km_ultima_troca_pastilhas,km_ultima_troca_arrefecimento,jarvys_technical_profile,jarvys_technical_profile_confidence,jarvys_technical_profile_source,jarvys_technical_profile_updated_at,modelo_fipe,combustivel_fipe,ano_modelo,codigo_fipe,motorizacao,cilindradas")
           .eq("user_id", userId)
           .eq("status", "ativo")
           .order("created_at", { ascending: true }),
@@ -241,6 +282,19 @@ function AppPage() {
           kmUltimaTrocaFiltros: v.km_ultima_troca_filtros,
           kmUltimaTrocaPastilhas: v.km_ultima_troca_pastilhas,
           kmUltimaTrocaArrefecimento: v.km_ultima_troca_arrefecimento,
+          jarvysTechnicalProfile:
+            (v.jarvys_technical_profile as JarvysVehicleProfile | null) ?? null,
+          jarvysTechnicalProfileConfidence:
+            (v.jarvys_technical_profile_confidence as
+              | "low"
+              | "medium"
+              | "high"
+              | null) ?? null,
+          jarvysTechnicalProfileSource: v.jarvys_technical_profile_source ?? null,
+          modeloFipe: v.modelo_fipe ?? null,
+          motorizacao: v.motorizacao ?? null,
+          cilindradas: v.cilindradas ?? null,
+          anoModelo: v.ano_modelo ?? null,
         };
       });
       setVehicles(mapped);
@@ -530,6 +584,30 @@ function AppPage() {
             km_ultima_troca_pastilhas: selected.kmUltimaTrocaPastilhas,
             km_ultima_troca_arrefecimento: selected.kmUltimaTrocaArrefecimento,
           }}
+          jarvysProfile={selected.jarvysTechnicalProfile}
+          technicalProfileConfidence={selected.jarvysTechnicalProfileConfidence}
+          vehicleLabel={
+            [
+              selected.marca,
+              selected.modeloFipe ?? selected.modelo,
+              selected.anoModelo ?? selected.year,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() || "Veículo"
+          }
+          shoppingVehicle={{
+            brand: selected.marca ?? "",
+            model: selected.modelo ?? "",
+            version: selected.modeloFipe ?? selected.motorizacao ?? undefined,
+            engine:
+              selected.motorizacao ??
+              (selected.cilindradas
+                ? `${(selected.cilindradas / 1000).toFixed(1)}`
+                : undefined),
+            year:
+              Number(selected.anoModelo ?? selected.year) || undefined,
+          }}
           onKmChange={(km) =>
             setVehicles((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, km } : x)),
@@ -740,6 +818,10 @@ function VehicleStatusSection({
   onMaintenanceSaved,
   onDeleted,
   onPaywall,
+  jarvysProfile,
+  technicalProfileConfidence,
+  vehicleLabel,
+  shoppingVehicle,
 }: {
   vehicleId: string;
   placa: string;
@@ -752,7 +834,33 @@ function VehicleStatusSection({
   onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
   onDeleted: () => void;
   onPaywall?: () => void;
+  jarvysProfile: JarvysVehicleProfile | null;
+  technicalProfileConfidence: "low" | "medium" | "high" | null;
+  vehicleLabel: string;
+  shoppingVehicle: MaintenanceShoppingVehicle;
 }) {
+  const [isReviewSheetOpen, setIsReviewSheetOpen] = useState(false);
+  const [isFallbackOpen, setIsFallbackOpen] = useState(false);
+  const hasUsableProfile =
+    hasUsableConfidence(technicalProfileConfidence) &&
+    isUsableJarvysTechnicalProfile(jarvysProfile);
+  const fallbackMessage =
+    !kmAtual || kmAtual <= 0
+      ? "Informe a quilometragem atual do veículo para visualizar a próxima revisão."
+      : JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE;
+
+  function handleOpenReviewDetails() {
+    if (!kmAtual || kmAtual <= 0) {
+      setIsFallbackOpen(true);
+      return;
+    }
+    if (!hasUsableProfile) {
+      setIsFallbackOpen(true);
+      return;
+    }
+    setIsReviewSheetOpen(true);
+  }
+
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
@@ -1086,7 +1194,33 @@ function VehicleStatusSection({
           })}
         </div>
 
-        <NextRevisionCard kmAtual={kmAtual} />
+        <NextRevisionCard kmAtual={kmAtual} onClick={handleOpenReviewDetails} />
+
+        {hasUsableProfile && kmAtual && kmAtual > 0 ? (
+          <MaintenanceReviewShoppingSheet
+            open={isReviewSheetOpen}
+            onClose={() => setIsReviewSheetOpen(false)}
+            vehicleLabel={vehicleLabel}
+            currentKm={kmAtual}
+            initialRevisionKm={nextMilestone(kmAtual)}
+            jarvysProfile={jarvysProfile as JarvysVehicleProfile}
+            shoppingVehicle={shoppingVehicle}
+          />
+        ) : null}
+
+        <Dialog open={isFallbackOpen} onOpenChange={setIsFallbackOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Próxima revisão</DialogTitle>
+              <DialogDescription>{fallbackMessage}</DialogDescription>
+            </DialogHeader>
+            <div className="mt-2 flex justify-end">
+              <Button type="button" onClick={() => setIsFallbackOpen(false)}>
+                Entendi
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
 
 
