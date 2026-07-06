@@ -14,7 +14,7 @@ export function ShoppingMercadoLivreCard() {
     <ShoppingCardShell
       icon={<ShoppingBag className="h-5 w-5" />}
       title="Mercado Livre"
-      description="Pesquise peças e acessórios automotivos com links Jarvys."
+      description="Peças e acessórios automotivos em um só lugar."
       cta="Ver ofertas no Mercado Livre"
       href={ML_LINK.url}
       note="Confirme compatibilidade com o vendedor antes da compra."

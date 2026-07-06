@@ -9,7 +9,6 @@
 // Não altera Home, motor, BottomNav, banco, pagamentos, OCR, IA ou FIPE.
 
 import { useEffect, useMemo, useState } from "react";
-import logo from "@/assets/jarvys-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { useActiveVehicleId } from "@/lib/active-vehicle";
@@ -105,17 +104,7 @@ export function ShoppingPage() {
 
   return (
     <div className="relative min-h-screen bg-black pb-32">
-      <header className="flex items-center justify-center px-6 pt-10">
-        <img
-          src={logo}
-          alt="Jarvys"
-          width={40}
-          height={40}
-          className="h-10 w-10 object-contain"
-        />
-      </header>
-
-      <main className="mx-auto mt-6 flex w-full max-w-md flex-col px-4">
+      <main className="mx-auto flex w-full max-w-md flex-col px-4 pt-10">
         <h1
           className="text-center font-tech text-2xl uppercase"
           style={{
