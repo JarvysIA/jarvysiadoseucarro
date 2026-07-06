@@ -837,6 +837,7 @@ function VehicleStatusSection({
   onPaywall,
   jarvysProfile,
   technicalProfileConfidence,
+  technicalProfileSource,
   vehicleLabel,
   shoppingVehicle,
 }: {
@@ -853,14 +854,15 @@ function VehicleStatusSection({
   onPaywall?: () => void;
   jarvysProfile: JarvysVehicleProfile | null;
   technicalProfileConfidence: "low" | "medium" | "high" | null;
+  technicalProfileSource?: string | null;
   vehicleLabel: string;
   shoppingVehicle: MaintenanceShoppingVehicle;
 }) {
   const [isReviewSheetOpen, setIsReviewSheetOpen] = useState(false);
   const [isFallbackOpen, setIsFallbackOpen] = useState(false);
-  const hasUsableProfile =
-    hasUsableConfidence(technicalProfileConfidence) &&
-    isUsableJarvysTechnicalProfile(jarvysProfile);
+  const isUsableProfile = isUsableJarvysTechnicalProfile(jarvysProfile);
+  const isConfidenceOk = hasUsableConfidence(technicalProfileConfidence);
+  const hasUsableProfile = isConfidenceOk && isUsableProfile;
   const fallbackMessage =
     !kmAtual || kmAtual <= 0
       ? "Informe a quilometragem atual do veículo para visualizar a próxima revisão."
@@ -868,15 +870,35 @@ function VehicleStatusSection({
 
   function handleOpenReviewDetails() {
     if (!kmAtual || kmAtual <= 0) {
+      // Build 6.51A: debug discreto — não expõe dados sensíveis (sem placa/chassi).
+      console.warn("[JarvysTechnicalProfile:home-fallback]", {
+        vehicleId,
+        confidence: technicalProfileConfidence,
+        source: technicalProfileSource ?? null,
+        rawProfile: jarvysProfile,
+        isUsableProfile,
+        hasUsableConfidence: isConfidenceOk,
+        reason: "km_missing",
+      });
       setIsFallbackOpen(true);
       return;
     }
     if (!hasUsableProfile) {
+      console.warn("[JarvysTechnicalProfile:home-fallback]", {
+        vehicleId,
+        confidence: technicalProfileConfidence,
+        source: technicalProfileSource ?? null,
+        rawProfile: jarvysProfile,
+        isUsableProfile,
+        hasUsableConfidence: isConfidenceOk,
+        reason: "profile_or_confidence_invalid",
+      });
       setIsFallbackOpen(true);
       return;
     }
     setIsReviewSheetOpen(true);
   }
+
 
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
