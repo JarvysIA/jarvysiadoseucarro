@@ -1,12 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { ShoppingPage } from "@/components/shopping/ShoppingPage";
 
 export const Route = createFileRoute("/shopping")({
   head: () => ({ meta: [{ title: "Shopping — Jarvys" }] }),
-  component: () => (
-    <PlaceholderPage
-      title="Shopping"
-      subtitle="Marketplace de peças, acessórios e serviços com os melhores preços."
-    />
-  ),
+  component: () => <ShoppingPage />,
 });
