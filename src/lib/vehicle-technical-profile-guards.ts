@@ -91,3 +91,41 @@ export function hasUsableConfidence(
 ): confidence is "high" | "medium" {
   return confidence === "high" || confidence === "medium";
 }
+
+/**
+ * Normaliza o valor bruto vindo do banco (coluna jsonb
+ * `jarvys_technical_profile`) para um `JarvysVehicleProfile` utilizável
+ * pelo motor Jarvys, ou `null` quando o valor for inválido/incompleto.
+ *
+ * Aceita:
+ * - objeto já parseado (jsonb padrão)
+ * - string JSON parseável (defesa contra clientes/caches que devolvem texto)
+ *
+ * Zero I/O. Zero React. Zero side effects.
+ */
+export function normalizeSavedJarvysTechnicalProfile(
+  value: unknown,
+): JarvysVehicleProfile | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return isUsableJarvysTechnicalProfile(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return isUsableJarvysTechnicalProfile(value) ? value : null;
+  }
+
+  return null;
+}

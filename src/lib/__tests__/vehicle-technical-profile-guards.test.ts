@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   hasUsableConfidence,
   isUsableJarvysTechnicalProfile,
+  normalizeSavedJarvysTechnicalProfile,
 } from "@/lib/vehicle-technical-profile-guards";
 
 describe("isUsableJarvysTechnicalProfile", () => {
@@ -139,5 +140,79 @@ describe("hasUsableConfidence", () => {
     expect(hasUsableConfidence("HIGH")).toBe(false);
     expect(hasUsableConfidence("")).toBe(false);
     expect(hasUsableConfidence(1)).toBe(false);
+  });
+});
+
+describe("normalizeSavedJarvysTechnicalProfile", () => {
+  const validProfile = {
+    fuelKind: "combustao",
+    timingSystem: "correia_dentada",
+    transmissionKind: "automatico",
+    steeringKind: "eletrica",
+  };
+  const validJson = JSON.stringify(validProfile);
+
+  test("objeto válido retorna profile", () => {
+    const result = normalizeSavedJarvysTechnicalProfile(validProfile);
+    expect(result === validProfile).toBe(true);
+  });
+
+  test("string JSON válida com profile completo retorna profile", () => {
+    const result = normalizeSavedJarvysTechnicalProfile(validJson);
+    expect(JSON.stringify(result)).toBe(validJson);
+  });
+
+  test("string JSON inválida retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile("{not json")).toBe(null);
+  });
+
+  test("string JSON válida com profile incompleto retorna null", () => {
+    expect(
+      normalizeSavedJarvysTechnicalProfile(
+        JSON.stringify({ fuelKind: "combustao" }),
+      ),
+    ).toBe(null);
+  });
+
+  test("string JSON válida com valores inválidos retorna null", () => {
+    expect(
+      normalizeSavedJarvysTechnicalProfile(
+        JSON.stringify({
+          fuelKind: "combustao",
+          timingSystem: "desconhecido",
+          transmissionKind: "manual",
+          steeringKind: "eletrica",
+        }),
+      ),
+    ).toBe(null);
+  });
+
+  test("null retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile(null)).toBe(null);
+  });
+
+  test("undefined retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile(undefined)).toBe(null);
+  });
+
+  test("number retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile(123)).toBe(null);
+  });
+
+  test("boolean retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile(true)).toBe(null);
+  });
+
+  test("array retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile([validProfile])).toBe(null);
+  });
+
+  test("string vazia retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile("")).toBe(null);
+    expect(normalizeSavedJarvysTechnicalProfile("   ")).toBe(null);
+  });
+
+  test("string JSON de array retorna null", () => {
+    expect(normalizeSavedJarvysTechnicalProfile("[1,2,3]")).toBe(null);
   });
 });
