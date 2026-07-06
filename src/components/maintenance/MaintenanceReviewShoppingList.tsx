@@ -8,6 +8,7 @@ import {
   Disc3,
   Droplet,
   Search,
+  ShieldAlert,
   ShoppingCart,
   Snowflake,
   Wind,
@@ -20,6 +21,7 @@ import type {
   JarvysVisualGroup,
   JarvysVisualGroupIcon,
 } from "@/lib/maintenance-visual-groups";
+import { isJarvysVisualGroupCritical } from "@/lib/maintenance-visual-groups";
 import {
   buildMaintenanceMercadoLivreShoppingLink,
   type MaintenanceShoppingVehicle,
