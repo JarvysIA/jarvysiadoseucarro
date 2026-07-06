@@ -107,6 +107,16 @@ type DbVehicle = {
   km_ultima_troca_filtros: number | null;
   km_ultima_troca_pastilhas: number | null;
   km_ultima_troca_arrefecimento: number | null;
+  jarvys_technical_profile: unknown;
+  jarvys_technical_profile_confidence: string | null;
+  jarvys_technical_profile_source: string | null;
+  jarvys_technical_profile_updated_at: string | null;
+  modelo_fipe: string | null;
+  combustivel_fipe: string | null;
+  ano_modelo: string | null;
+  codigo_fipe: string | null;
+  motorizacao: string | null;
+  cilindradas: number | null;
 };
 
 type UserVehicle = {
@@ -123,6 +133,13 @@ type UserVehicle = {
   kmUltimaTrocaFiltros: number | null;
   kmUltimaTrocaPastilhas: number | null;
   kmUltimaTrocaArrefecimento: number | null;
+  jarvysTechnicalProfile: JarvysVehicleProfile | null;
+  jarvysTechnicalProfileConfidence: "low" | "medium" | "high" | null;
+  jarvysTechnicalProfileSource: string | null;
+  modeloFipe: string | null;
+  motorizacao: string | null;
+  cilindradas: number | null;
+  anoModelo: string | null;
 };
 
 // Cache em memória para renderização instantânea ao voltar para a Home
