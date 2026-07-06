@@ -19,6 +19,23 @@ import { ProfileSettingsModal } from "@/components/ProfileSettingsModal";
 import { FipeCard } from "@/components/FipeCard";
 import { MaintenancePanel, type MaintExpense, type MaintSaveInput } from "@/components/MaintenancePanel";
 import { NextRevisionCard } from "@/components/NextRevisionCard";
+import { MaintenanceReviewShoppingSheet } from "@/components/maintenance/MaintenanceReviewShoppingSheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { nextMilestone } from "@/lib/predictive-maintenance";
+import {
+  hasUsableConfidence,
+  isUsableJarvysTechnicalProfile,
+} from "@/lib/vehicle-technical-profile-guards";
+import { JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE } from "@/lib/vehicle-technical-profile";
+import type { JarvysVehicleProfile } from "@/lib/maintenance-jarvys-schedule-rules";
+import type { MaintenanceShoppingVehicle } from "@/lib/maintenance-mercado-livre-shopping";
 import { uploadReceiptImage } from "@/lib/despesas";
 import {
   AirFilterIcon,
