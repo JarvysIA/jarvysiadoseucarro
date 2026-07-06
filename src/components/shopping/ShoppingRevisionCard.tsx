@@ -51,7 +51,7 @@ export function ShoppingRevisionCard({
       <ShoppingCardShell
         icon={<Wrench className="h-5 w-5" />}
         title="Revisão Preventiva Jarvys"
-        description="Veja os itens da próxima revisão e ofertas compatíveis para pesquisar."
+        description="Confira a próxima revisão do seu carro com os itens indicados."
         cta={canOpen ? "Ver próxima revisão" : undefined}
         disabledText={!canOpen ? disabledReason ?? "Carregando…" : undefined}
         onClick={canOpen ? () => setOpen(true) : undefined}

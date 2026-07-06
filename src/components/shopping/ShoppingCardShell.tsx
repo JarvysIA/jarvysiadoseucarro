@@ -109,7 +109,7 @@ export function ShoppingCardShell({
         </div>
       )}
       {note && (
-        <p className="mt-2 text-[11px] text-muted-foreground">{note}</p>
+        <p className="mt-2 text-center text-[11px] text-muted-foreground">{note}</p>
       )}
     </div>
   );

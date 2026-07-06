@@ -14,7 +14,7 @@ export function ShoppingAutoCenterCard() {
     <ShoppingCardShell
       icon={<MapPin className="h-5 w-5" />}
       title="Auto Center Próximo"
-      description="Encontre auto centers próximos e confira avaliações no Google Maps."
+      description="Encontre auto centers próximos e verifique as avaliações antes de escolher."
       cta="Buscar auto centers"
       href={MAPS_URL}
     />
