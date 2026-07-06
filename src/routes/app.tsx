@@ -818,6 +818,10 @@ function VehicleStatusSection({
   onMaintenanceSaved,
   onDeleted,
   onPaywall,
+  jarvysProfile,
+  technicalProfileConfidence,
+  vehicleLabel,
+  shoppingVehicle,
 }: {
   vehicleId: string;
   placa: string;
@@ -830,7 +834,33 @@ function VehicleStatusSection({
   onMaintenanceSaved: (key: MaintItemKey, kmRegistrada: number) => void;
   onDeleted: () => void;
   onPaywall?: () => void;
+  jarvysProfile: JarvysVehicleProfile | null;
+  technicalProfileConfidence: "low" | "medium" | "high" | null;
+  vehicleLabel: string;
+  shoppingVehicle: MaintenanceShoppingVehicle;
 }) {
+  const [isReviewSheetOpen, setIsReviewSheetOpen] = useState(false);
+  const [isFallbackOpen, setIsFallbackOpen] = useState(false);
+  const hasUsableProfile =
+    hasUsableConfidence(technicalProfileConfidence) &&
+    isUsableJarvysTechnicalProfile(jarvysProfile);
+  const fallbackMessage =
+    !kmAtual || kmAtual <= 0
+      ? "Informe a quilometragem atual do veículo para visualizar a próxima revisão."
+      : JARVYS_TECHNICAL_PROFILE_FALLBACK_MESSAGE;
+
+  function handleOpenReviewDetails() {
+    if (!kmAtual || kmAtual <= 0) {
+      setIsFallbackOpen(true);
+      return;
+    }
+    if (!hasUsableProfile) {
+      setIsFallbackOpen(true);
+      return;
+    }
+    setIsReviewSheetOpen(true);
+  }
+
   const [editingKm, setEditingKm] = useState(false);
   const [draftKm, setDraftKm] = useState(String(kmAtual));
   const [openItemKey, setOpenItemKey] = useState<MaintItemKey | null>(null);
