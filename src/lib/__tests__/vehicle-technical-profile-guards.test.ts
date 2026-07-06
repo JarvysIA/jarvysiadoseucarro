@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   hasUsableConfidence,
   isUsableJarvysTechnicalProfile,
+  normalizeSavedJarvysTechnicalProfile,
 } from "@/lib/vehicle-technical-profile-guards";
 
 describe("isUsableJarvysTechnicalProfile", () => {
