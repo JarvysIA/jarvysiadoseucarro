@@ -19,6 +19,7 @@ Se for um serviço genérico (lavagem, alinhamento, balanceamento, mão de obra,
 Retorne APENAS a string final atualizada — sem aspas, sem markdown, sem explicação. Apenas o texto puro.`;
 
 export const classifyExpenseTextFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { text: string }) => {
     if (!data?.text || typeof data.text !== "string") {
       throw new Error("text é obrigatório");
