@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 /**
@@ -6,8 +7,12 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
  * para o bucket privado "vehicle-photos" e devolve uma URL assinada de longa
  * duração. A URL é persistida em `veiculos.foto_url`, então cada veículo só
  * é gerado UMA vez.
+ *
+ * Build 8.4: exige JWT Supabase e valida ownership do veículo antes de
+ * qualquer chamada IA, upload ou geração de signed URL.
  */
 export const generateVehicleImageFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: {
       vehicleId: string;
@@ -17,7 +22,7 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
       cor: string;
     }) => data,
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const marca = (data.marca || "").trim();
     const modelo = (data.modelo || "").trim();
     const ano = (data.ano || "").trim();
@@ -25,6 +30,16 @@ export const generateVehicleImageFn = createServerFn({ method: "POST" })
     const vehicleId = data.vehicleId;
 
     if (!vehicleId || (!marca && !modelo)) {
+      return { ok: false as const, url: null };
+    }
+
+    // Ownership: só o dono pode gerar/sobrescrever a foto do veículo.
+    const { data: veic, error: vErr } = await context.supabase
+      .from("veiculos")
+      .select("id, user_id")
+      .eq("id", vehicleId)
+      .maybeSingle();
+    if (vErr || !veic || veic.user_id !== context.userId) {
       return { ok: false as const, url: null };
     }
 
