@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SYSTEM_PROMPT = `Você é um classificador de autopeças. Receba o nome de um item digitado pelo usuário. Se o texto já vier com alguma tag entre colchetes (ex: [oleo], [filtro]), REMOVA-A antes de classificar para evitar duplicação.
 
