@@ -332,19 +332,25 @@ export const hasPremiumHistoryAvailableFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ available: boolean }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1) Valida posse do veículo atual e obtém placa.
+    // 1) Valida posse do veículo atual e obtém placa + estado de claim.
     const { data: cur, error: cErr } = await supabaseAdmin
       .from("veiculos")
-      .select("id,placa,user_id")
+      .select("id,placa,user_id,history_locked,claimed_at")
       .eq("id", data.vehicleId)
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
     if (!cur) return { available: false };
-    const curRow = cur as { id: string; placa: string; user_id: string };
+    const curRow = cur as {
+      id: string;
+      placa: string;
+      user_id: string;
+      history_locked: boolean | null;
+      claimed_at: string | null;
+    };
     if (curRow.user_id !== context.userId) return { available: false };
     if (!curRow.placa) return { available: false };
 
-    // 2) Outros vehicle_ids elegíveis com a mesma placa.
+    // 2) Caminho antigo — outros vehicle_ids elegíveis com a mesma placa.
     const { data: others, error: oErr } = await supabaseAdmin
       .from("veiculos")
       .select("id,status,user_id")
@@ -358,15 +364,33 @@ export const hasPremiumHistoryAvailableFn = createServerFn({ method: "POST" })
         return row.status === "archived" || row.user_id !== context.userId;
       })
       .map((v) => (v as { id: string }).id);
-    if (eligibleIds.length === 0) return { available: false };
 
-    // 3) Existe ao menos 1 despesa em algum desses vehicle_ids?
-    const { count, error: dErr } = await supabaseAdmin
-      .from("despesas")
-      .select("id", { head: true, count: "exact" })
-      .in("vehicle_id", eligibleIds)
-      .limit(1);
-    if (dErr) throw new Error(dErr.message);
+    if (eligibleIds.length > 0) {
+      const { count, error: dErr } = await supabaseAdmin
+        .from("despesas")
+        .select("id", { head: true, count: "exact" })
+        .in("vehicle_id", eligibleIds)
+        .limit(1);
+      if (dErr) throw new Error(dErr.message);
+      if ((count ?? 0) > 0) return { available: true };
+    }
 
-    return { available: (count ?? 0) > 0 };
+    // 3) Caminho novo — o claim reaproveitou a MESMA linha em `veiculos`,
+    // então despesas do dono anterior permanecem no mesmo vehicle_id atual.
+    // Contam apenas despesas anteriores ao claimed_at (histórico herdado
+    // pré-claim). Continua devolvendo apenas booleano; conteúdo do dono
+    // anterior segue bloqueado por `getRevendaHistoryFn` (Patch I).
+    if (curRow.history_locked === true && curRow.claimed_at) {
+      const { count, error: dErr } = await supabaseAdmin
+        .from("despesas")
+        .select("id", { head: true, count: "exact" })
+        .eq("vehicle_id", curRow.id)
+        .lt("created_at", curRow.claimed_at)
+        .limit(1);
+      if (dErr) throw new Error(dErr.message);
+      if ((count ?? 0) > 0) return { available: true };
+    }
+
+    return { available: false };
   });
+
