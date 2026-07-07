@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const SYSTEM_PROMPT = `Você é um classificador de autopeças. Receba o nome de um item digitado pelo usuário. Se o texto já vier com alguma tag entre colchetes (ex: [oleo], [filtro]), REMOVA-A antes de classificar para evitar duplicação.
 
@@ -18,6 +19,7 @@ Se for um serviço genérico (lavagem, alinhamento, balanceamento, mão de obra,
 Retorne APENAS a string final atualizada — sem aspas, sem markdown, sem explicação. Apenas o texto puro.`;
 
 export const classifyExpenseTextFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { text: string }) => {
     if (!data?.text || typeof data.text !== "string") {
       throw new Error("text é obrigatório");

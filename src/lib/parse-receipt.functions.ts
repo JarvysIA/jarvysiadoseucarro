@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type ReceiptCategory =
   | "oleo"
@@ -92,6 +93,7 @@ function stripJsonFences(text: string): string {
 }
 
 export const parseReceiptFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: { imageBase64: string; mimeType?: string }) => {
       if (!data?.imageBase64 || typeof data.imageBase64 !== "string") {
