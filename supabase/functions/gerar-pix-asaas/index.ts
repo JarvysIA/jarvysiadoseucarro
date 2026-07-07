@@ -1,7 +1,17 @@
-// Edge Function: gerar-pix-asaas
+// Edge Function: gerar-pix-asaas (Build 8.2 — hardened)
 // Cria cobrança PIX na Asaas e persiste em pagamentos_pix.
-// Reutiliza colunas existentes: txid_efi <- asaas_payment_id, pix_copia_cola <- payload.
-// Secrets: ASAAS_API_KEY, ASAAS_ENV ("production" | "sandbox", default production).
+//
+// HARDENING (Build 8.2):
+// - Exige JWT Supabase válido no header Authorization.
+// - user_id é derivado do token (claim `sub`). `user_id` do body é ignorado.
+// - veiculo_id é validado quanto à posse pelo user autenticado.
+// - Preço é calculado server-side por tabela fixa; `valor` do body é ignorado.
+// - Cupom é validado via RPC `validar_cupom_indicacao`; só reduz preço quando
+//   pertence a outro perfil (padrinho ≠ afilhado).
+// - tipo_produto restrito a "ativacao" | "historico".
+//
+// Secrets: ASAAS_API_KEY, ASAAS_ENV ("production" | "sandbox", default production),
+//          SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
@@ -12,10 +22,16 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Tabela de preços — fonte única de verdade server-side.
+const PRECO_ATIVACAO = 29.9;
+const PRECO_ATIVACAO_COM_CUPOM = 19.9;
+const PRECO_HISTORICO = 49.9;
+
 interface PixRequest {
-  user_id: string;
+  // Aceitos apenas para compatibilidade de contrato; user_id do body é ignorado.
+  user_id?: string;
   veiculo_id: string;
-  valor: number;
+  valor?: number; // ignorado — preço vem da tabela server-side
   codigo_cupom?: string | null;
   tipo_produto?: "ativacao" | "historico" | null;
   produto_ref_id?: string | null;
@@ -82,7 +98,6 @@ async function ensureCustomer(
     externalReference: user_id,
   };
 
-  // Se já existe customer na Asaas, atualiza com CPF (caso tenha sido criado antes do fluxo de CPF)
   if (profile?.asaas_customer_id) {
     const existingId = profile.asaas_customer_id as string;
     const updRes = await asaasFetch(
@@ -94,7 +109,6 @@ async function ensureCustomer(
       return existingId;
     }
     if (updRes.status === 404) {
-      // customer sumiu na Asaas → limpa e recria abaixo
       await supabase
         .from("profiles")
         .update({ asaas_customer_id: null })
@@ -128,31 +142,107 @@ async function ensureCustomer(
   return customerId;
 }
 
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
-    const { user_id, veiculo_id, valor, codigo_cupom, tipo_produto, produto_ref_id } =
-      (await req.json()) as PixRequest;
-    const tipo = tipo_produto === "historico" ? "historico" : "ativacao";
+    // 1) Autenticação obrigatória via JWT Supabase.
+    const authHeader = req.headers.get("Authorization") ?? req.headers.get("authorization");
+    if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+      return json({ error: "UNAUTHORIZED", message: "Token ausente" }, 401);
+    }
+    const token = authHeader.slice(7).trim();
+    if (!token) {
+      return json({ error: "UNAUTHORIZED", message: "Token vazio" }, 401);
+    }
 
-    if (!user_id || !veiculo_id || typeof valor !== "number" || valor <= 0) {
-      return json({ error: "Parâmetros inválidos" }, 400);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ??
+      Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Cliente com o token do usuário — apenas para validar identidade.
+    const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(token);
+    if (userErr || !userData?.user?.id) {
+      return json({ error: "UNAUTHORIZED", message: "Token inválido" }, 401);
+    }
+    const authUserId = userData.user.id;
+
+    // 2) Parse do body — user_id é IGNORADO, quem manda é o token.
+    let body: PixRequest;
+    try {
+      body = (await req.json()) as PixRequest;
+    } catch {
+      return json({ error: "INVALID_BODY" }, 400);
+    }
+
+    const veiculo_id = (body.veiculo_id ?? "").toString().trim();
+    if (!veiculo_id) {
+      return json({ error: "INVALID_BODY", message: "veiculo_id obrigatório" }, 400);
+    }
+
+    const tipo: "ativacao" | "historico" =
+      body.tipo_produto === "historico" ? "historico" : "ativacao";
+
+    const codigoCupomBruto = (body.codigo_cupom ?? "").toString().trim();
+
+    // 3) Cliente service-role para operações de DB (bypassa RLS de forma controlada).
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // 4) Confirma posse do veículo pelo usuário autenticado.
+    const { data: veiculoRow, error: errVeic } = await supabase
+      .from("veiculos")
+      .select("id, user_id")
+      .eq("id", veiculo_id)
+      .maybeSingle();
+    if (errVeic) throw errVeic;
+    if (!veiculoRow || veiculoRow.user_id !== authUserId) {
+      return json(
+        { error: "FORBIDDEN", message: "Veículo não pertence ao usuário" },
+        403,
+      );
+    }
+
+    // 5) Preço server-side. `valor` do body é IGNORADO.
+    let valor: number;
+    let cupomAplicado: string | null = null;
+
+    if (tipo === "historico") {
+      valor = PRECO_HISTORICO;
+    } else {
+      valor = PRECO_ATIVACAO;
+      if (codigoCupomBruto) {
+        try {
+          const { data: padrinhoId, error: errRpc } = await supabase.rpc(
+            "validar_cupom_indicacao",
+            { _codigo: codigoCupomBruto },
+          );
+          if (errRpc) throw errRpc;
+          const padrinho = (padrinhoId as string | null) ?? null;
+          if (padrinho && padrinho !== authUserId) {
+            valor = PRECO_ATIVACAO_COM_CUPOM;
+            cupomAplicado = codigoCupomBruto;
+          }
+        } catch (e) {
+          // Cupom inválido não bloqueia — cai no preço cheio.
+          console.warn("[gerar-pix-asaas] cupom inválido:", e);
+        }
+      }
     }
 
     const apiKey = Deno.env.get("ASAAS_API_KEY");
     if (!apiKey) return json({ error: "ASAAS_API_KEY ausente" }, 500);
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const asaas_customer_id = await ensureCustomer(apiKey, supabase, authUserId);
 
-    const asaas_customer_id = await ensureCustomer(apiKey, supabase, user_id);
-
-    // dueDate = hoje (YYYY-MM-DD)
     const dueDate = new Date().toISOString().slice(0, 10);
     const description =
       tipo === "historico"
@@ -167,7 +257,7 @@ Deno.serve(async (req) => {
         value: Number(valor.toFixed(2)),
         dueDate,
         description,
-        externalReference: `${user_id}:${veiculo_id}:${tipo}`,
+        externalReference: `${authUserId}:${veiculo_id}:${tipo}`,
       }),
     });
     const payJson = await payRes.json().catch(() => ({}));
@@ -190,15 +280,19 @@ Deno.serve(async (req) => {
       (qrJson as { encodedImage?: string }).encodedImage ?? null;
     if (!payload) throw new Error("Asaas pixQrCode sem payload");
 
+    const produto_ref_id = tipo === "historico"
+      ? (body.produto_ref_id ?? veiculo_id)
+      : null;
+
     const { data: inserted, error: insertError } = await supabase
       .from("pagamentos_pix")
       .insert({
-        user_id,
+        user_id: authUserId,
         veiculo_id,
         valor,
-        codigo_cupom: codigo_cupom ?? null,
+        codigo_cupom: cupomAplicado,
         tipo_produto: tipo,
-        produto_ref_id: produto_ref_id ?? null,
+        produto_ref_id,
         status: "pendente",
         txid_efi: asaas_payment_id,
         pix_copia_cola: payload,
@@ -206,6 +300,7 @@ Deno.serve(async (req) => {
           gateway: "asaas",
           asaas_payment_id,
           asaas_customer_id,
+          preco_origem: "server_side_table_v1",
         },
       })
       .select("id")
@@ -219,6 +314,8 @@ Deno.serve(async (req) => {
       pix_copia_cola: payload,
       qr_code_base64: encodedImage,
       txid_efi: asaas_payment_id,
+      valor,
+      cupom_aplicado: cupomAplicado !== null,
     });
   } catch (err) {
     console.error("[gerar-pix-asaas]", err);
