@@ -51,6 +51,7 @@ function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }>
 export function ReceiptScanFab({
   onParsed,
   className,
+  vehicleId,
   vehicleStatus,
   isActivated,
   onPaywall,
@@ -62,6 +63,10 @@ export function ReceiptScanFab({
   const handleFile = async (file: File) => {
     if (!plan) {
       toast.error("Carregando seu plano… tente novamente em instantes.");
+      return;
+    }
+    if (!vehicleId) {
+      toast.error("Selecione um veículo antes de escanear a nota.");
       return;
     }
     const vehicle: VehicleContext | undefined =
