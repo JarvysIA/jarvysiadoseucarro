@@ -110,7 +110,39 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
       };
     },
   )
-  .handler(async ({ data }): Promise<{ ok: true; receipt: ParsedReceipt } | { ok: false; error: string }> => {
+  .handler(async ({ data, context }): Promise<{ ok: true; receipt: ParsedReceipt } | { ok: false; error: string }> => {
+    // Build 8.7E1: gate server-side de canUseReceiptScanner.
+    // Regra comercial: liberado para trial ativo / ativo / vip / enterprise;
+    // bloqueado para trial expirado. Aplicado ANTES de qualquer chamada IA.
+    // Não passa vehicle context (input não tem vehicleId); a checagem por
+    // veículo ativado é responsabilidade do client, que já bloqueia via UI.
+    try {
+      const { data: prof } = await context.supabase
+        .from("profiles")
+        .select("status_usuario, trial_inicio")
+        .eq("id", context.userId)
+        .maybeSingle();
+      const status = (prof?.status_usuario ?? null) as ProfileStatus | null;
+      const trialInicio = (prof?.trial_inicio ?? null) as string | null;
+      let allowed = false;
+      if (status === "vip" || status === "enterprise" || status === "ativo") {
+        allowed = true;
+      } else if (status === "trial") {
+        allowed = trialActive({
+          status_usuario: "trial",
+          trial_inicio: trialInicio,
+          vehicleCount: 0,
+          activatedVehicleCount: 0,
+        });
+      }
+      if (!allowed) {
+        return { ok: false, error: "paywall" };
+      }
+    } catch (e) {
+      console.error("[parse-receipt] paywall check failed");
+      return { ok: false, error: "paywall" };
+    }
+
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       return { ok: false, error: "LOVABLE_API_KEY não configurada." };
