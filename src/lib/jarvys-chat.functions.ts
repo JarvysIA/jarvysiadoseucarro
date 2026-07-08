@@ -1,22 +1,50 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-export type ChatMsg = { role: "user" | "assistant"; content: string };
+// Build 8.8E1: limites runtime para o Dr. Jarvys chat.
+// Dr. Jarvys app continua LIVRE para usuário logado (regra comercial),
+// mas o payload é agora validado antes de qualquer chamada à IA.
+const MAX_MESSAGES = 20;
+const MAX_CONTENT_CHARS = 4000;
+const MAX_VEHICLE_STR = 80;
+const MIN_ANO = 1900;
+const MAX_ANO = 2100;
+const MAX_KM = 10_000_000;
 
-export type JarvysChatInput = {
-  messages: ChatMsg[];
-  vehicle: {
-    marca?: string | null;
-    modelo?: string | null;
-    ano?: string | null;
-    km?: number | null;
-  } | null;
-};
+const chatMsgSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().min(1).max(MAX_CONTENT_CHARS),
+});
+
+const vehicleSchema = z
+  .object({
+    marca: z.string().max(MAX_VEHICLE_STR).nullable().optional(),
+    modelo: z.string().max(MAX_VEHICLE_STR).nullable().optional(),
+    ano: z
+      .union([
+        z.string().max(10),
+        z.number().int().min(MIN_ANO).max(MAX_ANO),
+      ])
+      .nullable()
+      .optional()
+      .transform((v) => (v == null ? null : typeof v === "number" ? String(v) : v)),
+    km: z.number().int().min(0).max(MAX_KM).nullable().optional(),
+  })
+  .nullable();
+
+const jarvysChatInputSchema = z.object({
+  messages: z.array(chatMsgSchema).min(1).max(MAX_MESSAGES),
+  vehicle: vehicleSchema,
+});
+
+export type ChatMsg = z.infer<typeof chatMsgSchema>;
+export type JarvysChatInput = z.infer<typeof jarvysChatInputSchema>;
 
 function buildSystemPrompt(v: JarvysChatInput["vehicle"]): string {
   const marca = v?.marca?.trim() || "—";
   const modelo = v?.modelo?.trim() || "—";
-  const ano = v?.ano?.trim() || "—";
+  const ano = (v?.ano ?? "")?.toString().trim() || "—";
   const km = typeof v?.km === "number" ? `${v.km.toLocaleString("pt-BR")} km` : "—";
   return (
     `Você é o Jarvys, uma IA automotiva avançada, atuando como o consultor e mecânico particular do usuário. ` +
@@ -31,7 +59,14 @@ function buildSystemPrompt(v: JarvysChatInput["vehicle"]): string {
 
 export const jarvysChatFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: JarvysChatInput) => data)
+  .inputValidator((data: unknown) => {
+    const parsed = jarvysChatInputSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn("[jarvys-chat] input inválido");
+      throw new Error("Payload inválido.");
+    }
+    return parsed.data;
+  })
   .handler(async ({ data }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
