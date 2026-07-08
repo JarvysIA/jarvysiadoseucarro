@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { trialActive } from "@/lib/plan-capabilities";
+
 
 /**
  * Cron mensal FIPE (Build 5) — fonte única: Placa FIPE.
