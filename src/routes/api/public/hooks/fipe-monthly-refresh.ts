@@ -105,14 +105,18 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
 
 
         // Contagens "ignorados" — queries leves e independentes (não bloqueiam o refresh).
+        // skipped_by_plan agora conta APENAS trial expirado (trial ativo é elegível).
         let skipped_by_plan = 0;
         let skipped_by_status = 0;
         try {
+          const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
           const { count } = await supabaseAdmin
             .from("veiculos")
-            .select("id, profiles!inner(status_usuario)", { count: "exact", head: true })
+            .select("id, profiles!inner(status_usuario, trial_inicio)", { count: "exact", head: true })
             .eq("status", "ativo")
-            .eq("profiles.status_usuario", "trial");
+            .eq("profiles.status_usuario", "trial")
+            .not("profiles.trial_inicio", "is", null)
+            .lt("profiles.trial_inicio", cutoff);
           skipped_by_plan = count ?? 0;
         } catch (e) {
           console.warn("[fipe-monthly-refresh] skipped_by_plan count falhou", e);
@@ -127,12 +131,12 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
           console.warn("[fipe-monthly-refresh] skipped_by_status count falhou", e);
         }
 
-        // Elegíveis: veiculo ativo + dono ativo/vip/enterprise.
-        const { data: veiculos, error: vErr } = await supabaseAdmin
+        // Elegíveis: veiculo ativo + dono ativo/vip/enterprise/trial (trial só se ativo).
+        const { data: veiculosRaw, error: vErr } = await supabaseAdmin
           .from("veiculos")
-          .select("id, user_id, placa, codigo_fipe, placafipe_hash, profiles!inner(status_usuario)")
+          .select("id, user_id, placa, codigo_fipe, placafipe_hash, profiles!inner(status_usuario, trial_inicio)")
           .eq("status", "ativo")
-          .in("profiles.status_usuario", ["ativo", "vip", "enterprise"]);
+          .in("profiles.status_usuario", ["ativo", "vip", "enterprise", "trial"]);
 
         if (vErr) {
           console.error("[fipe-monthly-refresh] query elegíveis erro", vErr);
@@ -142,7 +146,24 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
           );
         }
 
-        const elegiveis = veiculos ?? [];
+        // Filtro adicional: trial só entra se trialActive() (dentro dos 30 dias).
+        const elegiveis = (veiculosRaw ?? []).filter((v) => {
+          const prof = (v as unknown as {
+            profiles?: { status_usuario?: string | null; trial_inicio?: string | null };
+          }).profiles;
+          const status = prof?.status_usuario ?? null;
+          if (status === "ativo" || status === "vip" || status === "enterprise") return true;
+          if (status === "trial") {
+            return trialActive({
+              status_usuario: "trial",
+              trial_inicio: prof?.trial_inicio ?? null,
+              vehicleCount: 0,
+              activatedVehicleCount: 0,
+            });
+          }
+          return false;
+        });
+
         let updated = 0;
         let no_hash = 0;
         let no_history = 0;
