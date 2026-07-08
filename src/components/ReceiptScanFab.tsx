@@ -106,7 +106,7 @@ export function ReceiptScanFab({
         }
       }
       const { base64, mimeType } = await fileToBase64(file);
-      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
+      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType, vehicleId } });
       if (!res.ok) {
         toast.error(res.error || "Falha ao ler a nota.");
         return;
