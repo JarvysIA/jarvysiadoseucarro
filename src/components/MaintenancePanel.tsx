@@ -194,6 +194,11 @@ export function MaintenancePanel({
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
+    if (!vehicleId) {
+      setErrorMsg("Selecione um veículo antes de escanear a nota.");
+      setFlow("error");
+      return;
+    }
     setFlow("scanning");
     setErrorMsg(null);
     setScannedFile(file);
