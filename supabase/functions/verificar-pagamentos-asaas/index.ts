@@ -30,6 +30,12 @@ function asaasBaseUrl(): string {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const expectedCronSecret = Deno.env.get("PAYMENT_CRON_SECRET");
+  const providedCronSecret = req.headers.get("x-cron-secret");
+  if (!expectedCronSecret || providedCronSecret !== expectedCronSecret) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
   try {
     const apiKey = Deno.env.get("ASAAS_API_KEY");
     if (!apiKey) return json({ error: "ASAAS_API_KEY ausente" }, 500);
