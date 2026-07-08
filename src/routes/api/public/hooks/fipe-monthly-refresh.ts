@@ -92,9 +92,15 @@ function normalizeHistorico(raw: unknown): HistoricoPoint[] {
 export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const expected = process.env.FIPE_CRON_SECRET;
+        const provided = request.headers.get("x-cron-secret");
+        if (!expected || provided !== expected) {
+          return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+        }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const ranAt = new Date().toISOString();
+
 
         // Contagens "ignorados" — queries leves e independentes (não bloqueiam o refresh).
         let skipped_by_plan = 0;
