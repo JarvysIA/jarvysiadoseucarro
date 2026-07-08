@@ -826,6 +826,10 @@ export type Database = {
       }
       solicitar_saque_indicacao: { Args: { _chave_pix: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
+      upsert_vault_secret: {
+        Args: { _name: string; _value: string }
+        Returns: undefined
+      }
       validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
     }
     Enums: {
