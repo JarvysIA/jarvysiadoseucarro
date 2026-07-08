@@ -75,12 +75,54 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
     const { data: v, error } = await supabase
       .from("veiculos")
       .select(
-        "id,user_id,placa,codigo_fipe,placafipe_hash,fipe_updated_at,fipe_valor,fipe_mes_referencia",
+        "id,user_id,status,placa,codigo_fipe,placafipe_hash,fipe_updated_at,fipe_valor,fipe_mes_referencia",
       )
       .eq("id", data.vehicleId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!v || v.user_id !== userId) throw new Error("Acesso negado.");
+
+    // Gate server-side (Build 8.7E2): plano/status antes de qualquer chamada externa.
+    if (isArchivedVehicleStatus(v.status)) {
+      return { refreshed: false as const, reason: "paywall" as const };
+    }
+
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("status_usuario, trial_inicio")
+      .eq("id", userId)
+      .maybeSingle();
+    const status = (prof?.status_usuario as ProfileStatus) ?? "trial";
+    const trialInicio = (prof?.trial_inicio as string | null) ?? null;
+
+    let allowed = false;
+    if (status === "vip" || status === "enterprise") {
+      allowed = true;
+    } else if (status === "trial") {
+      allowed = trialActive({
+        status_usuario: "trial",
+        trial_inicio: trialInicio,
+        vehicleCount: 0,
+        activatedVehicleCount: 0,
+      });
+    } else if (status === "ativo") {
+      if (isActiveVehicleStatus(v.status)) {
+        const { data: pay } = await supabase
+          .from("pagamentos_pix")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("veiculo_id", v.id)
+          .eq("status", "pago")
+          .eq("tipo_produto", "ativacao")
+          .limit(1)
+          .maybeSingle();
+        allowed = Boolean(pay);
+      }
+    }
+
+    if (!allowed) {
+      return { refreshed: false as const, reason: "paywall" as const };
+    }
 
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     if (!data.force && v.fipe_updated_at) {
@@ -94,6 +136,8 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
         };
       }
     }
+
+
 
     // 1) Resolver hash
     let hash = (v.placafipe_hash || "").trim();
