@@ -132,7 +132,8 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
       if (!veic || veic.user_id !== context.userId) {
         return { ok: false, error: "forbidden" };
       }
-      if (veic.status !== "ativo") {
+      // Bloqueio duro: veículo arquivado nunca usa OCR.
+      if (isArchivedVehicleStatus(veic.status)) {
         return { ok: false, error: "paywall" };
       }
 
@@ -146,8 +147,10 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
 
       let allowed = false;
       if (status === "vip" || status === "enterprise") {
+        // Qualquer veículo não-archived (já filtrado acima).
         allowed = true;
       } else if (status === "trial") {
+        // Trial ativo → qualquer veículo não-archived.
         allowed = trialActive({
           status_usuario: "trial",
           trial_inicio: trialInicio,
@@ -155,22 +158,26 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           activatedVehicleCount: 0,
         });
       } else if (status === "ativo") {
-        // Ativação comercial real: pagamentos_pix pago para este veículo.
-        const { data: pay } = await context.supabase
-          .from("pagamentos_pix")
-          .select("id")
-          .eq("user_id", context.userId)
-          .eq("veiculo_id", data.vehicleId)
-          .eq("status", "pago")
-          .eq("tipo_produto", "ativacao")
-          .limit(1)
-          .maybeSingle();
-        allowed = Boolean(pay);
+        // Exige veículo com status='ativo' E ativação comercial real
+        // (pagamentos_pix pago, tipo_produto='ativacao', veiculo_id=X).
+        if (isActiveVehicleStatus(veic.status)) {
+          const { data: pay } = await context.supabase
+            .from("pagamentos_pix")
+            .select("id")
+            .eq("user_id", context.userId)
+            .eq("veiculo_id", data.vehicleId)
+            .eq("status", "pago")
+            .eq("tipo_produto", "ativacao")
+            .limit(1)
+            .maybeSingle();
+          allowed = Boolean(pay);
+        }
       }
 
       if (!allowed) {
         return { ok: false, error: "paywall" };
       }
+
     } catch (e) {
       console.error("[parse-receipt] paywall check failed");
       return { ok: false, error: "paywall" };
