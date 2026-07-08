@@ -22,16 +22,9 @@ export type WelcomePayload = {
   cor?: string;
 };
 
-// Dispara o webhook de boas-vindas. Falhas não devem bloquear o fluxo do usuário.
-export async function fireWelcomeWebhook(payload: WelcomePayload): Promise<void> {
-  try {
-    await fetch(WELCOME_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event: "user.welcome", ...payload }),
-      keepalive: true,
-    });
-  } catch (err) {
-    console.warn("[welcome-webhook] falhou (não-bloqueante):", err);
-  }
+// Welcome webhook desativado temporariamente até o domínio ser publicado.
+// Futura implementação deve ser server-side com requireSupabaseAuth + HMAC WELCOME_WEBHOOK_SECRET.
+export async function fireWelcomeWebhook(payload: WelcomePayload): Promise<{ ok: false; skipped: true; reason: string }> {
+  // Evita chamada client-side insegura para domínio ainda não publicado.
+  return { ok: false, skipped: true, reason: "welcome_webhook_disabled_until_publish" };
 }
