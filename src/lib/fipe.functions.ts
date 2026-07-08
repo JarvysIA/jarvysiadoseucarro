@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isActiveVehicleStatus, isArchivedVehicleStatus } from "@/lib/vehicle-status";
+import { trialActive } from "@/lib/plan-capabilities";
+import type { ProfileStatus } from "@/lib/profile-status";
+
 
 export type FipeHistoricoItem = { mes_referencia: string; valor: string | number };
 
