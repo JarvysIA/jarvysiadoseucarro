@@ -377,6 +377,7 @@ function DespesasPage() {
 
       {/* FAB IA — Ler nota com IA */}
       <ReceiptScanFab
+        vehicleId={activeVehicleId}
         vehicleStatus={vehicleStatus}
         isActivated={isActivated}
         onPaywall={() => setActivateOpen(true)}

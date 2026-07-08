@@ -194,6 +194,11 @@ export function MaintenancePanel({
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
+    if (!vehicleId) {
+      setErrorMsg("Selecione um veículo antes de escanear a nota.");
+      setFlow("error");
+      return;
+    }
     setFlow("scanning");
     setErrorMsg(null);
     setScannedFile(file);
@@ -206,7 +211,7 @@ export function MaintenancePanel({
         }
       }
       const { base64, mimeType } = await fileToBase64(file);
-      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
+      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType, vehicleId } });
       if (!res.ok) {
         setErrorMsg(res.error);
         setFlow("error");

@@ -512,6 +512,7 @@ function RevisoesPage() {
       </button>
 
       <ReceiptScanFab
+        vehicleId={activeVehicleId}
         vehicleStatus={vehicleFull?.status ?? null}
         isActivated={isActivated}
         onPaywall={() => setActivateOpen(true)}

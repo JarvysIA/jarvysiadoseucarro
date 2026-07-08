@@ -17,6 +17,8 @@ type Props = {
   onParsed: (parsed: ParsedReceipt, file: File) => void;
   /** Posição vertical opcional (default bottom-44). */
   className?: string;
+  /** ID do veículo atual (obrigatório para o gate server-side do OCR). */
+  vehicleId?: string | null;
   /** Status do veículo NA GARAGEM (ativo | archived). */
   vehicleStatus?: string | null;
   /**
@@ -49,6 +51,7 @@ function fileToBase64(file: File): Promise<{ base64: string; mimeType: string }>
 export function ReceiptScanFab({
   onParsed,
   className,
+  vehicleId,
   vehicleStatus,
   isActivated,
   onPaywall,
@@ -60,6 +63,10 @@ export function ReceiptScanFab({
   const handleFile = async (file: File) => {
     if (!plan) {
       toast.error("Carregando seu plano… tente novamente em instantes.");
+      return;
+    }
+    if (!vehicleId) {
+      toast.error("Selecione um veículo antes de escanear a nota.");
       return;
     }
     const vehicle: VehicleContext | undefined =
@@ -99,7 +106,7 @@ export function ReceiptScanFab({
         }
       }
       const { base64, mimeType } = await fileToBase64(file);
-      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType } });
+      const res = await parseReceiptFn({ data: { imageBase64: base64, mimeType, vehicleId } });
       if (!res.ok) {
         toast.error(res.error || "Falha ao ler a nota.");
         return;
