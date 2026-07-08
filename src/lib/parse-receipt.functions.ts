@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { trialActive } from "@/lib/plan-capabilities";
+import type { ProfileStatus } from "@/lib/profile-status";
 
 export type ReceiptCategory =
   | "oleo"
