@@ -17,6 +17,8 @@ type Props = {
   onParsed: (parsed: ParsedReceipt, file: File) => void;
   /** Posição vertical opcional (default bottom-44). */
   className?: string;
+  /** ID do veículo atual (obrigatório para o gate server-side do OCR). */
+  vehicleId?: string | null;
   /** Status do veículo NA GARAGEM (ativo | archived). */
   vehicleStatus?: string | null;
   /**
