@@ -97,26 +97,43 @@ function stripJsonFences(text: string): string {
 export const parseReceiptFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (data: { imageBase64: string; mimeType?: string }) => {
+    (data: { imageBase64: string; mimeType?: string; vehicleId: string }) => {
       if (!data?.imageBase64 || typeof data.imageBase64 !== "string") {
         throw new Error("imageBase64 é obrigatório");
       }
       if (data.imageBase64.length > 12_000_000) {
         throw new Error("Imagem muito grande (máx ~9MB).");
       }
+      if (!data?.vehicleId || typeof data.vehicleId !== "string") {
+        throw new Error("vehicleId é obrigatório");
+      }
       return {
         imageBase64: data.imageBase64,
         mimeType: data.mimeType || "image/jpeg",
+        vehicleId: data.vehicleId,
       };
     },
   )
   .handler(async ({ data, context }): Promise<{ ok: true; receipt: ParsedReceipt } | { ok: false; error: string }> => {
-    // Build 8.7E1: gate server-side de canUseReceiptScanner.
-    // Regra comercial: liberado para trial ativo / ativo / vip / enterprise;
-    // bloqueado para trial expirado. Aplicado ANTES de qualquer chamada IA.
-    // Não passa vehicle context (input não tem vehicleId); a checagem por
-    // veículo ativado é responsabilidade do client, que já bloqueia via UI.
+    // Build 8.7E1b: gate server-side de canUseReceiptScanner com contexto de veículo.
+    // Regra comercial: vip/enterprise → sempre; trial → trial ativo;
+    // ativo → veículo pertencente ao usuário, status='ativo' E ativação real
+    // via pagamentos_pix (status='pago', tipo_produto='ativacao', veiculo_id=X).
+    // Bloqueia trial expirado, free, archived e veículo não-ativado.
     try {
+      // Ownership + status do veículo (RLS já garante user_id = auth.uid()).
+      const { data: veic } = await context.supabase
+        .from("veiculos")
+        .select("id, user_id, status")
+        .eq("id", data.vehicleId)
+        .maybeSingle();
+      if (!veic || veic.user_id !== context.userId) {
+        return { ok: false, error: "forbidden" };
+      }
+      if (veic.status !== "ativo") {
+        return { ok: false, error: "paywall" };
+      }
+
       const { data: prof } = await context.supabase
         .from("profiles")
         .select("status_usuario, trial_inicio")
@@ -124,8 +141,9 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
         .maybeSingle();
       const status = (prof?.status_usuario ?? null) as ProfileStatus | null;
       const trialInicio = (prof?.trial_inicio ?? null) as string | null;
+
       let allowed = false;
-      if (status === "vip" || status === "enterprise" || status === "ativo") {
+      if (status === "vip" || status === "enterprise") {
         allowed = true;
       } else if (status === "trial") {
         allowed = trialActive({
@@ -134,7 +152,20 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
           vehicleCount: 0,
           activatedVehicleCount: 0,
         });
+      } else if (status === "ativo") {
+        // Ativação comercial real: pagamentos_pix pago para este veículo.
+        const { data: pay } = await context.supabase
+          .from("pagamentos_pix")
+          .select("id")
+          .eq("user_id", context.userId)
+          .eq("veiculo_id", data.vehicleId)
+          .eq("status", "pago")
+          .eq("tipo_produto", "ativacao")
+          .limit(1)
+          .maybeSingle();
+        allowed = Boolean(pay);
       }
+
       if (!allowed) {
         return { ok: false, error: "paywall" };
       }
@@ -142,6 +173,7 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
       console.error("[parse-receipt] paywall check failed");
       return { ok: false, error: "paywall" };
     }
+
 
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
