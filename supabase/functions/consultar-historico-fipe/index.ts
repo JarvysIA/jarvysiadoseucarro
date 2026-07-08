@@ -2,6 +2,8 @@
 // Consulta o desvalorizômetro (histórico FIPE) na API placafipe.com.br via hash.
 // Variáveis necessárias: PLACA_FIPE_TOKEN
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -14,6 +16,23 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+async function requireAuth(req: Request): Promise<Response | null> {
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  const bearer = authHeader.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+  if (!bearer) return json({ ok: false, error: "unauthorized" }, 401);
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (serviceRole && bearer === serviceRole) return null;
+  const url = Deno.env.get("SUPABASE_URL");
+  const anon = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!url || !anon) return json({ ok: false, error: "unauthorized" }, 401);
+  const supabase = createClient(url, anon);
+  const { data, error } = await supabase.auth.getUser(bearer);
+  if (error || !data?.user) return json({ ok: false, error: "unauthorized" }, 401);
+  return null;
 }
 
 function parseValor(raw: unknown): number {
@@ -32,6 +51,9 @@ function parseValor(raw: unknown): number {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Método inválido" }, 405);
+
+  const authFail = await requireAuth(req);
+  if (authFail) return authFail;
 
   try {
     const token = Deno.env.get("PLACA_FIPE_TOKEN");
