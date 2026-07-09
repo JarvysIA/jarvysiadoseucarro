@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { isLikelyE164, normalizeBrazilPhoneToE164 } from "../phone";
 import { maskPhone, sanitizeWhatsappPayload } from "../sanitize";
 import { zapiProvider } from "../providers/zapi-provider";
@@ -9,30 +9,36 @@ import {
 } from "../provider-router";
 
 describe("phone helpers", () => {
-  it("normaliza número brasileiro com máscara", () => {
+  test("normaliza número brasileiro com máscara", () => {
     expect(normalizeBrazilPhoneToE164("(21) 99999-8888")).toBe("+5521999998888");
   });
-  it("normaliza número com 55 sem +", () => {
+  test("normaliza número com 55 sem +", () => {
     expect(normalizeBrazilPhoneToE164("5521999998888")).toBe("+5521999998888");
   });
-  it("aceita já com +", () => {
+  test("aceita já com +", () => {
     expect(normalizeBrazilPhoneToE164("+5521999998888")).toBe("+5521999998888");
   });
-  it("retorna null para input vazio ou inválido", () => {
-    expect(normalizeBrazilPhoneToE164("")).toBeNull();
-    expect(normalizeBrazilPhoneToE164(null)).toBeNull();
-    expect(normalizeBrazilPhoneToE164("123")).toBeNull();
+  test("retorna null para input vazio ou inválido", () => {
+    expect(normalizeBrazilPhoneToE164("")).toBe(null);
+    expect(normalizeBrazilPhoneToE164(null)).toBe(null);
+    expect(normalizeBrazilPhoneToE164("123")).toBe(null);
   });
-  it("isLikelyE164", () => {
+  test("isLikelyE164 válido", () => {
     expect(isLikelyE164("+5521999998888")).toBe(true);
+  });
+  test("isLikelyE164 rejeita sem +", () => {
     expect(isLikelyE164("21999998888")).toBe(false);
+  });
+  test("isLikelyE164 rejeita null", () => {
     expect(isLikelyE164(null)).toBe(false);
+  });
+  test("isLikelyE164 rejeita não numérico", () => {
     expect(isLikelyE164("+abc")).toBe(false);
   });
 });
 
 describe("sanitize", () => {
-  it("remove chaves sensíveis", () => {
+  test("remove chaves sensíveis", () => {
     const out = sanitizeWhatsappPayload({
       token: "abc",
       authorization: "Bearer x",
@@ -46,26 +52,44 @@ describe("sanitize", () => {
     expect(out.phone).toBe("+5521999998888");
     expect(out.text).toBe("oi");
   });
-  it("trunca strings gigantes", () => {
+  test("trunca strings gigantes", () => {
     const big = "a".repeat(5000);
     const out = sanitizeWhatsappPayload({ text: big });
-    expect(typeof out.text).toBe("string");
-    expect((out.text as string).length).toBeLessThan(big.length);
+    const truncated = out.text as string;
+    expect(typeof truncated).toBe("string");
+    expect(truncated.length < big.length).toBe(true);
+    expect(truncated).toContain("[truncated]");
   });
-  it("nunca lança para input inválido", () => {
-    expect(() => sanitizeWhatsappPayload(null)).not.toThrow();
-    expect(() => sanitizeWhatsappPayload(undefined)).not.toThrow();
-    expect(() => sanitizeWhatsappPayload(123)).not.toThrow();
-    expect(() => sanitizeWhatsappPayload("x")).not.toThrow();
+  test("nunca lança para null", () => {
+    let threw = false;
+    try {
+      sanitizeWhatsappPayload(null);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
   });
-  it("maskPhone", () => {
+  test("nunca lança para primitivo", () => {
+    let threw = false;
+    try {
+      sanitizeWhatsappPayload(123);
+      sanitizeWhatsappPayload("x");
+      sanitizeWhatsappPayload(undefined);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
+  });
+  test("maskPhone mascara meio", () => {
     expect(maskPhone("+5521999998888")).toBe("+55219****8888");
-    expect(maskPhone(null)).toBeNull();
+  });
+  test("maskPhone aceita null", () => {
+    expect(maskPhone(null)).toBe(null);
   });
 });
 
 describe("zapi normalizeInbound", () => {
-  it("mensagem de texto", () => {
+  test("mensagem de texto", () => {
     const n = zapiProvider.normalizeInbound({
       instanceId: "inst-1",
       messageId: "M1",
@@ -80,7 +104,7 @@ describe("zapi normalizeInbound", () => {
     expect(n.displayName).toBe("João");
     expect(n.isGroup).toBe(false);
   });
-  it("mensagem com imagem", () => {
+  test("mensagem com imagem", () => {
     const n = zapiProvider.normalizeInbound({
       messageId: "M2",
       phone: "+5521999998888",
@@ -91,7 +115,7 @@ describe("zapi normalizeInbound", () => {
     expect(n.mediaMimeType).toBe("image/jpeg");
     expect(n.textBody).toBe("nota");
   });
-  it("mensagem com PDF", () => {
+  test("mensagem com PDF", () => {
     const n = zapiProvider.normalizeInbound({
       messageId: "M3",
       phone: "+5521999998888",
@@ -100,53 +124,65 @@ describe("zapi normalizeInbound", () => {
     expect(n.messageType).toBe("pdf");
     expect(n.mediaMimeType).toBe("application/pdf");
   });
-  it("marca isGroup quando phone tem @g.us", () => {
+  test("marca isGroup quando phone tem @g.us", () => {
     const n = zapiProvider.normalizeInbound({
       phone: "5521999998888@g.us",
       text: "grupo",
     });
     expect(n.isGroup).toBe(true);
   });
-  it("payload desconhecido vira unknown sem crash", () => {
+  test("payload desconhecido vira unknown sem crash", () => {
     const n = zapiProvider.normalizeInbound({ foo: "bar" });
     expect(n.messageType).toBe("unknown");
     expect(n.provider).toBe("zapi");
   });
-  it("não lança para null/undefined/primitivo", () => {
-    expect(() => zapiProvider.normalizeInbound(null)).not.toThrow();
-    expect(() => zapiProvider.normalizeInbound(undefined)).not.toThrow();
-    expect(() => zapiProvider.normalizeInbound(42)).not.toThrow();
+  test("não lança para null/primitivo", () => {
+    let threw = false;
+    try {
+      zapiProvider.normalizeInbound(null);
+      zapiProvider.normalizeInbound(undefined);
+      zapiProvider.normalizeInbound(42);
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(false);
   });
-  it("converte timestamp numérico em ISO", () => {
-    const n = zapiProvider.normalizeInbound({ phone: "+5521999998888", text: "x", moment: 1700000000 });
+  test("converte timestamp numérico em ISO", () => {
+    const n = zapiProvider.normalizeInbound({
+      phone: "+5521999998888",
+      text: "x",
+      moment: 1700000000,
+    });
     expect(n.receivedAt).toBe(new Date(1700000000 * 1000).toISOString());
   });
 });
 
 describe("zapi verifyWebhook", () => {
-  it("aceita sem secret esperado (TODO 5.4)", () => {
+  test("aceita sem secret esperado (TODO 5.4)", () => {
     expect(zapiProvider.verifyWebhook({}).ok).toBe(true);
   });
-  it("valida header quando secret esperado", () => {
-    const ok = zapiProvider.verifyWebhook({
+  test("valida header quando secret esperado — ok", () => {
+    const r = zapiProvider.verifyWebhook({
       expectedSecret: "s3cret",
       headers: { "x-webhook-secret": "s3cret" },
     });
-    expect(ok.ok).toBe(true);
-    const bad = zapiProvider.verifyWebhook({
+    expect(r.ok).toBe(true);
+  });
+  test("valida header quando secret esperado — falha", () => {
+    const r = zapiProvider.verifyWebhook({
       expectedSecret: "s3cret",
       headers: { "x-webhook-secret": "wrong" },
     });
-    expect(bad.ok).toBe(false);
+    expect(r.ok).toBe(false);
   });
-  it("aceita Headers real também", () => {
+  test("aceita Headers real", () => {
     const h = new Headers({ "x-zapi-webhook-secret": "abc" });
     expect(zapiProvider.verifyWebhook({ expectedSecret: "abc", headers: h }).ok).toBe(true);
   });
 });
 
 describe("zapi sendMessage", () => {
-  it("retorna not implemented", async () => {
+  test("retorna not implemented", async () => {
     const r = await zapiProvider.sendMessage({
       provider: "zapi",
       instanceId: "inst-1",
@@ -155,22 +191,28 @@ describe("zapi sendMessage", () => {
       textBody: "oi",
     });
     expect(r.ok).toBe(false);
-    expect(r.errorMessage).toContain("not implemented");
+    expect(r.errorMessage as string).toContain("not implemented");
   });
 });
 
 describe("provider-router", () => {
-  it("resolve zapi", () => {
+  test("resolve zapi", () => {
     expect(getWhatsappProvider("zapi").name).toBe("zapi");
   });
-  it("lança em provider não suportado", () => {
-    expect(() => getWhatsappProvider("meta_cloud")).toThrow();
+  test("lança em provider não suportado", () => {
+    let threw = false;
+    try {
+      getWhatsappProvider("meta_cloud");
+    } catch {
+      threw = true;
+    }
+    expect(threw).toBe(true);
   });
-  it("normalizeInboundByProvider funciona", () => {
+  test("normalizeInboundByProvider funciona", () => {
     const n = normalizeInboundByProvider("zapi", { phone: "+5521999998888", text: "oi" });
     expect(n.messageType).toBe("text");
   });
-  it("verifyWebhookByProvider funciona", () => {
+  test("verifyWebhookByProvider funciona", () => {
     expect(verifyWebhookByProvider("zapi", {}).ok).toBe(true);
   });
 });
