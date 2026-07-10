@@ -219,7 +219,7 @@ export const zapiProvider: WhatsappProvider = {
     const messageType = detectMessageType(p, mediaMimeType);
     const textBody =
       messageType === "text"
-        ? pickString(p, "text", "message", "body", "text.message", "message.text")
+        ? pickInboundText(p)
         : pickString(p, "caption", "text.caption", "image.caption", "document.caption");
 
     const eventType = pickString(p, "event", "type", "messageType") ?? "message";
