@@ -221,6 +221,18 @@ async function processItem(
     return { result: "failed" };
   }
 
+  // link_code expirado — não envia, cancela sem retry.
+  if (item.purpose === "link_code" && item.expires_at) {
+    const exp = new Date(item.expires_at).getTime();
+    if (Number.isFinite(exp) && exp <= Date.now()) {
+      await markCancelled(supabase, item.id, "link_code_expired");
+      console.log(JSON.stringify({ ...log, status: "cancelled", reason: "link_code_expired" }));
+      return { result: "cancelled" };
+    }
+  }
+
+
+
   const instance = await fetchInstance(supabase, item.instance_id);
   if (!instance) {
     await markFailed(supabase, item.id, "instance_not_found");
