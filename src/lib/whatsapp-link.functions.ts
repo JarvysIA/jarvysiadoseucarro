@@ -298,3 +298,135 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       expiresInSeconds: LINK_CODE_TTL_SECONDS,
     };
   });
+
+// ============================================================================
+// Build 5.7C2 — confirmWhatsappLinkCodeFn
+// ----------------------------------------------------------------------------
+// Valida input, calcula hash com o mesmo helper de request, chama a RPC
+// transacional public.confirm_whatsapp_link_code (única responsável por lock,
+// tentativas, expiração, conflitos, contato, consentimento, instância,
+// current_users e enfileiramento do link_confirm) e retorna resposta segura.
+// Nunca retorna nem loga: código, hash, pepper, telefone completo, erro SQL.
+// Não inicia trial. Não altera capabilities. Não chama IA/OCR.
+// ============================================================================
+
+type ConfirmInput = { verificationId: string; code: string };
+
+type ConfirmSuccess = { ok: true; contactId: string; phoneMasked: string };
+type ConfirmReason =
+  | "invalid_or_expired"
+  | "blocked"
+  | "phone_conflict"
+  | "user_has_other_active"
+  | "no_instance_available"
+  | "internal_error";
+type ConfirmFailure = { ok: false; reason: ConfirmReason };
+type ConfirmOutput = ConfirmSuccess | ConfirmFailure;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CODE_RE = /^\d{6}$/;
+
+function logConfirm(payload: Record<string, unknown>) {
+  console.log(
+    JSON.stringify({ tag: "whatsapp-link-confirm", ...payload }),
+  );
+}
+
+function validateConfirmInput(input: unknown): ConfirmInput | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const verificationId = raw.verificationId;
+  const code = raw.code;
+  if (typeof verificationId !== "string" || !UUID_RE.test(verificationId)) return null;
+  if (typeof code !== "string" || !CODE_RE.test(code)) return null;
+  return { verificationId, code };
+}
+
+export const confirmWhatsappLinkCodeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown): ConfirmInput | { __invalid: true } => {
+    const ok = validateConfirmInput(input);
+    if (!ok) return { __invalid: true };
+    return ok;
+  })
+  .handler(async ({ data, context }): Promise<ConfirmOutput> => {
+    const { userId } = context;
+    const t0 = Date.now();
+
+    if ((data as { __invalid?: boolean }).__invalid) {
+      logConfirm({ user_id: userId, result: "invalid_or_expired", error_code: "invalid_input", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "invalid_or_expired" };
+    }
+    const { verificationId, code } = data as ConfirmInput;
+
+    const pepper = process.env.WHATSAPP_LINK_PEPPER;
+    if (!pepper) {
+      logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "pepper_missing", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
+
+    const codeHashCandidate = hashLinkCode(pepper, verificationId, code);
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: rows, error } = await supabaseAdmin.rpc(
+        "confirm_whatsapp_link_code",
+        {
+          p_user_id: userId,
+          p_verification_id: verificationId,
+          p_code_hash_candidate: codeHashCandidate,
+        },
+      );
+
+      if (error) {
+        logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: "internal_error" };
+      }
+
+      const row = Array.isArray(rows) ? rows[0] : (rows as unknown as { result?: string; contact_id?: string | null; phone_e164?: string | null } | null);
+      if (!row || typeof row.result !== "string") {
+        logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "empty_result", elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: "internal_error" };
+      }
+
+      const result = row.result;
+      const knownReasons: ConfirmReason[] = [
+        "invalid_or_expired",
+        "blocked",
+        "phone_conflict",
+        "user_has_other_active",
+        "no_instance_available",
+      ];
+
+      if (result === "ok") {
+        const contactId = row.contact_id ?? "";
+        const phoneE164 = row.phone_e164 ?? "";
+        const phoneMasked = maskPhone(phoneE164);
+        if (!contactId || !phoneE164) {
+          logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "missing_ok_fields", elapsed_ms: Date.now() - t0 });
+          return { ok: false, reason: "internal_error" };
+        }
+        logConfirm({
+          user_id: userId,
+          verification_id: verificationId,
+          result: "ok",
+          contact_id: contactId,
+          phone: phoneMasked,
+          elapsed_ms: Date.now() - t0,
+        });
+        return { ok: true, contactId, phoneMasked };
+      }
+
+      if ((knownReasons as string[]).includes(result)) {
+        logConfirm({ user_id: userId, verification_id: verificationId, result, elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: result as ConfirmReason };
+      }
+
+      logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "unknown_rpc_result", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    } catch (_e) {
+      logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "exception", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
+  });
