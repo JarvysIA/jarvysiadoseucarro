@@ -924,6 +924,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          is_primary: boolean
           last_inbound_at: string | null
           last_outbound_at: string | null
           opt_in: boolean
@@ -932,8 +933,10 @@ export type Database = {
           opt_out: boolean
           opt_out_at: string | null
           phone_e164: string
+          unlinked_at: string | null
           updated_at: string
           user_id: string
+          verified_at: string | null
         }
         Insert: {
           assigned_instance_id?: string | null
@@ -942,6 +945,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_primary?: boolean
           last_inbound_at?: string | null
           last_outbound_at?: string | null
           opt_in?: boolean
@@ -950,8 +954,10 @@ export type Database = {
           opt_out?: boolean
           opt_out_at?: string | null
           phone_e164: string
+          unlinked_at?: string | null
           updated_at?: string
           user_id: string
+          verified_at?: string | null
         }
         Update: {
           assigned_instance_id?: string | null
@@ -960,6 +966,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_primary?: boolean
           last_inbound_at?: string | null
           last_outbound_at?: string | null
           opt_in?: boolean
@@ -968,8 +975,10 @@ export type Database = {
           opt_out?: boolean
           opt_out_at?: string | null
           phone_e164?: string
+          unlinked_at?: string | null
           updated_at?: string
           user_id?: string
+          verified_at?: string | null
         }
         Relationships: [
           {
@@ -1031,6 +1040,65 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      whatsapp_link_verifications: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_sent_at: string | null
+          max_attempts: number
+          phone_e164: string
+          purpose: string
+          requested_ip_hash: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_sent_at?: string | null
+          max_attempts?: number
+          phone_e164: string
+          purpose?: string
+          requested_ip_hash?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_sent_at?: string | null
+          max_attempts?: number
+          phone_e164?: string
+          purpose?: string
+          requested_ip_hash?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_link_verifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_messages: {
         Row: {
