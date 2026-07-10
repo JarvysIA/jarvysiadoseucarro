@@ -65,7 +65,8 @@ async function claimBatch(supabase: SupabaseClient, batchSize: number): Promise<
   const { data: candidates } = await supabase
     .from("whatsapp_outbound_queue")
     .select(
-      "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at",
+      "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at, purpose, expires_at",
+
     )
     .eq("status", "queued")
     .eq("provider", PROVIDER)
