@@ -245,7 +245,9 @@ async function processItem(
     return { result: "requeued" };
   }
 
-  // Opt-out
+  // Opt-out — bypass exclusivo para purpose='link_code' (reativação explícita
+  // solicitada pelo próprio usuário autenticado). Qualquer outro purpose
+  // continua bloqueado quando opt_out=true.
   if (item.contact_id) {
     const { data: contact } = await supabase
       .from("whatsapp_contacts")
@@ -253,11 +255,17 @@ async function processItem(
       .eq("id", item.contact_id)
       .maybeSingle();
     if (contact && (contact as { opt_out: boolean }).opt_out === true) {
-      await markCancelled(supabase, item.id, "contact_opted_out");
-      console.log(JSON.stringify({ ...log, status: "cancelled", reason: "contact_opted_out" }));
-      return { result: "cancelled" };
+      if (item.purpose !== "link_code") {
+        await markCancelled(supabase, item.id, "contact_opted_out");
+        console.log(JSON.stringify({ ...log, status: "cancelled", reason: "contact_opted_out" }));
+        return { result: "cancelled" };
+      }
+      console.log(
+        JSON.stringify({ ...log, status: "opt_out_bypass", reason: "link_code_reactivation" }),
+      );
     }
   }
+
 
   // Daily limit da instância
   if (instance.daily_message_limit && instance.daily_message_limit > 0) {
