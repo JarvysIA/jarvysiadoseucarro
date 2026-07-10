@@ -89,6 +89,41 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
     };
   }, [open]);
 
+  // Carrega o contato WhatsApp ativo (vínculo) do usuário — RLS.
+  useEffect(() => {
+    if (!open) return;
+    let cancel = false;
+    (async () => {
+      setLinkedLoading(true);
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess.session?.user.id;
+      if (!userId) {
+        if (!cancel) {
+          setLinkedContact(null);
+          setLinkedLoading(false);
+        }
+        return;
+      }
+      const { data } = await supabase
+        .from("whatsapp_contacts")
+        .select("id, phone_e164, verified_at, unlinked_at, opt_out")
+        .eq("user_id", userId)
+        .is("unlinked_at", null)
+        .not("verified_at", "is", null)
+        .eq("opt_out", false)
+        .order("is_primary", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancel) return;
+      const row = data as { id: string; phone_e164: string } | null;
+      setLinkedContact(row ?? null);
+      setLinkedLoading(false);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [open, linkedReloadKey]);
+
   // Lookup automático e silencioso no ViaCEP quando 8 dígitos completos.
   useEffect(() => {
     const digits = cep.replace(/\D/g, "");
