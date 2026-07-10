@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, User as UserIcon, Wallet } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
+import { WhatsappLinkCard } from "@/components/WhatsappLinkCard";
 
 type Props = {
   open: boolean;
