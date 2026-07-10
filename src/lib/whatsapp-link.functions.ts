@@ -380,6 +380,7 @@ export const confirmWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       );
 
       if (error) {
+        console.error("[whatsapp-link-confirm] rpc_error detail", { message: error.message, code: (error as { code?: string }).code, details: (error as { details?: string }).details, hint: (error as { hint?: string }).hint });
         logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
         return { ok: false, reason: "internal_error" };
       }
