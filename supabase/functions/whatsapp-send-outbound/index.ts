@@ -48,7 +48,10 @@ type OutboundRow = {
   attempts: number;
   max_attempts: number;
   scheduled_at: string;
+  purpose: string | null;
+  expires_at: string | null;
 };
+
 
 function backoffMinutes(attempts: number): number {
   if (attempts <= 1) return 1;
@@ -62,7 +65,8 @@ async function claimBatch(supabase: SupabaseClient, batchSize: number): Promise<
   const { data: candidates } = await supabase
     .from("whatsapp_outbound_queue")
     .select(
-      "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at",
+      "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at, purpose, expires_at",
+
     )
     .eq("status", "queued")
     .eq("provider", PROVIDER)
@@ -81,7 +85,7 @@ async function claimBatch(supabase: SupabaseClient, batchSize: number): Promise<
       .eq("id", r.id)
       .eq("status", "queued")
       .select(
-        "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at",
+        "id, user_id, contact_id, provider, instance_id, phone_e164, message_type, text_body, status, priority, attempts, max_attempts, scheduled_at, purpose, expires_at",
       )
       .maybeSingle();
     if (upd) claimed.push(upd as OutboundRow);
@@ -216,6 +220,18 @@ async function processItem(
     console.log(JSON.stringify({ ...log, status: "failed", reason: "missing_instance_id" }));
     return { result: "failed" };
   }
+
+  // link_code expirado — não envia, cancela sem retry.
+  if (item.purpose === "link_code" && item.expires_at) {
+    const exp = new Date(item.expires_at).getTime();
+    if (Number.isFinite(exp) && exp <= Date.now()) {
+      await markCancelled(supabase, item.id, "link_code_expired");
+      console.log(JSON.stringify({ ...log, status: "cancelled", reason: "link_code_expired" }));
+      return { result: "cancelled" };
+    }
+  }
+
+
 
   const instance = await fetchInstance(supabase, item.instance_id);
   if (!instance) {
