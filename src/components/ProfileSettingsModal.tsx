@@ -158,7 +158,6 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
     try {
       const cepDigits = cep.replace(/\D/g, "") || null;
       const updates: {
-        whatsapp: string;
         cep: string | null;
         cidade: string | null;
         uf: string | null;
@@ -166,7 +165,6 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         pix_recebimento: string | null;
         cpf: string | null;
       } = {
-        whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
         uf: uf.trim().toUpperCase().slice(0, 2) || null,
