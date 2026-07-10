@@ -1,140 +1,129 @@
-# Build 6.42C — Camada determinística Jarvys no dry-run IA
+## Build 5.6C-PLAN — Cron seguro do sender outbound WhatsApp (read-only)
 
-## Escopo
+### A. Resumo executivo
+Fila outbound está limpa e segura para automação. Sender está hardened e validado manualmente. Falta apenas espelhar `WHATSAPP_SENDER_SECRET` no Vault e criar o `pg_cron` — ambos ficam para o EXEC. Este plano define a sequência segura.
 
-Alterar **somente** `src/lib/maintenance-plan-ai-dry-run.functions.ts`. Nenhum outro arquivo é tocado. Sem UI, sem banco, sem Shopping, sem ML, sem IA extra, sem OCR, sem persistência.
+### B. Estado atual da `whatsapp_outbound_queue`
+Total: 2 registros.
+- 1 `sent` — smoke real do 5.6B (`185f2aed…`, phone `****0805`, attempts=1, `provider_message_id` presente, `sent_at` OK, body 58 chars).
+- 1 `cancelled` — onboarding antigo (`0d7aabfc…`, `error_message=pre_sender_cleanup`).
+- `queued`: 0. `sending`: 0. `failed`: 0.
+- Nenhum item preso, nenhum `scheduled_at<=now()` pendente.
 
-## Onde encaixa
+**Conclusão: fila segura. Liberada para automação.**
 
-No fluxo atual do handler (linhas ~1171–1212):
+### C. Confirmação de fila segura
+✅ Sem `queued` não autorizado. ✅ Sem item preso em `sending`. ✅ Smoke real foi `sent` com sucesso.
 
+### D. Auditoria do sender (`whatsapp-send-outbound`)
+Confere com o requisito: exige `x-sender-secret` (constant-time `safeEqual`), lê env vars do Deno, valida `ZAPI_*`, `batch_size` clamp 1–5, claim otimista `queued→sending` com increment de `attempts`, valida provider/instance/telefone E.164/text_body/opt_out/daily_limit, chama `sendZapiText` com timeout 8s, aplica backoff 1/5/15/60min, timeout ambíguo vira `failed` (manual review), sem log de credenciais/telefone completo/body. **Nenhuma alteração necessária.**
+
+### E. Estado de `WHATSAPP_SENDER_SECRET`
+- Existe como Edge Function Secret (usado pelo sender).
+- **Ausente no Vault** (Vault atual: `FIPE_CRON_SECRET`, `PAYMENT_CRON_SECRET`, `WHATSAPP_WORKER_SECRET`).
+- Precisa ser espelhado para o cron consumir via `vault.decrypted_secrets`.
+
+### F. Estratégia de bootstrap no Vault
+Reutilizar o padrão dos Builds 5.5C / 8.6C:
+1. Criar Edge Function temporária `whatsapp-bootstrap-sender-secret`.
+2. Protegida por token único `WA_SENDER_BOOT_TOKEN` (secret novo, exclusivo, diferente de todos os outros).
+3. Handler lê `Deno.env.get("WHATSAPP_SENDER_SECRET")` e chama `public.upsert_vault_secret('WHATSAPP_SENDER_SECRET', value)`.
+4. Nunca retorna nem loga o valor.
+5. Executada uma única vez.
+6. Neutralizar com 410 Gone imediatamente após confirmação.
+7. Deletar `WA_SENDER_BOOT_TOKEN` após bootstrap.
+
+### G. Estratégia do `pg_cron`
 ```
-safeParseMaintenancePlanJson(parsedJson)
-  → validation.success
-    → validateMilestoneSchedule(validation.data)
-    → validateBaselineItems(validation.data)
-    → return valid:true / errors
+jobname: whatsapp_send_outbound_every_minute
+schedule: * * * * *
+comando: net.http_post(
+  url := 'https://thbbyjyefozrznocihso.supabase.co/functions/v1/whatsapp-send-outbound?batch_size=5',
+  headers := jsonb_build_object(
+    'Content-Type','application/json',
+    'Authorization','Bearer <anon>',
+    'x-sender-secret', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name='WHATSAPP_SENDER_SECRET')
+  ),
+  body := '{}'::jsonb
+)
 ```
+Regras: nenhum secret/token literal, apenas endpoint público, criação idempotente (`SELECT cron.unschedule('whatsapp_send_outbound_every_minute')` antes se existir).
 
-A camada determinística entra **entre** o `safeParseMaintenancePlanJson` bem-sucedido e o `validateMilestoneSchedule`:
+### H. Cron nasce ativo — mitigação
+`pg_cron` no ambiente cria jobs sempre ativos (confirmado: jobs `3`,`4`,`5` todos `active=true`). Não há como criar inativo diretamente. Mitigação:
+1. Confirmar `queued=0` imediatamente antes de criar.
+2. Criar cron.
+3. Em seguida inserir 1 outbound controlado (smoke).
+4. Se o smoke falhar → `cron.unschedule('whatsapp_send_outbound_every_minute')` imediatamente.
 
-```
-safeParseMaintenancePlanJson
-  ↓
-applyJarvysDeterministicMaintenanceRules(plan)   ← NOVO
-  ↓
-validateMilestoneSchedule
-  ↓
-validateBaselineItems
-  ↓
-valid / invalid (plano = retorno determinístico)
-```
+### I. Sequência segura do smoke automático (EXEC futuro)
+1. Auditar fila (deve estar sem `queued`).
+2. Bootstrap Vault + neutralizar função temporária + deletar `WA_SENDER_BOOT_TOKEN`.
+3. Criar cron idempotente.
+4. Inserir 1 outbound para o telefone do operador: “Olá! O envio automático do WhatsApp Jarvys foi ativado com sucesso.”
+5. Aguardar até 2 min.
+6. Validar: `queued→sending→sent`, `attempts=1`, `sent_at` e `provider_message_id` preenchidos, aparelho recebeu exatamente 1 mensagem, execução seguinte `claimed=0`.
+7. Manter cron ativo somente se smoke passar.
 
-Os `warnings` retornados pela nova função são concatenados ao `baseWarnings` já usado em todos os `return` paths posteriores ao parse, de modo que aparecem mesmo quando schedule/baseline falham depois.
+### J. Rate limit e limites operacionais
+- Teto teórico: 5 msg/min × 60 = 300/h; `daily_message_limit=1000` na instância.
+- Sender já reagenda para o próximo dia UTC quando atinge limite.
+- Envio bloqueado se `status!='active'` ou `health_status='failed'` ou `contact.opt_out=true`.
+- Onboarding a não-vinculados: manter apenas quando gerado pelo worker inbound em resposta a evento real recente (já é o comportamento). Purpose/type na fila fica para build futuro.
 
-## Nova função
+### K. Item preso em `sending`
+Nenhum atualmente. Reaper fica para build futuro:
+- `sending` >10min com `provider_message_id` → marcar para revisão, nunca reenviar.
+- Sem `provider_message_id` → tratar como timeout ambíguo, sem reenvio automático no MVP.
 
-Adicionar ao mesmo arquivo, abaixo de `validateBaselineItems`:
+### L. Idempotência e timeout ambíguo
+Sender já garante: `sent` nunca reenviado; timeout ambíguo vira `failed`; retries só para erros `retryable`; cron ignora `failed/cancelled/sent`. Teste do EXEC: fila vazia → cron rodando → 0 envios; inserir 1 → 1 envio; próxima execução → `claimed=0`.
 
-```ts
-function applyJarvysDeterministicMaintenanceRules(
-  plan: MaintenancePlanJson,
-): { plan: MaintenancePlanJson; warnings: string[] }
-```
+### M. Funções temporárias
+`whatsapp-send-outbound-trigger` está neutralizada (410 Gone). Não será usada pelo cron. Recomenda-se remoção definitiva após publicação. Bootstrap do Vault será função separada, dedicada e neutralizada logo após uso.
 
-- Usa o tipo real já importado `MaintenancePlanJson` (não há tipo `MaintenancePlan` separado no arquivo). Sem schema paralelo, sem `as any`.
-- Trabalha sobre um clone raso por milestone (`milestones.map(m => ({ ...m, items: [...m.items] }))`) para não mutar a entrada.
-- Reutiliza helpers existentes: `normalizeText`, `isECvtTransmission`, `isPureElectricVehicle`, `normalizeForBaseline`.
+### N. Logs e segurança
+Sender atual não expõe secret/token/telefone completo/body/URL Z-API. Logs do cron devem conter apenas `jobname`, `request_id` do `pg_net` e `succeeded/failed` — sem headers, sem secret.
 
-## Detecção de elegibilidade
+### O. Testes do build futuro
+1. Vault contém `WHATSAPP_SENDER_SECRET` (nome apenas).
+2. `cron.job` tem 1 único job novo, schedule `* * * * *`, comando referencia `vault.decrypted_secrets`, sem literais.
+3. Fila vazia → cron não envia.
+4. Smoke: 1 outbound → recebido 1×, `sent`, `attempts=1`, `provider_message_id` presente.
+5. Execução seguinte: `claimed=0`.
+6. Opt-out: item vira `cancelled` sem chamar Z-API.
+7. Falha permanente (telefone inválido / instância inativa): `failed/cancelled`, sem chamada Z-API.
+8. Logs sem credenciais.
+9. Fora de escopo: sem OCR, IA, mídia, despesa, KM, UI, RLS, capabilities, FIPE, pagamentos.
 
-Helpers locais determinísticos baseados em `plan.vehicle_summary` + `plan.system_profile`:
+### P. Riscos e mitigação
+| Risco | Mitigação |
+|---|---|
+| Cron nasce ativo | Fila vazia antes; unschedule se smoke falhar |
+| Envio duplicado | Claim atômico + `sent` imutável |
+| Timeout ambíguo | Já mapeado para `failed` manual review |
+| Secret ausente/divergente no Vault | Bootstrap dedicado + validação pós-espelhamento |
+| Cron 401 | Testar endpoint com curl antes do smoke |
+| Cron duplicado | `unschedule` antes de `schedule` |
+| Instância caiu | `status/health_status` gates no sender |
+| Item sem consentimento | `opt_out` gate |
+| Onboarding indesejado | Manter regra do worker inbound (24h anti-spam) |
+| Item preso em `sending` | Reaper futuro; monitoramento manual no MVP |
+| Rate limit / ban | `daily_message_limit=1000`, batch=5/min |
+| Log com credenciais | Sender já sanitiza; cron não loga headers |
+| Bootstrap temporário exposto | Token único + neutralização + delete pós-uso |
+| `WA_SENDER_BOOT_TOKEN` esquecido | Passo obrigatório de delete no EXEC |
 
-- `isElectricOnly = isPureElectricVehicle(plan)` (reuso direto).
-- `hasCombustionEngine`:
-  - `false` se `isElectricOnly`;
-  - `true` se `combustivel`/`motor_textual` contiver qualquer token combustão/híbrido: `flex`, `gasolina`, `etanol`, `alcool`, `diesel`, `hibrido`, `hybrid`, `hev`, `phev`, `dm-i`, `dmi`, `hsd`, `mhev`;
-  - fallback `true` quando há `cilindradas > 0` e não é elétrico puro.
-- `isECvt = isECvtTransmission(plan.vehicle_summary.transmissao) || normalizeText(motor_textual).includes("e-cvt"|"ecvt"|"hsd"|"dm-i")`.
-- `isConventionalAutomatic`: `transmission_type` em `{automatico, cvt, automatizado, dupla_embreagem}` **e** `!isECvt`.
-- `timingSystem = plan.system_profile.timing_system` (`correia_dentada` | `corrente` | `correia_banhada` | `desconhecido`).
+### Q. Próximo build recomendado
+**Build 5.6C-EXEC — Cron seguro do sender outbound**
+- Confirmar fila vazia.
+- Bootstrap `WHATSAPP_SENDER_SECRET` no Vault + neutralizar função + deletar `WA_SENDER_BOOT_TOKEN`.
+- Criar `pg_cron` idempotente.
+- Smoke controlado (1 mensagem).
+- Validar não duplicidade.
+- Manter cron somente se smoke passar.
+- Sem OCR, IA, mídia.
 
-## Regras aplicadas (somente se `hasCombustionEngine`)
+---
 
-### Parte 1 — Baseline em todas as milestones
-
-- Garantir `oleo_motor` e `filtro_oleo` em **todas** as milestones do plano.
-- Garantir `filtro_ar_motor`, `filtro_cabine`, `filtro_combustivel` nas milestones cujo `km ∈ {20000, 40000, …, 200000}`.
-- Itens inseridos exatamente com os payloads do brief (campos `item_key`, `label`, `category`, `action`, `recommendation_type`, `shopping_classification`, `applies`, `confidence`, `source_type: "regra_jarvys"`).
-- Inserir apenas no **final** de `milestone.items`; não sobrescrever existentes; não tocar `km`/`label`/`revision_number`.
-
-### Parte 2 — Câmbio automático convencional
-
-Se `isConventionalAutomatic`, garantir `oleo_cambio_automatico` (payload do brief, label sem "parcial"/"flush", orienta troca completa com equipamento especializado) em milestones com `km ∈ {40000, 80000, 120000, 160000, 200000}`.
-
-Se `isECvt`, **não** inserir óleo CVT convencional. Se ainda não existir item de diagnóstico e-CVT no plano (busca global por `item_key` equivalentes), inserir `diagnostico_e_cvt` (payload do brief) nas milestones 100000 e 200000.
-
-### Parte 3 — Sincronismo / correia
-
-- `timingSystem === "correia_dentada"`: garantir `kit_sincronismo` nas milestones 60000, 120000, 180000.
-- `timingSystem === "corrente"`: percorrer todos os itens de todas as milestones; para qualquer `item_key` equivalente a `correia_dentada`, `kit_correia_dentada`, `kit_sincronismo`, `sincronismo` → **não remover**, apenas mutar para `applies: false`, `recommendation_type: "not_applicable"`, `shopping_classification: "not_applicable"` (o schema exige `not_applicable` quando `applies=false`, e `service_only` violaria o `.superRefine`; o brief diz "padrão mais seguro do arquivo", e o padrão seguro aqui é o que o Zod aceita). Sem mexer em `not_applicable_items` (o schema permite, mas adicionar exige preencher `reason`/`label` e não é estritamente necessário para passar nas validações).
-- `timingSystem === "correia_banhada"`: não gerar `kit_sincronismo`. Garantir `diagnostico_correia_banhada` nas milestones 60000, 100000, 150000, 200000. Se a IA tiver criado kit de correia dentada seca, marcar como `applies:false` + `not_applicable` (mesma mecânica do caso "corrente").
-- `timingSystem === "desconhecido"`: não adicionar nem desabilitar nada de sincronismo.
-
-### Parte 4 — Itens fora do escopo determinístico
-
-Nunca inserir automaticamente: velas, bobinas, correia/poly V de acessórios, bomba d'água, pastilhas, fluido de freio, arrefecimento, suspensão, scanner, checklist. Continuam responsabilidade da IA/corpus.
-
-### Parte 5 — Warnings
-
-Formato:
-
-- `jarvys_rule_added:{km}:{item_key}` quando insere item novo;
-- `jarvys_rule_disabled:{km}:{item_key}` quando muta item existente para `not_applicable`.
-
-## Detecção de duplicidade
-
-Helper interno `hasEquivalentItem(milestoneItems, canonicalKey)` que normaliza `item_key` e `label` via `normalizeText` e checa contra os grupos de equivalência do brief:
-
-- `oleo_motor`: `oleo_motor`, `oleo motor`, `oleo do motor`.
-- `filtro_oleo`: `filtro_oleo`, `filtro oleo`, `filtro de oleo`.
-- `filtro_ar_motor`, `filtro_cabine`, `filtro_combustivel`: por chave exata + label contendo o termo.
-- `oleo_cambio_automatico`: `oleo_cambio`, `oleo cambio`, `fluido_cambio`, `fluido de cambio`, `oleo_cambio_automatico`, `kit_cambio_automatico`.
-- `kit_sincronismo`: `kit_sincronismo`, `correia_dentada`, `kit_correia_dentada`, `sincronismo`.
-- `diagnostico_correia_banhada`: `correia_banhada`, `diagnostico_correia_banhada`.
-- `diagnostico_e_cvt`: `diagnostico_e_cvt`, `e-cvt`, `ecvt`, `sistema hibrido`/`sistema híbrido` (busca em label e item_key).
-
-Sem `as any`; iteração com tipos do `MaintenancePlanJson`.
-
-## Integração no handler
-
-Substituir o bloco entre o `if (!validation.success)` e `validateMilestoneSchedule`:
-
-```ts
-const deterministic = applyJarvysDeterministicMaintenanceRules(validation.data);
-const planAfterRules = deterministic.plan;
-const combinedWarnings = [...baseWarnings, ...deterministic.warnings];
-```
-
-Todos os `return` posteriores (sucesso e erro de schedule/baseline) passam a usar `planAfterRules` e `combinedWarnings`. O contrato de retorno (`valid`, `plan`, `errors`, `warnings`, `ai`, `technical_context_debug`, `raw_preview`) permanece idêntico.
-
-## Verificação
-
-- `bunx tsgo --noEmit` → 0 erros.
-- Teste manual em `/admin-corpus-smoke` cobrindo os 7 cenários do brief (BYD DM-i, Corolla híbrido, 208 PureTech, Onix 1.0 Turbo, Argo Firefly corrente, veículo com correia dentada comum, veículo automático convencional), conferindo:
-  - baseline óleo+filtro em todas as milestones;
-  - kit filtros nas pares;
-  - kit sincronismo apenas em correia dentada;
-  - diagnóstico em correia banhada;
-  - itens de dentada desabilitados em motor de corrente e em correia banhada quando a IA inventar;
-  - óleo/filtro câmbio automático nas milestones 40k/80k/120k/160k/200k apenas para automático convencional;
-  - diagnóstico e-CVT em vez de óleo CVT para híbridos e-CVT;
-  - warnings `jarvys_rule_added` / `jarvys_rule_disabled` aparecem no painel admin.
-
-## Garantias
-
-- Único arquivo alterado: `src/lib/maintenance-plan-ai-dry-run.functions.ts`.
-- Não altera schema, validação, UI, Shopping helper, banco, edge functions.
-- Não chama IA, OCR, embedding, rede, Supabase.
-- Não persiste nada.
-- Não adiciona velas/bobinas/poly V/bomba d'água/pastilhas/fluido de freio/arrefecimento automaticamente.
+Build 5.6C-PLAN executado em modo read-only. Plano do cron seguro do sender outbound concluído sem criar cron, sem enviar mensagens e sem alterar código.
