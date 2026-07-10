@@ -249,7 +249,10 @@ Deno.serve(async (req) => {
 
     const eventId = evtRow?.id as string | undefined;
 
-    // 4. Lookup opcional de contato (sem criar contato sombra).
+    // 4. Lookup opcional de contato (apenas contato ATIVO e VERIFICADO;
+    //    sem criar contato sombra). Contatos com verified_at NULL ou
+    //    unlinked_at preenchido são ignorados para não vincular
+    //    mensagens a vínculos históricos ou não confirmados.
     let contactId: string | null = null;
     let userId: string | null = null;
     if (n.phoneE164) {
@@ -257,6 +260,8 @@ Deno.serve(async (req) => {
         .from("whatsapp_contacts")
         .select("id, user_id")
         .eq("phone_e164", n.phoneE164)
+        .is("unlinked_at", null)
+        .not("verified_at", "is", null)
         .maybeSingle();
       if (contact) {
         contactId = (contact as { id: string }).id;
