@@ -216,7 +216,7 @@ export function normalizeZapiInbound(payload: unknown): NormalizedWhatsappInboun
 
   const rawText =
     messageType === "text"
-      ? pickString(p, "text", "message", "body", "text.message", "message.text", "data.text")
+      ? pickInboundText(p)
       : pickString(p, "caption", "text.caption", "image.caption", "document.caption");
   const textBody = safeString(rawText, TEXT_BODY_MAX);
 
