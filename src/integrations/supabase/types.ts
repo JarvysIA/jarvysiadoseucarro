@@ -1053,6 +1053,7 @@ export type Database = {
           phone_e164: string
           purpose: string
           requested_ip_hash: string | null
+          source: string
           status: string
           updated_at: string
           user_id: string
@@ -1069,6 +1070,7 @@ export type Database = {
           phone_e164: string
           purpose?: string
           requested_ip_hash?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id: string
@@ -1085,6 +1087,7 @@ export type Database = {
           phone_e164?: string
           purpose?: string
           requested_ip_hash?: string | null
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string
@@ -1188,6 +1191,7 @@ export type Database = {
           contact_id: string | null
           created_at: string
           error_message: string | null
+          expires_at: string | null
           id: string
           instance_id: string | null
           max_attempts: number
@@ -1197,6 +1201,7 @@ export type Database = {
           priority: number
           provider: string
           provider_message_id: string | null
+          purpose: string
           scheduled_at: string
           sent_at: string | null
           status: string
@@ -1209,6 +1214,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           error_message?: string | null
+          expires_at?: string | null
           id?: string
           instance_id?: string | null
           max_attempts?: number
@@ -1218,6 +1224,7 @@ export type Database = {
           priority?: number
           provider?: string
           provider_message_id?: string | null
+          purpose?: string
           scheduled_at?: string
           sent_at?: string | null
           status?: string
@@ -1230,6 +1237,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           error_message?: string | null
+          expires_at?: string | null
           id?: string
           instance_id?: string | null
           max_attempts?: number
@@ -1239,6 +1247,7 @@ export type Database = {
           priority?: number
           provider?: string
           provider_message_id?: string | null
+          purpose?: string
           scheduled_at?: string
           sent_at?: string | null
           status?: string
@@ -1389,6 +1398,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      confirm_whatsapp_link_code: {
+        Args: {
+          p_code_hash_candidate: string
+          p_user_id: string
+          p_verification_id: string
+        }
+        Returns: {
+          contact_id: string
+          phone_e164: string
+          result: string
+        }[]
+      }
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
       get_indicacao_dias_bloqueio: { Args: never; Returns: number }
       get_indicacao_saque_minimo: { Args: never; Returns: number }
