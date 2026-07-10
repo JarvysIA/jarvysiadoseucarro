@@ -260,14 +260,50 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               {newPassword.length > 0 && <PasswordChecklist password={newPassword} />}
             </Field>
 
-            <Field label="WhatsApp" icon={<Phone className="h-3.5 w-3.5" />}>
-              <input
-                type="tel"
-                placeholder="(11) 90000-0000"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
-              />
+            <Field label="Celular/WhatsApp" icon={<MessageCircle className="h-3.5 w-3.5" />}>
+              {linkedLoading ? (
+                <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando...
+                </div>
+              ) : linkedContact ? (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm">{maskLinkedPhone(linkedContact.phone_e164)}</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      Vinculado
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    Para alterar o número, será necessário revincular pelo WhatsApp (em breve).
+                  </span>
+                </div>
+              ) : (
+                <WhatsappLinkCard
+                  source="app_settings"
+                  initialPhone={whatsapp}
+                  onLinked={async ({ contactId }) => {
+                    try {
+                      const { data: contact } = await supabase
+                        .from("whatsapp_contacts")
+                        .select("phone_e164")
+                        .eq("id", contactId)
+                        .maybeSingle();
+                      const canonical = (contact as { phone_e164?: string } | null)?.phone_e164;
+                      if (canonical && profile) {
+                        await supabase
+                          .from("profiles")
+                          .update({ whatsapp: canonical })
+                          .eq("id", profile.id);
+                        setWhatsapp(canonical);
+                      }
+                    } catch {
+                      // ignore sync error
+                    }
+                    setLinkedReloadKey((k) => k + 1);
+                    toast.success("WhatsApp vinculado!");
+                  }}
+                />
+              )}
             </Field>
 
             <Field label="CPF" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
