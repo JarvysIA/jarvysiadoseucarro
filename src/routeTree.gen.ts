@@ -18,6 +18,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as MasterAdminRouteImport } from './routes/master-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as DevWaLinkRouteImport } from './routes/dev-wa-link'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CarteiraRouteImport } from './routes/carteira'
@@ -72,6 +73,11 @@ const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevWaLinkRoute = DevWaLinkRouteImport.update({
+  id: '/dev-wa-link',
+  path: '/dev-wa-link',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DespesasRoute = DespesasRouteImport.update({
   id: '/despesas',
   path: '/despesas',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/dev-wa-link': typeof DevWaLinkRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/dev-wa-link': typeof DevWaLinkRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/carteira': typeof CarteiraRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/dev-wa-link': typeof DevWaLinkRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/carteira'
     | '/dashboard'
     | '/despesas'
+    | '/dev-wa-link'
     | '/forgot-password'
     | '/login'
     | '/master-admin'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/carteira'
     | '/dashboard'
     | '/despesas'
+    | '/dev-wa-link'
     | '/forgot-password'
     | '/login'
     | '/master-admin'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/carteira'
     | '/dashboard'
     | '/despesas'
+    | '/dev-wa-link'
     | '/forgot-password'
     | '/login'
     | '/master-admin'
@@ -235,6 +247,7 @@ export interface RootRouteChildren {
   CarteiraRoute: typeof CarteiraRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
+  DevWaLinkRoute: typeof DevWaLinkRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   MasterAdminRoute: typeof MasterAdminRoute
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-wa-link': {
+      id: '/dev-wa-link'
+      path: '/dev-wa-link'
+      fullPath: '/dev-wa-link'
+      preLoaderRoute: typeof DevWaLinkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/despesas': {
@@ -389,6 +409,7 @@ const rootRouteChildren: RootRouteChildren = {
   CarteiraRoute: CarteiraRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
+  DevWaLinkRoute: DevWaLinkRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   MasterAdminRoute: MasterAdminRoute,
@@ -403,13 +424,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
