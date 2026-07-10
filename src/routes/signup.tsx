@@ -280,7 +280,7 @@ function SignupPage() {
       setModalOpen(false);
       setForm({ name: "", email: "", phone: "", password: "", plate: "" });
       toast.success("Conta criada e veículo salvo!");
-      navigate({ to: "/dashboard" });
+      navigate({ to: "/onboarding-whatsapp" });
     } catch (err: any) {
       console.error("[signup] exceção:", err);
       toast.error(`Falha no cadastro: ${err?.message ?? String(err)}`);
