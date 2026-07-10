@@ -126,9 +126,16 @@ Deno.serve(async (req) => {
     return json({ error: "webhook_not_configured" }, 500);
   }
 
+  let querySecret: string | null = null;
+  try {
+    querySecret = new URL(req.url).searchParams.get("secret");
+  } catch {
+    querySecret = null;
+  }
   const receivedSecret =
     req.headers.get("x-webhook-secret") ??
     req.headers.get("x-zapi-webhook-secret") ??
+    querySecret ??
     "";
   if (!receivedSecret || !safeEqual(receivedSecret, expectedSecret)) {
     return json({ error: "Unauthorized" }, 401);
