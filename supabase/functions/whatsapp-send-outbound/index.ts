@@ -48,7 +48,10 @@ type OutboundRow = {
   attempts: number;
   max_attempts: number;
   scheduled_at: string;
+  purpose: string | null;
+  expires_at: string | null;
 };
+
 
 function backoffMinutes(attempts: number): number {
   if (attempts <= 1) return 1;
