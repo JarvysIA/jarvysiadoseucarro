@@ -46,15 +46,32 @@ function pickBool(obj: unknown, ...paths: string[]): boolean {
   return false;
 }
 
+const TEXT_PATHS = [
+  "text.message",
+  "message.text",
+  "data.text",
+  "data.message",
+  "text",
+  "message",
+  "body",
+  "msg",
+  "content",
+] as const;
+
+function pickInboundText(payload: Record<string, unknown>): string | null {
+  return pickString(payload, ...TEXT_PATHS);
+}
+
 function detectMessageType(
   payload: Record<string, unknown>,
   mimeType: string | null,
   mediaUrl: string | null,
 ): WhatsappMessageType {
-  const explicit = pickString(payload, "type", "messageType", "event");
+  // 1) Explicit type hints (ignore generic wrappers like "ReceivedCallback").
+  const explicit = pickString(payload, "messageType", "type", "event");
   if (explicit) {
     const t = explicit.toLowerCase();
-    if (t.includes("image") || t.includes("photo")) return "image";
+    if (t.includes("image") && !t.includes("received")) return "image";
     if (t.includes("pdf")) return "pdf";
     if (t.includes("document")) {
       if (mimeType && mimeType.toLowerCase().includes("pdf")) return "pdf";
@@ -65,6 +82,12 @@ function detectMessageType(
     if (t.includes("system")) return "system";
   }
 
+  // 2) Prioritize real text content BEFORE any media auxiliary check
+  //    (payload.photo is the sender's avatar, not a message attachment).
+  const text = pickInboundText(payload);
+  if (text != null && text.trim() !== "") return "text";
+
+  // 3) Real media MIME type on the message.
   if (mimeType) {
     const m = mimeType.toLowerCase();
     if (m.startsWith("image/")) return "image";
@@ -75,24 +98,16 @@ function detectMessageType(
 
   if (mediaUrl && mediaUrl.toLowerCase().endsWith(".pdf")) return "pdf";
 
-  if (payload.image || payload.photo || (payload as Record<string, unknown>).imageUrl) return "image";
+  // 4) Real media fields on the message. NOTE: payload.photo is intentionally
+  //    excluded — Z-API sends the contact's profile photo/avatar under that
+  //    key, which must never classify a message as image.
+  if (payload.image || (payload as Record<string, unknown>).imageUrl) return "image";
   if (payload.document || payload.file) {
     if (mimeType && mimeType.toLowerCase().includes("pdf")) return "pdf";
     return "file";
   }
   if (payload.audio || payload.voice) return "audio";
   if (payload.video) return "video";
-
-  const text = pickString(
-    payload,
-    "text",
-    "message",
-    "body",
-    "text.message",
-    "message.text",
-    "data.text",
-  );
-  if (text != null) return "text";
 
   return "unknown";
 }
@@ -201,7 +216,7 @@ export function normalizeZapiInbound(payload: unknown): NormalizedWhatsappInboun
 
   const rawText =
     messageType === "text"
-      ? pickString(p, "text", "message", "body", "text.message", "message.text", "data.text")
+      ? pickInboundText(p)
       : pickString(p, "caption", "text.caption", "image.caption", "document.caption");
   const textBody = safeString(rawText, TEXT_BODY_MAX);
 
