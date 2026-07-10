@@ -25,6 +25,7 @@ import { Route as CarteiraRouteImport } from './routes/carteira'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedOnboardingWhatsappRouteImport } from './routes/_authenticated/onboarding-whatsapp'
 import { Route as AuthenticatedAdminCorpusSmokeRouteImport } from './routes/_authenticated/admin-corpus-smoke'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
 
@@ -107,6 +108,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedOnboardingWhatsappRoute =
+  AuthenticatedOnboardingWhatsappRouteImport.update({
+    id: '/onboarding-whatsapp',
+    path: '/onboarding-whatsapp',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminCorpusSmokeRoute =
   AuthenticatedAdminCorpusSmokeRouteImport.update({
     id: '/admin-corpus-smoke',
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
+  '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesByTo {
@@ -156,6 +164,7 @@ export interface FileRoutesByTo {
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
+  '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesById {
@@ -177,6 +186,7 @@ export interface FileRoutesById {
   '/splash': typeof SplashRoute
   '/welcome': typeof WelcomeRoute
   '/_authenticated/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
+  '/_authenticated/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRouteTypes {
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/splash'
     | '/welcome'
     | '/admin-corpus-smoke'
+    | '/onboarding-whatsapp'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/splash'
     | '/welcome'
     | '/admin-corpus-smoke'
+    | '/onboarding-whatsapp'
     | '/api/public/hooks/fipe-monthly-refresh'
   id:
     | '__root__'
@@ -237,6 +249,7 @@ export interface FileRouteTypes {
     | '/splash'
     | '/welcome'
     | '/_authenticated/admin-corpus-smoke'
+    | '/_authenticated/onboarding-whatsapp'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesById: FileRoutesById
 }
@@ -374,6 +387,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/onboarding-whatsapp': {
+      id: '/_authenticated/onboarding-whatsapp'
+      path: '/onboarding-whatsapp'
+      fullPath: '/onboarding-whatsapp'
+      preLoaderRoute: typeof AuthenticatedOnboardingWhatsappRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin-corpus-smoke': {
       id: '/_authenticated/admin-corpus-smoke'
       path: '/admin-corpus-smoke'
@@ -393,10 +413,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminCorpusSmokeRoute: typeof AuthenticatedAdminCorpusSmokeRoute
+  AuthenticatedOnboardingWhatsappRoute: typeof AuthenticatedOnboardingWhatsappRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminCorpusSmokeRoute: AuthenticatedAdminCorpusSmokeRoute,
+  AuthenticatedOnboardingWhatsappRoute: AuthenticatedOnboardingWhatsappRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -424,13 +446,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

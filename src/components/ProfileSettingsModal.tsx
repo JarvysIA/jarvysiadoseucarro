@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, Phone, ShieldCheck, User as UserIcon, Wallet } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
+import { WhatsappLinkCard } from "@/components/WhatsappLinkCard";
 
 type Props = {
   open: boolean;
@@ -36,6 +37,17 @@ function maskCep(v: string): string {
   return `${d.slice(0, 5)}-${d.slice(5)}`;
 }
 
+function maskLinkedPhone(phoneE164: string): string {
+  if (!phoneE164) return "";
+  const digits = phoneE164.replace(/\D/g, "");
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length < 4) return phoneE164;
+  const dd = local.slice(0, 2);
+  const tail = local.slice(-4);
+  const middleLen = Math.max(0, local.length - 2 - 4);
+  return `(${dd}) ${"*".repeat(middleLen)}${tail}`;
+}
+
 export function ProfileSettingsModal({ open, onClose }: Props) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -50,6 +62,9 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [pixRecebimento, setPixRecebimento] = useState("");
   const [cpf, setCpf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+  const [linkedContact, setLinkedContact] = useState<{ id: string; phone_e164: string } | null>(null);
+  const [linkedLoading, setLinkedLoading] = useState(true);
+  const [linkedReloadKey, setLinkedReloadKey] = useState(0);
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +100,41 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
     };
   }, [open]);
 
+  // Carrega o contato WhatsApp ativo (vínculo) do usuário — RLS.
+  useEffect(() => {
+    if (!open) return;
+    let cancel = false;
+    (async () => {
+      setLinkedLoading(true);
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess.session?.user.id;
+      if (!userId) {
+        if (!cancel) {
+          setLinkedContact(null);
+          setLinkedLoading(false);
+        }
+        return;
+      }
+      const { data } = await supabase
+        .from("whatsapp_contacts")
+        .select("id, phone_e164, verified_at, unlinked_at, opt_out")
+        .eq("user_id", userId)
+        .is("unlinked_at", null)
+        .not("verified_at", "is", null)
+        .eq("opt_out", false)
+        .order("is_primary", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancel) return;
+      const row = data as { id: string; phone_e164: string } | null;
+      setLinkedContact(row ?? null);
+      setLinkedLoading(false);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [open, linkedReloadKey]);
+
   // Lookup automático e silencioso no ViaCEP quando 8 dígitos completos.
   useEffect(() => {
     const digits = cep.replace(/\D/g, "");
@@ -119,7 +169,6 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
     try {
       const cepDigits = cep.replace(/\D/g, "") || null;
       const updates: {
-        whatsapp: string;
         cep: string | null;
         cidade: string | null;
         uf: string | null;
@@ -127,7 +176,6 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         pix_recebimento: string | null;
         cpf: string | null;
       } = {
-        whatsapp: whatsapp.trim(),
         cep: cepDigits,
         cidade: cidade.trim() || null,
         uf: uf.trim().toUpperCase().slice(0, 2) || null,
@@ -223,14 +271,50 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
               {newPassword.length > 0 && <PasswordChecklist password={newPassword} />}
             </Field>
 
-            <Field label="WhatsApp" icon={<Phone className="h-3.5 w-3.5" />}>
-              <input
-                type="tel"
-                placeholder="(11) 90000-0000"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
-              />
+            <Field label="Celular/WhatsApp" icon={<MessageCircle className="h-3.5 w-3.5" />}>
+              {linkedLoading ? (
+                <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando...
+                </div>
+              ) : linkedContact ? (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm">{maskLinkedPhone(linkedContact.phone_e164)}</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      Vinculado
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    Para alterar o número, será necessário revincular pelo WhatsApp (em breve).
+                  </span>
+                </div>
+              ) : (
+                <WhatsappLinkCard
+                  source="app_settings"
+                  initialPhone={whatsapp}
+                  onLinked={async ({ contactId }) => {
+                    try {
+                      const { data: contact } = await supabase
+                        .from("whatsapp_contacts")
+                        .select("phone_e164")
+                        .eq("id", contactId)
+                        .maybeSingle();
+                      const canonical = (contact as { phone_e164?: string } | null)?.phone_e164;
+                      if (canonical && profile) {
+                        await supabase
+                          .from("profiles")
+                          .update({ whatsapp: canonical })
+                          .eq("id", profile.id);
+                        setWhatsapp(canonical);
+                      }
+                    } catch {
+                      // ignore sync error
+                    }
+                    setLinkedReloadKey((k) => k + 1);
+                    toast.success("WhatsApp vinculado!");
+                  }}
+                />
+              )}
             </Field>
 
             <Field label="CPF" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
