@@ -37,6 +37,17 @@ function maskCep(v: string): string {
   return `${d.slice(0, 5)}-${d.slice(5)}`;
 }
 
+function maskLinkedPhone(phoneE164: string): string {
+  if (!phoneE164) return "";
+  const digits = phoneE164.replace(/\D/g, "");
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  if (local.length < 4) return phoneE164;
+  const dd = local.slice(0, 2);
+  const tail = local.slice(-4);
+  const middleLen = Math.max(0, local.length - 2 - 4);
+  return `(${dd}) ${"*".repeat(middleLen)}${tail}`;
+}
+
 export function ProfileSettingsModal({ open, onClose }: Props) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
