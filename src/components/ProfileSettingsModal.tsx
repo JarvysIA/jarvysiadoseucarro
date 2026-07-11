@@ -298,7 +298,25 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                       </span>
                     )}
                   </div>
-                  {linkedContact.opt_out ? (
+
+                  {changeNumberOpen ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="rounded-md border border-border bg-muted/40 px-2 py-2 text-[11px] text-muted-foreground">
+                        Enviaremos um código para o novo número. Seu WhatsApp atual continuará funcionando até a confirmação.
+                      </p>
+                      <WhatsappLinkCard
+                        source="change_number"
+                        initialPhone=""
+                        allowSkip={false}
+                        onPhoneChanged={() => {
+                          setChangeNumberOpen(false);
+                          setLinkedReloadKey((k) => k + 1);
+                          toast.success("Número do WhatsApp alterado com sucesso.");
+                        }}
+                        onCancel={() => setChangeNumberOpen(false)}
+                      />
+                    </div>
+                  ) : linkedContact.opt_out ? (
                     <>
                       <p className="text-[11px] text-muted-foreground">
                         Você não está recebendo mensagens do Jarvys neste número. Seu vínculo continua ativo.
@@ -336,12 +354,27 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                         )}
                         Reativar WhatsApp
                       </button>
+                      <button
+                        type="button"
+                        disabled={waActionBusy}
+                        onClick={() => setChangeNumberOpen(true)}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium text-muted-foreground disabled:opacity-50"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Alterar número
+                      </button>
                     </>
                   ) : (
                     <>
-                      <p className="text-[11px] text-muted-foreground">
-                        Para alterar o número, será necessário revincular pelo WhatsApp (em breve).
-                      </p>
+                      <button
+                        type="button"
+                        disabled={waActionBusy}
+                        onClick={() => setChangeNumberOpen(true)}
+                        className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Alterar número
+                      </button>
                       <button
                         type="button"
                         disabled={waActionBusy}
@@ -385,18 +418,20 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                   initialPhone={whatsapp}
                   onLinked={async ({ contactId }) => {
                     try {
-                      const { data: contact } = await supabase
-                        .from("whatsapp_contacts")
-                        .select("phone_e164")
-                        .eq("id", contactId)
-                        .maybeSingle();
-                      const canonical = (contact as { phone_e164?: string } | null)?.phone_e164;
-                      if (canonical && profile) {
-                        await supabase
-                          .from("profiles")
-                          .update({ whatsapp: canonical })
-                          .eq("id", profile.id);
-                        setWhatsapp(canonical);
+                      if (contactId) {
+                        const { data: contact } = await supabase
+                          .from("whatsapp_contacts")
+                          .select("phone_e164")
+                          .eq("id", contactId)
+                          .maybeSingle();
+                        const canonical = (contact as { phone_e164?: string } | null)?.phone_e164;
+                        if (canonical && profile) {
+                          await supabase
+                            .from("profiles")
+                            .update({ whatsapp: canonical })
+                            .eq("id", profile.id);
+                          setWhatsapp(canonical);
+                        }
                       }
                     } catch {
                       // ignore sync error
@@ -407,6 +442,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 />
               )}
             </Field>
+
 
             <Field label="CPF" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
               <input
