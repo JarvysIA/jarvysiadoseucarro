@@ -95,11 +95,14 @@ export function WhatsappLinkCard({
   initialPhone,
   allowSkip = false,
   onLinked,
+  onPhoneChanged,
   onSkip,
   onCancel,
 }: Props) {
+  const isChangeNumber = source === "change_number";
   const requestFn = useServerFn(requestWhatsappLinkCodeFn);
   const confirmFn = useServerFn(confirmWhatsappLinkCodeFn);
+  const confirmChangeFn = useServerFn(confirmWhatsappPhoneChangeFn);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [phone, setPhone] = useState<string>(() => toDisplayFromStored(initialPhone));
