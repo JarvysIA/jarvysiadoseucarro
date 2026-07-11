@@ -129,13 +129,12 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         .eq("user_id", userId)
         .is("unlinked_at", null)
         .not("verified_at", "is", null)
-        .eq("opt_out", false)
         .order("is_primary", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (cancel) return;
-      const row = data as { id: string; phone_e164: string } | null;
-      setLinkedContact(row ?? null);
+      const row = data as { id: string; phone_e164: string; opt_out: boolean | null } | null;
+      setLinkedContact(row ? { id: row.id, phone_e164: row.phone_e164, opt_out: row.opt_out === true } : null);
       setLinkedLoading(false);
     })();
     return () => {
