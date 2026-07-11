@@ -6,6 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
+import {
+  runWhatsappOrchestratorShadow,
+  type SupabaseLike as ShadowSupabaseLike,
+} from "../_shared/whatsapp/orchestrator/shadow.ts";
 
 const PROVIDER_DEFAULT = "zapi" as const;
 const MAX_BATCH = 10;
