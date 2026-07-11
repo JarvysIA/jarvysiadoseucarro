@@ -12,9 +12,13 @@
 // o contrato de runtime.
 
 import type {
+  ActiveVehicleIssue,
   ApplyReasonCode,
   ClaimInput,
   ClaimedItem,
+  ConversationContext,
+  LoadContextReasonCode,
+  LoadContextResult,
   OrchestratorResultOk,
   ReleaseInput,
   ReleaseReasonCode,
@@ -23,7 +27,12 @@ import type {
   TransitionOptions,
   TransitionResult,
 } from "./types.ts";
-import type { ConversationStatePatch } from "../conversation/types.ts";
+import type {
+  ConversationState,
+  ConversationStateName,
+  ConversationStatePatch,
+  ConversationVehicle,
+} from "../conversation/types.ts";
 import {
   AmbiguousTimeoutError,
   MalformedResponseError,
@@ -34,8 +43,7 @@ import {
 } from "./errors.ts";
 
 // ============================================================
-// Structural client — evita acoplar a supabase-js@X.Y.Z. Basta expor .rpc().
-// Em produção o caller passa `createClient(...)` normal. Em testes, um mock.
+// Structural client — evita acoplar a supabase-js@X.Y.Z. Expõe .rpc() e .from().
 // ============================================================
 
 export type RpcResponse<T> = {
@@ -56,8 +64,35 @@ export type RpcInvoker = <T = unknown>(
   options?: { signal?: AbortSignal },
 ) => Promise<RpcResponse<T>>;
 
+/**
+ * Builder mínimo compatível com PostgREST/supabase-js. Suporta apenas o
+ * subconjunto usado por loadContext: select + eq encadeados, finalizados por
+ * maybeSingle() (uma linha) ou aguardando a promise diretamente (lista).
+ */
+export type SupabaseSelectResult = {
+  data: Record<string, unknown>[] | null;
+  error: RpcError | null;
+};
+
+export type SupabaseMaybeSingleResult = {
+  data: Record<string, unknown> | null;
+  error: RpcError | null;
+};
+
+export type SupabaseSelectBuilder = PromiseLike<SupabaseSelectResult> & {
+  eq: (column: string, value: unknown) => SupabaseSelectBuilder;
+  maybeSingle: () => Promise<SupabaseMaybeSingleResult>;
+};
+
+export type SupabaseFromBuilder = {
+  select: (columns: string) => SupabaseSelectBuilder;
+};
+
 export type SupabaseLike = {
   rpc: RpcInvoker;
+  // Opcional apenas para não quebrar callers/tests que só exercitam RPCs.
+  // loadContext lança RepositoryError se este método não for fornecido.
+  from?: (table: string) => SupabaseFromBuilder;
 };
 
 // ============================================================
