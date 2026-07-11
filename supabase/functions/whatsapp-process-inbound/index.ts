@@ -91,6 +91,7 @@ type MessageRow = {
   vehicle_id: string | null;
   provider: string | null;
   instance_id: string | null;
+  direction: string | null;
   message_type: string;
   text_body: string | null;
   media_url: string | null;
