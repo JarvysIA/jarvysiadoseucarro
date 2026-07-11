@@ -383,7 +383,7 @@ describe("claim", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const items = await repo.claim({ workerId: "w1" });
+    const items = await repo.claimItems({ workerId: "w1" });
     expect(items.length).toBe(1);
     expect(items[0].queueId).toBe("q1");
     expect(items[0].orchestratorMode).toBe("active");
@@ -393,7 +393,7 @@ describe("claim", () => {
   test("data null → []", async () => {
     const client = makeClient(async () => ({ data: null, error: null }));
     const repo = new WhatsappOrchestratorRepository(client);
-    expect(await repo.claim({ workerId: "w1" })).toEqual([]);
+    expect(await repo.claimItems({ workerId: "w1" })).toEqual([]);
   });
 
   test("orchestrator_mode inválido → MalformedResponseError", async () => {
@@ -411,7 +411,7 @@ describe("claim", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    await expect(repo.claim({ workerId: "w1" })).rejects.toBeInstanceOf(MalformedResponseError);
+    await expect(repo.claimItems({ workerId: "w1" })).rejects.toBeInstanceOf(MalformedResponseError);
   });
 });
 
@@ -426,7 +426,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "transient",
@@ -446,7 +446,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "transient",
@@ -464,7 +464,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "x",
@@ -486,7 +486,7 @@ describe("release", () => {
     });
     const repo = new WhatsappOrchestratorRepository(client, { defaultTimeoutMs: 10 });
     await expect(
-      repo.release({
+      repo.releaseItem({
         queueItemId: "q",
         leaseToken: "l",
         reason: "x",
