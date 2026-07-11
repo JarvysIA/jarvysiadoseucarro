@@ -20,7 +20,7 @@ import {
   buildLinkCodeMessage,
 } from "@/lib/whatsapp-link.server";
 
-type LinkSource = "onboarding" | "app_settings";
+type LinkSource = "onboarding" | "app_settings" | "change_number";
 
 type RequestInput = {
   phone: string;
@@ -43,6 +43,8 @@ type ErrorCode =
   | "phone_conflict"
   | "user_has_other_active"
   | "already_linked"
+  | "no_active_contact"
+  | "same_phone"
   | "no_instance_available"
   | "internal_error";
 
@@ -62,7 +64,7 @@ function validateInput(input: unknown): RequestInput | null {
   const source = raw.source;
   if (typeof phone !== "string" || phone.length === 0 || phone.length > 40) return null;
   if (consent !== true) return null;
-  if (source !== "onboarding" && source !== "app_settings") return null;
+  if (source !== "onboarding" && source !== "app_settings" && source !== "change_number") return null;
   return {
     phone,
     consentGeneralAccepted: true,
