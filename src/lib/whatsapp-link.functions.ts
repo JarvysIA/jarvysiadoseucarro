@@ -20,7 +20,7 @@ import {
   buildLinkCodeMessage,
 } from "@/lib/whatsapp-link.server";
 
-type LinkSource = "onboarding" | "app_settings";
+type LinkSource = "onboarding" | "app_settings" | "change_number";
 
 type RequestInput = {
   phone: string;
@@ -43,6 +43,8 @@ type ErrorCode =
   | "phone_conflict"
   | "user_has_other_active"
   | "already_linked"
+  | "no_active_contact"
+  | "same_phone"
   | "no_instance_available"
   | "internal_error";
 
@@ -62,7 +64,7 @@ function validateInput(input: unknown): RequestInput | null {
   const source = raw.source;
   if (typeof phone !== "string" || phone.length === 0 || phone.length > 40) return null;
   if (consent !== true) return null;
-  if (source !== "onboarding" && source !== "app_settings") return null;
+  if (source !== "onboarding" && source !== "app_settings" && source !== "change_number") return null;
   return {
     phone,
     consentGeneralAccepted: true,
@@ -100,6 +102,7 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1) Conflitos ---------------------------------------------------------
+    // phone_conflict é aplicado para todos os sources: telefone ativo em OUTRA conta.
     const { data: activeSamePhoneOther, error: otherErr } = await supabaseAdmin
       .from("whatsapp_contacts")
       .select("id, user_id")
@@ -116,28 +119,48 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       return { ok: false, error: "phone_conflict" };
     }
 
+    // Contatos ativos do usuário — necessário para as duas ramificações.
     const { data: userActiveContacts, error: userActiveErr } = await supabaseAdmin
       .from("whatsapp_contacts")
-      .select("id, phone_e164, opt_out")
+      .select("id, phone_e164, opt_out, verified_at")
       .eq("user_id", userId)
       .is("unlinked_at", null);
     if (userActiveErr) {
       logInfo({ user_id: userId, phone: phoneMasked, status: "error", error_code: "user_active_lookup" });
       return { ok: false, error: "internal_error" };
     }
-    const otherActive = (userActiveContacts ?? []).find((c) => c.phone_e164 !== phoneE164);
-    if (otherActive) {
-      logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "user_has_other_active" });
-      return { ok: false, error: "user_has_other_active" };
-    }
-    const sameActive = (userActiveContacts ?? []).find((c) => c.phone_e164 === phoneE164);
-    let purpose: "link" | "reactivate" = "link";
-    if (sameActive) {
-      if (sameActive.opt_out === true && source === "app_settings") {
-        purpose = "reactivate";
-      } else {
-        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "already_linked" });
-        return { ok: false, error: "already_linked" };
+
+    let purpose: "link" | "reactivate" | "relink" = "link";
+    let sameActive: { id: string; phone_e164: string; opt_out: boolean | null; verified_at: string | null } | undefined;
+
+    if (source === "change_number") {
+      // Ramo change_number: exatamente 1 contato ativo/verificado; novo != atual.
+      const verifiedActive = (userActiveContacts ?? []).filter((c) => c.verified_at != null);
+      if (verifiedActive.length !== 1) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "no_active_contact" });
+        return { ok: false, error: "no_active_contact" };
+      }
+      const current = verifiedActive[0];
+      if (current.phone_e164 === phoneE164) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "same_phone" });
+        return { ok: false, error: "same_phone" };
+      }
+      purpose = "relink";
+    } else {
+      // Ramos onboarding / app_settings: comportamento original preservado.
+      const otherActive = (userActiveContacts ?? []).find((c) => c.phone_e164 !== phoneE164);
+      if (otherActive) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "user_has_other_active" });
+        return { ok: false, error: "user_has_other_active" };
+      }
+      sameActive = (userActiveContacts ?? []).find((c) => c.phone_e164 === phoneE164);
+      if (sameActive) {
+        if (sameActive.opt_out === true && source === "app_settings") {
+          purpose = "reactivate";
+        } else {
+          logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "already_linked" });
+          return { ok: false, error: "already_linked" };
+        }
       }
     }
 
@@ -215,13 +238,24 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       return { ok: false, error: "no_instance_available" };
     }
 
-    // 4) Cancela pendings anteriores do mesmo par (par válido, mesmo user).
-    await supabaseAdmin
-      .from("whatsapp_link_verifications")
-      .update({ status: "cancelled" })
-      .eq("user_id", userId)
-      .eq("phone_e164", phoneE164)
-      .eq("status", "pending");
+    // 4) Cancela pendings anteriores.
+    if (purpose === "relink") {
+      // change_number: cancela qualquer pending relink do usuário (respeita índice uq_wlv_pending_relink_per_user).
+      await supabaseAdmin
+        .from("whatsapp_link_verifications")
+        .update({ status: "cancelled" })
+        .eq("user_id", userId)
+        .eq("purpose", "relink")
+        .eq("status", "pending");
+    } else {
+      // onboarding / app_settings: cancela pendings do mesmo par (user, phone).
+      await supabaseAdmin
+        .from("whatsapp_link_verifications")
+        .update({ status: "cancelled" })
+        .eq("user_id", userId)
+        .eq("phone_e164", phoneE164)
+        .eq("status", "pending");
+    }
 
     // 5) Gera código e cria verification ----------------------------------
     const verificationId = newVerificationId();
@@ -510,4 +544,141 @@ export const reactivateWhatsappContactFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OptOutOutput> => {
     return runOptRpc("reactivate_whatsapp_contact", context.userId);
+  });
+
+// ============================================================================
+// Build 5.7E2B — confirmWhatsappPhoneChangeFn
+// ----------------------------------------------------------------------------
+// Confirma troca segura de número: reusa hashLinkCode (mesmo helper do request)
+// e delega toda a mutação para a RPC transacional confirm_whatsapp_phone_change.
+// Nunca escreve diretamente em whatsapp_contacts, whatsapp_consents, profiles,
+// whatsapp_provider_instances ou whatsapp_outbound_queue. Nunca inicia trial.
+// Nunca altera capabilities. Nunca loga code, hash, pepper ou telefone completo.
+// ============================================================================
+
+type PhoneChangeSuccess = {
+  ok: true;
+  newContactId: string;
+  oldContactId: string;
+  phoneMasked: string;
+};
+type PhoneChangeReason =
+  | "invalid_or_expired"
+  | "blocked"
+  | "phone_conflict"
+  | "no_active_contact"
+  | "same_phone"
+  | "no_instance_available"
+  | "internal_error";
+type PhoneChangeFailure = { ok: false; reason: PhoneChangeReason };
+type PhoneChangeOutput = PhoneChangeSuccess | PhoneChangeFailure;
+
+function logPhoneChange(payload: Record<string, unknown>) {
+  console.log(JSON.stringify({ tag: "whatsapp-phone-change-confirm", ...payload }));
+}
+
+function validatePhoneChangeInput(input: unknown): ConfirmInput | null {
+  // Reutiliza os mesmos regex/validações do confirmWhatsappLinkCodeFn.
+  return validateConfirmInput(input);
+}
+
+export const confirmWhatsappPhoneChangeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown): ConfirmInput | { __invalid: true } => {
+    const ok = validatePhoneChangeInput(input);
+    if (!ok) return { __invalid: true };
+    return ok;
+  })
+  .handler(async ({ data, context }): Promise<PhoneChangeOutput> => {
+    const { userId } = context;
+    const t0 = Date.now();
+
+    if ((data as { __invalid?: boolean }).__invalid) {
+      logPhoneChange({ user_id: userId, result: "invalid_or_expired", error_code: "invalid_input", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "invalid_or_expired" };
+    }
+    const { verificationId, code } = data as ConfirmInput;
+
+    const pepper = process.env.WHATSAPP_LINK_PEPPER;
+    if (!pepper) {
+      logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "pepper_missing", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
+
+    const codeHashCandidate = hashLinkCode(pepper, verificationId, code);
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: rows, error } = await supabaseAdmin.rpc(
+        "confirm_whatsapp_phone_change",
+        {
+          p_user_id: userId,
+          p_verification_id: verificationId,
+          p_code_hash_candidate: codeHashCandidate,
+        },
+      );
+
+      if (error) {
+        console.error("[whatsapp-phone-change-confirm] rpc_error detail", {
+          message: error.message,
+          code: (error as { code?: string }).code,
+        });
+        logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: "internal_error" };
+      }
+
+      const row = Array.isArray(rows)
+        ? rows[0]
+        : (rows as unknown as {
+            result?: string;
+            new_contact_id?: string | null;
+            old_contact_id?: string | null;
+            new_phone_e164?: string | null;
+          } | null);
+      if (!row || typeof row.result !== "string") {
+        logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "empty_result", elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: "internal_error" };
+      }
+
+      const knownReasons: PhoneChangeReason[] = [
+        "invalid_or_expired",
+        "blocked",
+        "phone_conflict",
+        "no_active_contact",
+        "same_phone",
+        "no_instance_available",
+      ];
+
+      if (row.result === "ok") {
+        const newContactId = row.new_contact_id ?? "";
+        const oldContactId = row.old_contact_id ?? "";
+        const newPhone = row.new_phone_e164 ?? "";
+        if (!newContactId || !oldContactId || !newPhone) {
+          logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "missing_ok_fields", elapsed_ms: Date.now() - t0 });
+          return { ok: false, reason: "internal_error" };
+        }
+        const phoneMasked = maskPhone(newPhone);
+        logPhoneChange({
+          user_id: userId,
+          verification_id: verificationId,
+          result: "ok",
+          old_contact_id: oldContactId,
+          new_contact_id: newContactId,
+          phone: phoneMasked,
+          elapsed_ms: Date.now() - t0,
+        });
+        return { ok: true, newContactId, oldContactId, phoneMasked };
+      }
+
+      if ((knownReasons as string[]).includes(row.result)) {
+        logPhoneChange({ user_id: userId, verification_id: verificationId, result: row.result, elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: row.result as PhoneChangeReason };
+      }
+
+      logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "unknown_rpc_result", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    } catch {
+      logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "exception", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
   });
