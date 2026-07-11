@@ -1410,6 +1410,19 @@ export type Database = {
           result: string
         }[]
       }
+      confirm_whatsapp_phone_change: {
+        Args: {
+          p_code_hash_candidate: string
+          p_user_id: string
+          p_verification_id: string
+        }
+        Returns: {
+          new_contact_id: string
+          new_phone_e164: string
+          old_contact_id: string
+          result: string
+        }[]
+      }
       disable_whatsapp_messages: {
         Args: { p_user_id: string }
         Returns: {
