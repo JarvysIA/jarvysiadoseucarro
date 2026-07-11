@@ -71,6 +71,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [linkedLoading, setLinkedLoading] = useState(true);
   const [linkedReloadKey, setLinkedReloadKey] = useState(0);
   const [waActionBusy, setWaActionBusy] = useState(false);
+  const [changeNumberOpen, setChangeNumberOpen] = useState(false);
   const disableWaFn = useServerFn(disableWhatsappMessagesFn);
   const reactivateWaFn = useServerFn(reactivateWhatsappContactFn);
 
