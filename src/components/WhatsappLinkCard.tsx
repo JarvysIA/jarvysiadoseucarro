@@ -8,16 +8,22 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   requestWhatsappLinkCodeFn,
   confirmWhatsappLinkCodeFn,
+  confirmWhatsappPhoneChangeFn,
 } from "@/lib/whatsapp-link.functions";
 import { normalizeBrazilPhoneToE164, isLikelyE164 } from "@/lib/whatsapp/phone";
 
-export type WhatsappLinkSource = "onboarding" | "app_settings";
+export type WhatsappLinkSource = "onboarding" | "app_settings" | "change_number";
 
 type Props = {
   source: WhatsappLinkSource;
   initialPhone?: string;
   allowSkip?: boolean;
-  onLinked?: (result: { contactId: string }) => void;
+  onLinked?: (result: { contactId?: string }) => void;
+  onPhoneChanged?: (result: {
+    newContactId: string;
+    oldContactId: string;
+    phoneMasked: string;
+  }) => void;
   onSkip?: () => void;
   onCancel?: () => void;
 };
