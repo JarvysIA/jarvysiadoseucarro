@@ -6,6 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
+import {
+  runWhatsappOrchestratorShadow,
+  type SupabaseLike as ShadowSupabaseLike,
+} from "../_shared/whatsapp/orchestrator/shadow.ts";
 
 const PROVIDER_DEFAULT = "zapi" as const;
 const MAX_BATCH = 10;
@@ -87,6 +91,7 @@ type MessageRow = {
   vehicle_id: string | null;
   provider: string | null;
   instance_id: string | null;
+  direction: string | null;
   message_type: string;
   text_body: string | null;
   media_url: string | null;
@@ -313,7 +318,7 @@ async function processItem(
   const { data: msgData, error: msgErr } = await supabase
     .from("whatsapp_messages")
     .select(
-      "id, user_id, contact_id, vehicle_id, provider, instance_id, message_type, text_body, media_url, media_mime_type, status",
+      "id, user_id, contact_id, vehicle_id, provider, instance_id, direction, message_type, text_body, media_url, media_mime_type, status",
     )
     .eq("id", item.message_id)
     .maybeSingle();
@@ -334,6 +339,50 @@ async function processItem(
   const finalQueueType = reevaluateQueueType(item.queue_type, msg.message_type, msg.text_body);
   const linked = !!(msg.user_id && msg.contact_id);
   const log = { ...baseLog, message_id: msg.id, message_type: msg.message_type, queue_type: finalQueueType, phone: maskPhone(phone) };
+
+  // 0) Shadow passivo do orquestrador (Build 5.7F2C1).
+  //    Fail-open: exception/timeout NUNCA interrompe o fluxo legado abaixo.
+  //    Gate local para evitar consultas em casos claramente inelegíveis.
+  if (
+    msg.direction === "inbound" &&
+    msg.message_type === "text" &&
+    msg.contact_id &&
+    msg.user_id &&
+    msg.provider &&
+    msg.instance_id &&
+    !looksLikeOptOut(msg.text_body)
+  ) {
+    try {
+      await runWhatsappOrchestratorShadow(
+        {
+          queueItemId: item.id,
+          userId: msg.user_id,
+          message: {
+            id: msg.id,
+            contactId: msg.contact_id,
+            provider: msg.provider,
+            instanceId: msg.instance_id,
+            direction: "inbound",
+            messageType: "text",
+            textBody: msg.text_body ?? "",
+          },
+          now: new Date().toISOString(),
+        },
+        { supabase: supabase as unknown as ShadowSupabaseLike },
+      );
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          tag: "whatsapp_orchestrator_shadow",
+          queueItemId: item.id,
+          messageId: msg.id,
+          status: "failed",
+          errorCategory: "hook_threw",
+        }),
+      );
+      void err;
+    }
+  }
 
   // 1) OPT-OUT
   if (msg.message_type === "text" && looksLikeOptOut(msg.text_body)) {
