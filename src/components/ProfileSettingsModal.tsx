@@ -284,16 +284,99 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando...
                 </div>
               ) : linkedContact ? (
-                <div className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2">
+                <div className="flex flex-col gap-3 rounded-md border border-border bg-background px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-sm">{maskLinkedPhone(linkedContact.phone_e164)}</span>
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                      Vinculado
-                    </span>
+                    {linkedContact.opt_out ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Mensagens desativadas
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                        WhatsApp vinculado
+                      </span>
+                    )}
                   </div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Para alterar o número, será necessário revincular pelo WhatsApp (em breve).
-                  </span>
+                  {linkedContact.opt_out ? (
+                    <>
+                      <p className="text-[11px] text-muted-foreground">
+                        Você não está recebendo mensagens do Jarvys neste número. Seu vínculo continua ativo.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={waActionBusy}
+                        onClick={async () => {
+                          setWaActionBusy(true);
+                          try {
+                            const r = await reactivateWaFn({});
+                            if ((r as { ok?: boolean }).ok) {
+                              toast.success("Mensagens do WhatsApp reativadas.");
+                              setLinkedReloadKey((k) => k + 1);
+                            } else {
+                              const reason = (r as { reason?: string }).reason;
+                              toast.error(
+                                reason === "no_active_contact"
+                                  ? "Não encontramos um WhatsApp vinculado."
+                                  : "Não foi possível reativar agora. Tente novamente.",
+                              );
+                            }
+                          } catch {
+                            toast.error("Não foi possível reativar agora. Tente novamente.");
+                          } finally {
+                            setWaActionBusy(false);
+                          }
+                        }}
+                        className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        {waActionBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <BellRing className="h-3.5 w-3.5" />
+                        )}
+                        Reativar WhatsApp
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-muted-foreground">
+                        Para alterar o número, será necessário revincular pelo WhatsApp (em breve).
+                      </p>
+                      <button
+                        type="button"
+                        disabled={waActionBusy}
+                        onClick={async () => {
+                          if (!confirm("Deixar de receber mensagens do Jarvys neste WhatsApp? Seu número continuará vinculado à conta.")) return;
+                          setWaActionBusy(true);
+                          try {
+                            const r = await disableWaFn({});
+                            if ((r as { ok?: boolean }).ok) {
+                              toast.success("Mensagens do WhatsApp desativadas.");
+                              setLinkedReloadKey((k) => k + 1);
+                            } else {
+                              const reason = (r as { reason?: string }).reason;
+                              toast.error(
+                                reason === "no_active_contact"
+                                  ? "Não encontramos um WhatsApp vinculado."
+                                  : "Não foi possível desativar agora. Tente novamente.",
+                              );
+                            }
+                          } catch {
+                            toast.error("Não foi possível desativar agora. Tente novamente.");
+                          } finally {
+                            setWaActionBusy(false);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium text-muted-foreground disabled:opacity-50"
+                      >
+                        {waActionBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <BellOff className="h-3.5 w-3.5" />
+                        )}
+                        Desativar mensagens
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <WhatsappLinkCard
