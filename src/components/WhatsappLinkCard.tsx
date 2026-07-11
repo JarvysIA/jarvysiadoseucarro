@@ -48,6 +48,8 @@ const REQUEST_ERROR_COPY: Record<string, string> = {
   phone_conflict: "Este número já está vinculado a outra conta Jarvys.",
   user_has_other_active: "Você já tem outro número vinculado.",
   already_linked: "Este número já está vinculado à sua conta.",
+  no_active_contact: "Não encontramos um vínculo ativo para alterar.",
+  same_phone: "Informe um número diferente do atual.",
   no_instance_available:
     "O WhatsApp Jarvys está temporariamente indisponível. Tente novamente em alguns minutos.",
   internal_error: "Não foi possível concluir agora. Tente novamente.",
@@ -58,9 +60,16 @@ const CONFIRM_ERROR_COPY: Record<string, string> = {
   blocked: "Limite de tentativas atingido. Solicite um novo código.",
   phone_conflict: "Este número já está vinculado a outra conta Jarvys.",
   user_has_other_active: "Você já tem outro número vinculado.",
+  no_active_contact: "Não encontramos um vínculo ativo para alterar.",
+  same_phone: "Informe um número diferente do atual.",
   no_instance_available:
     "O WhatsApp Jarvys está temporariamente indisponível. Tente novamente em alguns minutos.",
   internal_error: "Não foi possível concluir agora. Tente novamente.",
+};
+
+const CHANGE_NUMBER_ERROR_COPY: Record<string, string> = {
+  ...CONFIRM_ERROR_COPY,
+  internal_error: "Não foi possível alterar o número agora. Tente novamente.",
 };
 
 function formatBrPhoneInput(raw: string): string {
