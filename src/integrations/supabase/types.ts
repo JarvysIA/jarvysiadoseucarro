@@ -1626,6 +1626,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_whatsapp_orchestrator_items: {
+        Args: {
+          p_batch?: number
+          p_lease_seconds?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempts: number
+          contact_id: string
+          instance_id: string
+          instance_pk: string
+          lease_expires_at: string
+          lease_token: string
+          max_attempts: number
+          message_id: string
+          message_type: string
+          orchestrator_mode: string
+          provider: string
+          queue_id: string
+          queue_type: string
+          user_id: string
+          was_recovered: boolean
+        }[]
+      }
       confirm_whatsapp_link_code: {
         Args: {
           p_code_hash_candidate: string
@@ -1696,6 +1720,16 @@ export type Database = {
           _valor?: number
         }
         Returns: string
+      }
+      release_whatsapp_orchestrator_item: {
+        Args: {
+          p_delay_seconds?: number
+          p_lease_token: string
+          p_queue_item_id: string
+          p_reason: string
+          p_retry_kind: string
+        }
+        Returns: Json
       }
       solicitar_saque_indicacao: { Args: { _chave_pix: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
