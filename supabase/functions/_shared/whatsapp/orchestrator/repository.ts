@@ -569,7 +569,7 @@ export class WhatsappOrchestratorRepository {
   // RELEASE
   // --------------------------------------------------------
 
-  async release(input: ReleaseInput, options: TransitionOptions = {}): Promise<ReleaseResult> {
+  async releaseItem(input: ReleaseInput, options: TransitionOptions = {}): Promise<ReleaseResult> {
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs;
     const { signal, cleanup, timedOut } = composeSignal(options.signal, timeoutMs);
     const started = Date.now();
@@ -614,6 +614,241 @@ export class WhatsappOrchestratorRepository {
       cleanup();
     }
   }
+
+  // --------------------------------------------------------
+  // LOAD CONTEXT — read-only. Nenhuma escrita, nenhuma RPC.
+  // Usa apenas .from(...).select(...).eq(...) no client injetado.
+  // Sem timeout/abort configuráveis (não adicionamos TransitionOptions
+  // sem uso real; caller decide a estratégia de cancelamento externa).
+  // --------------------------------------------------------
+
+  async loadContext(item: ClaimedItem): Promise<LoadContextResult> {
+    const started = Date.now();
+    const queueItemId = item.queueId;
+    try {
+      // (1) processing queue
+      const q = await this.selectOne(
+        "whatsapp_processing_queue",
+        "id,status,lease_token,lease_expires_at,claimed_at,claimed_by,message_id",
+        { id: queueItemId },
+      );
+      if (!q) return this.loadCtxErr(queueItemId, "queue_not_found", started);
+      if (q.status !== "running") return this.loadCtxErr(queueItemId, "queue_not_running", started);
+
+      const leaseExpiresAt = typeof q.lease_expires_at === "string" ? q.lease_expires_at : null;
+      const leaseValid =
+        q.lease_token === item.leaseToken &&
+        typeof q.claimed_at === "string" && q.claimed_at.length > 0 &&
+        typeof q.claimed_by === "string" && q.claimed_by.length > 0 &&
+        leaseExpiresAt !== null &&
+        Date.parse(leaseExpiresAt) > Date.now();
+      if (!leaseValid) return this.loadCtxErr(queueItemId, "lease_lost", started);
+
+      if (q.message_id !== item.messageId) {
+        return this.loadCtxErr(queueItemId, "message_mismatch", started);
+      }
+
+      // (2) message — fonte de verdade para contact/provider/instance
+      const m = await this.selectOne(
+        "whatsapp_messages",
+        "id,contact_id,provider,instance_id",
+        { id: item.messageId },
+      );
+      if (!m) return this.loadCtxErr(queueItemId, "message_missing", started);
+      if (m.contact_id !== item.contactId) {
+        return this.loadCtxErr(queueItemId, "message_contact_mismatch", started);
+      }
+      if (m.provider !== item.provider) {
+        return this.loadCtxErr(queueItemId, "message_provider_mismatch", started);
+      }
+      if (m.instance_id !== item.instanceId) {
+        return this.loadCtxErr(queueItemId, "message_instance_mismatch", started);
+      }
+
+      // (3) contact — user_id NUNCA null
+      const c = await this.selectOne(
+        "whatsapp_contacts",
+        "id,user_id",
+        { id: item.contactId },
+      );
+      if (!c) return this.loadCtxErr(queueItemId, "contact_missing", started);
+      if (c.user_id == null || c.user_id !== item.userId) {
+        return this.loadCtxErr(queueItemId, "ownership_mismatch", started);
+      }
+
+      // (4) instance resolvida por message.provider + message.instance_id
+      const inst = await this.selectOne(
+        "whatsapp_provider_instances",
+        "id,provider,instance_id",
+        { provider: m.provider as string, instance_id: m.instance_id as string },
+      );
+      if (!inst) return this.loadCtxErr(queueItemId, "instance_missing", started);
+      if (inst.id !== item.instancePk) {
+        return this.loadCtxErr(queueItemId, "message_instance_mismatch", started);
+      }
+
+      // (5) conversation state (single ou nenhum) → virtual idle/v0
+      const s = await this.selectOne(
+        "whatsapp_conversation_states",
+        "state,current_intent,awaiting_field,request_source,draft_type,draft_id,draft_version,draft_payload,active_vehicle_id,confirmed_at,executed_at,last_message_id,expires_at,state_version,fallback_count",
+        { contact_id: item.contactId },
+      );
+      const state: ConversationState = s ? mapStateRow(s) : virtualIdleState();
+      const stateVersion = s ? Number(s.state_version ?? 0) : 0;
+      const fallbackCount = s ? Number(s.fallback_count ?? 0) : 0;
+
+      // (6) veículos do usuário — incluímos archived para diagnosticar issue
+      const vehicleRows = await this.selectMany(
+        "veiculos",
+        "id,marca,modelo,placa,status",
+        { user_id: item.userId },
+      );
+      const allVehicles = vehicleRows.map(mapVehicleRow);
+      const vehicles = allVehicles.filter((v) => !v.isArchived);
+
+      // (7) active vehicle issue — sem escrita em qualquer caso
+      const activeId = state.activeVehicleId;
+      let activeVehicleIssue: ActiveVehicleIssue | null = null;
+      if (activeId) {
+        const found = allVehicles.find((v) => v.id === activeId);
+        if (!found) activeVehicleIssue = "invalid";
+        else if (found.isArchived) activeVehicleIssue = "archived";
+      }
+
+      const context: ConversationContext = { state, stateVersion, fallbackCount, vehicles };
+      this.log({
+        event: "orchestrator.load_context.ok",
+        queueItemId,
+        durationMs: Date.now() - started,
+        ok: true,
+      });
+      return { kind: "ok", context, activeVehicleIssue };
+    } catch (err) {
+      if (err instanceof RepositoryError) throw err;
+      this.log({
+        event: "orchestrator.load_context.transport_error",
+        queueItemId,
+        durationMs: Date.now() - started,
+        ok: false,
+      });
+      throw new TransportError((err as Error)?.message ?? "loadContext failed", { queueItemId });
+    }
+  }
+
+  private loadCtxErr(
+    queueItemId: string,
+    reason: LoadContextReasonCode,
+    started: number,
+  ): LoadContextResult {
+    this.log({
+      event: "orchestrator.load_context.error",
+      queueItemId,
+      reasonCode: reason,
+      durationMs: Date.now() - started,
+      ok: false,
+    });
+    return { kind: "error", reason };
+  }
+
+  private async selectOne(
+    table: string,
+    cols: string,
+    filters: Record<string, unknown>,
+  ): Promise<Record<string, unknown> | null> {
+    let builder = this.requireFrom()(table).select(cols);
+    for (const [k, v] of Object.entries(filters)) builder = builder.eq(k, v);
+    const res = await builder.maybeSingle();
+    if (res.error) throw new RpcExceptionError(res.error.code ?? null, res.error.message);
+    return res.data;
+  }
+
+  private async selectMany(
+    table: string,
+    cols: string,
+    filters: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    let builder = this.requireFrom()(table).select(cols);
+    for (const [k, v] of Object.entries(filters)) builder = builder.eq(k, v);
+    const res = await builder;
+    if (res.error) throw new RpcExceptionError(res.error.code ?? null, res.error.message);
+    return res.data ?? [];
+  }
+
+  private requireFrom(): NonNullable<SupabaseLike["from"]> {
+    if (!this.client.from) {
+      throw new RepositoryError(
+        "client_missing_from",
+        "SupabaseLike.from is required for loadContext",
+      );
+    }
+    return this.client.from;
+  }
+}
+
+// ============================================================
+// Mapeadores read-only para loadContext.
+// ============================================================
+
+const VALID_STATE_NAMES: ReadonlySet<ConversationStateName> = new Set<ConversationStateName>([
+  "idle",
+  "awaiting_vehicle",
+  "completed",
+  "cancelled",
+  "expired",
+  "failed",
+]);
+
+function virtualIdleState(): ConversationState {
+  return {
+    state: "idle",
+    currentIntent: null,
+    awaitingField: null,
+    requestSource: null,
+    draftType: null,
+    draftId: null,
+    draftVersion: 0,
+    draftPayload: null,
+    activeVehicleId: null,
+    confirmedAt: null,
+    executedAt: null,
+    expiresAt: null,
+    lastMessageId: null,
+  };
+}
+
+function mapStateRow(row: Record<string, unknown>): ConversationState {
+  const stateName = row.state;
+  if (typeof stateName !== "string" || !VALID_STATE_NAMES.has(stateName as ConversationStateName)) {
+    throw new MalformedResponseError("conversation_states.state inválido ou ausente");
+  }
+  return {
+    state: stateName as ConversationStateName,
+    currentIntent: (row.current_intent as string | null) ?? null,
+    awaitingField: (row.awaiting_field as string | null) ?? null,
+    requestSource: (row.request_source as string | null) ?? null,
+    draftType: (row.draft_type as string | null) ?? null,
+    draftId: (row.draft_id as string | null) ?? null,
+    draftVersion: row.draft_version == null ? null : Number(row.draft_version),
+    draftPayload: (row.draft_payload as Record<string, unknown> | null) ?? null,
+    activeVehicleId: (row.active_vehicle_id as string | null) ?? null,
+    confirmedAt: (row.confirmed_at as string | null) ?? null,
+    executedAt: (row.executed_at as string | null) ?? null,
+    expiresAt: (row.expires_at as string | null) ?? null,
+    lastMessageId: (row.last_message_id as string | null) ?? null,
+  };
+}
+
+function mapVehicleRow(row: Record<string, unknown>): ConversationVehicle {
+  const status = typeof row.status === "string" ? row.status : "";
+  const isArchived = status === "archived";
+  return {
+    id: String(row.id),
+    brand: (row.marca as string | null) ?? null,
+    model: (row.modelo as string | null) ?? null,
+    plate: (row.placa as string | null) ?? null,
+    isArchived,
+    isEligible: !isArchived,
+  };
 }
 
 // ============================================================
