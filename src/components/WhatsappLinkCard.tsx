@@ -249,11 +249,14 @@ export function WhatsappLinkCard({
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 text-sm shadow-lg">
       <div className="flex items-center gap-2">
         <MessageCircle className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold">Ative o Jarvys no WhatsApp</h2>
+        <h2 className="text-base font-semibold">
+          {isChangeNumber ? "Alterar número do WhatsApp" : "Ative o Jarvys no WhatsApp"}
+        </h2>
       </div>
       <p className="text-xs text-muted-foreground">
-        Receba lembretes, envie informações do seu veículo e use os recursos do
-        Jarvys pelo WhatsApp.
+        {isChangeNumber
+          ? "Enviaremos um código para o novo número. Seu WhatsApp atual continuará funcionando até a confirmação."
+          : "Receba lembretes, envie informações do seu veículo e use os recursos do Jarvys pelo WhatsApp."}
       </p>
 
       {phase === "success" ? (
@@ -262,12 +265,17 @@ export function WhatsappLinkCard({
             <Check className="h-6 w-6 text-primary" />
           </div>
           <p className="text-center text-sm font-medium">
-            Seu WhatsApp foi vinculado ao Jarvys com sucesso.
+            {isChangeNumber
+              ? "Número do WhatsApp alterado com sucesso."
+              : "Seu WhatsApp foi vinculado ao Jarvys com sucesso."}
           </p>
-          {contactId ? null : null}
           <button
             type="button"
-            onClick={() => onLinked?.({ contactId })}
+            onClick={() =>
+              isChangeNumber
+                ? onPhoneChanged?.({ newContactId: contactId, oldContactId: "", phoneMasked })
+                : onLinked?.({ contactId })
+            }
             className="glow-neon mt-2 w-full rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground"
           >
             Continuar
