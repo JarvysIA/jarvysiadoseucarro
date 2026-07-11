@@ -318,7 +318,7 @@ async function processItem(
   const { data: msgData, error: msgErr } = await supabase
     .from("whatsapp_messages")
     .select(
-      "id, user_id, contact_id, vehicle_id, provider, instance_id, message_type, text_body, media_url, media_mime_type, status",
+      "id, user_id, contact_id, vehicle_id, provider, instance_id, direction, message_type, text_body, media_url, media_mime_type, status",
     )
     .eq("id", item.message_id)
     .maybeSingle();
