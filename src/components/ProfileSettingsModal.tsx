@@ -67,9 +67,12 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [pixRecebimento, setPixRecebimento] = useState("");
   const [cpf, setCpf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
-  const [linkedContact, setLinkedContact] = useState<{ id: string; phone_e164: string } | null>(null);
+  const [linkedContact, setLinkedContact] = useState<{ id: string; phone_e164: string; opt_out: boolean } | null>(null);
   const [linkedLoading, setLinkedLoading] = useState(true);
   const [linkedReloadKey, setLinkedReloadKey] = useState(0);
+  const [waActionBusy, setWaActionBusy] = useState(false);
+  const disableWaFn = useServerFn(disableWhatsappMessagesFn);
+  const reactivateWaFn = useServerFn(reactivateWhatsappContactFn);
 
   useEffect(() => {
     if (!open) return;
