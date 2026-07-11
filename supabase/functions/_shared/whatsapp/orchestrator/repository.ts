@@ -425,7 +425,7 @@ export class WhatsappOrchestratorRepository {
   // CLAIM
   // --------------------------------------------------------
 
-  async claim(input: ClaimInput, options: TransitionOptions = {}): Promise<ClaimedItem[]> {
+  async claimItems(input: ClaimInput, options: TransitionOptions = {}): Promise<ClaimedItem[]> {
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs;
     const { signal, cleanup, timedOut } = composeSignal(options.signal, timeoutMs);
     const started = Date.now();
