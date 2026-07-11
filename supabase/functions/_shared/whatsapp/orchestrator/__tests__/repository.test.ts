@@ -383,7 +383,7 @@ describe("claim", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const items = await repo.claim({ workerId: "w1" });
+    const items = await repo.claimItems({ workerId: "w1" });
     expect(items.length).toBe(1);
     expect(items[0].queueId).toBe("q1");
     expect(items[0].orchestratorMode).toBe("active");
@@ -393,7 +393,7 @@ describe("claim", () => {
   test("data null → []", async () => {
     const client = makeClient(async () => ({ data: null, error: null }));
     const repo = new WhatsappOrchestratorRepository(client);
-    expect(await repo.claim({ workerId: "w1" })).toEqual([]);
+    expect(await repo.claimItems({ workerId: "w1" })).toEqual([]);
   });
 
   test("orchestrator_mode inválido → MalformedResponseError", async () => {
@@ -411,7 +411,7 @@ describe("claim", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    await expect(repo.claim({ workerId: "w1" })).rejects.toBeInstanceOf(MalformedResponseError);
+    await expect(repo.claimItems({ workerId: "w1" })).rejects.toBeInstanceOf(MalformedResponseError);
   });
 });
 
@@ -426,7 +426,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "transient",
@@ -446,7 +446,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "transient",
@@ -464,7 +464,7 @@ describe("release", () => {
       error: null,
     }));
     const repo = new WhatsappOrchestratorRepository(client);
-    const res = await repo.release({
+    const res = await repo.releaseItem({
       queueItemId: "q",
       leaseToken: "l",
       reason: "x",
@@ -486,7 +486,7 @@ describe("release", () => {
     });
     const repo = new WhatsappOrchestratorRepository(client, { defaultTimeoutMs: 10 });
     await expect(
-      repo.release({
+      repo.releaseItem({
         queueItemId: "q",
         leaseToken: "l",
         reason: "x",
@@ -519,5 +519,417 @@ describe("logger sanitizado", () => {
       expect(asJson.includes("Olá")).toBe(false);
       expect(/\+?55/.test(asJson)).toBe(false);
     }
+  });
+});
+
+// ============================================================
+// loadContext — read-only, apenas .from(...).select(...).eq(...)
+// ============================================================
+
+import type {
+  ClaimedItem,
+  SupabaseFromBuilder,
+  SupabaseMaybeSingleResult,
+  SupabaseSelectResult,
+} from "../index.ts";
+
+type TableRows = Record<string, Record<string, unknown>[]>;
+
+function makeFromMock(
+  rows: TableRows,
+  opts: { errorOn?: string; errorPayload?: { message: string; code?: string } } = {},
+): (table: string) => SupabaseFromBuilder {
+  return (table: string) => {
+    const filters: Array<[string, unknown]> = [];
+    const runSelect = (): SupabaseSelectResult => {
+      if (opts.errorOn === table) {
+        return { data: null, error: { message: opts.errorPayload?.message ?? "boom", code: opts.errorPayload?.code ?? null } };
+      }
+      const matched = (rows[table] ?? []).filter((r) =>
+        filters.every(([c, v]) => r[c] === v),
+      );
+      return { data: matched, error: null };
+    };
+    const builder = {
+      eq(column: string, value: unknown) {
+        filters.push([column, value]);
+        return builder;
+      },
+      async maybeSingle(): Promise<SupabaseMaybeSingleResult> {
+        const r = runSelect();
+        if (r.error) return { data: null, error: r.error };
+        return { data: r.data?.[0] ?? null, error: null };
+      },
+      then<T1, T2>(
+        onFulfilled?: (v: SupabaseSelectResult) => T1 | PromiseLike<T1>,
+        onRejected?: (e: unknown) => T2 | PromiseLike<T2>,
+      ) {
+        return Promise.resolve(runSelect()).then(onFulfilled, onRejected);
+      },
+    } as unknown as SupabaseSelectBuilderMock;
+    const rootBuilder: SupabaseFromBuilder = {
+      select: () => builder,
+    };
+    return rootBuilder;
+  };
+}
+
+// Alias tipográfico só para o cast interno acima.
+type SupabaseSelectBuilderMock = SupabaseFromBuilder["select"] extends (c: string) => infer B ? B : never;
+
+function makeCtxClient(rows: TableRows, opts?: { errorOn?: string }) {
+  return {
+    rpc: (async () => ({ data: null, error: null })) as RpcInvoker,
+    from: makeFromMock(rows, opts),
+  } satisfies SupabaseLike;
+}
+
+const FUTURE = new Date(Date.now() + 60_000).toISOString();
+const PAST = new Date(Date.now() - 60_000).toISOString();
+
+const CLAIMED: ClaimedItem = {
+  queueId: "q1",
+  messageId: "m1",
+  contactId: "c1",
+  userId: "u1",
+  instancePk: "ip1",
+  provider: "zapi",
+  instanceId: "inst-1",
+  queueType: "orchestrator",
+  messageType: "text",
+  attempts: 0,
+  maxAttempts: 3,
+  leaseToken: "lt1",
+  leaseExpiresAt: FUTURE,
+  wasRecovered: false,
+  orchestratorMode: "test",
+};
+
+function baseRows(overrides: Partial<TableRows> = {}): TableRows {
+  return {
+    whatsapp_processing_queue: [
+      {
+        id: "q1",
+        status: "running",
+        lease_token: "lt1",
+        lease_expires_at: FUTURE,
+        claimed_at: "2026-07-11T00:00:00Z",
+        claimed_by: "w1",
+        message_id: "m1",
+      },
+    ],
+    whatsapp_messages: [
+      { id: "m1", contact_id: "c1", provider: "zapi", instance_id: "inst-1" },
+    ],
+    whatsapp_contacts: [{ id: "c1", user_id: "u1" }],
+    whatsapp_provider_instances: [
+      { id: "ip1", provider: "zapi", instance_id: "inst-1" },
+    ],
+    whatsapp_conversation_states: [],
+    veiculos: [],
+    ...overrides,
+  };
+}
+
+describe("loadContext — happy path & state virtual", () => {
+  test("sem state row → snapshot virtual idle/v0/fallback=0/draftVersion=0", async () => {
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(baseRows()));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.state.state).toBe("idle");
+      expect(res.context.stateVersion).toBe(0);
+      expect(res.context.fallbackCount).toBe(0);
+      expect(res.context.state.draftVersion).toBe(0);
+      expect(res.context.state.activeVehicleId).toBeNull();
+      expect(res.context.vehicles).toEqual([]);
+      expect(res.activeVehicleIssue).toBeNull();
+    }
+  });
+
+  test("com state existente → devolve valores da linha", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "awaiting_vehicle",
+          current_intent: "log_expense",
+          awaiting_field: null,
+          request_source: null,
+          draft_type: null,
+          draft_id: null,
+          draft_version: 2,
+          draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null,
+          executed_at: null,
+          last_message_id: null,
+          expires_at: null,
+          state_version: 7,
+          fallback_count: 3,
+          contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.state.state).toBe("awaiting_vehicle");
+      expect(res.context.state.currentIntent).toBe("log_expense");
+      expect(res.context.state.draftVersion).toBe(2);
+      expect(res.context.stateVersion).toBe(7);
+      expect(res.context.fallbackCount).toBe(3);
+    }
+  });
+});
+
+describe("loadContext — queue/message/lease/contact/instance", () => {
+  test("queue ausente → queue_not_found", async () => {
+    const rows = baseRows({ whatsapp_processing_queue: [] });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "queue_not_found" });
+  });
+
+  test("queue status != running → queue_not_running", async () => {
+    const rows = baseRows({
+      whatsapp_processing_queue: [{ ...baseRows().whatsapp_processing_queue[0], status: "done" }],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "queue_not_running" });
+  });
+
+  test("lease_lost: token diferente", async () => {
+    const rows = baseRows({
+      whatsapp_processing_queue: [{ ...baseRows().whatsapp_processing_queue[0], lease_token: "OTHER" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "lease_lost" });
+  });
+
+  test("lease_lost: expirado", async () => {
+    const rows = baseRows({
+      whatsapp_processing_queue: [{ ...baseRows().whatsapp_processing_queue[0], lease_expires_at: PAST }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "lease_lost" });
+  });
+
+  test("lease_lost: claimed_at ou claimed_by null", async () => {
+    const rows = baseRows({
+      whatsapp_processing_queue: [{ ...baseRows().whatsapp_processing_queue[0], claimed_at: null, claimed_by: null }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "lease_lost" });
+  });
+
+  test("message_mismatch: queue.message_id diverge", async () => {
+    const rows = baseRows({
+      whatsapp_processing_queue: [{ ...baseRows().whatsapp_processing_queue[0], message_id: "OTHER" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_mismatch" });
+  });
+
+  test("message_missing: linha da mensagem ausente", async () => {
+    const rows = baseRows({ whatsapp_messages: [] });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_missing" });
+  });
+
+  test("message_contact_mismatch", async () => {
+    const rows = baseRows({
+      whatsapp_messages: [{ id: "m1", contact_id: "OTHER", provider: "zapi", instance_id: "inst-1" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_contact_mismatch" });
+  });
+
+  test("message_provider_mismatch", async () => {
+    const rows = baseRows({
+      whatsapp_messages: [{ id: "m1", contact_id: "c1", provider: "OTHER", instance_id: "inst-1" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_provider_mismatch" });
+  });
+
+  test("message_instance_mismatch (message.instance_id diverge)", async () => {
+    const rows = baseRows({
+      whatsapp_messages: [{ id: "m1", contact_id: "c1", provider: "zapi", instance_id: "OTHER" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_instance_mismatch" });
+  });
+
+  test("contact_missing", async () => {
+    const rows = baseRows({ whatsapp_contacts: [] });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "contact_missing" });
+  });
+
+  test("ownership_mismatch: contact.user_id null NÃO é aceito", async () => {
+    const rows = baseRows({ whatsapp_contacts: [{ id: "c1", user_id: null }] });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "ownership_mismatch" });
+  });
+
+  test("ownership_mismatch: user_id diferente", async () => {
+    const rows = baseRows({ whatsapp_contacts: [{ id: "c1", user_id: "OTHER" }] });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "ownership_mismatch" });
+  });
+
+  test("instance_missing: provider+instance_id não resolvem", async () => {
+    const rows = baseRows({ whatsapp_provider_instances: [] });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "instance_missing" });
+  });
+
+  test("message_instance_mismatch: resolve mas pk diverge do claim", async () => {
+    const rows = baseRows({
+      whatsapp_provider_instances: [{ id: "OTHER_PK", provider: "zapi", instance_id: "inst-1" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "message_instance_mismatch" });
+  });
+});
+
+describe("loadContext — veículos e activeVehicleIssue", () => {
+  test("veículo ativo válido → issue null; lista exclui archived", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "idle",
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: "v_ok",
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+      veiculos: [
+        { id: "v_ok", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active" },
+        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived" },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.activeVehicleIssue).toBeNull();
+      expect(res.context.vehicles.map((v) => v.id)).toEqual(["v_ok"]);
+      expect(res.context.vehicles[0].isArchived).toBe(false);
+      expect(res.context.vehicles[0].isEligible).toBe(true);
+    }
+  });
+
+  test("activeVehicleId aponta para archived → issue='archived', sem escrita", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "idle",
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: "v_arc",
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+      veiculos: [
+        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived" },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.activeVehicleIssue).toBe("archived");
+      expect(res.context.vehicles).toEqual([]); // archived filtrado da lista viva
+    }
+  });
+
+  test("activeVehicleId inexistente → issue='invalid'", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "idle",
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: "GHOST",
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+      veiculos: [],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") expect(res.activeVehicleIssue).toBe("invalid");
+  });
+});
+
+describe("loadContext — erros e logs", () => {
+  test("erro transitório do client → TransportError", async () => {
+    const repo = new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows(), { errorOn: "whatsapp_processing_queue" }),
+    );
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(RpcExceptionError);
+  });
+
+  test("state inválido → MalformedResponseError", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "NOT_A_STATE", // inválido
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("logs de loadContext não carregam brand/model/plate/user_id/phone", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const rows = baseRows({
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active" },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows), {
+      logger: (e) => events.push(e as unknown as Record<string, unknown>),
+    });
+    await repo.loadContext(CLAIMED);
+    expect(events.length).toBeGreaterThan(0);
+    for (const e of events) {
+      const j = JSON.stringify(e);
+      expect(/Fiat|Argo|ABC1D23|u1|c1|55\d/.test(j)).toBe(false);
+    }
+  });
+});
+
+// ============================================================
+// claimItems — ausência de retry automático (paralelo ao releaseItem existente)
+// ============================================================
+
+describe("claimItems — no retry", () => {
+  test("timeout NÃO faz retry automático: invoker chamado exatamente 1 vez", async () => {
+    let calls = 0;
+    const client = makeClient(async (_fn, _params, opts) => {
+      calls += 1;
+      return await new Promise((_res, rej) => {
+        opts?.signal?.addEventListener("abort", () => {
+          const e = new Error("aborted");
+          (e as { name?: string }).name = "AbortError";
+          rej(e);
+        });
+      });
+    });
+    const repo = new WhatsappOrchestratorRepository(client, { defaultTimeoutMs: 10 });
+    await expect(repo.claimItems({ workerId: "w1" })).rejects.toBeInstanceOf(TransportError);
+    expect(calls).toBe(1);
   });
 });

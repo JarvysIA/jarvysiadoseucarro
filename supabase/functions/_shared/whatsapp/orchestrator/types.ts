@@ -49,13 +49,8 @@ export type ClaimedItem = {
 };
 
 // ============================================================
-// CONTEXT — leitura auxiliar; NÃO consultada pela RPC.
+// CONTEXT — leitura auxiliar via SELECTs read-only. NÃO usa RPC.
 // ============================================================
-
-export type LoadContextInput = {
-  contactId: string;
-  userId: string | null;
-};
 
 export type ConversationContext = {
   state: ConversationState;
@@ -63,6 +58,37 @@ export type ConversationContext = {
   stateVersion: number;
   vehicles: ConversationVehicle[];
 };
+
+/**
+ * Reasons possíveis de loadContext. Todos derivam de consultas SELECT no
+ * client injetado; nenhum acessa RPC. Mismatches são atribuídos à MENSAGEM
+ * (não à queue) porque contact/provider/instance vivem em whatsapp_messages.
+ */
+export type LoadContextReasonCode =
+  | "queue_not_found"
+  | "queue_not_running"
+  | "lease_lost"
+  | "message_mismatch"           // queue.message_id != item.messageId
+  | "message_missing"
+  | "message_contact_mismatch"
+  | "message_provider_mismatch"
+  | "message_instance_mismatch"
+  | "contact_missing"
+  | "ownership_mismatch"
+  | "instance_missing";
+
+export type ActiveVehicleIssue = "invalid" | "archived";
+
+export type LoadContextResult =
+  | {
+      kind: "ok";
+      context: ConversationContext;
+      activeVehicleIssue: ActiveVehicleIssue | null;
+    }
+  | {
+      kind: "error";
+      reason: LoadContextReasonCode;
+    };
 
 // ============================================================
 // APPLY TRANSITION
