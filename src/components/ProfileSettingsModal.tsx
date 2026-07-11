@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { BellOff, BellRing, Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
+import { Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -14,10 +13,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
 import { WhatsappLinkCard } from "@/components/WhatsappLinkCard";
-import {
-  disableWhatsappMessagesFn,
-  reactivateWhatsappContactFn,
-} from "@/lib/whatsapp-link.functions";
 
 type Props = {
   open: boolean;
@@ -67,13 +62,10 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [pixRecebimento, setPixRecebimento] = useState("");
   const [cpf, setCpf] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
-  const [linkedContact, setLinkedContact] = useState<{ id: string; phone_e164: string; opt_out: boolean } | null>(null);
+  const [linkedContact, setLinkedContact] = useState<{ id: string; phone_e164: string } | null>(null);
   const [linkedLoading, setLinkedLoading] = useState(true);
   const [linkedReloadKey, setLinkedReloadKey] = useState(0);
-  const [waActionBusy, setWaActionBusy] = useState(false);
   const [changeNumberOpen, setChangeNumberOpen] = useState(false);
-  const disableWaFn = useServerFn(disableWhatsappMessagesFn);
-  const reactivateWaFn = useServerFn(reactivateWhatsappContactFn);
 
   useEffect(() => {
     if (!open) return;
@@ -126,7 +118,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       }
       const { data } = await supabase
         .from("whatsapp_contacts")
-        .select("id, phone_e164, verified_at, unlinked_at, opt_out")
+        .select("id, phone_e164, verified_at, unlinked_at")
         .eq("user_id", userId)
         .is("unlinked_at", null)
         .not("verified_at", "is", null)
@@ -134,8 +126,8 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         .limit(1)
         .maybeSingle();
       if (cancel) return;
-      const row = data as { id: string; phone_e164: string; opt_out: boolean | null } | null;
-      setLinkedContact(row ? { id: row.id, phone_e164: row.phone_e164, opt_out: row.opt_out === true } : null);
+      const row = data as { id: string; phone_e164: string } | null;
+      setLinkedContact(row ? { id: row.id, phone_e164: row.phone_e164 } : null);
       setLinkedLoading(false);
     })();
     return () => {
@@ -288,15 +280,9 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 <div className="flex flex-col gap-3 rounded-md border border-border bg-background px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-sm">{maskLinkedPhone(linkedContact.phone_e164)}</span>
-                    {linkedContact.opt_out ? (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Mensagens desativadas
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                        WhatsApp vinculado
-                      </span>
-                    )}
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                      WhatsApp vinculado
+                    </span>
                   </div>
 
                   {changeNumberOpen ? (
@@ -316,100 +302,15 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                         onCancel={() => setChangeNumberOpen(false)}
                       />
                     </div>
-                  ) : linkedContact.opt_out ? (
-                    <>
-                      <p className="text-[11px] text-muted-foreground">
-                        Você não está recebendo mensagens do Jarvys neste número. Seu vínculo continua ativo.
-                      </p>
-                      <button
-                        type="button"
-                        disabled={waActionBusy}
-                        onClick={async () => {
-                          setWaActionBusy(true);
-                          try {
-                            const r = await reactivateWaFn({});
-                            if ((r as { ok?: boolean }).ok) {
-                              toast.success("Mensagens do WhatsApp reativadas.");
-                              setLinkedReloadKey((k) => k + 1);
-                            } else {
-                              const reason = (r as { reason?: string }).reason;
-                              toast.error(
-                                reason === "no_active_contact"
-                                  ? "Não encontramos um WhatsApp vinculado."
-                                  : "Não foi possível reativar agora. Tente novamente.",
-                              );
-                            }
-                          } catch {
-                            toast.error("Não foi possível reativar agora. Tente novamente.");
-                          } finally {
-                            setWaActionBusy(false);
-                          }
-                        }}
-                        className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
-                      >
-                        {waActionBusy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <BellRing className="h-3.5 w-3.5" />
-                        )}
-                        Reativar WhatsApp
-                      </button>
-                      <button
-                        type="button"
-                        disabled={waActionBusy}
-                        onClick={() => setChangeNumberOpen(true)}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium text-muted-foreground disabled:opacity-50"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Alterar número
-                      </button>
-                    </>
                   ) : (
-                    <>
-                      <button
-                        type="button"
-                        disabled={waActionBusy}
-                        onClick={() => setChangeNumberOpen(true)}
-                        className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        Alterar número
-                      </button>
-                      <button
-                        type="button"
-                        disabled={waActionBusy}
-                        onClick={async () => {
-                          if (!confirm("Deixar de receber mensagens do Jarvys neste WhatsApp? Seu número continuará vinculado à conta.")) return;
-                          setWaActionBusy(true);
-                          try {
-                            const r = await disableWaFn({});
-                            if ((r as { ok?: boolean }).ok) {
-                              toast.success("Mensagens do WhatsApp desativadas.");
-                              setLinkedReloadKey((k) => k + 1);
-                            } else {
-                              const reason = (r as { reason?: string }).reason;
-                              toast.error(
-                                reason === "no_active_contact"
-                                  ? "Não encontramos um WhatsApp vinculado."
-                                  : "Não foi possível desativar agora. Tente novamente.",
-                              );
-                            }
-                          } catch {
-                            toast.error("Não foi possível desativar agora. Tente novamente.");
-                          } finally {
-                            setWaActionBusy(false);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2.5 text-xs font-medium text-muted-foreground disabled:opacity-50"
-                      >
-                        {waActionBusy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <BellOff className="h-3.5 w-3.5" />
-                        )}
-                        Desativar mensagens
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => setChangeNumberOpen(true)}
+                      className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Alterar número
+                    </button>
                   )}
                 </div>
               ) : (
