@@ -1626,6 +1626,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_whatsapp_orchestrator_transition: {
+        Args: {
+          p_expected_state_version: number
+          p_lease_token: string
+          p_orchestrator_version: string
+          p_patch: Json
+          p_queue_item_id: string
+          p_response?: Json
+          p_result_summary: Json
+        }
+        Returns: Json
+      }
       claim_whatsapp_orchestrator_items: {
         Args: {
           p_batch?: number
