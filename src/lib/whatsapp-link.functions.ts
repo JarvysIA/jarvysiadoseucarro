@@ -102,6 +102,7 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // 1) Conflitos ---------------------------------------------------------
+    // phone_conflict é aplicado para todos os sources: telefone ativo em OUTRA conta.
     const { data: activeSamePhoneOther, error: otherErr } = await supabaseAdmin
       .from("whatsapp_contacts")
       .select("id, user_id")
@@ -118,28 +119,48 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       return { ok: false, error: "phone_conflict" };
     }
 
+    // Contatos ativos do usuário — necessário para as duas ramificações.
     const { data: userActiveContacts, error: userActiveErr } = await supabaseAdmin
       .from("whatsapp_contacts")
-      .select("id, phone_e164, opt_out")
+      .select("id, phone_e164, opt_out, verified_at")
       .eq("user_id", userId)
       .is("unlinked_at", null);
     if (userActiveErr) {
       logInfo({ user_id: userId, phone: phoneMasked, status: "error", error_code: "user_active_lookup" });
       return { ok: false, error: "internal_error" };
     }
-    const otherActive = (userActiveContacts ?? []).find((c) => c.phone_e164 !== phoneE164);
-    if (otherActive) {
-      logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "user_has_other_active" });
-      return { ok: false, error: "user_has_other_active" };
-    }
-    const sameActive = (userActiveContacts ?? []).find((c) => c.phone_e164 === phoneE164);
-    let purpose: "link" | "reactivate" = "link";
-    if (sameActive) {
-      if (sameActive.opt_out === true && source === "app_settings") {
-        purpose = "reactivate";
-      } else {
-        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "already_linked" });
-        return { ok: false, error: "already_linked" };
+
+    let purpose: "link" | "reactivate" | "relink" = "link";
+    let sameActive: { id: string; phone_e164: string; opt_out: boolean | null; verified_at: string | null } | undefined;
+
+    if (source === "change_number") {
+      // Ramo change_number: exatamente 1 contato ativo/verificado; novo != atual.
+      const verifiedActive = (userActiveContacts ?? []).filter((c) => c.verified_at != null);
+      if (verifiedActive.length !== 1) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "no_active_contact" });
+        return { ok: false, error: "no_active_contact" };
+      }
+      const current = verifiedActive[0];
+      if (current.phone_e164 === phoneE164) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "same_phone" });
+        return { ok: false, error: "same_phone" };
+      }
+      purpose = "relink";
+    } else {
+      // Ramos onboarding / app_settings: comportamento original preservado.
+      const otherActive = (userActiveContacts ?? []).find((c) => c.phone_e164 !== phoneE164);
+      if (otherActive) {
+        logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "user_has_other_active" });
+        return { ok: false, error: "user_has_other_active" };
+      }
+      sameActive = (userActiveContacts ?? []).find((c) => c.phone_e164 === phoneE164);
+      if (sameActive) {
+        if (sameActive.opt_out === true && source === "app_settings") {
+          purpose = "reactivate";
+        } else {
+          logInfo({ user_id: userId, phone: phoneMasked, source, status: "rejected", error_code: "already_linked" });
+          return { ok: false, error: "already_linked" };
+        }
       }
     }
 
@@ -217,13 +238,24 @@ export const requestWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       return { ok: false, error: "no_instance_available" };
     }
 
-    // 4) Cancela pendings anteriores do mesmo par (par válido, mesmo user).
-    await supabaseAdmin
-      .from("whatsapp_link_verifications")
-      .update({ status: "cancelled" })
-      .eq("user_id", userId)
-      .eq("phone_e164", phoneE164)
-      .eq("status", "pending");
+    // 4) Cancela pendings anteriores.
+    if (purpose === "relink") {
+      // change_number: cancela qualquer pending relink do usuário (respeita índice uq_wlv_pending_relink_per_user).
+      await supabaseAdmin
+        .from("whatsapp_link_verifications")
+        .update({ status: "cancelled" })
+        .eq("user_id", userId)
+        .eq("purpose", "relink")
+        .eq("status", "pending");
+    } else {
+      // onboarding / app_settings: cancela pendings do mesmo par (user, phone).
+      await supabaseAdmin
+        .from("whatsapp_link_verifications")
+        .update({ status: "cancelled" })
+        .eq("user_id", userId)
+        .eq("phone_e164", phoneE164)
+        .eq("status", "pending");
+    }
 
     // 5) Gera código e cria verification ----------------------------------
     const verificationId = newVerificationId();
