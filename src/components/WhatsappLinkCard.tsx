@@ -181,26 +181,55 @@ export function WhatsappLinkCard({
     if (code.length !== 6 || !verificationId || busy) return;
     setErrorMsg("");
     setPhase("confirming");
+    const copy = isChangeNumber ? CHANGE_NUMBER_ERROR_COPY : CONFIRM_ERROR_COPY;
     try {
-      const r = await confirmFn({ data: { verificationId, code } });
-      if ((r as { ok?: boolean }).ok) {
-        const ok = r as { ok: true; contactId: string };
-        setContactId(ok.contactId);
-        // limpar dados sensíveis da memória
-        setCode("");
-        setVerificationId("");
-        setPhase("success");
-        onLinked?.({ contactId: ok.contactId });
-      } else {
-        const err = r as { ok: false; reason: string };
-        setErrorMsg(CONFIRM_ERROR_COPY[err.reason] ?? CONFIRM_ERROR_COPY.internal_error);
-        if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+      if (isChangeNumber) {
+        const r = await confirmChangeFn({ data: { verificationId, code } });
+        if ((r as { ok?: boolean }).ok) {
+          const ok = r as {
+            ok: true;
+            newContactId: string;
+            oldContactId: string;
+            phoneMasked: string;
+          };
+          setContactId(ok.newContactId);
+          setPhoneMasked(ok.phoneMasked);
           setCode("");
+          setVerificationId("");
+          setPhase("success");
+          onPhoneChanged?.({
+            newContactId: ok.newContactId,
+            oldContactId: ok.oldContactId,
+            phoneMasked: ok.phoneMasked,
+          });
+        } else {
+          const err = r as { ok: false; reason: string };
+          setErrorMsg(copy[err.reason] ?? copy.internal_error);
+          if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+            setCode("");
+          }
+          setPhase("awaiting_code");
         }
-        setPhase("awaiting_code");
+      } else {
+        const r = await confirmFn({ data: { verificationId, code } });
+        if ((r as { ok?: boolean }).ok) {
+          const ok = r as { ok: true; contactId: string };
+          setContactId(ok.contactId);
+          setCode("");
+          setVerificationId("");
+          setPhase("success");
+          onLinked?.({ contactId: ok.contactId });
+        } else {
+          const err = r as { ok: false; reason: string };
+          setErrorMsg(copy[err.reason] ?? copy.internal_error);
+          if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+            setCode("");
+          }
+          setPhase("awaiting_code");
+        }
       }
     } catch {
-      setErrorMsg(CONFIRM_ERROR_COPY.internal_error);
+      setErrorMsg(copy.internal_error);
       setPhase("awaiting_code");
     }
   }
