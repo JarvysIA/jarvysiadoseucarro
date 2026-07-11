@@ -340,6 +340,50 @@ async function processItem(
   const linked = !!(msg.user_id && msg.contact_id);
   const log = { ...baseLog, message_id: msg.id, message_type: msg.message_type, queue_type: finalQueueType, phone: maskPhone(phone) };
 
+  // 0) Shadow passivo do orquestrador (Build 5.7F2C1).
+  //    Fail-open: exception/timeout NUNCA interrompe o fluxo legado abaixo.
+  //    Gate local para evitar consultas em casos claramente inelegíveis.
+  if (
+    msg.direction === "inbound" &&
+    msg.message_type === "text" &&
+    msg.contact_id &&
+    msg.user_id &&
+    msg.provider &&
+    msg.instance_id &&
+    !looksLikeOptOut(msg.text_body)
+  ) {
+    try {
+      await runWhatsappOrchestratorShadow(
+        {
+          queueItemId: item.id,
+          userId: msg.user_id,
+          message: {
+            id: msg.id,
+            contactId: msg.contact_id,
+            provider: msg.provider,
+            instanceId: msg.instance_id,
+            direction: "inbound",
+            messageType: "text",
+            textBody: msg.text_body ?? "",
+          },
+          now: new Date().toISOString(),
+        },
+        { supabase: supabase as unknown as ShadowSupabaseLike },
+      );
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          tag: "whatsapp_orchestrator_shadow",
+          queueItemId: item.id,
+          messageId: msg.id,
+          status: "failed",
+          errorCategory: "hook_threw",
+        }),
+      );
+      void err;
+    }
+  }
+
   // 1) OPT-OUT
   if (msg.message_type === "text" && looksLikeOptOut(msg.text_body)) {
     if (linked && msg.contact_id && msg.user_id) {
