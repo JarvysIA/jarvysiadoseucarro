@@ -1410,6 +1410,14 @@ export type Database = {
           result: string
         }[]
       }
+      disable_whatsapp_messages: {
+        Args: { p_user_id: string }
+        Returns: {
+          contact_id: string
+          phone_e164: string
+          result: string
+        }[]
+      }
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
       get_indicacao_dias_bloqueio: { Args: never; Returns: number }
       get_indicacao_saque_minimo: { Args: never; Returns: number }
@@ -1427,6 +1435,14 @@ export type Database = {
         Returns: {
           canceladas: number
           liberadas: number
+        }[]
+      }
+      reactivate_whatsapp_contact: {
+        Args: { p_user_id: string }
+        Returns: {
+          contact_id: string
+          phone_e164: string
+          result: string
         }[]
       }
       registrar_comissao_indicacao: {
