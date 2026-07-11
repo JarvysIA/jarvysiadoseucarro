@@ -8,16 +8,22 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   requestWhatsappLinkCodeFn,
   confirmWhatsappLinkCodeFn,
+  confirmWhatsappPhoneChangeFn,
 } from "@/lib/whatsapp-link.functions";
 import { normalizeBrazilPhoneToE164, isLikelyE164 } from "@/lib/whatsapp/phone";
 
-export type WhatsappLinkSource = "onboarding" | "app_settings";
+export type WhatsappLinkSource = "onboarding" | "app_settings" | "change_number";
 
 type Props = {
   source: WhatsappLinkSource;
   initialPhone?: string;
   allowSkip?: boolean;
-  onLinked?: (result: { contactId: string }) => void;
+  onLinked?: (result: { contactId?: string }) => void;
+  onPhoneChanged?: (result: {
+    newContactId: string;
+    oldContactId: string;
+    phoneMasked: string;
+  }) => void;
   onSkip?: () => void;
   onCancel?: () => void;
 };
@@ -42,6 +48,8 @@ const REQUEST_ERROR_COPY: Record<string, string> = {
   phone_conflict: "Este número já está vinculado a outra conta Jarvys.",
   user_has_other_active: "Você já tem outro número vinculado.",
   already_linked: "Este número já está vinculado à sua conta.",
+  no_active_contact: "Não encontramos um vínculo ativo para alterar.",
+  same_phone: "Informe um número diferente do atual.",
   no_instance_available:
     "O WhatsApp Jarvys está temporariamente indisponível. Tente novamente em alguns minutos.",
   internal_error: "Não foi possível concluir agora. Tente novamente.",
@@ -52,9 +60,16 @@ const CONFIRM_ERROR_COPY: Record<string, string> = {
   blocked: "Limite de tentativas atingido. Solicite um novo código.",
   phone_conflict: "Este número já está vinculado a outra conta Jarvys.",
   user_has_other_active: "Você já tem outro número vinculado.",
+  no_active_contact: "Não encontramos um vínculo ativo para alterar.",
+  same_phone: "Informe um número diferente do atual.",
   no_instance_available:
     "O WhatsApp Jarvys está temporariamente indisponível. Tente novamente em alguns minutos.",
   internal_error: "Não foi possível concluir agora. Tente novamente.",
+};
+
+const CHANGE_NUMBER_ERROR_COPY: Record<string, string> = {
+  ...CONFIRM_ERROR_COPY,
+  internal_error: "Não foi possível alterar o número agora. Tente novamente.",
 };
 
 function formatBrPhoneInput(raw: string): string {
@@ -80,11 +95,14 @@ export function WhatsappLinkCard({
   initialPhone,
   allowSkip = false,
   onLinked,
+  onPhoneChanged,
   onSkip,
   onCancel,
 }: Props) {
+  const isChangeNumber = source === "change_number";
   const requestFn = useServerFn(requestWhatsappLinkCodeFn);
   const confirmFn = useServerFn(confirmWhatsappLinkCodeFn);
+  const confirmChangeFn = useServerFn(confirmWhatsappPhoneChangeFn);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [phone, setPhone] = useState<string>(() => toDisplayFromStored(initialPhone));
@@ -163,26 +181,55 @@ export function WhatsappLinkCard({
     if (code.length !== 6 || !verificationId || busy) return;
     setErrorMsg("");
     setPhase("confirming");
+    const copy = isChangeNumber ? CHANGE_NUMBER_ERROR_COPY : CONFIRM_ERROR_COPY;
     try {
-      const r = await confirmFn({ data: { verificationId, code } });
-      if ((r as { ok?: boolean }).ok) {
-        const ok = r as { ok: true; contactId: string };
-        setContactId(ok.contactId);
-        // limpar dados sensíveis da memória
-        setCode("");
-        setVerificationId("");
-        setPhase("success");
-        onLinked?.({ contactId: ok.contactId });
-      } else {
-        const err = r as { ok: false; reason: string };
-        setErrorMsg(CONFIRM_ERROR_COPY[err.reason] ?? CONFIRM_ERROR_COPY.internal_error);
-        if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+      if (isChangeNumber) {
+        const r = await confirmChangeFn({ data: { verificationId, code } });
+        if ((r as { ok?: boolean }).ok) {
+          const ok = r as {
+            ok: true;
+            newContactId: string;
+            oldContactId: string;
+            phoneMasked: string;
+          };
+          setContactId(ok.newContactId);
+          setPhoneMasked(ok.phoneMasked);
           setCode("");
+          setVerificationId("");
+          setPhase("success");
+          onPhoneChanged?.({
+            newContactId: ok.newContactId,
+            oldContactId: ok.oldContactId,
+            phoneMasked: ok.phoneMasked,
+          });
+        } else {
+          const err = r as { ok: false; reason: string };
+          setErrorMsg(copy[err.reason] ?? copy.internal_error);
+          if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+            setCode("");
+          }
+          setPhase("awaiting_code");
         }
-        setPhase("awaiting_code");
+      } else {
+        const r = await confirmFn({ data: { verificationId, code } });
+        if ((r as { ok?: boolean }).ok) {
+          const ok = r as { ok: true; contactId: string };
+          setContactId(ok.contactId);
+          setCode("");
+          setVerificationId("");
+          setPhase("success");
+          onLinked?.({ contactId: ok.contactId });
+        } else {
+          const err = r as { ok: false; reason: string };
+          setErrorMsg(copy[err.reason] ?? copy.internal_error);
+          if (err.reason === "invalid_or_expired" || err.reason === "blocked") {
+            setCode("");
+          }
+          setPhase("awaiting_code");
+        }
       }
     } catch {
-      setErrorMsg(CONFIRM_ERROR_COPY.internal_error);
+      setErrorMsg(copy.internal_error);
       setPhase("awaiting_code");
     }
   }
@@ -202,11 +249,14 @@ export function WhatsappLinkCard({
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 text-sm shadow-lg">
       <div className="flex items-center gap-2">
         <MessageCircle className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold">Ative o Jarvys no WhatsApp</h2>
+        <h2 className="text-base font-semibold">
+          {isChangeNumber ? "Alterar número do WhatsApp" : "Ative o Jarvys no WhatsApp"}
+        </h2>
       </div>
       <p className="text-xs text-muted-foreground">
-        Receba lembretes, envie informações do seu veículo e use os recursos do
-        Jarvys pelo WhatsApp.
+        {isChangeNumber
+          ? "Enviaremos um código para o novo número. Seu WhatsApp atual continuará funcionando até a confirmação."
+          : "Receba lembretes, envie informações do seu veículo e use os recursos do Jarvys pelo WhatsApp."}
       </p>
 
       {phase === "success" ? (
@@ -215,12 +265,17 @@ export function WhatsappLinkCard({
             <Check className="h-6 w-6 text-primary" />
           </div>
           <p className="text-center text-sm font-medium">
-            Seu WhatsApp foi vinculado ao Jarvys com sucesso.
+            {isChangeNumber
+              ? "Número do WhatsApp alterado com sucesso."
+              : "Seu WhatsApp foi vinculado ao Jarvys com sucesso."}
           </p>
-          {contactId ? null : null}
           <button
             type="button"
-            onClick={() => onLinked?.({ contactId })}
+            onClick={() =>
+              isChangeNumber
+                ? onPhoneChanged?.({ newContactId: contactId, oldContactId: "", phoneMasked })
+                : onLinked?.({ contactId })
+            }
             className="glow-neon mt-2 w-full rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-3 text-sm font-semibold text-primary-foreground"
           >
             Continuar

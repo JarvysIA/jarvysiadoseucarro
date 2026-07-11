@@ -45,11 +45,11 @@ function OnboardingWhatsappPage() {
     };
   }, []);
 
-  async function handleLinked({ contactId }: { contactId: string }) {
+  async function handleLinked({ contactId }: { contactId?: string }) {
     try {
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess.session?.user.id;
-      if (userId) {
+      if (userId && contactId) {
         const { data: contact } = await supabase
           .from("whatsapp_contacts")
           .select("phone_e164")
