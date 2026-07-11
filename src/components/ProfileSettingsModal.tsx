@@ -118,7 +118,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       }
       const { data } = await supabase
         .from("whatsapp_contacts")
-        .select("id, phone_e164, verified_at, unlinked_at, opt_out")
+        .select("id, phone_e164, verified_at, unlinked_at")
         .eq("user_id", userId)
         .is("unlinked_at", null)
         .not("verified_at", "is", null)
@@ -126,8 +126,8 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
         .limit(1)
         .maybeSingle();
       if (cancel) return;
-      const row = data as { id: string; phone_e164: string; opt_out: boolean | null } | null;
-      setLinkedContact(row ? { id: row.id, phone_e164: row.phone_e164, opt_out: row.opt_out === true } : null);
+      const row = data as { id: string; phone_e164: string } | null;
+      setLinkedContact(row ? { id: row.id, phone_e164: row.phone_e164 } : null);
       setLinkedLoading(false);
     })();
     return () => {
