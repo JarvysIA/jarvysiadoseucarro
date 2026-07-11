@@ -431,3 +431,83 @@ export const confirmWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       return { ok: false, reason: "internal_error" };
     }
   });
+
+// ============================================================================
+// Build 5.7E1 — Opt-out (disable) e reativação do WhatsApp pelo app.
+// ----------------------------------------------------------------------------
+// Duas server functions autenticadas que apenas encaminham o context.userId
+// para as RPCs SECURITY DEFINER `public.disable_whatsapp_messages` e
+// `public.reactivate_whatsapp_contact`. Sem input do client (evita spoof de
+// user_id). Toda a lógica transacional (UPDATE + INSERT em consents) mora no
+// banco. Sender continua bloqueando opt_out=true para tudo, exceto link_code.
+// ============================================================================
+
+type OptOutSuccess = { ok: true; contactId: string; phoneMasked: string };
+type OptOutReason = "no_active_contact" | "invalid_request" | "internal_error";
+type OptOutFailure = { ok: false; reason: OptOutReason };
+type OptOutOutput = OptOutSuccess | OptOutFailure;
+
+function logOptToggle(tag: string, payload: Record<string, unknown>) {
+  console.log(JSON.stringify({ tag, ...payload }));
+}
+
+async function runOptRpc(
+  rpcName: "disable_whatsapp_messages" | "reactivate_whatsapp_contact",
+  userId: string,
+): Promise<OptOutOutput> {
+  const t0 = Date.now();
+  const tag = `whatsapp-${rpcName.replace(/_/g, "-")}`;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin.rpc(rpcName, {
+      p_user_id: userId,
+    });
+    if (error) {
+      console.error(`[${tag}] rpc_error`, {
+        message: error.message,
+        code: (error as { code?: string }).code,
+      });
+      logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
+    const row = Array.isArray(rows)
+      ? rows[0]
+      : (rows as unknown as { result?: string; contact_id?: string | null; phone_e164?: string | null } | null);
+    if (!row || typeof row.result !== "string") {
+      logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "empty_result", elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: "internal_error" };
+    }
+    if (row.result === "ok") {
+      const contactId = row.contact_id ?? "";
+      const phoneE164 = row.phone_e164 ?? "";
+      if (!contactId || !phoneE164) {
+        logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "missing_ok_fields", elapsed_ms: Date.now() - t0 });
+        return { ok: false, reason: "internal_error" };
+      }
+      const phoneMasked = maskPhone(phoneE164);
+      logOptToggle(tag, { user_id: userId, result: "ok", contact_id: contactId, phone: phoneMasked, elapsed_ms: Date.now() - t0 });
+      return { ok: true, contactId, phoneMasked };
+    }
+    if (row.result === "no_active_contact" || row.result === "invalid_request") {
+      logOptToggle(tag, { user_id: userId, result: row.result, elapsed_ms: Date.now() - t0 });
+      return { ok: false, reason: row.result };
+    }
+    logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "unknown_rpc_result", elapsed_ms: Date.now() - t0 });
+    return { ok: false, reason: "internal_error" };
+  } catch {
+    logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "exception", elapsed_ms: Date.now() - t0 });
+    return { ok: false, reason: "internal_error" };
+  }
+}
+
+export const disableWhatsappMessagesFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<OptOutOutput> => {
+    return runOptRpc("disable_whatsapp_messages", context.userId);
+  });
+
+export const reactivateWhatsappContactFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<OptOutOutput> => {
+    return runOptRpc("reactivate_whatsapp_contact", context.userId);
+  });
