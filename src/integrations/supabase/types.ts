@@ -1094,11 +1094,13 @@ export type Database = {
           draft_version: number
           executed_at: string | null
           expires_at: string | null
+          fallback_count: number
           id: string
           last_interaction_at: string
           last_message_id: string | null
           request_source: string | null
           state: string
+          state_version: number
           updated_at: string
           user_id: string
         }
@@ -1115,11 +1117,13 @@ export type Database = {
           draft_version?: number
           executed_at?: string | null
           expires_at?: string | null
+          fallback_count?: number
           id?: string
           last_interaction_at?: string
           last_message_id?: string | null
           request_source?: string | null
           state?: string
+          state_version?: number
           updated_at?: string
           user_id: string
         }
@@ -1136,11 +1140,13 @@ export type Database = {
           draft_version?: number
           executed_at?: string | null
           expires_at?: string | null
+          fallback_count?: number
           id?: string
           last_interaction_at?: string
           last_message_id?: string | null
           request_source?: string | null
           state?: string
+          state_version?: number
           updated_at?: string
           user_id?: string
         }
@@ -1378,6 +1384,7 @@ export type Database = {
           error_message: string | null
           expires_at: string | null
           id: string
+          idempotency_key: string | null
           instance_id: string | null
           max_attempts: number
           media_storage_path: string | null
@@ -1389,6 +1396,7 @@ export type Database = {
           purpose: string
           scheduled_at: string
           sent_at: string | null
+          source_message_id: string | null
           status: string
           text_body: string | null
           user_id: string | null
@@ -1401,6 +1409,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string | null
           id?: string
+          idempotency_key?: string | null
           instance_id?: string | null
           max_attempts?: number
           media_storage_path?: string | null
@@ -1412,6 +1421,7 @@ export type Database = {
           purpose?: string
           scheduled_at?: string
           sent_at?: string | null
+          source_message_id?: string | null
           status?: string
           text_body?: string | null
           user_id?: string | null
@@ -1424,6 +1434,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string | null
           id?: string
+          idempotency_key?: string | null
           instance_id?: string | null
           max_attempts?: number
           media_storage_path?: string | null
@@ -1435,6 +1446,7 @@ export type Database = {
           purpose?: string
           scheduled_at?: string
           sent_at?: string | null
+          source_message_id?: string | null
           status?: string
           text_body?: string | null
           user_id?: string | null
@@ -1446,6 +1458,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_outbound_queue_source_message_id_fkey"
+            columns: ["source_message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
             referencedColumns: ["id"]
           },
           {
@@ -1467,13 +1486,20 @@ export type Database = {
       whatsapp_processing_queue: {
         Row: {
           attempts: number
+          claimed_at: string | null
+          claimed_by: string | null
           created_at: string
           error_message: string | null
           event_id: string | null
           finished_at: string | null
           id: string
+          lease_expires_at: string | null
+          lease_token: string | null
           max_attempts: number
           message_id: string | null
+          orchestrator_processed_at: string | null
+          orchestrator_result: Json | null
+          orchestrator_version: string | null
           queue_type: string
           scheduled_at: string
           started_at: string | null
@@ -1481,13 +1507,20 @@ export type Database = {
         }
         Insert: {
           attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
           created_at?: string
           error_message?: string | null
           event_id?: string | null
           finished_at?: string | null
           id?: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
           max_attempts?: number
           message_id?: string | null
+          orchestrator_processed_at?: string | null
+          orchestrator_result?: Json | null
+          orchestrator_version?: string | null
           queue_type: string
           scheduled_at?: string
           started_at?: string | null
@@ -1495,13 +1528,20 @@ export type Database = {
         }
         Update: {
           attempts?: number
+          claimed_at?: string | null
+          claimed_by?: string | null
           created_at?: string
           error_message?: string | null
           event_id?: string | null
           finished_at?: string | null
           id?: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
           max_attempts?: number
           message_id?: string | null
+          orchestrator_processed_at?: string | null
+          orchestrator_result?: Json | null
+          orchestrator_version?: string | null
           queue_type?: string
           scheduled_at?: string
           started_at?: string | null
@@ -1537,6 +1577,7 @@ export type Database = {
           is_default: boolean
           last_health_check_at: string | null
           max_users: number | null
+          orchestrator_mode: string
           phone_number_e164: string | null
           provider: string
           status: string
@@ -1554,6 +1595,7 @@ export type Database = {
           is_default?: boolean
           last_health_check_at?: string | null
           max_users?: number | null
+          orchestrator_mode?: string
           phone_number_e164?: string | null
           provider?: string
           status?: string
@@ -1571,6 +1613,7 @@ export type Database = {
           is_default?: boolean
           last_health_check_at?: string | null
           max_users?: number | null
+          orchestrator_mode?: string
           phone_number_e164?: string | null
           provider?: string
           status?: string
