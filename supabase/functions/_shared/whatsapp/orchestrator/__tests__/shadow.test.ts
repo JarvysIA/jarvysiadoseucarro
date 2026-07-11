@@ -223,9 +223,12 @@ describe("shadow — instância e modo", () => {
 
 describe("shadow — state", () => {
   test("state ausente → virtual idle, stateVersion=0, fallbackCount=0, draftVersion=0", async () => {
-    const { res, events } = await run();
+    const input: ShadowInput = { ...BASE_INPUT, message: { ...BASE_INPUT.message, textBody: "oi" } };
+    const { client } = makeSupabase({ rows: baseRows() });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(input, { supabase: client, logger });
     expect(res.status).toBe("evaluated");
-    // decisão sobre state idle com mensagem 'oi jarvys' — greeting
+    // texto 'oi' vs state virtual idle → greeting no core
     expect(events[0].eventKind).toBe("greeting");
   });
 
