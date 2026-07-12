@@ -6,6 +6,7 @@
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
+import { isRoutingOptOut } from "../_shared/whatsapp/routing.ts";
 import {
   runWhatsappOrchestratorShadow,
   type SupabaseLike as ShadowSupabaseLike,
@@ -61,12 +62,12 @@ function normalizeCommandText(text: string | null | undefined): string {
     .trim();
 }
 
-const OPTOUT = new Set(["SAIR", "PARAR", "CANCELAR", "NAO QUERO", "REMOVER", "STOP"]);
 const HELP = new Set(["OI", "OLA", "MENU", "AJUDA", "HELP", "?"]);
 
+// Opt-out delegado ao módulo compartilhado (routing.ts): fonte única de verdade
+// para produtor (webhook) e consumidor (worker legado).
 function looksLikeOptOut(t: string | null | undefined): boolean {
-  const n = normalizeCommandText(t);
-  return n !== "" && OPTOUT.has(n);
+  return isRoutingOptOut(t);
 }
 function looksLikeHelp(t: string | null | undefined): boolean {
   const n = normalizeCommandText(t);
@@ -212,6 +213,7 @@ async function claimNext(
     .from("whatsapp_processing_queue")
     .select("id, message_id, event_id, queue_type, attempts, max_attempts")
     .eq("status", "queued")
+    .eq("route_owner", "legacy")
     .lte("scheduled_at", nowIso)
     .order("scheduled_at", { ascending: true })
     .limit(batchSize);
@@ -228,6 +230,7 @@ async function claimNext(
       })
       .eq("id", r.id)
       .eq("status", "queued")
+      .eq("route_owner", "legacy")
       .select("id, message_id, event_id, queue_type, attempts, max_attempts")
       .maybeSingle();
     if (upd) claimed.push(upd as QueueItem);

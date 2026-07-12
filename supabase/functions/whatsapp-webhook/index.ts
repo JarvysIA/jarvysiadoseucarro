@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
 import { normalizeZapiInbound } from "../_shared/whatsapp/normalize.ts";
+import { decideRouteOwner } from "../_shared/whatsapp/routing.ts";
 import type { NormalizedWhatsappInbound } from "../_shared/whatsapp/types.ts";
 
 const MAX_PAYLOAD_BYTES = 512 * 1024;
@@ -191,7 +192,7 @@ Deno.serve(async (req) => {
 
     const { data: inst, error: instErr } = await supabase
       .from("whatsapp_provider_instances")
-      .select("id, status, health_status")
+      .select("id, status, health_status, orchestrator_mode")
       .eq("provider", PROVIDER)
       .eq("instance_id", n.instanceId)
       .maybeSingle();
@@ -314,12 +315,18 @@ Deno.serve(async (req) => {
 
     const messageId = msgRow?.id as string | undefined;
     const queueType = decideQueueType(n);
+    const routeOwner = decideRouteOwner({
+      messageType: n.messageType,
+      textBody: n.textBody,
+      orchestratorMode: (inst as { orchestrator_mode?: string | null }).orchestrator_mode ?? null,
+    });
 
     // 6. Enfileira.
     const { error: qErr } = await supabase.from("whatsapp_processing_queue").insert({
       message_id: messageId ?? null,
       event_id: eventId ?? null,
       queue_type: queueType,
+      route_owner: routeOwner,
       status: "queued",
       attempts: 0,
       max_attempts: 5,
@@ -350,10 +357,11 @@ Deno.serve(async (req) => {
         ...baseLog,
         status: "queued",
         queue_type: queueType,
+        route_owner: routeOwner,
         elapsed_ms: Date.now() - startedAt,
       }),
     );
-    return json({ ok: true, message_id: messageId, queued: true, queue_type: queueType });
+    return json({ ok: true, message_id: messageId, queued: true, queue_type: queueType, route_owner: routeOwner });
   } catch (err) {
     console.error(
       JSON.stringify({
