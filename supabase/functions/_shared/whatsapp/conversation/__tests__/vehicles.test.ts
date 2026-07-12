@@ -10,6 +10,7 @@ function v(partial: Partial<ConversationVehicle> & { id: string }): Conversation
     plate: partial.plate ?? null,
     isArchived: partial.isArchived ?? false,
     isEligible: partial.isEligible ?? true,
+    kmAtual: partial.kmAtual ?? null,
     optionalLabel: partial.optionalLabel ?? null,
   };
 }

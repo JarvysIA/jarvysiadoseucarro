@@ -83,6 +83,14 @@ export type ConversationVehicle = {
   plate: string | null;
   isArchived: boolean;
   isEligible: boolean;
+  /**
+   * Build 5.7F2E1A.5-MA — transporte read-only de veiculos.km_atual.
+   * - null representa km_atual IS NULL no banco;
+   * - 0 é KM zero válido (não convertido para null);
+   * - inteiro seguro no range PostgreSQL integer (0..2147483647);
+   * - o core NÃO consome este campo neste build.
+   */
+  kmAtual: number | null;
   optionalLabel?: string | null;
 };
 
