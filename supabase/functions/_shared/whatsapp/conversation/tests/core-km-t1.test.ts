@@ -438,7 +438,8 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     expect(d.statePatch.draftType).toBe("km_update");
     // draftId é preservado do parcial (não muda para o sourceMessageId da resposta).
     expect(d.statePatch.draftId).toBe(MSG_UUID_A);
-    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
+    // Promoção do MESMO draft parcial: version persistida avança 0 → 1.
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_PROMOTED_DRAFT_VERSION);
     expect(d.statePatch.activeVehicleId).toBe(VEH_UUID_2);
     // lastMessageId acompanha a mensagem atual (a de seleção).
     expect(d.statePatch.lastMessageId).toBe(MSG_UUID_B);
