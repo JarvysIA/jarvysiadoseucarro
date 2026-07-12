@@ -2,11 +2,16 @@
 // Módulo 100% puro: sem I/O, sem Supabase, sem env, sem clock, sem crypto, sem rede.
 
 // ---------------------------------------------------------------------------
-// Constantes de versão externa (não pertencem ao payload do draft)
+// Constantes de versão de PERSISTÊNCIA do draft (não pertencem ao payload).
+// draftVersion representa evolução persistida/concorrência (CAS), não a phase:
+//   - INITIAL (0): todo draft novo, independentemente da phase (parcial ou
+//     completo direto criado no idle).
+//   - PROMOTED (1): mesmo draftId promovido uma vez após seleção válida
+//     (partial → complete). Phase e version são conceitos independentes.
 // ---------------------------------------------------------------------------
 
-export const KM_UPDATE_PARTIAL_DRAFT_VERSION = 0 as const;
-export const KM_UPDATE_COMPLETE_DRAFT_VERSION = 1 as const;
+export const KM_UPDATE_INITIAL_DRAFT_VERSION = 0 as const;
+export const KM_UPDATE_PROMOTED_DRAFT_VERSION = 1 as const;
 
 // ---------------------------------------------------------------------------
 // Limites locais (independentes de banco)
