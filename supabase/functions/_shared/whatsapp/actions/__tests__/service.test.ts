@@ -725,10 +725,11 @@ describe("J. logs sanitizados", () => {
     newKm: 876543212,
   };
 
-  // Strings sensíveis: apenas as que NÃO podem aparecer sob nenhuma chave.
-  // draftId/queueItemId são chaves permitidas do contrato, portanto seus
-  // valores podem aparecer legitimamente e são omitidos desta lista.
+  // Strings sensíveis: todos os identificadores agora são proibidos em qualquer
+  // valor de log, seja como chave ou interpolados em campos permitidos.
   const SENSITIVE_STRINGS = [
+    SENTINEL.draftId,
+    SENTINEL.queueItemId,
     SENTINEL.conversationStateId,
     SENTINEL.confirmationMessageId,
     SENTINEL.sourceMessageId,
