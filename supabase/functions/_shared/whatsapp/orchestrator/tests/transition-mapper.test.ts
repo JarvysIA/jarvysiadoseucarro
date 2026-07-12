@@ -448,7 +448,7 @@ describe("8. anti-T2 / anti-E1A", () => {
         draftPayload: { vehicleId: VEH_1, newKm: 12345 },
       },
     });
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       decision: { ...d, nextState: "awaiting_km_confirmation" },
     });
