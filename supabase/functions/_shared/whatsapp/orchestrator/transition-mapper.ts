@@ -1,9 +1,12 @@
-// Build 5.7F2E1A.5-MH — Mapper produtivo puro:
+// Build 5.7F2E1A.5-MH.1 — Mapper produtivo puro:
 //   ConversationCoreDecision → TransitionInput
 //
-// Reproduz 1:1 a semântica comprovada em MG (test-only) e a promove a um
-// módulo produtivo, único e reutilizável. Puro: sem I/O, sem Repository,
-// sem RPC, sem banco, sem clock, sem logger, sem side effects.
+// Corrige o BUILD MH removendo qualquer fabricação de resposta. O mapper
+// agora exige que o chamador forneça explicitamente a `response` real (ou
+// null) já preparada em camada superior, valida a coerência com a decisão
+// e apenas a transporta. Continua puro: sem I/O, sem Repository, sem RPC,
+// sem banco, sem clock, sem logger, sem side effects, sem renderer,
+// sem templates, sem texto sintético.
 //
 // Este módulo NÃO é importado por worker, webhook, Shadow, test-service ou
 // qualquer runtime neste build. Apenas testes e o barrel podem importá-lo.
@@ -65,12 +68,15 @@ export type MapConversationDecisionToTransitionInputArgs = Readonly<{
   leaseToken: string;
   expectedStateVersion: number;
   orchestratorVersion: string;
+  /**
+   * Response real já preparada pelo chamador em camada superior (renderer
+   * externo). Deve ser `null` quando — e somente quando — a decisão não
+   * possui `responseKey`. Quando fornecida, seu `responseKey` deve ser
+   * exatamente igual ao da decisão. O mapper apenas a transporta:
+   * NUNCA fabrica textBody, NUNCA renderiza, NUNCA aplica fallback.
+   */
+  response: OutboundResponsePayload | null;
 }>;
-
-// Corpo sintético usado quando a decisão possui responseKey. O texto real é
-// renderizado por responses.ts em camada superior (não é responsabilidade do
-// mapper). Mantido idêntico ao mapper local do MG para preservar contrato.
-const SYNTHETIC_RESPONSE_TEXT_BODY = "synthetic-body";
 
 /**
  * Converte uma ConversationCoreDecision em TransitionInput imutável, pronto
@@ -86,8 +92,9 @@ const SYNTHETIC_RESPONSE_TEXT_BODY = "synthetic-body";
  *     lança RepositoryError("state_mismatch") — nunca escolhe silenciosamente.
  *  5. null explícito no patch é preservado (semântica de limpeza da RPC).
  *  6. resultSummary usa camelCase estrito (decisionKind, eventKind, outcome).
- *  7. response é derivado de responseKey; ausente/null quando responseKey é null.
- *  8. Nenhum campo da decisão original é mutado.
+ *  7. response é apenas transportada do argumento; coerência com responseKey
+ *     é validada, mas nenhum textBody é fabricado.
+ *  8. Nenhum campo da decisão ou da response original é mutado.
  */
 export function mapConversationDecisionToTransitionInput(
   args: MapConversationDecisionToTransitionInputArgs,
@@ -98,6 +105,7 @@ export function mapConversationDecisionToTransitionInput(
     leaseToken,
     expectedStateVersion,
     orchestratorVersion,
+    response: providedResponse,
   } = args;
 
   if (!PERSISTIBLE_DECISION_KINDS.has(decision.decisionKind)) {
@@ -128,12 +136,7 @@ export function mapConversationDecisionToTransitionInput(
     );
   }
 
-  const response: OutboundResponsePayload | null = decision.responseKey
-    ? {
-      responseKey: decision.responseKey,
-      textBody: SYNTHETIC_RESPONSE_TEXT_BODY,
-    }
-    : null;
+  const response = validateAndCopyResponse(decision.responseKey, providedResponse);
 
   return {
     queueItemId,
@@ -148,4 +151,52 @@ export function mapConversationDecisionToTransitionInput(
     },
     response,
   };
+}
+
+/**
+ * Valida a coerência entre `decision.responseKey` e a `response` fornecida
+ * pelo chamador. Retorna uma cópia rasa imutável da response (ou null).
+ *
+ * O mapper NUNCA fabrica textBody nem invoca renderer. Toda mensagem real
+ * deve chegar aqui já preparada.
+ */
+function validateAndCopyResponse(
+  responseKey: string | null,
+  provided: OutboundResponsePayload | null,
+): OutboundResponsePayload | null {
+  if (responseKey === null || responseKey === undefined) {
+    if (provided !== null) {
+      throw new RepositoryError(
+        "response_unexpected",
+        "response provided but decision has no responseKey",
+      );
+    }
+    return null;
+  }
+
+  if (provided === null) {
+    throw new RepositoryError(
+      "response_missing",
+      "decision has responseKey but no response was provided",
+    );
+  }
+
+  if (provided.responseKey !== responseKey) {
+    throw new RepositoryError(
+      "response_key_mismatch",
+      "provided response.responseKey diverges from decision.responseKey",
+    );
+  }
+
+  // Cópia rasa imutável — não referencia o objeto original.
+  const copy: OutboundResponsePayload = {
+    responseKey: provided.responseKey,
+    textBody: provided.textBody,
+  };
+  if (provided.messageType !== undefined) copy.messageType = provided.messageType;
+  if (provided.purpose !== undefined) copy.purpose = provided.purpose;
+  if (provided.priority !== undefined) copy.priority = provided.priority;
+  if (provided.scheduledAt !== undefined) copy.scheduledAt = provided.scheduledAt;
+  if (provided.expiresAt !== undefined) copy.expiresAt = provided.expiresAt;
+  return copy;
 }
