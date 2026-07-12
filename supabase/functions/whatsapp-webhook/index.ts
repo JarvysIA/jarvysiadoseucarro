@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
 
     const { data: inst, error: instErr } = await supabase
       .from("whatsapp_provider_instances")
-      .select("id, status, health_status")
+      .select("id, status, health_status, orchestrator_mode")
       .eq("provider", PROVIDER)
       .eq("instance_id", n.instanceId)
       .maybeSingle();
