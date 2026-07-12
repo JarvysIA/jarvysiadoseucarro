@@ -4,7 +4,7 @@
 // não baixa mídia; não grava despesa; não atualiza KM.
 // Jarvys = cérebro; Z-API = canal.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
 import {
   runWhatsappOrchestratorShadow,
@@ -73,7 +73,7 @@ function looksLikeHelp(t: string | null | undefined): boolean {
   return n !== "" && HELP.has(n);
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
+type WorkerSupabaseClient = SupabaseClient<any, "public", any>;
 
 type QueueItem = {
   id: string;
@@ -117,7 +117,7 @@ type Decision = {
 };
 
 async function findPhoneFromEvent(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   eventId: string | null,
 ): Promise<string | null> {
   if (!eventId) return null;
@@ -130,7 +130,7 @@ async function findPhoneFromEvent(
 }
 
 async function findPhoneFromContact(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   contactId: string | null,
 ): Promise<string | null> {
   if (!contactId) return null;
@@ -143,7 +143,7 @@ async function findPhoneFromContact(
 }
 
 async function onboardingRecentlySent(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   phoneE164: string,
 ): Promise<boolean> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -158,7 +158,7 @@ async function onboardingRecentlySent(
 }
 
 async function enqueueOutboundText(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   params: {
     user_id: string | null;
     contact_id: string | null;
@@ -204,7 +204,7 @@ function reevaluateQueueType(
 }
 
 async function claimNext(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   batchSize: number,
 ): Promise<QueueItem[]> {
   const nowIso = new Date().toISOString();
@@ -239,7 +239,7 @@ function backoffMinutes(attempts: number): number {
   return Math.min(Math.pow(2, attempts), 60);
 }
 
-async function markDone(supabase: SupabaseClient, queueId: string) {
+async function markDone(supabase: WorkerSupabaseClient, queueId: string) {
   await supabase
     .from("whatsapp_processing_queue")
     .update({
@@ -251,7 +251,7 @@ async function markDone(supabase: SupabaseClient, queueId: string) {
 }
 
 async function markCancelled(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   queueId: string,
   reason: string,
 ) {
@@ -266,7 +266,7 @@ async function markCancelled(
 }
 
 async function markFailOrRetry(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   item: QueueItem,
   errShort: string,
 ) {
@@ -293,7 +293,7 @@ async function markFailOrRetry(
 }
 
 async function updateMessageDecision(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   messageId: string | null,
   decision: Decision,
   msgStatus: "processed" | "ignored" | "cancelled" | "failed",
@@ -306,7 +306,7 @@ async function updateMessageDecision(
 }
 
 async function processItem(
-  supabase: SupabaseClient,
+  supabase: WorkerSupabaseClient,
   item: QueueItem,
   baseLog: Record<string, unknown>,
 ): Promise<{ action: ActionKind | "no_message"; status: string }> {
