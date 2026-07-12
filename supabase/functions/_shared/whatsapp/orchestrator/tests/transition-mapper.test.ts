@@ -77,6 +77,33 @@ function fixtureResponseFor(
   return { responseKey: d.responseKey, textBody };
 }
 
+/**
+ * Wrapper de testes: chama o mapper produtivo injetando automaticamente uma
+ * response de fixture coerente com a decisão, salvo quando o teste fornece
+ * `response` explicitamente (inclusive `null`).
+ */
+function callMapper(
+  args: {
+    decision: ConversationCoreDecision;
+    queueItemId: string;
+    leaseToken: string;
+    expectedStateVersion: number;
+    orchestratorVersion: string;
+    response?: OutboundResponsePayload | null;
+  },
+) {
+  const response =
+    "response" in args ? args.response! : fixtureResponseFor(args.decision);
+  return mapConversationDecisionToTransitionInput({
+    decision: args.decision,
+    queueItemId: args.queueItemId,
+    leaseToken: args.leaseToken,
+    expectedStateVersion: args.expectedStateVersion,
+    orchestratorVersion: args.orchestratorVersion,
+    response: response as OutboundResponsePayload | null,
+  });
+}
+
 // ===========================================================================
 // 1. Mapeamento simples
 // ===========================================================================
