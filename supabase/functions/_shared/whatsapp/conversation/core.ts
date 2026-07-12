@@ -292,6 +292,60 @@ export function decideConversation(
       activeVehicleId: effectiveState.activeVehicleId,
     });
     if (resolved.kind === "matched") {
+      // Preservação/completação de draft parcial de km_update
+      const partial = extractPartialKmDraft(effectiveState);
+      if (partial !== null) {
+        const veh = resolved.vehicle;
+        const prev = veh.kmAtual;
+        const isCorrection = prev !== null && partial.newKm < prev;
+        const completeCandidate = {
+          phase: "awaiting_confirmation" as const,
+          vehicleId: veh.id,
+          expectedPreviousKm: prev,
+          newKm: partial.newKm,
+          requestMessageId: partial.requestMessageId,
+          isCorrection,
+        };
+        const validated =
+          validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
+        if (validated.ok && isUuid(veh.id)) {
+          const nextState: ConversationStateName = isCorrection
+            ? "awaiting_km_correction_confirmation"
+            : "awaiting_km_confirmation";
+          return buildDecision({
+            eventKind: "vehicle_reply",
+            decisionKind: "transition",
+            previousState,
+            nextState,
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: nextState,
+                currentIntent: "km_update",
+                awaitingField: "confirmation",
+                draftType: "km_update",
+                draftId: partial.requestMessageId,
+                draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+                draftPayload: validated.value as unknown as Record<string, unknown>,
+                activeVehicleId: veh.id,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: isCorrection
+              ? "km_update_correction_confirmation"
+              : "km_update_confirmation",
+            responseParams: {
+              vehicleLabel: labelFor(veh),
+              newKm: partial.newKm,
+              previousKm: prev,
+            },
+            nextFallbackCount: 0,
+            reasonCode: isCorrection
+              ? "km_update_complete_from_vehicle_reply_correction"
+              : "km_update_complete_from_vehicle_reply",
+          });
+        }
+        // Invariante violada — não persistir draft inválido; segue caminho legado.
+      }
       return buildDecision({
         eventKind: "vehicle_reply",
         decisionKind: "select_vehicle",
