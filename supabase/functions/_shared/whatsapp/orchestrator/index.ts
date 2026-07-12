@@ -15,3 +15,14 @@ export type {
   RpcResponse,
   SupabaseLike,
 } from "./repository.ts";
+export { runWhatsappOrchestratorTestCycle } from "./test-service.ts";
+export type {
+  ItemOutcome,
+  TestCycleCounts,
+  TestCycleDeps,
+  TestCycleInput,
+  TestCycleResult,
+  TestServiceLogEvent,
+  TestServiceLogEventName,
+  TestServiceLogger,
+} from "./test-service.ts";
