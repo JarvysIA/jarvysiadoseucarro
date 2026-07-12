@@ -1123,8 +1123,8 @@ describe("static safety", () => {
       "whatsapp-process-inbound",
       "openai",
       "gemini",
-      "ocr",
-      "tesseract",
+      "parse-receipt",
+      "openai",
     ];
     for (const s of banned) {
       expect(src.toLowerCase().includes(s.toLowerCase())).toBe(false);
