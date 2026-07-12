@@ -69,7 +69,7 @@ describe("validateAwaitingVehicleKmUpdateDraft", () => {
     expect(r.ok && r.value.requestMessageId).toBe(UUID_V1);
   });
 
-  it.each([null, [], "x", 1, true, new Date()])(
+  it.each([[null], [[]], ["x"], [1], [true], [new Date()]])(
     "rejeita não-objeto: %p",
     (v) => {
       const r = validateAwaitingVehicleKmUpdateDraft(v);
