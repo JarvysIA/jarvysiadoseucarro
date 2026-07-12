@@ -184,8 +184,8 @@ function parseExplicitReport(normalized: string): KmUpdateParseResult {
   let m: RegExpExecArray | null;
   while ((m = EXPR_RE.exec(normalized)) !== null) {
     if (++iter > MAX_MATCH_ITER) break;
-    const numStr = m[1] ?? m[3];
-    const milStr = m[2] ?? m[4];
+    const numStr = m[1] ?? m[3] ?? m[5];
+    const milStr = m[2] ?? m[4] ?? m[6];
     if (typeof numStr !== "string" || numStr.length === 0) {
       // Evita loop infinito caso o motor produza match de tamanho zero.
       if (EXPR_RE.lastIndex === m.index) EXPR_RE.lastIndex++;
