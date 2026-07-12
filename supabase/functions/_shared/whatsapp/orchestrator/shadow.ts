@@ -279,7 +279,7 @@ export async function runWhatsappOrchestratorShadow(
           .maybeSingle(),
         deps.supabase
           .from("veiculos")
-          .select<VehicleRow>("id, marca, modelo, placa, status")
+          .select<VehicleRow>("id, marca, modelo, placa, status, km_atual")
           .eq("user_id", input.userId)
           .abortSignal(controller.signal),
       ]);
@@ -310,16 +310,22 @@ export async function runWhatsappOrchestratorShadow(
     void stateVersion;
 
     const allVehicles: VehicleRow[] = vehiclesResp.data ?? [];
-    const eligibleVehicles: ConversationVehicle[] = allVehicles
-      .filter((v) => v.status !== "archived")
-      .map((v) => ({
-        id: v.id,
-        brand: v.marca,
-        model: v.modelo,
-        plate: v.placa,
-        isArchived: false,
-        isEligible: true,
-      }));
+    let eligibleVehicles: ConversationVehicle[];
+    try {
+      eligibleVehicles = allVehicles
+        .filter((v) => v.status !== "archived")
+        .map((v) => ({
+          id: v.id,
+          brand: v.marca,
+          model: v.modelo,
+          plate: v.placa,
+          isArchived: false,
+          isEligible: true,
+          kmAtual: parseKmAtualShadow(v.km_atual),
+        }));
+    } catch {
+      return emitFailed(baseLog, startedAt, "vehicles_lookup_failed", logger);
+    }
 
     let activeVehicleIssue: "invalid" | "archived" | null = null;
     if (state.activeVehicleId) {
