@@ -933,3 +933,76 @@ describe("claimItems — no retry", () => {
     expect(calls).toBe(1);
   });
 });
+
+// ============================================================
+// Build 5.7F2E1A.5-MA — kmAtual plumbing (integer|null, sem coerção)
+// ============================================================
+
+describe("loadContext — kmAtual (Build 5.7F2E1A.5-MA)", () => {
+  function rowsWithKm(km_atual: unknown): TableRows {
+    return baseRows({
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active", km_atual },
+      ],
+    });
+  }
+
+  test("km_atual NULL → kmAtual null", async () => {
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(null))).loadContext(CLAIMED);
+    if (res.kind !== "ok") throw new Error("expected ok");
+    expect(res.context.vehicles[0].kmAtual).toBeNull();
+  });
+
+  test("km_atual 0 → kmAtual 0 (não vira null)", async () => {
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(0))).loadContext(CLAIMED);
+    if (res.kind !== "ok") throw new Error("expected ok");
+    expect(res.context.vehicles[0].kmAtual).toBe(0);
+  });
+
+  test("km_atual inteiro positivo é preservado", async () => {
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(123456))).loadContext(CLAIMED);
+    if (res.kind !== "ok") throw new Error("expected ok");
+    expect(res.context.vehicles[0].kmAtual).toBe(123456);
+  });
+
+  test("km_atual 2147483647 (INT max) é preservado", async () => {
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(2147483647))).loadContext(CLAIMED);
+    if (res.kind !== "ok") throw new Error("expected ok");
+    expect(res.context.vehicles[0].kmAtual).toBe(2147483647);
+  });
+
+  test("km_atual string '1000' → MalformedResponseError (sem coerção silenciosa)", async () => {
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm("1000")));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("km_atual decimal 100.5 → MalformedResponseError", async () => {
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(100.5)));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("km_atual acima de 2147483647 → MalformedResponseError", async () => {
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(2147483648)));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("km_atual negativo → MalformedResponseError", async () => {
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(-1)));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("demais campos permanecem inalterados junto de kmAtual", async () => {
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(42))).loadContext(CLAIMED);
+    if (res.kind !== "ok") throw new Error("expected ok");
+    expect(res.context.vehicles[0]).toEqual({
+      id: "v1",
+      brand: "Fiat",
+      model: "Argo",
+      plate: "ABC1D23",
+      isArchived: false,
+      isEligible: true,
+      kmAtual: 42,
+    });
+  });
+});
+
