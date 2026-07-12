@@ -838,6 +838,20 @@ function mapStateRow(row: Record<string, unknown>): ConversationState {
   };
 }
 
+// Build 5.7F2E1A.5-MA — range válido para veiculos.km_atual (PostgreSQL integer, uso conversacional).
+const KM_ATUAL_MAX = 2147483647;
+
+function parseKmAtual(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "number") {
+    throw new MalformedResponseError("veiculos.km_atual com tipo inesperado (esperado integer|null)");
+  }
+  if (!Number.isInteger(raw) || raw < 0 || raw > KM_ATUAL_MAX) {
+    throw new MalformedResponseError("veiculos.km_atual fora do range válido (0..2147483647 integer)");
+  }
+  return raw;
+}
+
 function mapVehicleRow(row: Record<string, unknown>): ConversationVehicle {
   const status = typeof row.status === "string" ? row.status : "";
   const isArchived = status === "archived";
@@ -848,6 +862,7 @@ function mapVehicleRow(row: Record<string, unknown>): ConversationVehicle {
     plate: (row.placa as string | null) ?? null,
     isArchived,
     isEligible: !isArchived,
+    kmAtual: parseKmAtual(row.km_atual),
   };
 }
 
