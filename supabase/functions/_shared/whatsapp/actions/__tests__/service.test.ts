@@ -612,13 +612,13 @@ const ALLOWED_LOG_KEYS = new Set<string>([
   "reasonCode",
   "isCorrection",
   "durationMs",
-  "draftId",
-  "queueItemId",
-  "actionExecutionId",
 ]);
 
 // Chaves sensíveis que jamais podem aparecer em nenhum registro (nem aninhadas).
 const FORBIDDEN_LOG_KEYS = new Set<string>([
+  "draftId",
+  "queueItemId",
+  "actionExecutionId",
   "confirmationMessageId",
   "sourceMessageId",
   "conversationStateId",
@@ -632,6 +632,8 @@ const FORBIDDEN_LOG_KEYS = new Set<string>([
   "expectedStateVersion",
   "orchestratorVersion",
   "payload",
+  "input",
+  "metadata",
   "phone",
   "plate",
   "message",
