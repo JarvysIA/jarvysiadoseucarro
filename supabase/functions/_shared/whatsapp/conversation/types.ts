@@ -141,11 +141,15 @@ export type ConversationResponseKey =
   | "no_eligible_vehicle"
   | "fallback_first"
   | "fallback_second"
-  | "fallback_reset";
+  | "fallback_reset"
+  | "km_update_confirmation"
+  | "km_update_correction_confirmation";
 
 export type ConversationResponseParams = {
   vehicleLabel?: string;
   options?: string[];
+  newKm?: number;
+  previousKm?: number | null;
 };
 
 export type ConversationCoreDecision = {
