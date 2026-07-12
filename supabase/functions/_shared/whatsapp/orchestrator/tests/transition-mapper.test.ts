@@ -92,15 +92,16 @@ function callMapper(
     response?: OutboundResponsePayload | null;
   },
 ) {
-  const response =
-    "response" in args ? args.response! : fixtureResponseFor(args.decision);
+  const response = "response" in args
+    ? (args.response as OutboundResponsePayload | null)
+    : fixtureResponseFor(args.decision);
   return mapConversationDecisionToTransitionInput({
     decision: args.decision,
     queueItemId: args.queueItemId,
     leaseToken: args.leaseToken,
     expectedStateVersion: args.expectedStateVersion,
     orchestratorVersion: args.orchestratorVersion,
-    response: response as OutboundResponsePayload | null,
+    response,
   });
 }
 
