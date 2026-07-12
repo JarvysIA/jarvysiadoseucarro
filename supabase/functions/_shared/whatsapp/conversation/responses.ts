@@ -44,5 +44,25 @@ export function renderResponse(
       return "Desculpa, ainda não consegui entender. Me diga em uma frase o que você precisa.";
     case "fallback_reset":
       return "Vamos começar de novo. O que você precisa sobre seu carro?";
+    case "km_update_confirmation": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const nk = formatKm(params.newKm);
+      const prev = params.previousKm;
+      if (typeof prev === "number") {
+        return `Anotar ${nk} km no ${label} (hoje está ${formatKm(prev)} km)? Responda sim para confirmar ou não para cancelar.`;
+      }
+      return `Anotar ${nk} km no ${label}? Responda sim para confirmar ou não para cancelar.`;
+    }
+    case "km_update_correction_confirmation": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const nk = formatKm(params.newKm);
+      const prev = formatKm(params.previousKm ?? undefined);
+      return `O ${label} está com ${prev} km. Corrigir para ${nk} km (valor menor)? Responda sim para confirmar.`;
+    }
   }
+}
+
+function formatKm(value: number | undefined | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "?";
+  return String(Math.trunc(value));
 }
