@@ -357,10 +357,11 @@ Deno.serve(async (req) => {
         ...baseLog,
         status: "queued",
         queue_type: queueType,
+        route_owner: routeOwner,
         elapsed_ms: Date.now() - startedAt,
       }),
     );
-    return json({ ok: true, message_id: messageId, queued: true, queue_type: queueType });
+    return json({ ok: true, message_id: messageId, queued: true, queue_type: queueType, route_owner: routeOwner });
   } catch (err) {
     console.error(
       JSON.stringify({
