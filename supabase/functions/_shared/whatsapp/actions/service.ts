@@ -1,6 +1,6 @@
 // Build 5.7F2E1A — Serviço puro e desconectado de atualização confirmada de KM.
-// TypeScript puro. Sem Supabase, sem Deno.env, sem fetch, sem crypto, sem React.
-// Executor chamado no máximo uma vez. Qualquer exception -> outcome_unknown.
+// TypeScript puro e desconectado. Executor chamado no máximo uma vez.
+// Qualquer exception lançada pela porta -> outcome_unknown.
 
 import {
   KM_MAX_VALUE,
