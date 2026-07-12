@@ -8,6 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  mapConversationDecisionToTransitionInput,
   WhatsappOrchestratorRepository,
   serializePatch,
   type RpcInvoker,
@@ -103,40 +104,27 @@ function makeInput(overrides: Partial<ConversationCoreInput> = {}): Conversation
 }
 
 // ---------------------------------------------------------------------------
-// Mapper test-only: ConversationCoreDecision → TransitionInput
+// Adaptador local ao mapper produtivo (BUILD 5.7F2E1A.5-MH).
 //
-// Semântica:
-//  - strip lastMessageId (não aceito por serializePatch);
-//  - preserva todos os demais campos do patch por identidade;
-//  - garante state (obrigatório em serializePatch): usa d.nextState quando o
-//    core omite state no patch (caminhos que preservam snapshot);
-//  - resultSummary é 1:1 com d;
-//  - response opcional derivado de responseKey (textBody sintético).
+// O mapper local test-only foi removido; toda conversão passa agora pelo
+// módulo produtivo transition-mapper.ts. Este helper apenas injeta os campos
+// de infraestrutura (queueItemId, leaseToken, orchestratorVersion) que são
+// estáveis dentro deste arquivo de testes.
 // ---------------------------------------------------------------------------
 
 function decisionToTransition(
   d: ConversationCoreDecision,
   expectedStateVersion: number,
 ): TransitionInput {
-  const patch: ConversationStatePatch = { ...d.statePatch };
-  delete patch.lastMessageId;
-  if (patch.state === undefined) patch.state = d.nextState;
-  return {
+  return mapConversationDecisionToTransitionInput({
+    decision: d,
     queueItemId: QUEUE_ITEM_ID,
     leaseToken: LEASE_TOKEN,
     expectedStateVersion,
-    patch,
     orchestratorVersion: ORCH_VERSION,
-    resultSummary: {
-      decisionKind: d.decisionKind,
-      eventKind: d.eventKind,
-      outcome: d.outcome,
-    },
-    response: d.responseKey
-      ? { responseKey: d.responseKey, textBody: "synthetic-body" }
-      : null,
-  };
+  });
 }
+
 
 // ---------------------------------------------------------------------------
 // Mock fiel da RPC apply_whatsapp_orchestrator_transition

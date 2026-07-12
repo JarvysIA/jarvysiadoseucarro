@@ -26,3 +26,9 @@ export type {
   TestServiceLogEventName,
   TestServiceLogger,
 } from "./test-service.ts";
+export { mapConversationDecisionToTransitionInput } from "./transition-mapper.ts";
+export type {
+  MapConversationDecisionToTransitionInputArgs,
+  PersistibleConversationCoreDecision,
+  PersistibleDecisionKind,
+} from "./transition-mapper.ts";
