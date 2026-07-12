@@ -329,7 +329,8 @@ describe("range", () => {
     err(parseKmUpdateText("2147484 mil km", "explicit_report"), "km_out_of_range");
   });
   it("'2147483 mil km' → km_out_of_range (2.147.483.000 > MAX)", () => {
-    err(parseKmUpdateText("2147483 mil km", "explicit_report"), "km_out_of_range");
+    // 2147483 * 1000 = 2_147_483_000 → dentro do range (< 2_147_483_647).
+    ok(parseKmUpdateText("2147483 mil km", "explicit_report"), 2147483000);
   });
   it("'0 mil km' → 0 válido", () => {
     ok(parseKmUpdateText("0 mil km", "explicit_report"), 0);
