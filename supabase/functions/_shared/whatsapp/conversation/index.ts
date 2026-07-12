@@ -26,3 +26,9 @@ export type {
   KmUpdateDraftValidationErrorCode,
   KmUpdateDraftValidationResult,
 } from "./km-update-draft.ts";
+export { parseKmUpdateText } from "./km-update-parser.ts";
+export type {
+  KmUpdateParseErrorCode,
+  KmUpdateParseMode,
+  KmUpdateParseResult,
+} from "./km-update-parser.ts";
