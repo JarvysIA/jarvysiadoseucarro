@@ -991,6 +991,17 @@ describe("loadContext — kmAtual (Build 5.7F2E1A.5-MA)", () => {
     await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
   });
 
+  test("km_atual undefined (coluna ausente) → MalformedResponseError (NÃO vira null)", async () => {
+    // Build 5.7F2E1A.5-MA correção: distinguir NULL de undefined.
+    const rowsMissing: TableRows = baseRows({
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active" },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rowsMissing));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
   test("demais campos permanecem inalterados junto de kmAtual", async () => {
     const res = await new WhatsappOrchestratorRepository(makeCtxClient(rowsWithKm(42))).loadContext(CLAIMED);
     if (res.kind !== "ok") throw new Error("expected ok");

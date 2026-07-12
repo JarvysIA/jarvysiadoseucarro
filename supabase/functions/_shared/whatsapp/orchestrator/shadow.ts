@@ -186,7 +186,10 @@ type VehicleRow = {
 // Build 5.7F2E1A.5-MA — mesma regra de validação usada no Repository.
 const KM_ATUAL_MAX = 2147483647;
 function parseKmAtualShadow(raw: unknown): number | null {
-  if (raw === null || raw === undefined) return null;
+  if (raw === null) return null;
+  if (raw === undefined) {
+    throw new Error("veiculos.km_atual ausente (undefined) — esperado integer|null");
+  }
   if (typeof raw !== "number") {
     throw new Error("veiculos.km_atual com tipo inesperado (esperado integer|null)");
   }
