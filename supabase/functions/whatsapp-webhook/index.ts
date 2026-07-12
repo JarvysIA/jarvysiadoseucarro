@@ -3,7 +3,7 @@
 // NÃO faz: OCR, IA, download de mídia, envio outbound, gravação de despesa,
 // FIPE, pagamento, chamada externa Z-API. Regra: Jarvys = cérebro, Z-API = canal.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
 import { normalizeZapiInbound } from "../_shared/whatsapp/normalize.ts";
 import { decideRouteOwner } from "../_shared/whatsapp/routing.ts";
@@ -81,10 +81,15 @@ function decideQueueType(n: NormalizedWhatsappInbound): string {
   }
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// Alias local estritamente tipado. O valor de runtime retornado por
+// createClient(url, serviceRoleKey) sem genéricos é SupabaseClient<any,"public",any>;
+// o antigo ReturnType<typeof createClient> resolvia com defaults incompatíveis
+// (<unknown, never, GenericSchema>). Padrão idêntico ao WorkerSupabaseClient do
+// whatsapp-process-inbound (Build 5.7F2C1.1).
+type WebhookSupabaseClient = SupabaseClient<any, "public", any>;
 
 async function insertIgnoredEvent(
-  supabase: SupabaseClient,
+  supabase: WebhookSupabaseClient,
   n: NormalizedWhatsappInbound,
   errorMessage: string,
 ): Promise<void> {
