@@ -32,3 +32,13 @@ export type {
   KmUpdateParseMode,
   KmUpdateParseResult,
 } from "./km-update-parser.ts";
+export {
+  CONFIRM_KM_UPDATE_HANDOFF_KIND,
+  KM_REPORTED_EVENT_KIND,
+} from "./km-update-protocol.ts";
+export type {
+  ConfirmKmUpdateHandoff,
+  ConfirmKmUpdateHandoffKind,
+  KmReportedEvent,
+  KmReportedEventKind,
+} from "./km-update-protocol.ts";
