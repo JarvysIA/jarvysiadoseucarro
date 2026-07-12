@@ -612,13 +612,13 @@ const ALLOWED_LOG_KEYS = new Set<string>([
   "reasonCode",
   "isCorrection",
   "durationMs",
-  "draftId",
-  "queueItemId",
-  "actionExecutionId",
 ]);
 
 // Chaves sensíveis que jamais podem aparecer em nenhum registro (nem aninhadas).
 const FORBIDDEN_LOG_KEYS = new Set<string>([
+  "draftId",
+  "queueItemId",
+  "actionExecutionId",
   "confirmationMessageId",
   "sourceMessageId",
   "conversationStateId",
@@ -632,6 +632,8 @@ const FORBIDDEN_LOG_KEYS = new Set<string>([
   "expectedStateVersion",
   "orchestratorVersion",
   "payload",
+  "input",
+  "metadata",
   "phone",
   "plate",
   "message",
@@ -723,10 +725,11 @@ describe("J. logs sanitizados", () => {
     newKm: 876543212,
   };
 
-  // Strings sensíveis: apenas as que NÃO podem aparecer sob nenhuma chave.
-  // draftId/queueItemId são chaves permitidas do contrato, portanto seus
-  // valores podem aparecer legitimamente e são omitidos desta lista.
+  // Strings sensíveis: todos os identificadores agora são proibidos em qualquer
+  // valor de log, seja como chave ou interpolados em campos permitidos.
   const SENSITIVE_STRINGS = [
+    SENTINEL.draftId,
+    SENTINEL.queueItemId,
     SENTINEL.conversationStateId,
     SENTINEL.confirmationMessageId,
     SENTINEL.sourceMessageId,
@@ -817,9 +820,6 @@ describe("J. logs sanitizados", () => {
         outcome: "completed",
         isCorrection: false,
         durationMs: 0.123,
-        draftId: "d",
-        queueItemId: "q",
-        actionExecutionId: "ae",
       },
     ] as unknown as ConfirmedKmUpdateLogFields[];
     const noLeaks = findLogLeaks(clean, [SENTINEL.userId], [SENTINEL.newKm]);

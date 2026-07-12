@@ -190,8 +190,6 @@ export async function executeConfirmedKmUpdate(
       reasonCode: "correction_not_confirmed",
       isCorrection: true,
       durationMs: clock() - startedAt,
-      draftId: input.draftId,
-      queueItemId: input.queueItemId,
     });
     return { kind: "rejected", reason: "correction_not_confirmed" };
   }
@@ -223,8 +221,6 @@ export async function executeConfirmedKmUpdate(
     event: "km_update_dispatched",
     actionType: KM_UPDATE_ACTION_TYPE,
     isCorrection,
-    draftId: input.draftId,
-    queueItemId: input.queueItemId,
   });
 
   let executorResult: KmUpdateExecutorResult;
@@ -238,8 +234,6 @@ export async function executeConfirmedKmUpdate(
       reasonCode: category,
       isCorrection,
       durationMs: clock() - startedAt,
-      draftId: input.draftId,
-      queueItemId: input.queueItemId,
     });
     return { kind: "outcome_unknown", errorCategory: category };
   }
@@ -254,9 +248,6 @@ export async function executeConfirmedKmUpdate(
         outcome: "completed",
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
-        actionExecutionId: executorResult.actionExecutionId,
       });
       return {
         kind: "completed",
@@ -272,9 +263,6 @@ export async function executeConfirmedKmUpdate(
         outcome: "replayed",
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
-        actionExecutionId: executorResult.actionExecutionId,
       });
       return {
         kind: "replayed",
@@ -291,9 +279,6 @@ export async function executeConfirmedKmUpdate(
         outcome: "no_op",
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
-        actionExecutionId: executorResult.actionExecutionId,
       });
       return {
         kind: "no_op",
@@ -309,8 +294,6 @@ export async function executeConfirmedKmUpdate(
         reasonCode: executorResult.reason,
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
       });
       return { kind: "rejected", reason: executorResult.reason };
     }
@@ -322,8 +305,6 @@ export async function executeConfirmedKmUpdate(
         reasonCode: executorResult.reason,
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
       });
       return {
         kind: "conflicted",
@@ -344,10 +325,9 @@ export async function executeConfirmedKmUpdate(
         reasonCode: executorResult.reason,
         isCorrection,
         durationMs,
-        draftId: input.draftId,
-        queueItemId: input.queueItemId,
       });
       return { kind: "transient_failure", reason: executorResult.reason };
     }
   }
 }
+

@@ -217,9 +217,6 @@ export type ConfirmedKmUpdateLogFields = {
   reasonCode?: string;
   isCorrection?: boolean;
   durationMs?: number;
-  draftId?: string;
-  queueItemId?: string;
-  actionExecutionId?: string;
 };
 
 export interface ConfirmedKmUpdateLogger {
