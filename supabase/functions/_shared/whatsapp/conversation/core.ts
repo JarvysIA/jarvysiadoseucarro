@@ -106,6 +106,38 @@ function withLastMessage(
   return { ...patch, lastMessageId: sourceMessageId };
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function isUuid(value: string | null | undefined): value is string {
+  return typeof value === "string" && UUID_REGEX.test(value);
+}
+
+function firstEligible(vehicles: ConversationVehicle[]): ConversationVehicle[] {
+  return vehicles.filter((v) => v.isEligible && !v.isArchived);
+}
+
+function labelFor(v: ConversationVehicle): string {
+  return vehicleLabel(v);
+}
+
+/**
+ * Extrai draft parcial de km_update do state atual, se e somente se todas as
+ * invariantes forem verdadeiras: draftType km_update, versão 0, draftId UUID,
+ * payload válido e draftId === payload.requestMessageId.
+ */
+function extractPartialKmDraft(
+  state: ConversationState,
+): { newKm: number; requestMessageId: string } | null {
+  if (state.draftType !== "km_update") return null;
+  if (state.draftVersion !== KM_UPDATE_PARTIAL_DRAFT_VERSION) return null;
+  if (!isUuid(state.draftId)) return null;
+  const v = validateAwaitingVehicleKmUpdateDraft(state.draftPayload);
+  if (!v.ok) return null;
+  if (v.value.requestMessageId !== state.draftId) return null;
+  return { newKm: v.value.newKm, requestMessageId: v.value.requestMessageId };
+}
+
 export function decideConversation(
   input: ConversationCoreInput,
 ): ConversationCoreDecision {
