@@ -842,7 +842,10 @@ function mapStateRow(row: Record<string, unknown>): ConversationState {
 const KM_ATUAL_MAX = 2147483647;
 
 function parseKmAtual(raw: unknown): number | null {
-  if (raw === null || raw === undefined) return null;
+  if (raw === null) return null;
+  if (raw === undefined) {
+    throw new MalformedResponseError("veiculos.km_atual ausente (undefined) — esperado integer|null");
+  }
   if (typeof raw !== "number") {
     throw new MalformedResponseError("veiculos.km_atual com tipo inesperado (esperado integer|null)");
   }

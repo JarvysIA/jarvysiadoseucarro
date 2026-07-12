@@ -278,8 +278,8 @@ describe("shadow — veículos", () => {
   test("consulta veiculos com status e filtra archived em memória", async () => {
     const { calls, res } = await run({
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
-        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
+        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived", km_atual: null },
       ],
     });
     expect(res.status).toBe("evaluated");
@@ -319,7 +319,7 @@ describe("shadow — veículos", () => {
         },
       ],
       veiculos: [
-        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived" },
+        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived", km_atual: null },
       ],
     });
     expect(events[0].activeVehicleIssue).toBe("archived");
@@ -338,7 +338,7 @@ describe("shadow — veículos", () => {
         },
       ],
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
       ],
     });
     expect(events[0].activeVehicleIssue).toBeUndefined();
@@ -347,7 +347,7 @@ describe("shadow — veículos", () => {
   test("veículo de outro usuário não aparece", async () => {
     const { calls } = await run({
       veiculos: [
-        { id: "vX", user_id: "outro", marca: "X", modelo: "Y", placa: "ZZZ", status: "active" },
+        { id: "vX", user_id: "outro", marca: "X", modelo: "Y", placa: "ZZZ", status: "active", km_atual: null },
       ],
     });
     const vehCall = calls.selects.find((c) => c.table === "veiculos")!;
@@ -357,7 +357,7 @@ describe("shadow — veículos", () => {
   test("nenhuma placa aparece em logs", async () => {
     const { events } = await run({
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "SECRETA123", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "SECRETA123", status: "active", km_atual: null },
       ],
     });
     const json = JSON.stringify(events[0]);
@@ -505,7 +505,7 @@ describe("shadow — logs", () => {
         },
       ],
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
       ],
     });
     const json = JSON.stringify(events[0]);
@@ -519,3 +519,91 @@ describe("shadow — logs", () => {
     expect(SHADOW_TIMEOUT_MS).toBe(800);
   });
 });
+
+// ============================================================
+// Build 5.7F2E1A.5-MA — kmAtual (Shadow, implementação independente)
+// Verifica parseKmAtualShadow via caminho passivo, sem side effects.
+// ============================================================
+
+describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
+  function veh(km_atual: unknown): Record<string, unknown> {
+    const row: Record<string, unknown> = {
+      id: "v1",
+      user_id: "u-1",
+      marca: "Fiat",
+      modelo: "Argo",
+      placa: "ABC1D23",
+      status: "active",
+    };
+    if (arguments.length > 0) row.km_atual = km_atual;
+    return row;
+  }
+
+  test("km_atual null → evaluated, log sem km e sem exception", async () => {
+    const { res, events, calls } = await run({ veiculos: [veh(null)] });
+    expect(res.status).toBe("evaluated");
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe("evaluated");
+    // Nenhuma RPC nem outras tabelas escritas.
+    const tables = calls.selects.map((c) => c.table).sort();
+    expect(tables).toEqual(["veiculos", "whatsapp_conversation_states", "whatsapp_provider_instances"]);
+    // Nenhum campo kmAtual/km_atual vaza para o log.
+    const json = JSON.stringify(events[0]);
+    expect(json.includes("kmAtual")).toBe(false);
+    expect(json.includes("km_atual")).toBe(false);
+  });
+
+  test("km_atual 0 → evaluated (não é tratado como null/malformado)", async () => {
+    const { res, events } = await run({ veiculos: [veh(0)] });
+    expect(res.status).toBe("evaluated");
+    expect(events[0].status).toBe("evaluated");
+  });
+
+  test("km_atual string '1000' → failed:vehicles_lookup_failed (sem coerção)", async () => {
+    const { res, events } = await run({ veiculos: [veh("1000")] });
+    expect(res.status).toBe("failed");
+    if (res.status === "failed") expect(res.errorCategory).toBe("vehicles_lookup_failed");
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe("failed");
+    expect(events[0].errorCategory).toBe("vehicles_lookup_failed");
+  });
+
+  test("km_atual undefined (coluna ausente) → failed:vehicles_lookup_failed (NÃO vira null)", async () => {
+    const rowMissing: Record<string, unknown> = {
+      id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active",
+    };
+    const { res, events } = await run({ veiculos: [rowMissing] });
+    expect(res.status).toBe("failed");
+    if (res.status === "failed") expect(res.errorCategory).toBe("vehicles_lookup_failed");
+    expect(events[0].errorCategory).toBe("vehicles_lookup_failed");
+  });
+
+  test("km_atual malformado (decimal) → failed:vehicles_lookup_failed, passividade preservada", async () => {
+    const { res, events, calls } = await run({ veiculos: [veh(100.5)] });
+    expect(res.status).toBe("failed");
+    if (res.status === "failed") expect(res.errorCategory).toBe("vehicles_lookup_failed");
+    // Passividade: apenas SELECTs, nenhuma tabela de writes/rpc.
+    const tables = new Set(calls.selects.map((c) => c.table));
+    expect(tables.has("whatsapp_processing_queue")).toBe(false);
+    expect(tables.has("whatsapp_action_executions")).toBe(false);
+    expect(tables.has("whatsapp_messages")).toBe(false);
+    // Nenhum log evaluated foi emitido; apenas o failed.
+    expect(events.filter((e) => e.status === "evaluated")).toHaveLength(0);
+    expect(events.filter((e) => e.status === "failed")).toHaveLength(1);
+  });
+
+  test("km_atual malformado NÃO dispara claim/apply/release/state/outbound", async () => {
+    // A mock structural do supabase (makeSupabase) só expõe .from().select().eq()...
+    // Como não há .rpc/.insert/.update/.delete implementados, qualquer tentativa
+    // dispararia TypeError. O sucesso silencioso deste teste, portanto, prova
+    // que o Shadow permanece exclusivamente read-only mesmo no caminho de
+    // falha por malformed km_atual.
+    const { res, calls } = await run({ veiculos: [veh("nope")] });
+    expect(res.status).toBe("failed");
+    // Nenhum SELECT em tabelas de mutação/estado transacional.
+    for (const c of calls.selects) {
+      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos"]).toContain(c.table);
+    }
+  });
+});
+
