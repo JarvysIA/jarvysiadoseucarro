@@ -4,6 +4,8 @@
 export type ConversationStateName =
   | "idle"
   | "awaiting_vehicle"
+  | "awaiting_km_confirmation"
+  | "awaiting_km_correction_confirmation"
   | "completed"
   | "cancelled"
   | "expired"
@@ -18,6 +20,7 @@ export type ConversationEventKind =
   | "reset_conversation"
   | "explicit_opt_out"
   | "vehicle_reply"
+  | "km_reported"
   | "media"
   | "unknown"
   | "replay"
