@@ -81,10 +81,15 @@ function decideQueueType(n: NormalizedWhatsappInbound): string {
   }
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// Alias local estritamente tipado. O valor de runtime retornado por
+// createClient(url, serviceRoleKey) sem genéricos é SupabaseClient<any,"public",any>;
+// o antigo ReturnType<typeof createClient> resolvia com defaults incompatíveis
+// (<unknown, never, GenericSchema>). Padrão idêntico ao WorkerSupabaseClient do
+// whatsapp-process-inbound (Build 5.7F2C1.1).
+type WebhookSupabaseClient = SupabaseClient<any, "public", any>;
 
 async function insertIgnoredEvent(
-  supabase: SupabaseClient,
+  supabase: WebhookSupabaseClient,
   n: NormalizedWhatsappInbound,
   errorMessage: string,
 ): Promise<void> {
