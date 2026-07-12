@@ -15,8 +15,8 @@ import type {
   ConversationVehicle,
 } from "../types.ts";
 import {
-  KM_UPDATE_COMPLETE_DRAFT_VERSION,
-  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "../km-update-draft.ts";
@@ -132,7 +132,7 @@ describe("core T1 — draft completo direto em idle", () => {
     expect(d.statePatch.awaitingField).toBe("confirmation");
     expect(d.statePatch.draftType).toBe("km_update");
     expect(d.statePatch.draftId).toBe(MSG_UUID_A);
-    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_COMPLETE_DRAFT_VERSION);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
     expect(d.statePatch.activeVehicleId).toBe(VEH_UUID_1);
     expect(d.statePatch.lastMessageId).toBe(MSG_UUID_A);
 
@@ -221,7 +221,7 @@ describe("core T1 — draft completo direto em idle", () => {
     );
     expect(d.nextState).toBe("awaiting_km_confirmation");
     expect(d.statePatch.activeVehicleId).toBe(VEH_UUID_2);
-    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_COMPLETE_DRAFT_VERSION);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
     expect((d.statePatch.draftPayload as { vehicleId: string }).vehicleId).toBe(VEH_UUID_2);
     // Não é reaproveitamento de eventKind vehicle_reply — vem de km_reported.
     expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
@@ -249,7 +249,7 @@ describe("core T1 — draft parcial em idle (sem resolução direta)", () => {
     expect(d.statePatch.state).toBe("awaiting_vehicle");
     expect(d.statePatch.draftType).toBe("km_update");
     expect(d.statePatch.draftId).toBe(MSG_UUID_A);
-    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_PARTIAL_DRAFT_VERSION);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
     expect(d.statePatch.draftPayload).toEqual({
       phase: "awaiting_vehicle",
       newKm: 5000,
@@ -371,7 +371,7 @@ describe("core T1 — parser inerte em states não-idle", () => {
           state: "awaiting_km_confirmation",
           draftType: "km_update",
           draftId: MSG_UUID_B,
-          draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+          draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
         }),
       }),
     );
@@ -389,7 +389,7 @@ describe("core T1 — parser inerte em states não-idle", () => {
           state: "awaiting_km_correction_confirmation",
           draftType: "km_update",
           draftId: MSG_UUID_B,
-          draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+          draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
         }),
       }),
     );
@@ -416,7 +416,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     awaitingField: "vehicle",
     draftType: "km_update",
     draftId: MSG_UUID_A,
-    draftVersion: KM_UPDATE_PARTIAL_DRAFT_VERSION,
+    draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
     draftPayload: partialPayload,
   });
 
@@ -438,7 +438,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     expect(d.statePatch.draftType).toBe("km_update");
     // draftId é preservado do parcial (não muda para o sourceMessageId da resposta).
     expect(d.statePatch.draftId).toBe(MSG_UUID_A);
-    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_COMPLETE_DRAFT_VERSION);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
     expect(d.statePatch.activeVehicleId).toBe(VEH_UUID_2);
     // lastMessageId acompanha a mensagem atual (a de seleção).
     expect(d.statePatch.lastMessageId).toBe(MSG_UUID_B);
@@ -503,7 +503,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     const merged: ConversationState = { ...stateBefore, ...d.statePatch };
     expect(merged.draftType).toBe("km_update");
     expect(merged.draftId).toBe(MSG_UUID_A);
-    expect(merged.draftVersion).toBe(KM_UPDATE_PARTIAL_DRAFT_VERSION);
+    expect(merged.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
     expect(merged.draftPayload).toEqual(partialPayload);
     expect(merged.state).toBe("awaiting_vehicle");
     expect(merged.activeVehicleId).toBeNull();
@@ -527,7 +527,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     expect(d.statePatch.draftPayload).toBeUndefined();
     const merged: ConversationState = { ...partialState, ...d.statePatch };
     expect(merged.draftPayload).toEqual(partialPayload);
-    expect(merged.draftVersion).toBe(KM_UPDATE_PARTIAL_DRAFT_VERSION);
+    expect(merged.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
   });
 
   test("draft malformado (payload corrompido) NÃO é completado como km", () => {
@@ -535,7 +535,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
       state: "awaiting_vehicle",
       draftType: "km_update",
       draftId: MSG_UUID_A,
-      draftVersion: KM_UPDATE_PARTIAL_DRAFT_VERSION,
+      draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
       draftPayload: { phase: "awaiting_vehicle", newKm: -1, requestMessageId: MSG_UUID_A },
     });
     const d = decideConversation(
@@ -640,7 +640,7 @@ describe("core T1 — confirmações em states KM não emitem T2", () => {
     awaitingField: "confirmation",
     draftType: "km_update",
     draftId: MSG_UUID_A,
-    draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+    draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
     draftPayload: {
       phase: "awaiting_confirmation",
       vehicleId: VEH_UUID_1,
