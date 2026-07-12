@@ -530,7 +530,7 @@ export function decideConversation(
                 awaitingField: "confirmation",
                 draftType: "km_update",
                 draftId: input.sourceMessageId,
-                draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+                draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
                 draftPayload: validated.value as unknown as Record<string, unknown>,
                 activeVehicleId: veh.id,
               }),
