@@ -1501,6 +1501,7 @@ export type Database = {
           orchestrator_result: Json | null
           orchestrator_version: string | null
           queue_type: string
+          route_owner: string
           scheduled_at: string
           started_at: string | null
           status: string
@@ -1522,6 +1523,7 @@ export type Database = {
           orchestrator_result?: Json | null
           orchestrator_version?: string | null
           queue_type: string
+          route_owner?: string
           scheduled_at?: string
           started_at?: string | null
           status?: string
@@ -1543,6 +1545,7 @@ export type Database = {
           orchestrator_result?: Json | null
           orchestrator_version?: string | null
           queue_type?: string
+          route_owner?: string
           scheduled_at?: string
           started_at?: string | null
           status?: string
