@@ -222,7 +222,7 @@ describe("4. campos de infraestrutura", () => {
   });
 
   test("preserva expectedStateVersion incluindo 0", () => {
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       expectedStateVersion: 0,
       decision: decision(),
