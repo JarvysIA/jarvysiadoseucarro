@@ -73,7 +73,7 @@ function looksLikeHelp(t: string | null | undefined): boolean {
   return n !== "" && HELP.has(n);
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
+type WorkerSupabaseClient = SupabaseClient<any, "public", any>;
 
 type QueueItem = {
   id: string;
