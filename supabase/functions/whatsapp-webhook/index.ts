@@ -315,12 +315,18 @@ Deno.serve(async (req) => {
 
     const messageId = msgRow?.id as string | undefined;
     const queueType = decideQueueType(n);
+    const routeOwner = decideRouteOwner({
+      messageType: n.messageType,
+      textBody: n.textBody,
+      orchestratorMode: (inst as { orchestrator_mode?: string | null }).orchestrator_mode ?? null,
+    });
 
     // 6. Enfileira.
     const { error: qErr } = await supabase.from("whatsapp_processing_queue").insert({
       message_id: messageId ?? null,
       event_id: eventId ?? null,
       queue_type: queueType,
+      route_owner: routeOwner,
       status: "queued",
       attempts: 0,
       max_attempts: 5,
