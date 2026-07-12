@@ -303,9 +303,9 @@ describe("core T1 — casos que NÃO iniciam KM", () => {
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
-  test("formato inválido (letras no meio) não cria draft", () => {
+  test("formato inválido (sem dígitos após rótulo) não cria draft", () => {
     const d = decideConversation(
-      inp({ originalText: "km 12a45", vehicles: [v1] }),
+      inp({ originalText: "km abc", vehicles: [v1] }),
     );
     expect(d.decisionKind).toBe("fallback");
     expect(d.statePatch.draftType).toBeUndefined();
