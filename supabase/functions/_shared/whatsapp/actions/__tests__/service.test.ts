@@ -603,50 +603,227 @@ describe("I. exceptions do executor -> outcome_unknown", () => {
 // J. Logs sanitizados
 // ---------------------------------------------------------------------------
 
+// -------- Helpers estruturais de inspeção de logs (test-only) --------
+// Chaves de observabilidade permitidas no logger produtivo do E1A.
+const ALLOWED_LOG_KEYS = new Set<string>([
+  "event",
+  "actionType",
+  "outcome",
+  "reasonCode",
+  "isCorrection",
+  "durationMs",
+  "draftId",
+  "queueItemId",
+  "actionExecutionId",
+]);
+
+// Chaves sensíveis que jamais podem aparecer em nenhum registro (nem aninhadas).
+const FORBIDDEN_LOG_KEYS = new Set<string>([
+  "confirmationMessageId",
+  "sourceMessageId",
+  "conversationStateId",
+  "userId",
+  "contactId",
+  "vehicleId",
+  "expectedPreviousKm",
+  "newKm",
+  "correctionReason",
+  "correctionConfirmed",
+  "expectedStateVersion",
+  "orchestratorVersion",
+  "payload",
+  "phone",
+  "plate",
+  "message",
+  "body",
+]);
+
+type LogLeak =
+  | { kind: "forbidden_key"; path: string }
+  | { kind: "unknown_key"; path: string; key: string }
+  | { kind: "sensitive_string"; path: string; needle: string }
+  | { kind: "sensitive_number"; path: string; value: number }
+  | { kind: "invalid_duration"; path: string; value: unknown };
+
+function findLogLeaks(
+  entries: readonly unknown[],
+  sensitiveStrings: readonly string[],
+  sensitiveNumbers: readonly number[],
+): LogLeak[] {
+  const leaks: LogLeak[] = [];
+
+  function walk(value: unknown, path: string, insideDurationMs: boolean): void {
+    if (value === null || value === undefined) return;
+    if (typeof value === "string") {
+      for (const s of sensitiveStrings) {
+        if (s.length > 0 && value.includes(s)) {
+          leaks.push({ kind: "sensitive_string", path, needle: s });
+        }
+      }
+      return;
+    }
+    if (typeof value === "number") {
+      if (!insideDurationMs) {
+        for (const n of sensitiveNumbers) {
+          if (value === n) leaks.push({ kind: "sensitive_number", path, value });
+        }
+      }
+      return;
+    }
+    if (typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      value.forEach((v, i) => walk(v, `${path}[${i}]`, insideDurationMs));
+      return;
+    }
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const childPath = path === "" ? k : `${path}.${k}`;
+      if (FORBIDDEN_LOG_KEYS.has(k)) {
+        leaks.push({ kind: "forbidden_key", path: childPath });
+      }
+      // Somente no nível da entrada validamos o whitelist estrito de chaves.
+      if (path.match(/^entries\[\d+\]$/)) {
+        if (!ALLOWED_LOG_KEYS.has(k)) {
+          leaks.push({ kind: "unknown_key", path: childPath, key: k });
+        }
+      }
+      if (k === "durationMs") {
+        if (
+          typeof v !== "number" ||
+          !Number.isFinite(v) ||
+          v < 0
+        ) {
+          leaks.push({ kind: "invalid_duration", path: childPath, value: v });
+        }
+        walk(v, childPath, true);
+      } else {
+        walk(v, childPath, insideDurationMs);
+      }
+    }
+  }
+
+  entries.forEach((e, i) => walk(e, `entries[${i}]`, false));
+  return leaks;
+}
+
 describe("J. logs sanitizados", () => {
-  test("nenhum campo sensível aparece em logs em fluxo completo", async () => {
+  // Sentinelas distintivos e improváveis de colidir com qualquer campo legítimo
+  // (em particular, com durationMs, que é sub-segundo em ms).
+  const SENTINEL = {
+    draftId: "sentinel-draft-9f4e2a11-0001",
+    conversationStateId: "sentinel-cs-9f4e2a11-0002",
+    confirmationMessageId: "sentinel-cm-9f4e2a11-0003",
+    sourceMessageId: "sentinel-sm-9f4e2a11-0004",
+    queueItemId: "sentinel-q-9f4e2a11-0005",
+    userId: "sentinel-user-9f4e2a11-0006",
+    contactId: "sentinel-contact-9f4e2a11-0007",
+    vehicleId: "sentinel-vehicle-9f4e2a11-0008",
+    correctionReason: "sentinel-reason-9f4e2a11-hodômetro",
+    orchestratorVersion: "sentinel-orch-9f4e2a11-0009",
+    expectedPreviousKm: 987654321,
+    newKm: 876543212,
+  };
+
+  // Strings sensíveis: apenas as que NÃO podem aparecer sob nenhuma chave.
+  // draftId/queueItemId são chaves permitidas do contrato, portanto seus
+  // valores podem aparecer legitimamente e são omitidos desta lista.
+  const SENSITIVE_STRINGS = [
+    SENTINEL.conversationStateId,
+    SENTINEL.confirmationMessageId,
+    SENTINEL.sourceMessageId,
+    SENTINEL.userId,
+    SENTINEL.contactId,
+    SENTINEL.vehicleId,
+    SENTINEL.correctionReason,
+    SENTINEL.orchestratorVersion,
+  ];
+  const SENSITIVE_NUMBERS = [SENTINEL.expectedPreviousKm, SENTINEL.newKm];
+
+  test("nenhum campo sensível aparece em logs em fluxo completo (validação estrutural)", async () => {
     const { port } = makeExecutor(APPLIED);
     const { logger, entries } = makeLogger();
     const input = baseInput({
-      userId: "user-super-secret-123",
-      contactId: "contact-abc",
-      vehicleId: "vehicle-xyz",
-      expectedPreviousKm: 10000,
-      newKm: 12000,
-      correctionReason: "hodômetro trocado",
+      draftId: SENTINEL.draftId,
+      conversationStateId: SENTINEL.conversationStateId,
+      confirmationMessageId: SENTINEL.confirmationMessageId,
+      sourceMessageId: SENTINEL.sourceMessageId,
+      queueItemId: SENTINEL.queueItemId,
+      userId: SENTINEL.userId,
+      contactId: SENTINEL.contactId,
+      vehicleId: SENTINEL.vehicleId,
+      expectedPreviousKm: SENTINEL.expectedPreviousKm,
+      newKm: SENTINEL.newKm,
+      correctionReason: SENTINEL.correctionReason,
+      orchestratorVersion: SENTINEL.orchestratorVersion,
     });
     await executeConfirmedKmUpdate(input, { executor: port, logger });
-    const s = JSON.stringify(entries);
-    const forbidden = [
-      "user-super-secret-123",
-      "contact-abc",
-      "vehicle-xyz",
-      "hodômetro trocado",
-      "10000",
-      "12000",
-    ];
-    for (const needle of forbidden) {
-      expect(s.includes(needle)).toBe(false);
-    }
-    // deve conter apenas campos permitidos
+
+    const leaks = findLogLeaks(entries, SENSITIVE_STRINGS, SENSITIVE_NUMBERS);
+    expect(leaks).toEqual([]);
+
+    // durationMs estruturalmente válido em toda entrada que o carregue.
     for (const entry of entries) {
-      const keys = Object.keys(entry);
-      for (const key of keys) {
-        expect(
-          [
-            "event",
-            "actionType",
-            "outcome",
-            "reasonCode",
-            "isCorrection",
-            "durationMs",
-            "draftId",
-            "queueItemId",
-            "actionExecutionId",
-          ].includes(key),
-        ).toBe(true);
+      if ("durationMs" in entry) {
+        const d = (entry as { durationMs: unknown }).durationMs;
+        expect(typeof d).toBe("number");
+        expect(Number.isFinite(d as number)).toBe(true);
+        expect((d as number) >= 0).toBe(true);
+        // durationMs jamais pode coincidir com KMs sentinela.
+        expect(d).not.toBe(SENTINEL.expectedPreviousKm);
+        expect(d).not.toBe(SENTINEL.newKm);
+      }
+      // Whitelist de chaves por entrada.
+      for (const k of Object.keys(entry as Record<string, unknown>)) {
+        expect(ALLOWED_LOG_KEYS.has(k)).toBe(true);
       }
     }
+  });
+
+  test("helper findLogLeaks detecta vazamento real (auto-verificação)", () => {
+    // Chave sensível aninhada
+    const withForbiddenKey = [{ event: "x", userId: "u" }];
+    const leaksKey = findLogLeaks(withForbiddenKey, [], []);
+    expect(leaksKey.some((l) => l.kind === "forbidden_key")).toBe(true);
+
+    // String sensível em campo permitido
+    const withSensitiveString = [
+      { event: `payload=${SENTINEL.userId}`, actionType: "km_update" },
+    ];
+    const leaksStr = findLogLeaks(withSensitiveString, [SENTINEL.userId], []);
+    expect(leaksStr.some((l) => l.kind === "sensitive_string")).toBe(true);
+
+    // Número sensível em campo diferente de durationMs
+    const withSensitiveNumber = [
+      { event: "x", actionType: "km_update", reasonCode: "r", isCorrection: false, someNum: SENTINEL.newKm },
+    ] as unknown as ConfirmedKmUpdateLogFields[];
+    const leaksNum = findLogLeaks(withSensitiveNumber, [], [SENTINEL.newKm]);
+    expect(leaksNum.some((l) => l.kind === "sensitive_number")).toBe(true);
+
+    // Chave desconhecida (fora do whitelist) no nível da entrada
+    const withUnknownKey = [{ event: "x", weirdField: 1 }];
+    const leaksUnknown = findLogLeaks(withUnknownKey, [], []);
+    expect(leaksUnknown.some((l) => l.kind === "unknown_key")).toBe(true);
+
+    // durationMs inválido
+    const withBadDuration = [{ event: "x", durationMs: -1 }];
+    const leaksDur = findLogLeaks(withBadDuration, [], []);
+    expect(leaksDur.some((l) => l.kind === "invalid_duration")).toBe(true);
+
+    // Logs limpos não produzem vazamento
+    const clean = [
+      { event: "km_update_started", actionType: "km_update" },
+      {
+        event: "km_update_completed",
+        actionType: "km_update",
+        outcome: "completed",
+        isCorrection: false,
+        durationMs: 0.123,
+        draftId: "d",
+        queueItemId: "q",
+        actionExecutionId: "ae",
+      },
+    ] as unknown as ConfirmedKmUpdateLogFields[];
+    const noLeaks = findLogLeaks(clean, [SENTINEL.userId], [SENTINEL.newKm]);
+    expect(noLeaks).toEqual([]);
   });
 
   test("logs contêm evento started e completed no fluxo feliz", async () => {
