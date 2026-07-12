@@ -212,7 +212,7 @@ describe("3. lastMessageId e imutabilidade", () => {
 
 describe("4. campos de infraestrutura", () => {
   test("preserva queueItemId, leaseToken, orchestratorVersion", () => {
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       decision: decision(),
     });
