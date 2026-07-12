@@ -71,7 +71,7 @@ describe("validateAwaitingVehicleKmUpdateDraft", () => {
 
   it.each([[null], [[]], ["x"], [1], [true], [new Date()]])(
     "rejeita não-objeto: %p",
-    (v) => {
+    (v: unknown) => {
       const r = validateAwaitingVehicleKmUpdateDraft(v);
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.code).toBe("not_an_object");
@@ -116,7 +116,7 @@ describe("validateAwaitingVehicleKmUpdateDraft", () => {
     ["Infinity", Infinity, "invalid_new_km"],
     ["-Infinity", -Infinity, "invalid_new_km"],
     ["boolean", true, "invalid_new_km"],
-  ])("rejeita newKm %s", (_label, val, code) => {
+  ])("rejeita newKm %s", (_label: string, val: unknown, code: string) => {
     const input: Record<string, unknown> = {
       phase: "awaiting_vehicle",
       requestMessageId: UUID_A,
@@ -185,7 +185,7 @@ describe("validateAwaitingVehicleKmUpdateDraft", () => {
     ["expectedPreviousKm", { expectedPreviousKm: 5 }],
     ["isCorrection", { isCorrection: false }],
     ["arbitrary", { foo: "bar" }],
-  ])("rejeita campo extra %s", (_label, extra) => {
+  ])("rejeita campo extra %s", (_label: string, extra: Record<string, unknown>) => {
     const r = validateAwaitingVehicleKmUpdateDraft({
       phase: "awaiting_vehicle",
       newKm: 1,
@@ -283,7 +283,7 @@ describe("validateAwaitingConfirmationKmUpdateDraft", () => {
     "isCorrection",
   ] as const;
 
-  it.each(REQUIRED)("rejeita campo obrigatório ausente: %s", (field) => {
+  it.each(REQUIRED)("rejeita campo obrigatório ausente: %s", (field: string) => {
     const input = { ...completeBase() } as Record<string, unknown>;
     delete input[field];
     const r = validateAwaitingConfirmationKmUpdateDraft(input);
@@ -291,7 +291,7 @@ describe("validateAwaitingConfirmationKmUpdateDraft", () => {
     if (!r.ok) expect(r.code).toBe("missing_field");
   });
 
-  it.each(REQUIRED)("rejeita campo obrigatório undefined: %s", (field) => {
+  it.each(REQUIRED)("rejeita campo obrigatório undefined: %s", (field: string) => {
     const input = { ...completeBase() } as Record<string, unknown>;
     input[field] = undefined;
     const r = validateAwaitingConfirmationKmUpdateDraft(input);
@@ -325,7 +325,7 @@ describe("validateAwaitingConfirmationKmUpdateDraft", () => {
     ["decimal", 1.5],
     ["negative", -1],
     ["overflow", 2147483648],
-  ])("rejeita expectedPreviousKm %s", (_l, v) => {
+  ])("rejeita expectedPreviousKm %s", (_l: string, v: unknown) => {
     const r = validateAwaitingConfirmationKmUpdateDraft({
       ...completeBase(),
       expectedPreviousKm: v as number,
