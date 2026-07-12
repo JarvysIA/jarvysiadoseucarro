@@ -809,8 +809,8 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
         },
       ],
       veiculos: [
-        { id: "v_ok", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active" },
-        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived" },
+        { id: "v_ok", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active", km_atual: null },
+        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived", km_atual: null },
       ],
     });
     const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
@@ -836,7 +836,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
         },
       ],
       veiculos: [
-        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived" },
+        { id: "v_arc", user_id: "u1", marca: "VW", modelo: "Gol", placa: "OLD1234", status: "archived", km_atual: null },
       ],
     });
     const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
@@ -896,7 +896,7 @@ describe("loadContext — erros e logs", () => {
     const events: Array<Record<string, unknown>> = [];
     const rows = baseRows({
       veiculos: [
-        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active" },
+        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "active", km_atual: null },
       ],
     });
     const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows), {
