@@ -20,8 +20,8 @@ import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
 import { parseKmUpdateText } from "./km-update-parser.ts";
 import {
-  KM_UPDATE_COMPLETE_DRAFT_VERSION,
-  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
@@ -130,7 +130,8 @@ function extractPartialKmDraft(
   state: ConversationState,
 ): { newKm: number; requestMessageId: string } | null {
   if (state.draftType !== "km_update") return null;
-  if (state.draftVersion !== KM_UPDATE_PARTIAL_DRAFT_VERSION) return null;
+  // Um draft parcial persistido é sempre um draft novo (versão INITIAL=0).
+  if (state.draftVersion !== KM_UPDATE_INITIAL_DRAFT_VERSION) return null;
   if (!isUuid(state.draftId)) return null;
   const v = validateAwaitingVehicleKmUpdateDraft(state.draftPayload);
   if (!v.ok) return null;
@@ -324,7 +325,7 @@ export function decideConversation(
                 awaitingField: "confirmation",
                 draftType: "km_update",
                 draftId: partial.requestMessageId,
-                draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+                draftVersion: KM_UPDATE_PROMOTED_DRAFT_VERSION,
                 draftPayload: validated.value as unknown as Record<string, unknown>,
                 activeVehicleId: veh.id,
               }),
@@ -529,7 +530,7 @@ export function decideConversation(
                 awaitingField: "confirmation",
                 draftType: "km_update",
                 draftId: input.sourceMessageId,
-                draftVersion: KM_UPDATE_COMPLETE_DRAFT_VERSION,
+                draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
                 draftPayload: validated.value as unknown as Record<string, unknown>,
                 activeVehicleId: veh.id,
               }),
@@ -572,7 +573,7 @@ export function decideConversation(
                 awaitingField: "vehicle",
                 draftType: "km_update",
                 draftId: input.sourceMessageId,
-                draftVersion: KM_UPDATE_PARTIAL_DRAFT_VERSION,
+                draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
                 draftPayload: validated.value as unknown as Record<string, unknown>,
               }),
               input.sourceMessageId,
