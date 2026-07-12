@@ -965,12 +965,12 @@ describe("state_version_conflict", () => {
 
 describe("apply exception => outcomeUnknown", () => {
   const errors: Array<[string, () => Error]> = [
-    ["TransportError", () => new TransportError("t")],
-    ["AmbiguousTimeoutError", () => new AmbiguousTimeoutError("t")],
-    ["MalformedResponseError", () => new MalformedResponseError("m")],
-    ["UnknownReasonError", () => new UnknownReasonError("nope")],
-    ["RpcExceptionError", () => new RpcExceptionError("XX000", "boom")],
-    ["Error", () => new Error("random VERY_SECRET_MESSAGE")],
+    ["TransportError", () => new TransportError("UNIQUE_TRANSPORT_LEAK_XYZ")],
+    ["AmbiguousTimeoutError", () => new AmbiguousTimeoutError("UNIQUE_AMBIG_LEAK_XYZ")],
+    ["MalformedResponseError", () => new MalformedResponseError("UNIQUE_MALFORMED_LEAK_XYZ")],
+    ["UnknownReasonError", () => new UnknownReasonError("UNIQUE_UNKNOWN_LEAK_XYZ")],
+    ["RpcExceptionError", () => new RpcExceptionError("XX000", "UNIQUE_RPC_LEAK_XYZ")],
+    ["Error", () => new Error("UNIQUE_ERROR_LEAK_XYZ")],
   ];
   for (const [name, mk] of errors) {
     test(`${name} => outcomeUnknown; sem release; sem nova apply; sem message bruta em log`, async () => {
