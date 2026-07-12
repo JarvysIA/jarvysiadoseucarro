@@ -1,8 +1,8 @@
 // Build 5.7F2E1A.5-MB — Testes puros dos contratos e validators de drafts de KM.
 import { describe, expect, it } from "bun:test";
 import {
-  KM_UPDATE_COMPLETE_DRAFT_VERSION,
-  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
   validateKmUpdateDraft,
@@ -16,10 +16,49 @@ function freeze<T>(o: T): T {
   return Object.freeze(o) as T;
 }
 
-describe("constantes de versão", () => {
+describe("constantes de versão (persistência, não phase)", () => {
   it("expõe versões corretas e não conflitantes", () => {
-    expect(KM_UPDATE_PARTIAL_DRAFT_VERSION).toBe(0);
-    expect(KM_UPDATE_COMPLETE_DRAFT_VERSION).toBe(1);
+    expect(KM_UPDATE_INITIAL_DRAFT_VERSION).toBe(0);
+    expect(KM_UPDATE_PROMOTED_DRAFT_VERSION).toBe(1);
+  });
+
+  it("são conceitos independentes de phase (não fazem parte do payload)", () => {
+    // Um draft completo direto criado no idle usa version INITIAL (0).
+    // Um draft parcial promovido para completo usa version PROMOTED (1).
+    // Ou seja, phase 'awaiting_confirmation' NÃO implica version 1.
+    const completeInitial = validateAwaitingConfirmationKmUpdateDraft({
+      phase: "awaiting_confirmation",
+      vehicleId: UUID_B,
+      expectedPreviousKm: null,
+      newKm: 0,
+      requestMessageId: UUID_A,
+      isCorrection: false,
+    });
+    expect(completeInitial.ok).toBe(true);
+    if (completeInitial.ok) {
+      // Payload não expõe draftVersion.
+      expect(Object.keys(completeInitial.value).sort()).toEqual(
+        [
+          "expectedPreviousKm",
+          "isCorrection",
+          "newKm",
+          "phase",
+          "requestMessageId",
+          "vehicleId",
+        ],
+      );
+    }
+    const partial = validateAwaitingVehicleKmUpdateDraft({
+      phase: "awaiting_vehicle",
+      newKm: 1,
+      requestMessageId: UUID_A,
+    });
+    expect(partial.ok).toBe(true);
+    if (partial.ok) {
+      expect(Object.keys(partial.value).sort()).toEqual(
+        ["newKm", "phase", "requestMessageId"],
+      );
+    }
   });
 });
 
