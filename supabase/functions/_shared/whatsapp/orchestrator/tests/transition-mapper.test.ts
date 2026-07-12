@@ -518,3 +518,118 @@ describe("10. determinismo e imutabilidade estrutural", () => {
     expect((originalPatch.draftPayload as Record<string, unknown>).newKm).toBe(12345);
   });
 });
+
+// ===========================================================================
+// 11. Contrato de response (MH.1): coerência com responseKey, transporte puro
+// ===========================================================================
+
+describe("11. coerência entre responseKey e response fornecida", () => {
+  test("responseKey presente + response ausente (null) → RepositoryError", () => {
+    const d = decision({ responseKey: "help" });
+    expect(() =>
+      callMapper({ ...INFRA, decision: d, response: null })
+    ).toThrow(RepositoryError);
+  });
+
+  test("responseKey null + response não-null → RepositoryError", () => {
+    const d = decision({ responseKey: null });
+    expect(() =>
+      callMapper({
+        ...INFRA,
+        decision: d,
+        response: { responseKey: "greeting", textBody: FIXTURE_TEXT_BODY },
+      })
+    ).toThrow(RepositoryError);
+  });
+
+  test("responseKey null + response null → sucesso, response = null", () => {
+    const d = decision({ responseKey: null });
+    const out = callMapper({ ...INFRA, decision: d, response: null });
+    expect(out.response).toBeNull();
+  });
+
+  test("responseKey divergente entre decisão e response → RepositoryError", () => {
+    const d = decision({ responseKey: "help" });
+    expect(() =>
+      callMapper({
+        ...INFRA,
+        decision: d,
+        response: { responseKey: "greeting", textBody: FIXTURE_TEXT_BODY },
+      })
+    ).toThrow(RepositoryError);
+  });
+
+  test("mapper transporta textBody exatamente, sem prefixo ou fallback", () => {
+    const d = decision({ responseKey: "km_update_confirmation" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "km_update_confirmation",
+      textBody: "Confirma nova KM: 12.345?",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).not.toBeNull();
+    expect(out.response!.textBody).toBe("Confirma nova KM: 12.345?");
+    expect(out.response!.responseKey).toBe("km_update_confirmation");
+  });
+
+  test("mapper preserva campos opcionais da response (messageType, priority, ...)", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+      messageType: "text",
+      purpose: "general",
+      priority: 10,
+      scheduledAt: "2026-07-12T00:00:00.000Z",
+      expiresAt: "2026-07-12T00:05:00.000Z",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).toEqual(provided);
+  });
+
+  test("mapper não muta a response original", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+      priority: 3,
+    };
+    const snapshot = { ...provided };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    // muta o retorno; não deve afetar o original
+    out.response!.textBody = "outra";
+    expect(provided).toEqual(snapshot);
+  });
+
+  test("resultado não compartilha referência mutável com a response fornecida", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).not.toBe(provided);
+  });
+
+  test("duas chamadas iguais com mesma response são determinísticas", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+    };
+    const a = callMapper({ ...INFRA, decision: d, response: provided });
+    const b = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(a).toEqual(b);
+  });
+
+  test("mapper produtivo não fabrica textBody sintético", async () => {
+    // Prova estática: o código-fonte de transition-mapper.ts não contém
+    // o literal "synthetic-body" nem chamadas a renderers/templates.
+    const src = await Deno.readTextFile(
+      new URL("../transition-mapper.ts", import.meta.url),
+    );
+    expect(src.includes("synthetic-body")).toBe(false);
+    expect(src.includes("renderResponse")).toBe(false);
+    expect(src.includes("responses.ts")).toBe(false);
+    expect(src.includes('from "../conversation/responses')).toBe(false);
+  });
+});
