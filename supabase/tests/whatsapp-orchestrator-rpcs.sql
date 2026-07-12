@@ -119,11 +119,11 @@ BEGIN
   -- Criamos messages/queue sem contact_id (NULL permitido).
   -- ============================================================
 
+  
+  -- Q1: queued (não running) → lease_lost
   INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
     VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
     RETURNING id INTO v_msg_id;
-
-  -- Q1: queued (não running) → lease_lost
   INSERT INTO whatsapp_processing_queue(id, message_id, queue_type, status)
     VALUES (gen_random_uuid(), v_msg_id, 'jarvys', 'queued')
     RETURNING id INTO v_queue_id;
@@ -133,6 +133,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R08 FAIL: %', v_res; END IF;
 
   -- Q2: running com lease_token errado → lease_lost
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status,
       lease_token, lease_expires_at, claimed_at, claimed_by, attempts, max_attempts)
@@ -145,6 +148,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R09 FAIL: %', v_res; END IF;
 
   -- Q3: running, lease correto, retry_kind=transient_error, attempts<max → queued+willRetry
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status,
       lease_token, lease_expires_at, claimed_at, claimed_by, attempts, max_attempts)
@@ -158,6 +164,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R10 FAIL: %', v_res; END IF;
 
   -- Q4: running, transient_error, attempts=max-1 → failed
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status,
       lease_token, lease_expires_at, claimed_at, claimed_by, attempts, max_attempts)
@@ -170,6 +179,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R11 FAIL: %', v_res; END IF;
 
   -- Q5: running, retry_kind=state_conflict → queued sem incremento
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status,
       lease_token, lease_expires_at, claimed_at, claimed_by, attempts, max_attempts)
@@ -182,6 +194,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R12 FAIL: %', v_res; END IF;
 
   -- Q6: running, retry_kind=cancelled → cancelled
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status,
       lease_token, lease_expires_at, claimed_at, claimed_by, attempts, max_attempts)
@@ -194,6 +209,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R13 FAIL: %', v_res; END IF;
 
   -- Q7: status='done' com todos os orch fields NULL → already_terminal
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status, finished_at)
     VALUES (gen_random_uuid(), v_msg_id, 'jarvys', 'done', now())
@@ -204,6 +222,9 @@ BEGIN
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'R14 FAIL: %', v_res; END IF;
 
   -- Q8: durable replay (done + todos orch fields preenchidos)
+  INSERT INTO whatsapp_messages(id, provider, direction, message_type, status)
+    VALUES (gen_random_uuid(), 'zapi', 'inbound', 'text', 'received')
+    RETURNING id INTO v_msg_id;
   INSERT INTO whatsapp_processing_queue(
       id, message_id, queue_type, status, finished_at,
       orchestrator_processed_at, orchestrator_result, orchestrator_version)
