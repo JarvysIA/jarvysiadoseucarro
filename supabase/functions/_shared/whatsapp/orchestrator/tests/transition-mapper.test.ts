@@ -624,8 +624,11 @@ describe("11. coerência entre responseKey e response fornecida", () => {
   test("mapper produtivo não fabrica textBody sintético", async () => {
     // Prova estática: o código-fonte de transition-mapper.ts não contém
     // o literal "synthetic-body" nem chamadas a renderers/templates.
-    const src = await Deno.readTextFile(
-      new URL("../transition-mapper.ts", import.meta.url),
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const src = readFileSync(
+      fileURLToPath(new URL("../transition-mapper.ts", import.meta.url)),
+      "utf8",
     );
     expect(src.includes("synthetic-body")).toBe(false);
     expect(src.includes("renderResponse")).toBe(false);
