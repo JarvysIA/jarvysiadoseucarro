@@ -1,8 +1,11 @@
-// Build 5.7F2E1A.5-MH — Testes diretos do mapper produtivo
+// Build 5.7F2E1A.5-MH.1 — Testes diretos do mapper produtivo
 // mapConversationDecisionToTransitionInput.
 //
 // Puros: sem Repository, sem RPC, sem I/O. Exercitam o contrato
 // documentado no módulo transition-mapper.ts.
+//
+// O mapper NÃO fabrica textBody. Toda response é fornecida explicitamente
+// pelo chamador (fixture aqui) e apenas transportada.
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -14,6 +17,7 @@ import type {
   ConversationDecisionKind,
   ConversationStatePatch,
 } from "../../conversation/types.ts";
+import type { OutboundResponsePayload } from "../types.ts";
 import {
   KM_UPDATE_INITIAL_DRAFT_VERSION,
   KM_UPDATE_PROMOTED_DRAFT_VERSION,
@@ -28,7 +32,10 @@ const LEASE_TOKEN = "cccccccc-cccc-4ccc-8ccc-cccccccccc02";
 const MSG_T1 = "11111111-1111-4111-8111-111111111111";
 const MSG_SELECTION = "22222222-2222-4222-8222-222222222222";
 const VEH_1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01";
-const ORCH_VERSION = "5.7f2e1a.5-mh";
+const ORCH_VERSION = "5.7f2e1a.5-mh1";
+
+// Texto de fixture explícito de teste. Nunca aparece no código produtivo.
+const FIXTURE_TEXT_BODY = "synthetic-body";
 
 const INFRA = {
   queueItemId: QUEUE_ITEM_ID,
@@ -55,6 +62,19 @@ function decision(
     reasonCode: "test.decision",
     ...overrides,
   };
+}
+
+/**
+ * Constrói uma response de fixture coerente com a decisão fornecida.
+ * Se `decision.responseKey` for null, retorna null. Caso contrário,
+ * usa o próprio responseKey da decisão e um textBody de teste.
+ */
+function fixtureResponseFor(
+  d: ConversationCoreDecision,
+  textBody: string = FIXTURE_TEXT_BODY,
+): OutboundResponsePayload | null {
+  if (d.responseKey === null) return null;
+  return { responseKey: d.responseKey, textBody };
 }
 
 // ===========================================================================
