@@ -20,8 +20,8 @@ import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
 import { parseKmUpdateText } from "./km-update-parser.ts";
 import {
-  KM_UPDATE_COMPLETE_DRAFT_VERSION,
-  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
