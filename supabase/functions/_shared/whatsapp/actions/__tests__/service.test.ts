@@ -820,9 +820,6 @@ describe("J. logs sanitizados", () => {
         outcome: "completed",
         isCorrection: false,
         durationMs: 0.123,
-        draftId: "d",
-        queueItemId: "q",
-        actionExecutionId: "ae",
       },
     ] as unknown as ConfirmedKmUpdateLogFields[];
     const noLeaks = findLogLeaks(clean, [SENTINEL.userId], [SENTINEL.newKm]);
