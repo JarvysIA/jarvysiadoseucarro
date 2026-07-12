@@ -179,7 +179,22 @@ type VehicleRow = {
   modelo: string | null;
   placa: string | null;
   status: string | null;
+  // Build 5.7F2E1A.5-MA — transporte read-only de km_atual. Nunca logado.
+  km_atual: number | null;
 };
+
+// Build 5.7F2E1A.5-MA — mesma regra de validação usada no Repository.
+const KM_ATUAL_MAX = 2147483647;
+function parseKmAtualShadow(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "number") {
+    throw new Error("veiculos.km_atual com tipo inesperado (esperado integer|null)");
+  }
+  if (!Number.isInteger(raw) || raw < 0 || raw > KM_ATUAL_MAX) {
+    throw new Error("veiculos.km_atual fora do range válido (0..2147483647 integer)");
+  }
+  return raw;
+}
 
 function buildBaseLog(input: ShadowInput) {
   return {
