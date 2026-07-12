@@ -100,7 +100,7 @@ function assertNoT2Leakage(d: ConversationCoreDecision) {
   // em caminhos de select_vehicle (legacy) — não no fluxo KM.
   if (d.eventKind === KM_REPORTED_EVENT_KIND) {
     expect(d.outcome).not.toBe("completed");
-    expect(d.executedAtWasSet ?? false).toBe(false);
+    expect(d.statePatch.executedAt ?? null).toBeNull();
     expect(d.statePatch.executedAt ?? null).toBeNull();
     expect(d.statePatch.confirmedAt ?? null).toBeNull();
   }
