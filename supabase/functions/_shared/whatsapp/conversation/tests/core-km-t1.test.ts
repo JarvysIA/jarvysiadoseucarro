@@ -111,7 +111,7 @@ function assertNoT2Leakage(d: ConversationCoreDecision) {
 // ---------------------------------------------------------------------------
 
 describe("core T1 — draft completo direto em idle", () => {
-  test("veículo único elegível + relato explícito de KM → draft v1 awaiting_km_confirmation", () => {
+  test("veículo único elegível + relato explícito de KM → draft novo persistido v0 (INITIAL) awaiting_km_confirmation", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 10000);
     const d = decideConversation(
       inp({
@@ -209,7 +209,7 @@ describe("core T1 — draft completo direto em idle", () => {
     expect((d.statePatch.draftPayload as { newKm: number }).newKm).toBe(2147483647);
   });
 
-  test("múltiplos veículos + activeVehicleId válido → resolve direto (draft v1)", () => {
+  test("múltiplos veículos + activeVehicleId válido → resolve direto (draft novo persistido v0)", () => {
     const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
     const v2 = veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000);
     const d = decideConversation(
