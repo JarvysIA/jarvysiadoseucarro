@@ -708,3 +708,125 @@ describe("core T1 — regressão awaiting_vehicle legado (não-km_update)", () =
     assertNoT2Leakage(d);
   });
 });
+
+// ---------------------------------------------------------------------------
+// G. MF.1 — draftVersion representa persistência, não phase
+// ---------------------------------------------------------------------------
+
+describe("core T1 — MF.1 contrato de draftVersion (persistência, não phase)", () => {
+  test("constantes numéricas: INITIAL=0 e PROMOTED=1", () => {
+    expect(KM_UPDATE_INITIAL_DRAFT_VERSION).toBe(0);
+    expect(KM_UPDATE_PROMOTED_DRAFT_VERSION).toBe(1);
+    expect(KM_UPDATE_INITIAL_DRAFT_VERSION).not.toBe(
+      KM_UPDATE_PROMOTED_DRAFT_VERSION,
+    );
+  });
+
+  test("draft parcial novo em idle → draftVersion === 0 (INITIAL)", () => {
+    const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
+    const v2 = veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000);
+    const d = decideConversation(
+      inp({ originalText: "km 5000", vehicles: [v1, v2] }),
+    );
+    expect(d.statePatch.draftVersion).toBe(0);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
+  });
+
+  test("draft completo DIRETO em idle → draftVersion === 0 (INITIAL, não 1)", () => {
+    const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
+    const d = decideConversation(
+      inp({ originalText: "km 3000", vehicles: [v] }),
+    );
+    expect(d.nextState).toBe("awaiting_km_confirmation");
+    expect(d.statePatch.draftVersion).toBe(0);
+    expect(d.statePatch.draftVersion).not.toBe(KM_UPDATE_PROMOTED_DRAFT_VERSION);
+    // phase awaiting_confirmation NÃO implica draftVersion=1.
+    expect(
+      (d.statePatch.draftPayload as { phase: string }).phase,
+    ).toBe("awaiting_confirmation");
+  });
+
+  test("promoção do MESMO draft parcial: 0 → 1, mesmo draftId, mesmo requestMessageId", () => {
+    const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
+    const v2 = veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 5000);
+    const partialState = state({
+      state: "awaiting_vehicle",
+      currentIntent: "km_update",
+      awaitingField: "vehicle",
+      draftType: "km_update",
+      draftId: MSG_UUID_A,
+      draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION, // versão persistida anterior = 0
+      draftPayload: {
+        phase: "awaiting_vehicle",
+        newKm: 8000,
+        requestMessageId: MSG_UUID_A,
+      },
+    });
+    const d = decideConversation(
+      inp({
+        originalText: "onix",
+        vehicles: [v1, v2],
+        state: partialState,
+        sourceMessageId: MSG_UUID_B,
+      }),
+    );
+    expect(d.statePatch.draftVersion).toBe(1);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_PROMOTED_DRAFT_VERSION);
+    // draftId preservado (mesmo draft).
+    expect(d.statePatch.draftId).toBe(MSG_UUID_A);
+    // requestMessageId preservado dentro do payload.
+    expect(
+      (d.statePatch.draftPayload as { requestMessageId: string })
+        .requestMessageId,
+    ).toBe(MSG_UUID_A);
+  });
+
+  test("seleção inválida: nunca reenvia draftVersion nem incrementa (patch omitido)", () => {
+    const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
+    const partialState = state({
+      state: "awaiting_vehicle",
+      currentIntent: "km_update",
+      awaitingField: "vehicle",
+      draftType: "km_update",
+      draftId: MSG_UUID_A,
+      draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
+      draftPayload: {
+        phase: "awaiting_vehicle",
+        newKm: 8000,
+        requestMessageId: MSG_UUID_A,
+      },
+      activeVehicleId: null,
+    });
+    const d = decideConversation(
+      inp({
+        originalText: "corolla",
+        vehicles: [v1],
+        state: partialState,
+        sourceMessageId: MSG_UUID_B,
+      }),
+    );
+    expect(d.statePatch.draftVersion).toBeUndefined();
+    expect(d.statePatch.draftId).toBeUndefined();
+    expect(d.statePatch.draftPayload).toBeUndefined();
+  });
+
+  test("nenhum cenário deste build produz draftVersion === 1 sem snapshot anterior mesmo draftId", () => {
+    // Todos os drafts novos (parcial ou completo direto) devem ter version 0.
+    const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
+    const dDirect = decideConversation(
+      inp({ originalText: "km 4000", vehicles: [v] }),
+    );
+    expect(dDirect.statePatch.draftVersion).toBe(0);
+
+    const dPartial = decideConversation(
+      inp({
+        originalText: "km 4000",
+        vehicles: [
+          v,
+          veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000),
+        ],
+      }),
+    );
+    expect(dPartial.statePatch.draftVersion).toBe(0);
+  });
+});
