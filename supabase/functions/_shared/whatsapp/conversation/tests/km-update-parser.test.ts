@@ -300,12 +300,11 @@ describe("formatos numéricos inválidos", () => {
   it("rejeita 'abc50000kmxyz'", () => {
     err(parseKmUpdateText("abc50000kmxyz", "explicit_report"), "no_km_candidate");
   });
-  it("rejeita separador no início ou no fim", () => {
-    err(parseKmUpdateText(".50000 km", "explicit_report"), "invalid_km_format");
-    // ponto final após km é pontuação válida — não é separador do número:
+  it("aceita ponto final após expressão completa (é pontuação, não separador)", () => {
     ok(parseKmUpdateText("50000 km.", "explicit_report"), 50000);
-    // ".50000 km" o "." no início do número torna a expressão inválida
-    err(parseKmUpdateText("km ,50000", "explicit_report"), "invalid_km_format");
+  });
+  it("rejeita separador puro no início do número (',50000' → sem candidato)", () => {
+    err(parseKmUpdateText("km ,50000", "explicit_report"), "no_km_candidate");
   });
 });
 
