@@ -13,10 +13,19 @@ import type {
   ConversationState,
   ConversationStateName,
   ConversationStatePatch,
+  ConversationVehicle,
 } from "./types.ts";
 import { normalizeCommandText } from "./normalize.ts";
 import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
+import { parseKmUpdateText } from "./km-update-parser.ts";
+import {
+  KM_UPDATE_COMPLETE_DRAFT_VERSION,
+  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  validateAwaitingConfirmationKmUpdateDraft,
+  validateAwaitingVehicleKmUpdateDraft,
+} from "./km-update-draft.ts";
+import { KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
 
 const CLEAR_TASK_PATCH: ConversationStatePatch = {
   currentIntent: null,
