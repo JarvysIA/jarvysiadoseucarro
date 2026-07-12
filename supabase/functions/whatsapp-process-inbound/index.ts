@@ -62,12 +62,12 @@ function normalizeCommandText(text: string | null | undefined): string {
     .trim();
 }
 
-const OPTOUT = new Set(["SAIR", "PARAR", "CANCELAR", "NAO QUERO", "REMOVER", "STOP"]);
 const HELP = new Set(["OI", "OLA", "MENU", "AJUDA", "HELP", "?"]);
 
+// Opt-out delegado ao módulo compartilhado (routing.ts): fonte única de verdade
+// para produtor (webhook) e consumidor (worker legado).
 function looksLikeOptOut(t: string | null | undefined): boolean {
-  const n = normalizeCommandText(t);
-  return n !== "" && OPTOUT.has(n);
+  return isRoutingOptOut(t);
 }
 function looksLikeHelp(t: string | null | undefined): boolean {
   const n = normalizeCommandText(t);
