@@ -16,7 +16,7 @@ import type {
 } from "../types.ts";
 import {
   KM_UPDATE_INITIAL_DRAFT_VERSION,
-  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "../km-update-draft.ts";
