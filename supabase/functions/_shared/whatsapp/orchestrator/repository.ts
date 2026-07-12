@@ -700,7 +700,7 @@ export class WhatsappOrchestratorRepository {
       // (6) veículos do usuário — incluímos archived para diagnosticar issue
       const vehicleRows = await this.selectMany(
         "veiculos",
-        "id,marca,modelo,placa,status",
+        "id,marca,modelo,placa,status,km_atual",
         { user_id: item.userId },
       );
       const allVehicles = vehicleRows.map(mapVehicleRow);
