@@ -4,7 +4,7 @@
 // não baixa mídia; não grava despesa; não atualiza KM.
 // Jarvys = cérebro; Z-API = canal.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
 import {
   runWhatsappOrchestratorShadow,
