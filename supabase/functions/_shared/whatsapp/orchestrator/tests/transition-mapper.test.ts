@@ -1,8 +1,11 @@
-// Build 5.7F2E1A.5-MH — Testes diretos do mapper produtivo
+// Build 5.7F2E1A.5-MH.1 — Testes diretos do mapper produtivo
 // mapConversationDecisionToTransitionInput.
 //
 // Puros: sem Repository, sem RPC, sem I/O. Exercitam o contrato
 // documentado no módulo transition-mapper.ts.
+//
+// O mapper NÃO fabrica textBody. Toda response é fornecida explicitamente
+// pelo chamador (fixture aqui) e apenas transportada.
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -14,6 +17,7 @@ import type {
   ConversationDecisionKind,
   ConversationStatePatch,
 } from "../../conversation/types.ts";
+import type { OutboundResponsePayload } from "../types.ts";
 import {
   KM_UPDATE_INITIAL_DRAFT_VERSION,
   KM_UPDATE_PROMOTED_DRAFT_VERSION,
@@ -28,7 +32,10 @@ const LEASE_TOKEN = "cccccccc-cccc-4ccc-8ccc-cccccccccc02";
 const MSG_T1 = "11111111-1111-4111-8111-111111111111";
 const MSG_SELECTION = "22222222-2222-4222-8222-222222222222";
 const VEH_1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01";
-const ORCH_VERSION = "5.7f2e1a.5-mh";
+const ORCH_VERSION = "5.7f2e1a.5-mh1";
+
+// Texto de fixture explícito de teste. Nunca aparece no código produtivo.
+const FIXTURE_TEXT_BODY = "synthetic-body";
 
 const INFRA = {
   queueItemId: QUEUE_ITEM_ID,
@@ -57,6 +64,47 @@ function decision(
   };
 }
 
+/**
+ * Constrói uma response de fixture coerente com a decisão fornecida.
+ * Se `decision.responseKey` for null, retorna null. Caso contrário,
+ * usa o próprio responseKey da decisão e um textBody de teste.
+ */
+function fixtureResponseFor(
+  d: ConversationCoreDecision,
+  textBody: string = FIXTURE_TEXT_BODY,
+): OutboundResponsePayload | null {
+  if (d.responseKey === null) return null;
+  return { responseKey: d.responseKey, textBody };
+}
+
+/**
+ * Wrapper de testes: chama o mapper produtivo injetando automaticamente uma
+ * response de fixture coerente com a decisão, salvo quando o teste fornece
+ * `response` explicitamente (inclusive `null`).
+ */
+function callMapper(
+  args: {
+    decision: ConversationCoreDecision;
+    queueItemId: string;
+    leaseToken: string;
+    expectedStateVersion: number;
+    orchestratorVersion: string;
+    response?: OutboundResponsePayload | null;
+  },
+) {
+  const response = "response" in args
+    ? (args.response as OutboundResponsePayload | null)
+    : fixtureResponseFor(args.decision);
+  return mapConversationDecisionToTransitionInput({
+    decision: args.decision,
+    queueItemId: args.queueItemId,
+    leaseToken: args.leaseToken,
+    expectedStateVersion: args.expectedStateVersion,
+    orchestratorVersion: args.orchestratorVersion,
+    response,
+  });
+}
+
 // ===========================================================================
 // 1. Mapeamento simples
 // ===========================================================================
@@ -70,7 +118,7 @@ describe("1. mapeamento base", () => {
       statePatch: { state: "idle" },
       responseKey: "greeting",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.queueItemId).toBe(QUEUE_ITEM_ID);
     expect(out.leaseToken).toBe(LEASE_TOKEN);
     expect(out.expectedStateVersion).toBe(3);
@@ -95,7 +143,7 @@ describe("2. state ↔ nextState", () => {
       nextState: "awaiting_vehicle",
       statePatch: { currentIntent: "km_update" },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.state).toBe("awaiting_vehicle");
   });
 
@@ -104,7 +152,7 @@ describe("2. state ↔ nextState", () => {
       nextState: "awaiting_km_confirmation",
       statePatch: { state: "awaiting_km_confirmation" },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.state).toBe("awaiting_km_confirmation");
   });
 
@@ -114,7 +162,7 @@ describe("2. state ↔ nextState", () => {
       statePatch: { state: "awaiting_vehicle" },
     });
     expect(() =>
-      mapConversationDecisionToTransitionInput({ ...INFRA, decision: d })
+      callMapper({ ...INFRA, decision: d })
     ).toThrow(RepositoryError);
   });
 });
@@ -128,7 +176,7 @@ describe("3. lastMessageId e imutabilidade", () => {
     const d = decision({
       statePatch: { state: "idle", lastMessageId: MSG_T1 },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect("lastMessageId" in out.patch).toBe(false);
   });
 
@@ -141,7 +189,7 @@ describe("3. lastMessageId e imutabilidade", () => {
     const d = decision({ nextState: "awaiting_vehicle", statePatch: originalPatch });
     const snapshotPatch = { ...originalPatch };
     const snapshotDecision = { ...d };
-    mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    callMapper({ ...INFRA, decision: d });
     expect(originalPatch).toEqual(snapshotPatch);
     expect(d).toEqual(snapshotDecision);
     expect("lastMessageId" in originalPatch).toBe(true);
@@ -152,7 +200,7 @@ describe("3. lastMessageId e imutabilidade", () => {
     const d = decision({
       statePatch: { state: "idle", lastMessageId: MSG_T1 },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     const serialized = JSON.stringify(out);
     expect(serialized.includes(MSG_T1)).toBe(false);
   });
@@ -164,7 +212,7 @@ describe("3. lastMessageId e imutabilidade", () => {
 
 describe("4. campos de infraestrutura", () => {
   test("preserva queueItemId, leaseToken, orchestratorVersion", () => {
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       decision: decision(),
     });
@@ -174,7 +222,7 @@ describe("4. campos de infraestrutura", () => {
   });
 
   test("preserva expectedStateVersion incluindo 0", () => {
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       expectedStateVersion: 0,
       decision: decision(),
@@ -194,7 +242,7 @@ describe("5. resultSummary e response", () => {
       decisionKind: "select_vehicle",
       outcome: "none",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(Object.keys(out.resultSummary).sort()).toEqual(
       ["decisionKind", "eventKind", "outcome"].sort(),
     );
@@ -202,13 +250,13 @@ describe("5. resultSummary e response", () => {
 
   test("response = null quando responseKey ausente", () => {
     const d = decision({ responseKey: null });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.response).toBeNull();
   });
 
   test("response construído a partir de responseKey", () => {
     const d = decision({ responseKey: "help" });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.response).toEqual({ responseKey: "help", textBody: "synthetic-body" });
   });
 });
@@ -229,7 +277,7 @@ describe("6. null explícito vs ausência", () => {
         draftPayload: null,
       },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.activeVehicleId).toBeNull();
     expect(out.patch.draftId).toBeNull();
     expect(out.patch.draftVersion).toBeNull();
@@ -242,7 +290,7 @@ describe("6. null explícito vs ausência", () => {
       nextState: "awaiting_vehicle",
       statePatch: { currentIntent: "km_update" },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect("draftId" in out.patch).toBe(false);
     expect("draftVersion" in out.patch).toBe(false);
     expect("draftType" in out.patch).toBe(false);
@@ -259,7 +307,7 @@ describe("6. null explícito vs ausência", () => {
         draftVersion: undefined,
       },
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect("draftId" in out.patch).toBe(false);
     expect("draftVersion" in out.patch).toBe(false);
   });
@@ -286,7 +334,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
       },
       responseKey: "vehicle_ambiguous",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.draftVersion).toBe(0);
     expect(out.patch.draftId).toBe(MSG_T1);
     expect(out.resultSummary.eventKind).toBe("km_reported");
@@ -317,7 +365,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
       },
       responseKey: "km_update_confirmation",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.draftVersion).toBe(0);
     expect(out.patch.draftId).toBe(MSG_T1);
     expect("lastMessageId" in out.patch).toBe(false);
@@ -346,7 +394,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
       },
       responseKey: "km_update_confirmation",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(out.patch.draftId).toBe(MSG_T1);
     expect(out.patch.draftVersion).toBe(1);
     expect(out.resultSummary.eventKind).toBe("vehicle_reply");
@@ -361,7 +409,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
       statePatch: { state: "awaiting_vehicle" },
       responseKey: "vehicle_not_found",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect("draftId" in out.patch).toBe(false);
     expect("draftVersion" in out.patch).toBe(false);
     expect("draftType" in out.patch).toBe(false);
@@ -376,7 +424,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
       statePatch: { state: "awaiting_vehicle" },
       responseKey: "vehicle_ambiguous",
     });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect("draftId" in out.patch).toBe(false);
     expect("draftPayload" in out.patch).toBe(false);
   });
@@ -389,7 +437,7 @@ describe("7. cenários KM preservados pelo mapper", () => {
 describe("8. anti-T2 / anti-E1A", () => {
   test("não produz confirm_km_update em nenhum campo", () => {
     const d = decision({ responseKey: "km_update_confirmation" });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     expect(JSON.stringify(out).includes("confirm_km_update")).toBe(false);
   });
 
@@ -400,7 +448,7 @@ describe("8. anti-T2 / anti-E1A", () => {
         draftPayload: { vehicleId: VEH_1, newKm: 12345 },
       },
     });
-    const out = mapConversationDecisionToTransitionInput({
+    const out = callMapper({
       ...INFRA,
       decision: { ...d, nextState: "awaiting_km_confirmation" },
     });
@@ -429,7 +477,7 @@ describe("9. rejeição de decisões não persistíveis", () => {
     test(`rejeita decisionKind = ${kind}`, () => {
       const d = decision({ decisionKind: kind });
       expect(() =>
-        mapConversationDecisionToTransitionInput({ ...INFRA, decision: d })
+        callMapper({ ...INFRA, decision: d })
       ).toThrow(RepositoryError);
     });
   }
@@ -451,8 +499,8 @@ describe("10. determinismo e imutabilidade estrutural", () => {
       },
       responseKey: "vehicle_ambiguous",
     });
-    const a = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
-    const b = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const a = callMapper({ ...INFRA, decision: d });
+    const b = callMapper({ ...INFRA, decision: d });
     expect(a).toEqual(b);
   });
 
@@ -463,10 +511,128 @@ describe("10. determinismo e imutabilidade estrutural", () => {
       draftPayload: originalPayload,
     };
     const d = decision({ nextState: "awaiting_vehicle", statePatch: originalPatch });
-    const out = mapConversationDecisionToTransitionInput({ ...INFRA, decision: d });
+    const out = callMapper({ ...INFRA, decision: d });
     // Substituir a chave no patch retornado não deve criar/remover chaves no original.
     (out.patch as Record<string, unknown>).draftPayload = { newKm: 999 };
     expect(originalPatch.draftPayload).toBe(originalPayload);
     expect((originalPatch.draftPayload as Record<string, unknown>).newKm).toBe(12345);
+  });
+});
+
+// ===========================================================================
+// 11. Contrato de response (MH.1): coerência com responseKey, transporte puro
+// ===========================================================================
+
+describe("11. coerência entre responseKey e response fornecida", () => {
+  test("responseKey presente + response ausente (null) → RepositoryError", () => {
+    const d = decision({ responseKey: "help" });
+    expect(() =>
+      callMapper({ ...INFRA, decision: d, response: null })
+    ).toThrow(RepositoryError);
+  });
+
+  test("responseKey null + response não-null → RepositoryError", () => {
+    const d = decision({ responseKey: null });
+    expect(() =>
+      callMapper({
+        ...INFRA,
+        decision: d,
+        response: { responseKey: "greeting", textBody: FIXTURE_TEXT_BODY },
+      })
+    ).toThrow(RepositoryError);
+  });
+
+  test("responseKey null + response null → sucesso, response = null", () => {
+    const d = decision({ responseKey: null });
+    const out = callMapper({ ...INFRA, decision: d, response: null });
+    expect(out.response).toBeNull();
+  });
+
+  test("responseKey divergente entre decisão e response → RepositoryError", () => {
+    const d = decision({ responseKey: "help" });
+    expect(() =>
+      callMapper({
+        ...INFRA,
+        decision: d,
+        response: { responseKey: "greeting", textBody: FIXTURE_TEXT_BODY },
+      })
+    ).toThrow(RepositoryError);
+  });
+
+  test("mapper transporta textBody exatamente, sem prefixo ou fallback", () => {
+    const d = decision({ responseKey: "km_update_confirmation" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "km_update_confirmation",
+      textBody: "Confirma nova KM: 12.345?",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).not.toBeNull();
+    expect(out.response!.textBody).toBe("Confirma nova KM: 12.345?");
+    expect(out.response!.responseKey).toBe("km_update_confirmation");
+  });
+
+  test("mapper preserva campos opcionais da response (messageType, priority, ...)", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+      messageType: "text",
+      purpose: "general",
+      priority: 10,
+      scheduledAt: "2026-07-12T00:00:00.000Z",
+      expiresAt: "2026-07-12T00:05:00.000Z",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).toEqual(provided);
+  });
+
+  test("mapper não muta a response original", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+      priority: 3,
+    };
+    const snapshot = { ...provided };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    // muta o retorno; não deve afetar o original
+    out.response!.textBody = "outra";
+    expect(provided).toEqual(snapshot);
+  });
+
+  test("resultado não compartilha referência mutável com a response fornecida", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+    };
+    const out = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(out.response).not.toBe(provided);
+  });
+
+  test("duas chamadas iguais com mesma response são determinísticas", () => {
+    const d = decision({ responseKey: "help" });
+    const provided: OutboundResponsePayload = {
+      responseKey: "help",
+      textBody: "Ajuda",
+    };
+    const a = callMapper({ ...INFRA, decision: d, response: provided });
+    const b = callMapper({ ...INFRA, decision: d, response: provided });
+    expect(a).toEqual(b);
+  });
+
+  test("mapper produtivo não fabrica textBody sintético", async () => {
+    // Prova estática: o código-fonte de transition-mapper.ts não contém
+    // o literal "synthetic-body" nem chamadas a renderers/templates.
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const src = readFileSync(
+      fileURLToPath(new URL("../transition-mapper.ts", import.meta.url)),
+      "utf8",
+    );
+    expect(src.includes("synthetic-body")).toBe(false);
+    expect(src.includes("renderResponse")).toBe(false);
+    expect(src.includes("responses.ts")).toBe(false);
+    expect(src.includes('from "../conversation/responses')).toBe(false);
   });
 });

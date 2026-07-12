@@ -104,24 +104,30 @@ function makeInput(overrides: Partial<ConversationCoreInput> = {}): Conversation
 }
 
 // ---------------------------------------------------------------------------
-// Adaptador local ao mapper produtivo (BUILD 5.7F2E1A.5-MH).
+// Adaptador local ao mapper produtivo (BUILD 5.7F2E1A.5-MH.1).
 //
-// O mapper local test-only foi removido; toda conversão passa agora pelo
-// módulo produtivo transition-mapper.ts. Este helper apenas injeta os campos
-// de infraestrutura (queueItemId, leaseToken, orchestratorVersion) que são
-// estáveis dentro deste arquivo de testes.
+// O mapper produtivo deixou de fabricar textBody sintético. Este helper
+// prepara a `response` de fixture coerente com a decisão (usando a mesma
+// responseKey) e a repassa ao mapper. A fixture é claramente identificada
+// como teste; o mapper apenas transporta o objeto sem alterá-lo.
 // ---------------------------------------------------------------------------
+
+const FIXTURE_TEXT_BODY = "synthetic-body";
 
 function decisionToTransition(
   d: ConversationCoreDecision,
   expectedStateVersion: number,
 ): TransitionInput {
+  const response = d.responseKey === null
+    ? null
+    : { responseKey: d.responseKey, textBody: FIXTURE_TEXT_BODY };
   return mapConversationDecisionToTransitionInput({
     decision: d,
     queueItemId: QUEUE_ITEM_ID,
     leaseToken: LEASE_TOKEN,
     expectedStateVersion,
     orchestratorVersion: ORCH_VERSION,
+    response,
   });
 }
 
