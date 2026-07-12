@@ -213,6 +213,7 @@ async function claimNext(
     .from("whatsapp_processing_queue")
     .select("id, message_id, event_id, queue_type, attempts, max_attempts")
     .eq("status", "queued")
+    .eq("route_owner", "legacy")
     .lte("scheduled_at", nowIso)
     .order("scheduled_at", { ascending: true })
     .limit(batchSize);
@@ -229,6 +230,7 @@ async function claimNext(
       })
       .eq("id", r.id)
       .eq("status", "queued")
+      .eq("route_owner", "legacy")
       .select("id, message_id, event_id, queue_type, attempts, max_attempts")
       .maybeSingle();
     if (upd) claimed.push(upd as QueueItem);
