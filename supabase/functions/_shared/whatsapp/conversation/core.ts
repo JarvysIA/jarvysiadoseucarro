@@ -130,7 +130,8 @@ function extractPartialKmDraft(
   state: ConversationState,
 ): { newKm: number; requestMessageId: string } | null {
   if (state.draftType !== "km_update") return null;
-  if (state.draftVersion !== KM_UPDATE_PARTIAL_DRAFT_VERSION) return null;
+  // Um draft parcial persistido é sempre um draft novo (versão INITIAL=0).
+  if (state.draftVersion !== KM_UPDATE_INITIAL_DRAFT_VERSION) return null;
   if (!isUuid(state.draftId)) return null;
   const v = validateAwaitingVehicleKmUpdateDraft(state.draftPayload);
   if (!v.ok) return null;
