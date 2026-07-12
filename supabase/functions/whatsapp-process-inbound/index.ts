@@ -6,6 +6,7 @@
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
+import { isRoutingOptOut } from "../_shared/whatsapp/routing.ts";
 import {
   runWhatsappOrchestratorShadow,
   type SupabaseLike as ShadowSupabaseLike,
