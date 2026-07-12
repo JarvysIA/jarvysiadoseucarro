@@ -278,8 +278,8 @@ describe("shadow — veículos", () => {
   test("consulta veiculos com status e filtra archived em memória", async () => {
     const { calls, res } = await run({
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
-        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
+        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived", km_atual: null },
       ],
     });
     expect(res.status).toBe("evaluated");
@@ -319,7 +319,7 @@ describe("shadow — veículos", () => {
         },
       ],
       veiculos: [
-        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived" },
+        { id: "v2", user_id: "u-1", marca: "VW", modelo: "Gol", placa: "BBB2345", status: "archived", km_atual: null },
       ],
     });
     expect(events[0].activeVehicleIssue).toBe("archived");
@@ -338,7 +338,7 @@ describe("shadow — veículos", () => {
         },
       ],
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
       ],
     });
     expect(events[0].activeVehicleIssue).toBeUndefined();
@@ -347,7 +347,7 @@ describe("shadow — veículos", () => {
   test("veículo de outro usuário não aparece", async () => {
     const { calls } = await run({
       veiculos: [
-        { id: "vX", user_id: "outro", marca: "X", modelo: "Y", placa: "ZZZ", status: "active" },
+        { id: "vX", user_id: "outro", marca: "X", modelo: "Y", placa: "ZZZ", status: "active", km_atual: null },
       ],
     });
     const vehCall = calls.selects.find((c) => c.table === "veiculos")!;
@@ -357,7 +357,7 @@ describe("shadow — veículos", () => {
   test("nenhuma placa aparece em logs", async () => {
     const { events } = await run({
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "SECRETA123", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "SECRETA123", status: "active", km_atual: null },
       ],
     });
     const json = JSON.stringify(events[0]);
@@ -505,7 +505,7 @@ describe("shadow — logs", () => {
         },
       ],
       veiculos: [
-        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active" },
+        { id: "v1", user_id: "u-1", marca: "Fiat", modelo: "Argo", placa: "AAA1234", status: "active", km_atual: null },
       ],
     });
     const json = JSON.stringify(events[0]);
