@@ -145,7 +145,11 @@ const EXPR_RE = new RegExp(
   `\\b(?:${LABEL})\\b\\s*[:=]?\\s*(${LOOSE_NUM})${MIL}(?:\\s*${UNIT})?` +
     "|" +
     // Ramo com unidade posterior (sufixo).
-    `(${LOOSE_NUM})${MIL}\\s*${UNIT}`,
+    `(${LOOSE_NUM})${MIL}\\s*${UNIT}` +
+    "|" +
+    // Ramo "N mil" sem unidade nem rótulo — reconhecido como candidato de KM
+    // apenas para impedir falso sucesso em frases como "50 mil e 500 km".
+    `(${LOOSE_NUM})(\\s+mil(?![a-z0-9]))(?!\\s*(?:km|quilometros?))`,
   "g",
 );
 
