@@ -128,6 +128,7 @@ export type TestServiceLogEvent = {
   counts?: TestCycleCounts;
   errorCategory?: string;
   ok?: boolean;
+  claimed?: number;
 };
 
 // ============================================================
@@ -187,7 +188,12 @@ function emptyCounts(): TestCycleCounts {
 }
 
 function classifyError(err: unknown): string {
-  if (err && typeof err === "object" && "name" in err && typeof (err as { name: unknown }).name === "string") {
+  if (
+    err &&
+    typeof err === "object" &&
+    "name" in err &&
+    typeof (err as { name: unknown }).name === "string"
+  ) {
     return (err as { name: string }).name;
   }
   return "Error";
@@ -241,7 +247,7 @@ export async function runWhatsappOrchestratorTestCycle(
     return { workerId, status: "claim_failed", claimed: 0, durationMs, counts };
   }
 
-  log({ event: "claim_completed", workerId, attemptNumber: items.length });
+  log({ event: "claim_completed", workerId, claimed: items.length });
 
   if (items.length === 0) {
     const durationMs = Date.now() - started;
@@ -255,13 +261,7 @@ export async function runWhatsappOrchestratorTestCycle(
   }
 
   const durationMs = Date.now() - started;
-  log({
-    event: "cycle_completed",
-    workerId,
-    claimed: undefined,
-    durationMs,
-    counts,
-  } as TestServiceLogEvent);
+  log({ event: "cycle_completed", workerId, durationMs, counts });
   return {
     workerId,
     status: "ok",
@@ -272,7 +272,7 @@ export async function runWhatsappOrchestratorTestCycle(
 }
 
 // ============================================================
-// processamento por item
+// processItem
 // ============================================================
 
 async function processItem(
@@ -294,38 +294,24 @@ async function processItem(
     orchestratorMode: item.orchestratorMode,
   });
 
-  // Gate defensivo: messageType estranho não deve chegar (claim filtra text),
-  // mas se chegar não chamamos o core.
+  // Gate defensivo: só processamos texto. Claim atual já filtra, mas o
+  // tipo permite qualquer string.
   if (item.messageType !== "text") {
-    return await releaseAs(
-      item,
-      "cancelled",
-      "orchestrator_invariant",
-      "malformed",
-      log,
-      workerId,
-    );
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   }
 
-  // ---------- 1ª rodada: load context ----------
+  // ---------- 1ª rodada ----------
   const ctx1 = await runContext(item, deps, log, workerId);
   if (ctx1.kind !== "ok") return ctx1.outcome;
 
   const text1 = await runMessageText(item, deps, log, workerId);
   if (text1.kind !== "ok") return text1.outcome;
 
-  const coreRes1 = runCore(item, ctx1.result, text1.text, deps.clock, decide, log, workerId);
-  if (coreRes1.kind !== "ok") {
-    return await releaseAs(
-      item,
-      coreRes1.retryKind,
-      coreRes1.reason,
-      coreRes1.outcomeOnRelease,
-      log,
-      workerId,
-    );
+  const core1 = runCore(item, ctx1.result, text1.text, deps.clock, decide, log, workerId);
+  if (core1.kind !== "ok") {
+    return await releaseAs(item, deps, core1.retryKind, core1.reason, core1.outcomeOnRelease, log, workerId);
   }
-  const decision1 = coreRes1.decision;
+  const decision1 = core1.decision;
 
   if (isDeferred(decision1)) {
     log({
@@ -343,87 +329,75 @@ async function processItem(
 
   const resp1 = buildResponse(decision1, render, log, workerId, item);
   if (resp1.kind !== "ok") {
-    return await releaseAs(
-      item,
-      "cancelled",
-      "orchestrator_invariant",
-      "malformed",
-      log,
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  }
+
+  const apply1 = await runApply(
+    item,
+    ctx1.result.context.stateVersion,
+    decision1,
+    resp1.payload,
+    deps,
+    log,
+    workerId,
+    1,
+  );
+
+  if (apply1.kind !== "conflict") return apply1.outcome;
+
+  // ---------- Recálculo único ----------
+  log({ event: "state_conflict_recalculated", workerId, queueItemId: item.queueId });
+
+  const ctx2 = await runContext(item, deps, log, workerId);
+  if (ctx2.kind !== "ok") return ctx2.outcome;
+
+  const text2 = await runMessageText(item, deps, log, workerId);
+  if (text2.kind !== "ok") return text2.outcome;
+
+  const core2 = runCore(item, ctx2.result, text2.text, deps.clock, decide, log, workerId);
+  if (core2.kind !== "ok") {
+    return await releaseAs(item, deps, core2.retryKind, core2.reason, core2.outcomeOnRelease, log, workerId);
+  }
+  const decision2 = core2.decision;
+
+  if (isDeferred(decision2)) {
+    log({
+      event: "deferred_unsupported",
       workerId,
-    );
+      queueItemId: item.queueId,
+      messageId: item.messageId,
+      decisionKind: decision2.decisionKind,
+      eventKind: decision2.eventKind,
+      reasonCode: "legacy_handoff_unavailable",
+      outcome: "deferredUnsupported",
+    });
+    return "deferredUnsupported";
   }
 
-  const apply1 = await runApply(item, ctx1.result.stateVersion, decision1, resp1.payload, deps, log, workerId, 1);
-
-  if (apply1.kind === "conflict") {
-    // ---------- Recálculo único ----------
-    log({ event: "state_conflict_recalculated", workerId, queueItemId: item.queueId });
-
-    const ctx2 = await runContext(item, deps, log, workerId);
-    if (ctx2.kind !== "ok") return ctx2.outcome;
-
-    const text2 = await runMessageText(item, deps, log, workerId);
-    if (text2.kind !== "ok") return text2.outcome;
-
-    const coreRes2 = runCore(item, ctx2.result, text2.text, deps.clock, decide, log, workerId);
-    if (coreRes2.kind !== "ok") {
-      return await releaseAs(
-        item,
-        coreRes2.retryKind,
-        coreRes2.reason,
-        coreRes2.outcomeOnRelease,
-        log,
-        workerId,
-      );
-    }
-    const decision2 = coreRes2.decision;
-
-    if (isDeferred(decision2)) {
-      log({
-        event: "deferred_unsupported",
-        workerId,
-        queueItemId: item.queueId,
-        messageId: item.messageId,
-        decisionKind: decision2.decisionKind,
-        eventKind: decision2.eventKind,
-        reasonCode: "legacy_handoff_unavailable",
-        outcome: "deferredUnsupported",
-      });
-      return "deferredUnsupported";
-    }
-
-    const resp2 = buildResponse(decision2, render, log, workerId, item);
-    if (resp2.kind !== "ok") {
-      return await releaseAs(
-        item,
-        "cancelled",
-        "orchestrator_invariant",
-        "malformed",
-        log,
-        workerId,
-      );
-    }
-
-    const apply2 = await runApply(item, ctx2.result.stateVersion, decision2, resp2.payload, deps, log, workerId, 2);
-
-    if (apply2.kind === "conflict") {
-      return await releaseAs(
-        item,
-        "state_conflict",
-        "state_version_conflict",
-        "conflicted",
-        log,
-        workerId,
-      );
-    }
-    return apply2.outcome;
+  const resp2 = buildResponse(decision2, render, log, workerId, item);
+  if (resp2.kind !== "ok") {
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   }
 
-  return apply1.outcome;
+  const apply2 = await runApply(
+    item,
+    ctx2.result.context.stateVersion,
+    decision2,
+    resp2.payload,
+    deps,
+    log,
+    workerId,
+    2,
+  );
+
+  if (apply2.kind === "conflict") {
+    return await releaseAs(item, deps, "state_conflict", "state_version_conflict", "conflicted", log, workerId);
+  }
+  return apply2.outcome;
 }
 
 // ============================================================
-// helpers: context, text, core, response, apply
+// helpers
 // ============================================================
 
 type ContextOk = { kind: "ok"; result: Extract<LoadContextResult, { kind: "ok" }> };
@@ -443,6 +417,7 @@ async function runContext(
     if (category === "MalformedResponseError" || category === "UnknownReasonError") {
       const outcome = await releaseAs(
         item,
+        deps,
         "cancelled",
         "orchestrator_invariant",
         "malformed",
@@ -451,15 +426,16 @@ async function runContext(
       );
       return { kind: "fail", outcome };
     }
+    log({ event: "item_failed", workerId, queueItemId: item.queueId, errorCategory: category });
     const outcome = await releaseAs(
       item,
+      deps,
       "transient_error",
       "load_context_failed",
       "releasedForRetry",
       log,
       workerId,
     );
-    log({ event: "item_failed", workerId, queueItemId: item.queueId, errorCategory: category });
     return { kind: "fail", outcome };
   }
 
@@ -490,11 +466,10 @@ async function runContext(
   }
   if (CONTEXT_DEFINITIVE_REASONS.has(reason)) {
     const safeReason = REASON_REGEX.test(reason) ? reason : "orchestrator_invariant";
-    const outcome = await releaseAs(item, "cancelled", safeReason, "contextRejected", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", safeReason, "contextRejected", log, workerId);
     return { kind: "fail", outcome };
   }
-  // Reason desconhecido (não deve acontecer com o tipo union atual).
-  const outcome = await releaseAs(item, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  const outcome = await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   return { kind: "fail", outcome };
 }
 
@@ -514,6 +489,7 @@ async function runMessageText(
     log({ event: "item_failed", workerId, queueItemId: item.queueId, errorCategory: classifyError(err) });
     const outcome = await releaseAs(
       item,
+      deps,
       "transient_error",
       "message_text_load_failed",
       "releasedForRetry",
@@ -524,15 +500,15 @@ async function runMessageText(
   }
 
   if (text === null) {
-    const outcome = await releaseAs(item, "cancelled", "message_text_missing", "contextRejected", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", "message_text_missing", "contextRejected", log, workerId);
     return { kind: "fail", outcome };
   }
   if (typeof text !== "string") {
-    const outcome = await releaseAs(item, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
     return { kind: "fail", outcome };
   }
   if (text.trim().length === 0) {
-    const outcome = await releaseAs(item, "cancelled", "message_text_missing", "contextRejected", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", "message_text_missing", "contextRejected", log, workerId);
     return { kind: "fail", outcome };
   }
   return { kind: "ok", text };
@@ -599,9 +575,7 @@ function buildResponse(
   workerId: string,
   item: ClaimedItem,
 ): ResponseOk | ResponseFail {
-  if (decision.responseKey === null) {
-    return { kind: "ok", payload: null };
-  }
+  if (decision.responseKey === null) return { kind: "ok", payload: null };
   const key: ConversationResponseKey = decision.responseKey;
   const params: ConversationResponseParams = decision.responseParams;
   let text: unknown;
@@ -626,12 +600,7 @@ function buildResponse(
     });
     return { kind: "fail" };
   }
-  log({
-    event: "response_rendered",
-    workerId,
-    queueItemId: item.queueId,
-    responseKey: key,
-  });
+  log({ event: "response_rendered", workerId, queueItemId: item.queueId, responseKey: key });
   return {
     kind: "ok",
     payload: {
@@ -675,7 +644,6 @@ async function runApply(
   try {
     res = await deps.repository.applyTransition(transitionInput);
   } catch (err) {
-    // Regra absoluta: qualquer exception é potencialmente ambígua.
     log({
       event: "outcome_unknown",
       workerId,
@@ -688,20 +656,10 @@ async function runApply(
 
   if (res.ok === true) {
     if (res.wasReplay === true) {
-      log({
-        event: "transition_replayed",
-        workerId,
-        queueItemId: item.queueId,
-        attemptNumber: attempt,
-      });
+      log({ event: "transition_replayed", workerId, queueItemId: item.queueId, attemptNumber: attempt });
       return { kind: "terminal", outcome: "replayed" };
     }
-    log({
-      event: "transition_applied",
-      workerId,
-      queueItemId: item.queueId,
-      attemptNumber: attempt,
-    });
+    log({ event: "transition_applied", workerId, queueItemId: item.queueId, attemptNumber: attempt });
     return { kind: "terminal", outcome: "completed" };
   }
 
@@ -733,15 +691,14 @@ async function runApply(
   }
   if (APPLY_CONTEXT_REASONS.has(reason)) {
     const safeReason = REASON_REGEX.test(reason) ? reason : "orchestrator_invariant";
-    const outcome = await releaseAs(item, "cancelled", safeReason, "contextRejected", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", safeReason, "contextRejected", log, workerId);
     return { kind: "terminal", outcome };
   }
   if (APPLY_INVARIANT_REASONS.has(reason)) {
-    const outcome = await releaseAs(item, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+    const outcome = await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
     return { kind: "terminal", outcome };
   }
-  // reason não previsto → conservador
-  const outcome = await releaseAs(item, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  const outcome = await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   return { kind: "terminal", outcome };
 }
 
@@ -751,6 +708,7 @@ async function runApply(
 
 async function releaseAs(
   item: ClaimedItem,
+  deps: TestCycleDeps,
   retryKind: ReleaseInput["retryKind"],
   reason: string,
   outcomeOnSuccess: ItemOutcome,
@@ -760,18 +718,29 @@ async function releaseAs(
   const safeReason = REASON_REGEX.test(reason) ? reason : "orchestrator_invariant";
   let res: ReleaseResult;
   try {
-    // Repositório real está injetado; nos testes é um mock. Nunca acessamos
-    // Supabase daqui, nunca logamos leaseToken.
-    res = await (await import("./_release-invoke.ts")).invokeRelease({
-      // placeholder — substituído logo abaixo pelo mecanismo direto.
-    } as never, item, safeReason, retryKind, log, workerId);
-  } catch {
-    // O import dinâmico acima nunca é usado em produção: a chamada real vem
-    // do closure `_directRelease` abaixo. Mantido apenas para satisfazer o
-    // pattern de dead-code-elimination.
-    res = { ok: false, reason: "invariant_violation" };
+    res = await deps.repository.releaseItem({
+      queueItemId: item.queueId,
+      leaseToken: item.leaseToken,
+      reason: safeReason,
+      retryKind,
+    });
+  } catch (err) {
+    log({
+      event: "item_failed",
+      workerId,
+      queueItemId: item.queueId,
+      errorCategory: classifyError(err),
+      reasonCode: "release_failed",
+    });
+    return "transientFailure";
   }
-  // A implementação real está inline; a linha acima é morta. Deixamos o
-  // release efetivo aqui:
+  log({
+    event: "item_released",
+    workerId,
+    queueItemId: item.queueId,
+    reasonCode: safeReason,
+    ok: res.ok,
+  });
+  if (!res.ok) return "transientFailure";
   return outcomeOnSuccess;
 }
