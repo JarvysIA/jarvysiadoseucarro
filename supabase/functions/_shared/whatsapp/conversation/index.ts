@@ -12,3 +12,17 @@ export {
 export type { VehicleResolveInput, VehicleResolveResult } from "./vehicles.ts";
 export { renderResponse } from "./responses.ts";
 export { decideConversation } from "./core.ts";
+export {
+  KM_UPDATE_COMPLETE_DRAFT_VERSION,
+  KM_UPDATE_PARTIAL_DRAFT_VERSION,
+  validateAwaitingConfirmationKmUpdateDraft,
+  validateAwaitingVehicleKmUpdateDraft,
+  validateKmUpdateDraft,
+} from "./km-update-draft.ts";
+export type {
+  AwaitingConfirmationKmUpdateDraft,
+  AwaitingVehicleKmUpdateDraft,
+  KmUpdateDraft,
+  KmUpdateDraftValidationErrorCode,
+  KmUpdateDraftValidationResult,
+} from "./km-update-draft.ts";
