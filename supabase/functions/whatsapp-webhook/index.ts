@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { maskPhone } from "../_shared/whatsapp/phone.ts";
 import { normalizeZapiInbound } from "../_shared/whatsapp/normalize.ts";
+import { decideRouteOwner } from "../_shared/whatsapp/routing.ts";
 import type { NormalizedWhatsappInbound } from "../_shared/whatsapp/types.ts";
 
 const MAX_PAYLOAD_BYTES = 512 * 1024;
