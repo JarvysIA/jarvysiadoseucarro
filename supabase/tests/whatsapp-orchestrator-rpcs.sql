@@ -36,9 +36,9 @@ DECLARE
   v_bogus_qid  uuid := gen_random_uuid();
   v_instance   uuid;
   v_result_ok  jsonb := jsonb_build_object(
-                          'decisionId', gen_random_uuid()::text,
-                          'action','none',
-                          'summaryKey','noop');
+                          'decisionKind','no_op',
+                          'eventKind','unknown',
+                          'outcome','none');
   v_patch_ok   jsonb := jsonb_build_object('next_state','idle');
 BEGIN
   RAISE NOTICE '========== BUILD 5.7F2D0 START ==========';
@@ -242,89 +242,67 @@ BEGIN
   -- ============================================================
 
   -- A01: p_orchestrator_version negativo → invariant_violation
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', -1,
-    v_result_ok, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => -1::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='invariant_violation' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A01 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A01 FAIL: %', v_res; END IF;
 
   -- A02: result_summary não-object → result_summary_invalid
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    '[]'::jsonb, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => '[]'::jsonb, p_response => NULL);
   IF v_res->>'reason'='result_summary_invalid' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A02 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A02 FAIL: %', v_res; END IF;
 
   -- A03: result_summary com chave desconhecida → result_summary_invalid
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    '{"unknown_key":"x"}'::jsonb, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => '{"unknown_key":"x"}'::jsonb, p_response => NULL);
   IF v_res->>'reason'='result_summary_invalid' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A03 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A03 FAIL: %', v_res; END IF;
 
   -- A04: patch não-object → patch_invalid_value
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, '"nope"'::jsonb, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => '"nope"'::jsonb, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='patch_invalid_value' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A04 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A04 FAIL: %', v_res; END IF;
 
   -- A05: patch chave desconhecida → patch_invalid_key
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, '{"next_state":"idle","evil_key":1}'::jsonb, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => '{"next_state":"idle", p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => "evil_key":1}'::jsonb, NULL);
   IF v_res->>'reason'='patch_invalid_key' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A05 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A05 FAIL: %', v_res; END IF;
 
   -- A06: patch sem next_state → patch_invalid_value
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, '{}'::jsonb, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => '{}'::jsonb, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='patch_invalid_value' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A06 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A06 FAIL: %', v_res; END IF;
 
   -- A07: next_state fora do enum → patch_invalid_value
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, '{"next_state":"nope_state"}'::jsonb, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => '{"next_state":"nope_state"}'::jsonb, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='patch_invalid_value' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A07 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A07 FAIL: %', v_res; END IF;
 
   -- A08: active_vehicle_id com tipo errado → patch_invalid_value
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, '{"next_state":"idle","active_vehicle_id":42}'::jsonb, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => '{"next_state":"idle", p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => "active_vehicle_id":42}'::jsonb, NULL);
   IF v_res->>'reason'='patch_invalid_value' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A08 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A08 FAIL: %', v_res; END IF;
 
   -- A09: response não-object → response_invalid
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, v_patch_ok, '"nope"'::jsonb);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => '"nope"'::jsonb);
   IF v_res->>'reason'='response_invalid' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A09 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A09 FAIL: %', v_res; END IF;
 
   -- A10: response text_body vazio → response_invalid
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_bogus_qid, v_lease, 'w1', 0,
-    v_result_ok, v_patch_ok,
-    '{"message_type":"text","purpose":"general","text_body":"   "}'::jsonb);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_bogus_qid, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => '{"message_type":"text","purpose":"general","text_body":"   "}'::jsonb);
   IF v_res->>'reason'='response_invalid' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A10 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A10 FAIL: %', v_res; END IF;
 
   -- A11: queue_item_id inexistente → queue_item_not_found
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_random, v_lease, 'w1', 0, v_result_ok, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_random, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='queue_item_not_found' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A11 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A11 FAIL: %', v_res; END IF;
@@ -338,8 +316,7 @@ BEGIN
   INSERT INTO whatsapp_processing_queue(id, queue_type, status)
     VALUES (gen_random_uuid(), 'jarvys', 'queued')
     RETURNING id INTO v_queue_id;
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_queue_id, v_lease, 'w1', 0, v_result_ok, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_queue_id, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='source_message_missing' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A12 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A12 FAIL: %', v_res; END IF;
@@ -351,8 +328,7 @@ BEGIN
   INSERT INTO whatsapp_processing_queue(id, message_id, queue_type, status)
     VALUES (gen_random_uuid(), v_msg_id_nc, 'jarvys', 'queued')
     RETURNING id INTO v_queue_id;
-  v_res := apply_whatsapp_orchestrator_transition(
-    v_queue_id, v_lease, 'w1', 0, v_result_ok, v_patch_ok, NULL);
+  v_res := apply_whatsapp_orchestrator_transition(p_queue_item_id => v_queue_id, p_lease_token => v_lease, p_expected_state_version => 0::bigint, p_patch => v_patch_ok, p_orchestrator_version => 'v1', p_result_summary => v_result_ok, p_response => NULL);
   IF v_res->>'reason'='contact_missing' THEN
     v_pass := v_pass + 1; RAISE NOTICE 'A13 PASS';
   ELSE v_fail := v_fail + 1; RAISE NOTICE 'A13 FAIL: %', v_res; END IF;
