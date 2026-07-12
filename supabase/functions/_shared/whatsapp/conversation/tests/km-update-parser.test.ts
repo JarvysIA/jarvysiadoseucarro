@@ -276,7 +276,7 @@ describe("formatos numéricos inválidos", () => {
     ["+50000 km", "invalid_km_format"],
     ["50,5 mil km", "invalid_km_format"],
     ["50.5 mil km", "invalid_km_format"],
-    ["50 mil e 500 km", "invalid_km_format"],
+    ["50 mil e 500 km", "ambiguous_km_candidate"],
   ];
 
   for (const [input, code] of CASES) {
