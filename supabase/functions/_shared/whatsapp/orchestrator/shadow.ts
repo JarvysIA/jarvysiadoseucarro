@@ -179,6 +179,7 @@ function mapStateRow(row: Record<string, unknown>): ConversationState {
 
 type VehicleRow = {
   id: string;
+  user_id: string | null;
   marca: string | null;
   modelo: string | null;
   placa: string | null;
@@ -186,6 +187,17 @@ type VehicleRow = {
   // Build 5.7F2E1A.5-MA — transporte read-only de km_atual. Nunca logado.
   km_atual: number | null;
 };
+
+type ProfileRow = {
+  id: string;
+  status_usuario: string | null;
+  trial_inicio: string | null;
+};
+
+type PagamentoRow = {
+  veiculo_id: string | null;
+};
+
 
 // Build 5.7F2E1A.5-MA — mesma regra de validação usada no Repository.
 const KM_ATUAL_MAX = 2147483647;
