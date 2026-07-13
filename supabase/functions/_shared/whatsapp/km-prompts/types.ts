@@ -156,6 +156,158 @@ export type ExpireKmPromptRequestsResult = {
 };
 
 // ------------------------------------------------------------
+// ENQUEUE (Build 5.7F2E1A.5-MJ1A)
+// ------------------------------------------------------------
+
+export const KM_PROMPT_ENQUEUE_RESULTS = [
+  "created",
+  "replayed",
+  "idempotency_context_mismatch",
+  "invalid_idempotency_key",
+  "invalid_text",
+  "contact_not_found",
+  "contact_opted_out",
+  "contact_not_eligible",
+  "contact_not_linked",
+  "vehicle_not_found",
+  "vehicle_not_owned",
+  "vehicle_archived",
+  "vehicle_context_invalid",
+  "instance_not_found",
+  "instance_inactive",
+  "instance_context_mismatch",
+] as const;
+
+export type KmPromptEnqueueRejectResult =
+  | "idempotency_context_mismatch"
+  | "invalid_idempotency_key"
+  | "invalid_text"
+  | "contact_not_found"
+  | "contact_opted_out"
+  | "contact_not_eligible"
+  | "contact_not_linked"
+  | "vehicle_not_found"
+  | "vehicle_not_owned"
+  | "vehicle_archived"
+  | "vehicle_context_invalid"
+  | "instance_not_found"
+  | "instance_inactive"
+  | "instance_context_mismatch";
+
+export type EnqueueKmPromptInput = {
+  idempotencyKey: string;
+  contactId: string;
+  vehicleId: string;
+  textBody: string;
+};
+
+export type EnqueueKmPromptResult =
+  | {
+      result: "created" | "replayed";
+      promptRequestId: string;
+      promptMessageId: string;
+      outboundQueueId: string;
+    }
+  | { result: KmPromptEnqueueRejectResult };
+
+// ------------------------------------------------------------
+// FINALIZE SENT (Build 5.7F2E1A.5-MJ1A)
+// ------------------------------------------------------------
+
+export const KM_PROMPT_FINALIZE_SENT_RESULTS = [
+  "finalized",
+  "replayed",
+  "queue_not_found",
+  "queue_state_invalid",
+  "invalid_provider_message_id",
+  "provider_message_id_mismatch",
+  "km_prompt_invariant_violation",
+] as const;
+
+export type FinalizeKmPromptSentInput = {
+  outboundQueueId: string;
+  providerMessageId: string;
+};
+
+export type FinalizeKmPromptSentResult =
+  | {
+      result: "finalized" | "replayed";
+      promptRequestId: string;
+      promptMessageId: string;
+      outboundQueueId: string;
+      pendingAt: string | null;
+      expiresAt: string | null;
+    }
+  | {
+      result:
+        | "queue_not_found"
+        | "queue_state_invalid"
+        | "invalid_provider_message_id"
+        | "provider_message_id_mismatch"
+        | "km_prompt_invariant_violation";
+    };
+
+// ------------------------------------------------------------
+// FINALIZE FAILED (Build 5.7F2E1A.5-MJ1A)
+// ------------------------------------------------------------
+
+export const KM_PROMPT_TERMINAL_REASONS = [
+  "non_retryable_provider_error",
+  "max_attempts_reached",
+  "timeout_ambiguous",
+  "preflight_invalid",
+  "instance_not_found",
+] as const;
+
+export type KmPromptTerminalReason = (typeof KM_PROMPT_TERMINAL_REASONS)[number];
+
+export const KM_PROMPT_FINALIZE_FAILED_RESULTS = [
+  "finalized",
+  "terminal_replayed",
+  "queue_not_found",
+  "queue_state_invalid",
+  "invalid_terminal_reason",
+  "max_attempts_not_reached",
+  "km_prompt_invariant_violation",
+  "terminal_after_success_invariant",
+  "terminal_after_prompt_progress_invariant",
+] as const;
+
+export type FinalizeKmPromptFailedInput = {
+  outboundQueueId: string;
+  terminalReason: KmPromptTerminalReason;
+  errorMessage?: string | null;
+};
+
+export type FinalizeKmPromptFailedResult =
+  | {
+      result: "finalized";
+      promptRequestId: string;
+      promptMessageId: string;
+      outboundQueueId: string;
+      terminalReason: KmPromptTerminalReason;
+    }
+  | {
+      result: "terminal_replayed";
+      promptRequestId: string;
+      terminalReason: string;
+      repaired?: boolean;
+    }
+  | {
+      result: "terminal_after_prompt_progress_invariant";
+      promptRequestId: string;
+    }
+  | {
+      result:
+        | "queue_not_found"
+        | "queue_state_invalid"
+        | "invalid_terminal_reason"
+        | "max_attempts_not_reached"
+        | "km_prompt_invariant_violation"
+        | "terminal_after_success_invariant";
+    };
+
+// ------------------------------------------------------------
 // Erros do módulo (locais — não reutiliza orquestrador)
 // ------------------------------------------------------------
 
