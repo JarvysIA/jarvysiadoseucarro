@@ -66,6 +66,7 @@ function veh(
     isArchived: false,
     isEligible: true,
     kmAtual,
+    whatsappAccessMode: "full",
     optionalLabel: null,
   };
 }

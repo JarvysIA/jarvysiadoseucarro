@@ -41,6 +41,10 @@ import {
   TransportError,
   UnknownReasonError,
 } from "./errors.ts";
+import {
+  computeWhatsappVehicleAccessMode,
+  type WhatsappVehicleAccessProfileInput,
+} from "../plan/vehicle-access-mode.ts";
 
 // ============================================================
 // Structural client — evita acoplar a supabase-js@X.Y.Z. Expõe .rpc() e .from().
@@ -700,10 +704,50 @@ export class WhatsappOrchestratorRepository {
       // (6) veículos do usuário — incluímos archived para diagnosticar issue
       const vehicleRows = await this.selectMany(
         "veiculos",
-        "id,marca,modelo,placa,status,km_atual",
+        "id,user_id,marca,modelo,placa,status,km_atual",
         { user_id: item.userId },
       );
-      const allVehicles = vehicleRows.map(mapVehicleRow);
+
+      // (6.1) Build 5.7F2E1A.5-MJ0 — perfil do usuário (fail-closed).
+      let profileRow: Record<string, unknown> | null;
+      try {
+        profileRow = await this.selectOne(
+          "profiles",
+          "id,status_usuario,trial_inicio",
+          { id: item.userId },
+        );
+      } catch (_e) {
+        return this.loadCtxErr(queueItemId, "profile_lookup_failed", started);
+      }
+      if (!profileRow) return this.loadCtxErr(queueItemId, "profile_missing", started);
+      const profileInput: WhatsappVehicleAccessProfileInput = {
+        statusUsuario: typeof profileRow.status_usuario === "string" ? profileRow.status_usuario : null,
+        trialInicio: typeof profileRow.trial_inicio === "string" ? profileRow.trial_inicio : null,
+      };
+
+      // (6.2) ativações pagas do usuário (pagamentos_pix). Fail-closed.
+      let activationRows: Record<string, unknown>[];
+      try {
+        activationRows = await this.selectMany(
+          "pagamentos_pix",
+          "veiculo_id,status,tipo_produto,user_id",
+          { user_id: item.userId, status: "pago", tipo_produto: "ativacao" },
+        );
+      } catch (_e) {
+        return this.loadCtxErr(queueItemId, "activations_lookup_failed", started);
+      }
+      const activationSet = new Set<string>();
+      for (const row of activationRows) {
+        if (typeof row.veiculo_id === "string" && row.veiculo_id.length > 0) {
+          activationSet.add(row.veiculo_id);
+        }
+      }
+
+      const nowDate = new Date();
+      const expectedUserId = item.userId ?? ""; // ownership já validado acima
+      const allVehicles = vehicleRows.map((row) =>
+        mapVehicleRow(row, profileInput, activationSet, expectedUserId, nowDate),
+      );
       const vehicles = allVehicles.filter((v) => !v.isArchived);
 
       // (7) active vehicle issue — sem escrita em qualquer caso
@@ -714,6 +758,7 @@ export class WhatsappOrchestratorRepository {
         if (!found) activeVehicleIssue = "invalid";
         else if (found.isArchived) activeVehicleIssue = "archived";
       }
+
 
       const context: ConversationContext = { state, stateVersion, fallbackCount, vehicles };
       this.log({
@@ -855,19 +900,40 @@ function parseKmAtual(raw: unknown): number | null {
   return raw;
 }
 
-function mapVehicleRow(row: Record<string, unknown>): ConversationVehicle {
+function mapVehicleRow(
+  row: Record<string, unknown>,
+  profile: WhatsappVehicleAccessProfileInput,
+  activationSet: ReadonlySet<string>,
+  expectedUserId: string,
+  now: Date,
+): ConversationVehicle {
   const status = typeof row.status === "string" ? row.status : "";
   const isArchived = status === "archived";
+  const id = String(row.id);
+  const userId = typeof row.user_id === "string" ? row.user_id : "";
+  const whatsappAccessMode = computeWhatsappVehicleAccessMode(
+    profile,
+    {
+      id,
+      userId,
+      status: typeof row.status === "string" ? row.status : null,
+      hasPaidActivation: activationSet.has(id),
+    },
+    expectedUserId,
+    now,
+  );
   return {
-    id: String(row.id),
+    id,
     brand: (row.marca as string | null) ?? null,
     model: (row.modelo as string | null) ?? null,
     plate: (row.placa as string | null) ?? null,
     isArchived,
     isEligible: !isArchived,
     kmAtual: parseKmAtual(row.km_atual),
+    whatsappAccessMode,
   };
 }
+
 
 // ============================================================
 // Erros vindos do PostgREST/supabase-js → RpcExceptionError.

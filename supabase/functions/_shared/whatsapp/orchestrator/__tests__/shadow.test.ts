@@ -136,9 +136,15 @@ function baseRows(overrides: Partial<TableRows> = {}): TableRows {
     ],
     whatsapp_conversation_states: [],
     veiculos: [],
+    // Build 5.7F2E1A.5-MJ0 — perfil + ativações são obrigatórios no shadow.
+    profiles: [
+      { id: "u-1", status_usuario: "vip", trial_inicio: null },
+    ],
+    pagamentos_pix: [],
     ...overrides,
   };
 }
+
 
 async function run(rowsOverride: Partial<TableRows> = {}, extra?: Partial<ShadowDeps>) {
   const { client, calls } = makeSupabase({ rows: baseRows(rowsOverride) });
@@ -263,10 +269,13 @@ describe("shadow — state", () => {
     // Cliente mock só expõe .from().select(); qualquer .insert/.update tentaria acessar método inexistente → erro. Aqui basta confirmar tabelas visitadas.
     const tables = calls.selects.map((c) => c.table).sort();
     expect(tables).toEqual([
+      "pagamentos_pix",
+      "profiles",
       "veiculos",
       "whatsapp_conversation_states",
       "whatsapp_provider_instances",
     ]);
+
   });
 });
 
@@ -546,7 +555,7 @@ describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
     expect(events[0].status).toBe("evaluated");
     // Nenhuma RPC nem outras tabelas escritas.
     const tables = calls.selects.map((c) => c.table).sort();
-    expect(tables).toEqual(["veiculos", "whatsapp_conversation_states", "whatsapp_provider_instances"]);
+    expect(tables).toEqual(["pagamentos_pix", "profiles", "veiculos", "whatsapp_conversation_states", "whatsapp_provider_instances"]);
     // Nenhum campo kmAtual/km_atual vaza para o log.
     const json = JSON.stringify(events[0]);
     expect(json.includes("kmAtual")).toBe(false);
@@ -602,7 +611,7 @@ describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
     expect(res.status).toBe("failed");
     // Nenhum SELECT em tabelas de mutação/estado transacional.
     for (const c of calls.selects) {
-      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos"]).toContain(c.table);
+      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos", "profiles", "pagamentos_pix"]).toContain(c.table);
     }
   });
 });

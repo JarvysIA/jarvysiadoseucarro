@@ -11,6 +11,7 @@ function v(partial: Partial<ConversationVehicle> & { id: string }): Conversation
     isArchived: partial.isArchived ?? false,
     isEligible: partial.isEligible ?? true,
     kmAtual: partial.kmAtual ?? null,
+    whatsappAccessMode: partial.whatsappAccessMode ?? "full",
     optionalLabel: partial.optionalLabel ?? null,
   };
 }
