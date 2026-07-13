@@ -41,6 +41,10 @@ import {
   TransportError,
   UnknownReasonError,
 } from "./errors.ts";
+import {
+  computeWhatsappVehicleAccessMode,
+  type WhatsappVehicleAccessProfileInput,
+} from "../plan/vehicle-access-mode.ts";
 
 // ============================================================
 // Structural client — evita acoplar a supabase-js@X.Y.Z. Expõe .rpc() e .from().
