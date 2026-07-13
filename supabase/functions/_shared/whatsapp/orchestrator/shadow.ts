@@ -349,6 +349,11 @@ export async function runWhatsappOrchestratorShadow(
     if (!profileResp.data) {
       return emitFailed(baseLog, startedAt, "profile_missing", logger);
     }
+    // Build 5.7F2E1A.5-MJ0.1 — shape estrutural do perfil.
+    if (!isValidProfileContextRow(profileResp.data)) {
+      return emitFailed(baseLog, startedAt, "profile_context_invalid", logger);
+    }
+    const validProfile = profileResp.data;
 
     const stateRow = stateResp.data;
     const state = stateRow ? mapStateRow(stateRow) : virtualState();
@@ -362,14 +367,20 @@ export async function runWhatsappOrchestratorShadow(
     void stateVersion;
 
     const profileInput: WhatsappVehicleAccessProfileInput = {
-      statusUsuario: profileResp.data.status_usuario,
-      trialInicio: profileResp.data.trial_inicio,
+      statusUsuario: validProfile.status_usuario,
+      trialInicio: validProfile.trial_inicio,
     };
-    const activationSet = new Set<string>();
-    for (const row of activationsResp.data ?? []) {
-      if (typeof row.veiculo_id === "string" && row.veiculo_id.length > 0) {
-        activationSet.add(row.veiculo_id);
+    // Build 5.7F2E1A.5-MJ0.1 — valida cada linha antes de construir o Set;
+    // uma linha inválida invalida o contexto completo (nunca Set parcial).
+    const rawActivations = activationsResp.data ?? [];
+    for (const row of rawActivations) {
+      if (!isValidActivationContextRow(row)) {
+        return emitFailed(baseLog, startedAt, "activations_context_invalid", logger);
       }
+    }
+    const activationSet = new Set<string>();
+    for (const row of rawActivations) {
+      if (isValidActivationContextRow(row)) activationSet.add(row.veiculo_id);
     }
     const nowDate = new Date();
 
