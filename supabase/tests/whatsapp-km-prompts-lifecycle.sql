@@ -52,8 +52,9 @@ BEGIN
               (v_vehicle2, v_user, 'TSTKM02', 'ativo'),
               (v_archived, v_user, 'TSTKM03', 'archived');
 
-  INSERT INTO public.whatsapp_contacts(id, user_id, provider, instance_id, phone_hash, verified_at)
-       VALUES (v_contact, v_user, 'zapi', 'INSTX', repeat('a', 64), now());
+  INSERT INTO public.whatsapp_contacts(id, user_id, phone_e164, assigned_provider,
+                                       assigned_instance_id, verified_at, opt_in, opt_out)
+       VALUES (v_contact, v_user, '+5511900000000', 'zapi', 'INSTX', now(), true, false);
 
   -- Mensagens: outbound (prompt), outbound de outro contexto, inbound (draft).
   INSERT INTO public.whatsapp_messages(id, user_id, vehicle_id, contact_id, provider,
