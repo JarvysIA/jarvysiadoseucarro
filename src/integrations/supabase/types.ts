@@ -1805,11 +1805,32 @@ export type Database = {
           result: string
         }[]
       }
+      enqueue_whatsapp_km_prompt: {
+        Args: {
+          p_contact_id: string
+          p_idempotency_key: string
+          p_text_body: string
+          p_vehicle_id: string
+        }
+        Returns: Json
+      }
       expire_whatsapp_km_prompt_requests: {
         Args: { p_batch?: number }
         Returns: {
           expired_count: number
         }[]
+      }
+      finalize_whatsapp_km_prompt_failed: {
+        Args: {
+          p_error_message: string
+          p_outbound_queue_id: string
+          p_terminal_reason: string
+        }
+        Returns: Json
+      }
+      finalize_whatsapp_km_prompt_sent: {
+        Args: { p_outbound_queue_id: string; p_provider_message_id: string }
+        Returns: Json
       }
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
       get_indicacao_dias_bloqueio: { Args: never; Returns: number }
