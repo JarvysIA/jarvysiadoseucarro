@@ -283,11 +283,16 @@ export async function runWhatsappOrchestratorShadow(
       return { status: "skipped", reason: "mode_not_shadow", durationMs: Date.now() - startedAt };
     }
 
-    // 2) State + veículos em paralelo. Ambas compartilham o AbortSignal.
+    // 2) State + veículos + profile + activations em paralelo.
+    //    Build 5.7F2E1A.5-MJ0 — o classificador de acesso por veículo
+    //    exige perfil do usuário e ativações pagas (pagamentos_pix).
+    //    Todas compartilham o AbortSignal e são fail-open ao worker legado.
     let stateResp: ShadowMaybeSingleResult;
     let vehiclesResp: ShadowSelectResult<VehicleRow>;
+    let profileResp: ShadowMaybeSingleResult<ProfileRow>;
+    let activationsResp: ShadowSelectResult<PagamentoRow>;
     try {
-      const [s, v] = await Promise.all([
+      const [s, v, p, a] = await Promise.all([
         deps.supabase
           .from("whatsapp_conversation_states")
           .select(
@@ -298,12 +303,27 @@ export async function runWhatsappOrchestratorShadow(
           .maybeSingle(),
         deps.supabase
           .from("veiculos")
-          .select<VehicleRow>("id, marca, modelo, placa, status, km_atual")
+          .select<VehicleRow>("id, user_id, marca, modelo, placa, status, km_atual")
           .eq("user_id", input.userId)
+          .abortSignal(controller.signal),
+        deps.supabase
+          .from("profiles")
+          .select<ProfileRow>("id, status_usuario, trial_inicio")
+          .eq("id", input.userId)
+          .abortSignal(controller.signal)
+          .maybeSingle(),
+        deps.supabase
+          .from("pagamentos_pix")
+          .select<PagamentoRow>("veiculo_id")
+          .eq("user_id", input.userId)
+          .eq("status", "pago")
+          .eq("tipo_produto", "ativacao")
           .abortSignal(controller.signal),
       ]);
       stateResp = s;
       vehiclesResp = v;
+      profileResp = p;
+      activationsResp = a;
     } catch (err) {
       if (isAbortLike(err, controller.signal)) {
         return emitTimeout(baseLog, startedAt, logger);
@@ -316,6 +336,15 @@ export async function runWhatsappOrchestratorShadow(
     if (vehiclesResp.error) {
       return emitFailed(baseLog, startedAt, "vehicles_lookup_failed", logger);
     }
+    if (profileResp.error) {
+      return emitFailed(baseLog, startedAt, "profile_lookup_failed", logger);
+    }
+    if (activationsResp.error) {
+      return emitFailed(baseLog, startedAt, "activations_lookup_failed", logger);
+    }
+    if (!profileResp.data) {
+      return emitFailed(baseLog, startedAt, "profile_missing", logger);
+    }
 
     const stateRow = stateResp.data;
     const state = stateRow ? mapStateRow(stateRow) : virtualState();
@@ -327,6 +356,18 @@ export async function runWhatsappOrchestratorShadow(
       : 0;
     // stateVersion não é passado ao core; capturado apenas para clareza.
     void stateVersion;
+
+    const profileInput: WhatsappVehicleAccessProfileInput = {
+      statusUsuario: profileResp.data.status_usuario,
+      trialInicio: profileResp.data.trial_inicio,
+    };
+    const activationSet = new Set<string>();
+    for (const row of activationsResp.data ?? []) {
+      if (typeof row.veiculo_id === "string" && row.veiculo_id.length > 0) {
+        activationSet.add(row.veiculo_id);
+      }
+    }
+    const nowDate = new Date();
 
     const allVehicles: VehicleRow[] = vehiclesResp.data ?? [];
     let eligibleVehicles: ConversationVehicle[];
@@ -341,10 +382,22 @@ export async function runWhatsappOrchestratorShadow(
           isArchived: false,
           isEligible: true,
           kmAtual: parseKmAtualShadow(v.km_atual),
+          whatsappAccessMode: computeWhatsappVehicleAccessMode(
+            profileInput,
+            {
+              id: v.id,
+              userId: typeof v.user_id === "string" ? v.user_id : "",
+              status: v.status,
+              hasPaidActivation: activationSet.has(v.id),
+            },
+            input.userId,
+            nowDate,
+          ),
         }));
     } catch {
       return emitFailed(baseLog, startedAt, "vehicles_lookup_failed", logger);
     }
+
 
     let activeVehicleIssue: "invalid" | "archived" | null = null;
     if (state.activeVehicleId) {
