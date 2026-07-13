@@ -51,8 +51,10 @@ BEGIN
               (v_archived,  v_user, 'MJ1A02', 'archived');
 
   INSERT INTO public.whatsapp_contacts(id, user_id, phone_e164, assigned_provider,
-                                       assigned_instance_id, verified_at, opt_in, opt_out)
-       VALUES (v_contact, v_user, '+5511900000001', 'zapi', v_instance_id, now(), true, false);
+                                       assigned_instance_id, assigned_whatsapp_number,
+                                       verified_at, opt_in, opt_out)
+       VALUES (v_contact, v_user, '+5511900000001', 'zapi', v_instance_id,
+               '+551150000000', now(), true, false);
 
   -- ================== ENQUEUE ==================
 
