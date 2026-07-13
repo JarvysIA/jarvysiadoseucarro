@@ -304,6 +304,117 @@ function parseExpire(raw: unknown): ExpireKmPromptRequestsResult {
 }
 
 // ------------------------------------------------------------
+// MJ1A — parsers de enqueue / finalize sent / finalize failed.
+// As três novas RPCs retornam jsonb (objeto único), não table.
+// requireSingleRow também aceita objeto puro.
+// ------------------------------------------------------------
+
+const ENQUEUE_SET: ReadonlySet<string> = new Set(KM_PROMPT_ENQUEUE_RESULTS);
+const FINALIZE_SENT_SET: ReadonlySet<string> = new Set(
+  KM_PROMPT_FINALIZE_SENT_RESULTS,
+);
+const FINALIZE_FAILED_SET: ReadonlySet<string> = new Set(
+  KM_PROMPT_FINALIZE_FAILED_RESULTS,
+);
+const TERMINAL_REASON_SET: ReadonlySet<string> = new Set(
+  KM_PROMPT_TERMINAL_REASONS,
+);
+
+function parseEnqueue(raw: unknown): EnqueueKmPromptResult {
+  const row = requireSingleRow(raw);
+  const result = requireString(row, "result");
+  if (!ENQUEUE_SET.has(result)) throw new KmPromptUnknownResultError(result);
+  if (result === "created" || result === "replayed") {
+    return {
+      result: result as "created" | "replayed",
+      promptRequestId: requireUuid(row, "prompt_request_id"),
+      promptMessageId: requireUuid(row, "prompt_message_id"),
+      outboundQueueId: requireUuid(row, "outbound_queue_id"),
+    };
+  }
+  return { result: result as KmPromptEnqueueRejectResult };
+}
+
+function parseFinalizeSent(raw: unknown): FinalizeKmPromptSentResult {
+  const row = requireSingleRow(raw);
+  const result = requireString(row, "result");
+  if (!FINALIZE_SENT_SET.has(result)) {
+    throw new KmPromptUnknownResultError(result);
+  }
+  if (result === "finalized" || result === "replayed") {
+    return {
+      result: result as "finalized" | "replayed",
+      promptRequestId: requireUuid(row, "prompt_request_id"),
+      promptMessageId: requireUuid(row, "prompt_message_id"),
+      outboundQueueId: requireUuid(row, "outbound_queue_id"),
+      pendingAt: optionalIsoTimestamp(row, "pending_at"),
+      expiresAt: optionalIsoTimestamp(row, "expires_at"),
+    };
+  }
+  return {
+    result: result as
+      | "queue_not_found"
+      | "queue_state_invalid"
+      | "invalid_provider_message_id"
+      | "provider_message_id_mismatch"
+      | "km_prompt_invariant_violation",
+  };
+}
+
+function parseFinalizeFailed(raw: unknown): FinalizeKmPromptFailedResult {
+  const row = requireSingleRow(raw);
+  const result = requireString(row, "result");
+  if (!FINALIZE_FAILED_SET.has(result)) {
+    throw new KmPromptUnknownResultError(result);
+  }
+  if (result === "finalized") {
+    const reason = requireString(row, "terminal_reason");
+    if (!TERMINAL_REASON_SET.has(reason)) {
+      throw new KmPromptUnknownResultError(`terminal_reason:${reason}`);
+    }
+    return {
+      result: "finalized",
+      promptRequestId: requireUuid(row, "prompt_request_id"),
+      promptMessageId: requireUuid(row, "prompt_message_id"),
+      outboundQueueId: requireUuid(row, "outbound_queue_id"),
+      terminalReason: reason as KmPromptTerminalReason,
+    };
+  }
+  if (result === "terminal_replayed") {
+    const repairedRaw = row.repaired;
+    let repaired: boolean | undefined;
+    if (repairedRaw === undefined || repairedRaw === null) {
+      repaired = undefined;
+    } else if (typeof repairedRaw === "boolean") {
+      repaired = repairedRaw;
+    } else {
+      throw new KmPromptMalformedResponseError("repaired inválido");
+    }
+    return {
+      result: "terminal_replayed",
+      promptRequestId: requireUuid(row, "prompt_request_id"),
+      terminalReason: requireString(row, "terminal_reason"),
+      ...(repaired === undefined ? {} : { repaired }),
+    };
+  }
+  if (result === "terminal_after_prompt_progress_invariant") {
+    return {
+      result: "terminal_after_prompt_progress_invariant",
+      promptRequestId: requireUuid(row, "prompt_request_id"),
+    };
+  }
+  return {
+    result: result as
+      | "queue_not_found"
+      | "queue_state_invalid"
+      | "invalid_terminal_reason"
+      | "max_attempts_not_reached"
+      | "km_prompt_invariant_violation"
+      | "terminal_after_success_invariant",
+  };
+}
+
+// ------------------------------------------------------------
 // Repository
 // ------------------------------------------------------------
 
@@ -365,4 +476,36 @@ export class WhatsappKmPromptRepository {
     });
     return parseExpire(data);
   }
+
+  async enqueue(input: EnqueueKmPromptInput): Promise<EnqueueKmPromptResult> {
+    const data = await invokeRpc(this.client, "enqueue_whatsapp_km_prompt", {
+      p_idempotency_key: input.idempotencyKey,
+      p_contact_id: input.contactId,
+      p_vehicle_id: input.vehicleId,
+      p_text_body: input.textBody,
+    });
+    return parseEnqueue(data);
+  }
+
+  async finalizeSent(
+    input: FinalizeKmPromptSentInput,
+  ): Promise<FinalizeKmPromptSentResult> {
+    const data = await invokeRpc(this.client, "finalize_whatsapp_km_prompt_sent", {
+      p_outbound_queue_id: input.outboundQueueId,
+      p_provider_message_id: input.providerMessageId,
+    });
+    return parseFinalizeSent(data);
+  }
+
+  async finalizeFailed(
+    input: FinalizeKmPromptFailedInput,
+  ): Promise<FinalizeKmPromptFailedResult> {
+    const data = await invokeRpc(this.client, "finalize_whatsapp_km_prompt_failed", {
+      p_outbound_queue_id: input.outboundQueueId,
+      p_terminal_reason: input.terminalReason,
+      p_error_message: input.errorMessage ?? null,
+    });
+    return parseFinalizeFailed(data);
+  }
 }
+
