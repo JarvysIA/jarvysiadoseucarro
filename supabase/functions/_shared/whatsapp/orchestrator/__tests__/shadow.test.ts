@@ -555,7 +555,7 @@ describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
     expect(events[0].status).toBe("evaluated");
     // Nenhuma RPC nem outras tabelas escritas.
     const tables = calls.selects.map((c) => c.table).sort();
-    expect(tables).toEqual(["veiculos", "whatsapp_conversation_states", "whatsapp_provider_instances"]);
+    expect(tables).toEqual(["pagamentos_pix", "profiles", "veiculos", "whatsapp_conversation_states", "whatsapp_provider_instances"]);
     // Nenhum campo kmAtual/km_atual vaza para o log.
     const json = JSON.stringify(events[0]);
     expect(json.includes("kmAtual")).toBe(false);
