@@ -1232,6 +1232,93 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_km_prompt_requests: {
+        Row: {
+          cancelled_at: string | null
+          consumed_at: string | null
+          contact_id: string
+          created_at: string
+          expired_at: string | null
+          expires_at: string | null
+          id: string
+          pending_at: string | null
+          prompt_message_id: string
+          reserved_at: string | null
+          reserved_draft_id: string | null
+          status: string
+          user_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          consumed_at?: string | null
+          contact_id: string
+          created_at?: string
+          expired_at?: string | null
+          expires_at?: string | null
+          id?: string
+          pending_at?: string | null
+          prompt_message_id: string
+          reserved_at?: string | null
+          reserved_draft_id?: string | null
+          status: string
+          user_id: string
+          vehicle_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          consumed_at?: string | null
+          contact_id?: string
+          created_at?: string
+          expired_at?: string | null
+          expires_at?: string | null
+          id?: string
+          pending_at?: string | null
+          prompt_message_id?: string
+          reserved_at?: string | null
+          reserved_draft_id?: string | null
+          status?: string
+          user_id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_km_prompt_requests_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_km_prompt_requests_prompt_message_id_fkey"
+            columns: ["prompt_message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_km_prompt_requests_reserved_draft_id_fkey"
+            columns: ["reserved_draft_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_km_prompt_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_km_prompt_requests_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_link_verifications: {
         Row: {
           attempts: number
@@ -1641,6 +1728,14 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_whatsapp_km_prompt_request: {
+        Args: { p_prompt_message_id: string }
+        Returns: {
+          cancelled_at: string
+          request_id: string
+          result: string
+        }[]
+      }
       claim_whatsapp_orchestrator_items: {
         Args: {
           p_batch?: number
@@ -1690,12 +1785,30 @@ export type Database = {
           result: string
         }[]
       }
+      create_whatsapp_km_prompt_request: {
+        Args: {
+          p_contact_id: string
+          p_prompt_message_id: string
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: {
+          request_id: string
+          result: string
+        }[]
+      }
       disable_whatsapp_messages: {
         Args: { p_user_id: string }
         Returns: {
           contact_id: string
           phone_e164: string
           result: string
+        }[]
+      }
+      expire_whatsapp_km_prompt_requests: {
+        Args: { p_batch?: number }
+        Returns: {
+          expired_count: number
         }[]
       }
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
@@ -1715,6 +1828,15 @@ export type Database = {
         Returns: {
           canceladas: number
           liberadas: number
+        }[]
+      }
+      promote_whatsapp_km_prompt_request_to_pending: {
+        Args: { p_prompt_message_id: string }
+        Returns: {
+          expires_at: string
+          pending_at: string
+          request_id: string
+          result: string
         }[]
       }
       reactivate_whatsapp_contact: {
@@ -1745,6 +1867,21 @@ export type Database = {
           p_retry_kind: string
         }
         Returns: Json
+      }
+      reserve_whatsapp_km_prompt_request: {
+        Args: {
+          p_contact_id: string
+          p_draft_id: string
+          p_prompt_message_id: string
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: {
+          request_id: string
+          reserved_at: string
+          reserved_draft_id: string
+          result: string
+        }[]
       }
       solicitar_saque_indicacao: { Args: { _chave_pix: string }; Returns: Json }
       unaccent: { Args: { "": string }; Returns: string }
