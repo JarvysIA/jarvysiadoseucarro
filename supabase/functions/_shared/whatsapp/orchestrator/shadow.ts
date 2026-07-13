@@ -21,6 +21,10 @@ import {
   computeWhatsappVehicleAccessMode,
   type WhatsappVehicleAccessProfileInput,
 } from "../plan/vehicle-access-mode.ts";
+import {
+  isValidActivationContextRow,
+  isValidProfileContextRow,
+} from "./context-validation.ts";
 
 // ============================================================
 // Constantes
