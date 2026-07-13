@@ -17,6 +17,10 @@ import type {
   ConversationState,
   ConversationVehicle,
 } from "../conversation/types.ts";
+import {
+  computeWhatsappVehicleAccessMode,
+  type WhatsappVehicleAccessProfileInput,
+} from "../plan/vehicle-access-mode.ts";
 
 // ============================================================
 // Constantes
