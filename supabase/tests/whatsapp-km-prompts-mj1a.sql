@@ -1,14 +1,9 @@
 -- ============================================================
--- BUILD 5.7F2E1A.5-MJ1A — TESTES SQL FUNCIONAIS DAS RPCs
---   enqueue_whatsapp_km_prompt
---   finalize_whatsapp_km_prompt_sent
---   finalize_whatsapp_km_prompt_failed
+-- BUILD 5.7F2E1A.5-MJ1A — TESTES SQL FUNCIONAIS DAS RPCs (jsonb)
+--   enqueue_whatsapp_km_prompt          (jsonb)
+--   finalize_whatsapp_km_prompt_sent    (jsonb)
+--   finalize_whatsapp_km_prompt_failed  (jsonb)
 -- Isolamento: BEGIN ... ROLLBACK. Nada é comitado.
--- Sandbox_exec só tem INSERT (sem UPDATE) em tabelas whatsapp_*.
--- Estados de destino são preparados por INSERT direto quando
--- necessário; caminhos que exigem UPDATE (por exemplo, transição
--- explícita de status intermediário) são cobertos pelos wrappers
--- TS + mocks em `repository.test.ts` (102 passing).
 -- ============================================================
 
 BEGIN;
@@ -24,22 +19,19 @@ DECLARE
   v_contact    uuid := gen_random_uuid();
   v_vehicle    uuid := gen_random_uuid();
   v_archived   uuid := gen_random_uuid();
-  v_other_usr_veh uuid := gen_random_uuid();
 
   v_instance_pk uuid;
   v_instance_id text;
 
   v_idem1      text := 'test-idem-' || gen_random_uuid()::text;
   v_idem2      text := 'test-idem-' || gen_random_uuid()::text;
-  v_idem_bad   text := 'test-idem-' || gen_random_uuid()::text;
 
-  v_res        record;
+  v_res        jsonb;
   v_row        record;
 
-  -- Fixtures adicionais para finalize_sent / finalize_failed:
-  v_queue_ok   uuid := gen_random_uuid();
-  v_msg_ok     uuid := gen_random_uuid();
-  v_req_ok     uuid := gen_random_uuid();
+  v_queue_ok   uuid;
+  v_msg_ok     uuid;
+  v_req_ok     uuid;
 
   v_pmid       text := 'PMID-' || substr(md5(random()::text), 1, 12);
 BEGIN
@@ -54,7 +46,6 @@ BEGIN
    ORDER BY created_at LIMIT 1;
   IF v_instance_id IS NULL THEN RAISE EXCEPTION 'BLOCKED_NO_INSTANCE_FIXTURE'; END IF;
 
-  -- Fixtures.
   INSERT INTO public.veiculos(id, user_id, placa, status)
        VALUES (v_vehicle,   v_user, 'MJ1A01', 'ativo'),
               (v_archived,  v_user, 'MJ1A02', 'archived');
@@ -65,75 +56,77 @@ BEGIN
 
   -- ================== ENQUEUE ==================
 
-  -- E01: created (happy path)
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  -- E01: created
+  v_res := public.enqueue_whatsapp_km_prompt(
     v_idem1, v_contact, v_vehicle, 'Olá! Qual a quilometragem atual?');
-  IF v_res.result = 'created'
-       AND v_res.prompt_request_id  IS NOT NULL
-       AND v_res.prompt_message_id  IS NOT NULL
-       AND v_res.outbound_queue_id  IS NOT NULL
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E01 PASS created';
+  IF v_res->>'result' = 'created'
+       AND v_res ? 'prompt_request_id'
+       AND v_res ? 'prompt_message_id'
+       AND v_res ? 'outbound_queue_id'
+    THEN
+      v_pass:=v_pass+1; RAISE NOTICE 'E01 PASS created';
+      v_queue_ok := (v_res->>'outbound_queue_id')::uuid;
+      v_msg_ok   := (v_res->>'prompt_message_id')::uuid;
+      v_req_ok   := (v_res->>'prompt_request_id')::uuid;
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E01 FAIL %', v_res; END IF;
 
-  -- E02: replayed (mesma idempotency key + mesmo contexto)
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  -- E02: replayed (mesma key + mesmo contexto)
+  v_res := public.enqueue_whatsapp_km_prompt(
     v_idem1, v_contact, v_vehicle, 'Olá! Qual a quilometragem atual?');
-  IF v_res.result = 'replayed'
+  IF v_res->>'result' = 'replayed'
     THEN v_pass:=v_pass+1; RAISE NOTICE 'E02 PASS replayed';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E02 FAIL %', v_res; END IF;
 
-  -- E03: idempotency_context_mismatch (mesma key + contexto diferente)
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  -- E03: idempotency_context_mismatch
+  v_res := public.enqueue_whatsapp_km_prompt(
     v_idem1, v_contact, v_archived, 'Olá!');
-  IF v_res.result = 'idempotency_context_mismatch'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E03 PASS %', v_res.result;
+  IF v_res->>'result' = 'idempotency_context_mismatch'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E03 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E03 FAIL %', v_res; END IF;
 
   -- E04: vehicle_archived
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     v_idem2, v_contact, v_archived, 'Olá!');
-  IF v_res.result = 'vehicle_archived'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E04 PASS %', v_res.result;
+  IF v_res->>'result' = 'vehicle_archived'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E04 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E04 FAIL %', v_res; END IF;
 
-  -- E05: invalid_text (vazio)
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
-    v_idem_bad, v_contact, v_vehicle, '   ');
-  IF v_res.result = 'invalid_text'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E05 PASS %', v_res.result;
+  -- E05: invalid_text
+  v_res := public.enqueue_whatsapp_km_prompt(
+    'test-idem-bad-' || gen_random_uuid()::text, v_contact, v_vehicle, '   ');
+  IF v_res->>'result' = 'invalid_text'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E05 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E05 FAIL %', v_res; END IF;
 
   -- E06: invalid_idempotency_key
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     '', v_contact, v_vehicle, 'Olá!');
-  IF v_res.result = 'invalid_idempotency_key'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E06 PASS %', v_res.result;
+  IF v_res->>'result' = 'invalid_idempotency_key'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E06 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E06 FAIL %', v_res; END IF;
 
   -- E07: contact_not_found
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     'test-idem-nc-' || gen_random_uuid()::text,
     gen_random_uuid(), v_vehicle, 'Olá!');
-  IF v_res.result = 'contact_not_found'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E07 PASS %', v_res.result;
+  IF v_res->>'result' = 'contact_not_found'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E07 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E07 FAIL %', v_res; END IF;
 
   -- E08: vehicle_not_found
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     'test-idem-nv-' || gen_random_uuid()::text,
     v_contact, gen_random_uuid(), 'Olá!');
-  IF v_res.result = 'vehicle_not_found'
-    THEN v_pass:=v_pass+1; RAISE NOTICE 'E08 PASS %', v_res.result;
+  IF v_res->>'result' = 'vehicle_not_found'
+    THEN v_pass:=v_pass+1; RAISE NOTICE 'E08 PASS %', v_res->>'result';
     ELSE v_fail:=v_fail+1; RAISE NOTICE 'E08 FAIL %', v_res; END IF;
 
-  -- E09: verifica invariantes do row criado em E01
+  -- E09: invariantes do row criado
   SELECT status, pending_at, expires_at, reserved_at, consumed_at,
-         cancelled_at, expired_at, prompt_message_id, contact_id, user_id, vehicle_id
+         cancelled_at, expired_at, contact_id, user_id, vehicle_id
     INTO v_row
     FROM public.whatsapp_km_prompt_requests
-   WHERE prompt_message_id = (
-     SELECT prompt_message_id FROM public.enqueue_whatsapp_km_prompt(v_idem1, v_contact, v_vehicle, 'x')
-   );
+   WHERE id = v_req_ok;
   IF v_row.status = 'queued'
        AND v_row.pending_at IS NULL
        AND v_row.expires_at IS NULL
@@ -149,68 +142,61 @@ BEGIN
 
   -- ================== FINALIZE_SENT ==================
 
-  -- Preparar fixture: enqueue + injetar 'sending' via UPDATE (temos UPDATE em outbound_queue).
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     'test-idem-fs-' || gen_random_uuid()::text,
     v_contact, v_vehicle, 'Prompt para finalize sent.');
-  IF v_res.result <> 'created' THEN
+  IF v_res->>'result' <> 'created' THEN
     v_fail:=v_fail+1; RAISE NOTICE 'FS_SETUP FAIL %', v_res;
   ELSE
-    v_queue_ok := v_res.outbound_queue_id;
-    v_msg_ok   := v_res.prompt_message_id;
-    v_req_ok   := v_res.prompt_request_id;
+    v_queue_ok := (v_res->>'outbound_queue_id')::uuid;
+    v_msg_ok   := (v_res->>'prompt_message_id')::uuid;
+    v_req_ok   := (v_res->>'prompt_request_id')::uuid;
 
-    -- Transição queued -> sending (pré-condição do finalize_sent).
-    UPDATE public.whatsapp_outbound_queue
-       SET status = 'sending'
-     WHERE id = v_queue_ok;
-
-    -- FS01: queue_state_invalid quando ainda queued (voltar para queued por teste)
-    UPDATE public.whatsapp_outbound_queue SET status='queued' WHERE id=v_queue_ok;
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
-    IF v_res.result = 'queue_state_invalid'
+    -- FS01: queue_state_invalid (queued, não sending)
+    v_res := public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
+    IF v_res->>'result' = 'queue_state_invalid'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS01 PASS queue_state_invalid';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS01 FAIL %', v_res; END IF;
 
-    -- Voltar para sending
+    -- Transição para sending
     UPDATE public.whatsapp_outbound_queue SET status='sending' WHERE id=v_queue_ok;
 
     -- FS02: invalid_provider_message_id
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(v_queue_ok, '');
-    IF v_res.result = 'invalid_provider_message_id'
+    v_res := public.finalize_whatsapp_km_prompt_sent(v_queue_ok, '');
+    IF v_res->>'result' = 'invalid_provider_message_id'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS02 PASS invalid_provider_message_id';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS02 FAIL %', v_res; END IF;
 
     -- FS03: queue_not_found
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(gen_random_uuid(), v_pmid);
-    IF v_res.result = 'queue_not_found'
+    v_res := public.finalize_whatsapp_km_prompt_sent(gen_random_uuid(), v_pmid);
+    IF v_res->>'result' = 'queue_not_found'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS03 PASS queue_not_found';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS03 FAIL %', v_res; END IF;
 
     -- FS04: finalized (happy path)
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
-    IF v_res.result = 'finalized'
-         AND v_res.prompt_request_id = v_req_ok
-         AND v_res.prompt_message_id = v_msg_ok
-         AND v_res.outbound_queue_id = v_queue_ok
-         AND v_res.pending_at IS NOT NULL
-         AND v_res.expires_at IS NOT NULL
+    v_res := public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
+    IF v_res->>'result' = 'finalized'
+         AND (v_res->>'prompt_request_id')::uuid = v_req_ok
+         AND (v_res->>'prompt_message_id')::uuid = v_msg_ok
+         AND (v_res->>'outbound_queue_id')::uuid = v_queue_ok
+         AND v_res->>'pending_at' IS NOT NULL
+         AND v_res->>'expires_at' IS NOT NULL
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS04 PASS finalized';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS04 FAIL %', v_res; END IF;
 
-    -- FS05: replayed (mesmo pmid)
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
-    IF v_res.result = 'replayed'
+    -- FS05: replayed
+    v_res := public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid);
+    IF v_res->>'result' = 'replayed'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS05 PASS replayed';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS05 FAIL %', v_res; END IF;
 
-    -- FS06: provider_message_id_mismatch (pmid diferente após sucesso)
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid || '-X');
-    IF v_res.result = 'provider_message_id_mismatch'
+    -- FS06: provider_message_id_mismatch
+    v_res := public.finalize_whatsapp_km_prompt_sent(v_queue_ok, v_pmid || '-X');
+    IF v_res->>'result' = 'provider_message_id_mismatch'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FS06 PASS provider_message_id_mismatch';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FS06 FAIL %', v_res; END IF;
 
-    -- FS07: invariantes pós-sucesso
+    -- FS07: request pending invariants
     SELECT status, pending_at, expires_at
       INTO v_row
       FROM public.whatsapp_km_prompt_requests
@@ -225,52 +211,49 @@ BEGIN
 
   -- ================== FINALIZE_FAILED ==================
 
-  -- Setup independente
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     'test-idem-ff-' || gen_random_uuid()::text,
     v_contact, v_vehicle, 'Prompt para finalize failed.');
-  IF v_res.result <> 'created' THEN
+  IF v_res->>'result' <> 'created' THEN
     v_fail:=v_fail+1; RAISE NOTICE 'FF_SETUP FAIL %', v_res;
   ELSE
-    v_queue_ok := v_res.outbound_queue_id;
-    v_msg_ok   := v_res.prompt_message_id;
-    v_req_ok   := v_res.prompt_request_id;
+    v_queue_ok := (v_res->>'outbound_queue_id')::uuid;
+    v_req_ok   := (v_res->>'prompt_request_id')::uuid;
 
-    -- Pré-condição: sending + attempts=max_attempts para max_attempts_reached
     UPDATE public.whatsapp_outbound_queue
        SET status='sending', attempts=max_attempts
      WHERE id=v_queue_ok;
 
     -- FF01: invalid_terminal_reason
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_failed(
+    v_res := public.finalize_whatsapp_km_prompt_failed(
       v_queue_ok, 'bogus_reason', 'x');
-    IF v_res.result = 'invalid_terminal_reason'
+    IF v_res->>'result' = 'invalid_terminal_reason'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FF01 PASS invalid_terminal_reason';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FF01 FAIL %', v_res; END IF;
 
     -- FF02: queue_not_found
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_failed(
+    v_res := public.finalize_whatsapp_km_prompt_failed(
       gen_random_uuid(), 'non_retryable_provider_error', 'x');
-    IF v_res.result = 'queue_not_found'
+    IF v_res->>'result' = 'queue_not_found'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FF02 PASS queue_not_found';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FF02 FAIL %', v_res; END IF;
 
-    -- FF03: finalized (max_attempts_reached happy path)
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_failed(
+    -- FF03: finalized
+    v_res := public.finalize_whatsapp_km_prompt_failed(
       v_queue_ok, 'max_attempts_reached', 'exceeded');
-    IF v_res.result = 'finalized'
-         AND v_res.terminal_reason = 'max_attempts_reached'
+    IF v_res->>'result' = 'finalized'
+         AND v_res->>'terminal_reason' = 'max_attempts_reached'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FF03 PASS finalized';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FF03 FAIL %', v_res; END IF;
 
-    -- FF04: terminal_replayed (mesma razão)
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_failed(
+    -- FF04: terminal_replayed
+    v_res := public.finalize_whatsapp_km_prompt_failed(
       v_queue_ok, 'max_attempts_reached', 'again');
-    IF v_res.result = 'terminal_replayed'
+    IF v_res->>'result' = 'terminal_replayed'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FF04 PASS terminal_replayed';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FF04 FAIL %', v_res; END IF;
 
-    -- FF05: invariantes pós-falha (request cancelled)
+    -- FF05: request cancelled invariants
     SELECT status, cancelled_at, pending_at
       INTO v_row
       FROM public.whatsapp_km_prompt_requests
@@ -284,19 +267,18 @@ BEGIN
 
   -- ================== max_attempts_not_reached ==================
 
-  SELECT * INTO v_res FROM public.enqueue_whatsapp_km_prompt(
+  v_res := public.enqueue_whatsapp_km_prompt(
     'test-idem-mn-' || gen_random_uuid()::text,
     v_contact, v_vehicle, 'Prompt attempts guard.');
-  IF v_res.result = 'created' THEN
-    v_queue_ok := v_res.outbound_queue_id;
-    -- attempts < max_attempts
+  IF v_res->>'result' = 'created' THEN
+    v_queue_ok := (v_res->>'outbound_queue_id')::uuid;
     UPDATE public.whatsapp_outbound_queue
        SET status='sending', attempts=0, max_attempts=5
      WHERE id=v_queue_ok;
 
-    SELECT * INTO v_res FROM public.finalize_whatsapp_km_prompt_failed(
+    v_res := public.finalize_whatsapp_km_prompt_failed(
       v_queue_ok, 'max_attempts_reached', 'nope');
-    IF v_res.result = 'max_attempts_not_reached'
+    IF v_res->>'result' = 'max_attempts_not_reached'
       THEN v_pass:=v_pass+1; RAISE NOTICE 'FF06 PASS max_attempts_not_reached';
       ELSE v_fail:=v_fail+1; RAISE NOTICE 'FF06 FAIL %', v_res; END IF;
   ELSE
