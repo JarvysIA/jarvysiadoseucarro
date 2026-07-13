@@ -45,7 +45,8 @@ function safeEqual(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// deno-lint-ignore no-explicit-any
+type SupabaseClient = any;
 
 type OutboundRow = {
   id: string;
