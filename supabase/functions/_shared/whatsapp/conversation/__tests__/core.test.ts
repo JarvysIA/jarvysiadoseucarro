@@ -26,7 +26,7 @@ function state(overrides: Partial<ConversationState> = {}): ConversationState {
 }
 
 function veh(id: string, brand: string, model: string, plate: string): ConversationVehicle {
-  return { id, brand, model, plate, isArchived: false, isEligible: true, kmAtual: null, optionalLabel: null };
+  return { id, brand, model, plate, isArchived: false, isEligible: true, kmAtual: null, whatsappAccessMode: "full", optionalLabel: null };
 }
 
 function inp(overrides: Partial<ConversationCoreInput> = {}): ConversationCoreInput {
