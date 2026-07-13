@@ -627,9 +627,15 @@ function baseRows(overrides: Partial<TableRows> = {}): TableRows {
     ],
     whatsapp_conversation_states: [],
     veiculos: [],
+    // Build 5.7F2E1A.5-MJ0 — perfil + ativações são obrigatórios em loadContext.
+    profiles: [
+      { id: "u1", status_usuario: "vip", trial_inicio: null },
+    ],
+    pagamentos_pix: [],
     ...overrides,
   };
 }
+
 
 describe("loadContext — happy path & state virtual", () => {
   test("sem state row → snapshot virtual idle/v0/fallback=0/draftVersion=0", async () => {
