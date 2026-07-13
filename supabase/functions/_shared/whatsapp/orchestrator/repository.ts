@@ -45,6 +45,10 @@ import {
   computeWhatsappVehicleAccessMode,
   type WhatsappVehicleAccessProfileInput,
 } from "../plan/vehicle-access-mode.ts";
+import {
+  isValidActivationContextRow,
+  isValidProfileContextRow,
+} from "./context-validation.ts";
 
 // ============================================================
 // Structural client — evita acoplar a supabase-js@X.Y.Z. Expõe .rpc() e .from().
