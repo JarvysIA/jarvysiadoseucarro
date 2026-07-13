@@ -7,6 +7,8 @@ import {
   KmPromptRpcExceptionError,
   KmPromptTransportError,
   KmPromptUnknownResultError,
+} from "../types.ts";
+import {
   WhatsappKmPromptRepository,
   type KmPromptRpcInvoker,
   type KmPromptSupabaseLike,
