@@ -136,9 +136,15 @@ function baseRows(overrides: Partial<TableRows> = {}): TableRows {
     ],
     whatsapp_conversation_states: [],
     veiculos: [],
+    // Build 5.7F2E1A.5-MJ0 — perfil + ativações são obrigatórios no shadow.
+    profiles: [
+      { id: "u-1", status_usuario: "vip", trial_inicio: null },
+    ],
+    pagamentos_pix: [],
     ...overrides,
   };
 }
+
 
 async function run(rowsOverride: Partial<TableRows> = {}, extra?: Partial<ShadowDeps>) {
   const { client, calls } = makeSupabase({ rows: baseRows(rowsOverride) });
