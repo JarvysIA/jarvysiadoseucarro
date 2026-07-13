@@ -611,7 +611,7 @@ describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
     expect(res.status).toBe("failed");
     // Nenhum SELECT em tabelas de mutação/estado transacional.
     for (const c of calls.selects) {
-      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos"]).toContain(c.table);
+      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos", "profiles", "pagamentos_pix"]).toContain(c.table);
     }
   });
 });
