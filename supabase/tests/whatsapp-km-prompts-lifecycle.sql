@@ -63,7 +63,7 @@ BEGIN
     (v_prompt_arch,   v_user, v_archived, v_contact, 'zapi', 'INSTX', 'outbound', 'text', 'pa', 'sent'),
     (v_expire_prompt, v_user, v_vehicle,  v_contact, 'zapi', 'INSTX', 'outbound', 'text', 'pe', 'sent'),
     (v_draft,         v_user, v_vehicle,  v_contact, 'zapi', 'INSTX', 'inbound',  'text', 'd1', 'received'),
-    (v_draft_bad,     v_user, v_vehicle2, v_contact, 'zapi', 'INSTX', 'inbound',  'text', 'd2', 'received');
+    (v_draft_bad,     v_user, v_vehicle,  v_contact, 'zapi', 'INSTX', 'inbound',  'text', 'd2', 'received');
 
   -- ================== CREATE ==================
 
