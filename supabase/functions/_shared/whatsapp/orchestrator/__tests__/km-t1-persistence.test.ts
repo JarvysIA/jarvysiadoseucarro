@@ -453,9 +453,9 @@ describe("B. draft completo direto novo v0", () => {
     assertNoT2Contamination(mock.calls);
   });
 
-  test("redução/correção → v0 awaiting_km_correction_confirmation, isCorrection=true", async () => {
+  test("redução/correção → v0 awaiting_km_correction, isCorrection=true", async () => {
     const d = runComplete(20000, 12000);
-    expect(d.nextState).toBe("awaiting_km_correction_confirmation");
+    expect(d.nextState).toBe("awaiting_km_correction");
     const pl = d.statePatch.draftPayload as Record<string, unknown>;
     expect(pl.isCorrection).toBe(true);
     expect(d.statePatch.draftVersion).toBe(0);
@@ -463,7 +463,7 @@ describe("B. draft completo direto novo v0", () => {
     const { r, mock } = await persist(d);
     expect(r.ok).toBe(true);
     const patch = mock.calls[0].params.p_patch as Record<string, unknown>;
-    expect(patch.next_state).toBe("awaiting_km_correction_confirmation");
+    expect(patch.next_state).toBe("awaiting_km_correction");
     expect(patch.draft_version).toBe(0);
   });
 
