@@ -408,14 +408,364 @@ describe("expire", () => {
 });
 
 // ============================================================
+// MJ1A — ENQUEUE / FINALIZE SENT / FINALIZE FAILED
+// ============================================================
+
+const UUID_MSG = "77777777-7777-7777-7777-777777777777";
+const UUID_QUEUE = "88888888-8888-8888-8888-888888888888";
+const IDEMP = "idem-key-abc";
+const PROVIDER_MID = "prov-msg-1";
+
+describe("enqueue", () => {
+  test("created", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "created",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+      }),
+    );
+    const r = await repo.enqueue({
+      idempotencyKey: IDEMP,
+      contactId: UUID_CONTACT,
+      vehicleId: UUID_VEHICLE,
+      textBody: "hi",
+    });
+    expect(r).toEqual({
+      result: "created",
+      promptRequestId: UUID_REQ,
+      promptMessageId: UUID_MSG,
+      outboundQueueId: UUID_QUEUE,
+    });
+  });
+
+  test("replayed", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "replayed",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+      }),
+    );
+    const r = await repo.enqueue({
+      idempotencyKey: IDEMP,
+      contactId: UUID_CONTACT,
+      vehicleId: UUID_VEHICLE,
+      textBody: "hi",
+    });
+    expect(r.result).toBe("replayed");
+  });
+
+  test.each([
+    "idempotency_context_mismatch",
+    "invalid_idempotency_key",
+    "invalid_text",
+    "contact_not_found",
+    "contact_opted_out",
+    "contact_not_eligible",
+    "contact_not_linked",
+    "vehicle_not_found",
+    "vehicle_not_owned",
+    "vehicle_archived",
+    "vehicle_context_invalid",
+    "instance_not_found",
+    "instance_inactive",
+    "instance_context_mismatch",
+  ])("reject %s", async (reason) => {
+    const repo = new WhatsappKmPromptRepository(makeClient({ result: reason }));
+    const r = await repo.enqueue({
+      idempotencyKey: IDEMP,
+      contactId: UUID_CONTACT,
+      vehicleId: UUID_VEHICLE,
+      textBody: "hi",
+    });
+    expect(r).toEqual({ result: reason });
+  });
+
+  test("result desconhecido → UnknownResult", async () => {
+    const repo = new WhatsappKmPromptRepository(makeClient({ result: "wat" }));
+    expect(
+      repo.enqueue({
+        idempotencyKey: IDEMP,
+        contactId: UUID_CONTACT,
+        vehicleId: UUID_VEHICLE,
+        textBody: "hi",
+      }),
+    ).rejects.toBeInstanceOf(KmPromptUnknownResultError);
+  });
+
+  test("created sem prompt_request_id → Malformed", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "created",
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+      }),
+    );
+    expect(
+      repo.enqueue({
+        idempotencyKey: IDEMP,
+        contactId: UUID_CONTACT,
+        vehicleId: UUID_VEHICLE,
+        textBody: "hi",
+      }),
+    ).rejects.toBeInstanceOf(KmPromptMalformedResponseError);
+  });
+
+  test("payload nulo → Malformed", async () => {
+    const repo = new WhatsappKmPromptRepository(makeClient(null));
+    expect(
+      repo.enqueue({
+        idempotencyKey: IDEMP,
+        contactId: UUID_CONTACT,
+        vehicleId: UUID_VEHICLE,
+        textBody: "hi",
+      }),
+    ).rejects.toBeInstanceOf(KmPromptMalformedResponseError);
+  });
+
+  test("erro RPC propaga como RpcException", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeErrClient("P0001", "boom"),
+    );
+    expect(
+      repo.enqueue({
+        idempotencyKey: IDEMP,
+        contactId: UUID_CONTACT,
+        vehicleId: UUID_VEHICLE,
+        textBody: "hi",
+      }),
+    ).rejects.toBeInstanceOf(KmPromptRpcExceptionError);
+  });
+});
+
+describe("finalizeSent", () => {
+  test("finalized", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "finalized",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+        pending_at: "2026-07-13T00:00:00Z",
+        expires_at: "2026-07-20T00:00:00Z",
+      }),
+    );
+    const r = await repo.finalizeSent({
+      outboundQueueId: UUID_QUEUE,
+      providerMessageId: PROVIDER_MID,
+    });
+    expect(r.result).toBe("finalized");
+    if (r.result === "finalized") {
+      expect(r.pendingAt).toBe("2026-07-13T00:00:00Z");
+      expect(r.expiresAt).toBe("2026-07-20T00:00:00Z");
+    }
+  });
+
+  test("replayed", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "replayed",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+        pending_at: "2026-07-13T00:00:00Z",
+        expires_at: "2026-07-20T00:00:00Z",
+      }),
+    );
+    const r = await repo.finalizeSent({
+      outboundQueueId: UUID_QUEUE,
+      providerMessageId: PROVIDER_MID,
+    });
+    expect(r.result).toBe("replayed");
+  });
+
+  test.each([
+    "queue_not_found",
+    "queue_state_invalid",
+    "invalid_provider_message_id",
+    "provider_message_id_mismatch",
+    "km_prompt_invariant_violation",
+  ])("reject %s", async (reason) => {
+    const repo = new WhatsappKmPromptRepository(makeClient({ result: reason }));
+    const r = await repo.finalizeSent({
+      outboundQueueId: UUID_QUEUE,
+      providerMessageId: PROVIDER_MID,
+    });
+    expect(r).toEqual({ result: reason });
+  });
+
+  test("timestamp inválido → Malformed", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "finalized",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+        pending_at: "nope",
+        expires_at: "2026-07-20T00:00:00Z",
+      }),
+    );
+    expect(
+      repo.finalizeSent({
+        outboundQueueId: UUID_QUEUE,
+        providerMessageId: PROVIDER_MID,
+      }),
+    ).rejects.toBeInstanceOf(KmPromptMalformedResponseError);
+  });
+
+  test("result desconhecido → UnknownResult", async () => {
+    const repo = new WhatsappKmPromptRepository(makeClient({ result: "xx" }));
+    expect(
+      repo.finalizeSent({
+        outboundQueueId: UUID_QUEUE,
+        providerMessageId: PROVIDER_MID,
+      }),
+    ).rejects.toBeInstanceOf(KmPromptUnknownResultError);
+  });
+});
+
+describe("finalizeFailed", () => {
+  test("finalized com reason válido", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "finalized",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+        terminal_reason: "non_retryable_provider_error",
+      }),
+    );
+    const r = await repo.finalizeFailed({
+      outboundQueueId: UUID_QUEUE,
+      terminalReason: "non_retryable_provider_error",
+      errorMessage: "boom",
+    });
+    expect(r.result).toBe("finalized");
+    if (r.result === "finalized") {
+      expect(r.terminalReason).toBe("non_retryable_provider_error");
+    }
+  });
+
+  test("finalized com reason desconhecido → UnknownResult", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "finalized",
+        prompt_request_id: UUID_REQ,
+        prompt_message_id: UUID_MSG,
+        outbound_queue_id: UUID_QUEUE,
+        terminal_reason: "weird",
+      }),
+    );
+    expect(
+      repo.finalizeFailed({
+        outboundQueueId: UUID_QUEUE,
+        terminalReason: "non_retryable_provider_error",
+        errorMessage: null,
+      }),
+    ).rejects.toBeInstanceOf(KmPromptUnknownResultError);
+  });
+
+  test("terminal_replayed sem repaired", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "terminal_replayed",
+        prompt_request_id: UUID_REQ,
+        terminal_reason: "timeout_ambiguous",
+      }),
+    );
+    const r = await repo.finalizeFailed({
+      outboundQueueId: UUID_QUEUE,
+      terminalReason: "timeout_ambiguous",
+    });
+    expect(r).toEqual({
+      result: "terminal_replayed",
+      promptRequestId: UUID_REQ,
+      terminalReason: "timeout_ambiguous",
+    });
+  });
+
+  test("terminal_replayed com repaired=true", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "terminal_replayed",
+        prompt_request_id: UUID_REQ,
+        terminal_reason: "timeout_ambiguous",
+        repaired: true,
+      }),
+    );
+    const r = await repo.finalizeFailed({
+      outboundQueueId: UUID_QUEUE,
+      terminalReason: "timeout_ambiguous",
+    });
+    expect(r).toEqual({
+      result: "terminal_replayed",
+      promptRequestId: UUID_REQ,
+      terminalReason: "timeout_ambiguous",
+      repaired: true,
+    });
+  });
+
+  test("terminal_after_prompt_progress_invariant", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "terminal_after_prompt_progress_invariant",
+        prompt_request_id: UUID_REQ,
+      }),
+    );
+    const r = await repo.finalizeFailed({
+      outboundQueueId: UUID_QUEUE,
+      terminalReason: "max_attempts_reached",
+    });
+    expect(r).toEqual({
+      result: "terminal_after_prompt_progress_invariant",
+      promptRequestId: UUID_REQ,
+    });
+  });
+
+  test.each([
+    "queue_not_found",
+    "queue_state_invalid",
+    "invalid_terminal_reason",
+    "max_attempts_not_reached",
+    "km_prompt_invariant_violation",
+    "terminal_after_success_invariant",
+  ])("reject %s", async (reason) => {
+    const repo = new WhatsappKmPromptRepository(makeClient({ result: reason }));
+    const r = await repo.finalizeFailed({
+      outboundQueueId: UUID_QUEUE,
+      terminalReason: "non_retryable_provider_error",
+    });
+    expect(r).toEqual({ result: reason });
+  });
+
+  test("repaired com tipo inválido → Malformed", async () => {
+    const repo = new WhatsappKmPromptRepository(
+      makeClient({
+        result: "terminal_replayed",
+        prompt_request_id: UUID_REQ,
+        terminal_reason: "timeout_ambiguous",
+        repaired: "yes",
+      }),
+    );
+    expect(
+      repo.finalizeFailed({
+        outboundQueueId: UUID_QUEUE,
+        terminalReason: "timeout_ambiguous",
+      }),
+    ).rejects.toBeInstanceOf(KmPromptMalformedResponseError);
+  });
+});
+
+// ============================================================
 // Sanidade — nenhum any/casts públicos, wrappers puros.
 // ============================================================
 
 describe("integridade estrutural", () => {
   test("repository não vaza referências a core/mapper/drafts/action service", () => {
-    // Este teste é meramente documental: importar apenas './repository.ts'
-    // e './types.ts' já garante ausência de import lateral. Se algum dia
-    // esses módulos importarem código do orquestrador, o build falha.
     expect(WhatsappKmPromptRepository).toBeDefined();
   });
 });
+
