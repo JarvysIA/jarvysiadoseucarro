@@ -744,8 +744,9 @@ export class WhatsappOrchestratorRepository {
       }
 
       const nowDate = new Date();
+      const expectedUserId = item.userId ?? ""; // ownership já validado acima
       const allVehicles = vehicleRows.map((row) =>
-        mapVehicleRow(row, profileInput, activationSet, item.userId, nowDate),
+        mapVehicleRow(row, profileInput, activationSet, expectedUserId, nowDate),
       );
       const vehicles = allVehicles.filter((v) => !v.isArchived);
 
