@@ -616,3 +616,134 @@ describe("shadow — kmAtual (Build 5.7F2E1A.5-MA)", () => {
   });
 });
 
+// ============================================================
+// Build 5.7F2E1A.5-MJ0.1 — profile_context_invalid / activations_context_invalid
+// ============================================================
+
+describe("shadow — profile shape (Build 5.7F2E1A.5-MJ0.1)", () => {
+  test("profile row com status_usuario=null → failed:profile_context_invalid", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        profiles: [{ id: "u-1", status_usuario: null, trial_inicio: null }],
+      }),
+    });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    expect(res.status).toBe("failed");
+    if (res.status === "failed") expect(res.errorCategory).toBe("profile_context_invalid");
+    expect(events[0].status).toBe("failed");
+    expect(events[0].errorCategory).toBe("profile_context_invalid");
+  });
+
+  test("profile row sem id → failed:profile_context_invalid", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        // Não filtramos por id no mock retornado (o eq('id','u-1') falha),
+        // então usamos id: 'u-1' válido mas com trial_inicio inválido.
+        profiles: [{ id: "u-1", status_usuario: "vip", trial_inicio: 123 }],
+      }),
+    });
+    const { logger } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    if (res.status === "failed") expect(res.errorCategory).toBe("profile_context_invalid");
+    else throw new Error("expected failed");
+  });
+
+  test("profile válido com status_usuario desconhecido → evaluated (core decide)", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        profiles: [{ id: "u-1", status_usuario: "totally_unknown", trial_inicio: null }],
+      }),
+    });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    expect(res.status).toBe("evaluated");
+    expect(events[0].status).toBe("evaluated");
+  });
+});
+
+describe("shadow — activations shape (Build 5.7F2E1A.5-MJ0.1)", () => {
+  test("activation row sem veiculo_id → failed:activations_context_invalid", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        pagamentos_pix: [{ user_id: "u-1", status: "pago", tipo_produto: "ativacao" }],
+      }),
+    });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    expect(res.status).toBe("failed");
+    if (res.status === "failed") expect(res.errorCategory).toBe("activations_context_invalid");
+    expect(events[0].errorCategory).toBe("activations_context_invalid");
+  });
+
+  test("activation veiculo_id=null → failed:activations_context_invalid", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        pagamentos_pix: [{ veiculo_id: null, user_id: "u-1", status: "pago", tipo_produto: "ativacao" }],
+      }),
+    });
+    const { logger } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    if (res.status === "failed") expect(res.errorCategory).toBe("activations_context_invalid");
+    else throw new Error("expected failed");
+  });
+
+  test("activation veiculo_id='' → failed:activations_context_invalid", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        pagamentos_pix: [{ veiculo_id: "", user_id: "u-1", status: "pago", tipo_produto: "ativacao" }],
+      }),
+    });
+    const { logger } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    if (res.status === "failed") expect(res.errorCategory).toBe("activations_context_invalid");
+    else throw new Error("expected failed");
+  });
+
+  test("array vazio de ativações → evaluated (não é erro)", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        profiles: [{ id: "u-1", status_usuario: "ativo", trial_inicio: null }],
+        pagamentos_pix: [],
+      }),
+    });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    expect(res.status).toBe("evaluated");
+    expect(events[0].status).toBe("evaluated");
+  });
+
+  test("uma linha válida + uma inválida → failed:activations_context_invalid (sem Set parcial)", async () => {
+    const { client } = makeSupabase({
+      rows: baseRows({
+        pagamentos_pix: [
+          { veiculo_id: "v1", user_id: "u-1", status: "pago", tipo_produto: "ativacao" },
+          { veiculo_id: null, user_id: "u-1", status: "pago", tipo_produto: "ativacao" },
+        ],
+      }),
+    });
+    const { logger } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    if (res.status === "failed") expect(res.errorCategory).toBe("activations_context_invalid");
+    else throw new Error("expected failed");
+  });
+
+  test("contexto inválido: core não é chamado; permanece fail-open (sem throw)", async () => {
+    const { client, calls } = makeSupabase({
+      rows: baseRows({
+        pagamentos_pix: [{ user_id: "u-1", status: "pago", tipo_produto: "ativacao" }],
+      }),
+    });
+    const { logger, events } = makeLogger();
+    const res = await runWhatsappOrchestratorShadow(BASE_INPUT, { supabase: client, logger });
+    expect(res.status).toBe("failed");
+    // Nenhum evento evaluated foi emitido (core não foi chamado).
+    expect(events.filter((e) => e.status === "evaluated")).toHaveLength(0);
+    // Apenas SELECTs read-only nas tabelas esperadas.
+    for (const c of calls.selects) {
+      expect(["whatsapp_provider_instances", "whatsapp_conversation_states", "veiculos", "profiles", "pagamentos_pix"]).toContain(c.table);
+    }
+  });
+});
+
+
