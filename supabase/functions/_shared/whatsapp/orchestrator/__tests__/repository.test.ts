@@ -1019,6 +1019,8 @@ describe("loadContext — kmAtual (Build 5.7F2E1A.5-MA)", () => {
       isArchived: false,
       isEligible: true,
       kmAtual: 42,
+      // Build 5.7F2E1A.5-MJ0 — status='active' não é reconhecido → denied.
+      whatsappAccessMode: "denied",
     });
   });
 });
