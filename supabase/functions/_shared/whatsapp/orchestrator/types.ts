@@ -75,7 +75,13 @@ export type LoadContextReasonCode =
   | "message_instance_mismatch"
   | "contact_missing"
   | "ownership_mismatch"
-  | "instance_missing";
+  | "instance_missing"
+  // Build 5.7F2E1A.5-MJ0 — fail-closed do context loader por veículo.
+  | "profile_missing"            // profiles ausente para userId
+  | "profile_lookup_failed"      // erro/exception na query profiles
+  | "activations_lookup_failed"  // erro/exception na query pagamentos_pix
+  | "vehicle_context_invalid";   // shape inválido em veiculos p/ classificação
+
 
 export type ActiveVehicleIssue = "invalid" | "archived";
 
