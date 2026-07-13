@@ -269,10 +269,13 @@ describe("shadow — state", () => {
     // Cliente mock só expõe .from().select(); qualquer .insert/.update tentaria acessar método inexistente → erro. Aqui basta confirmar tabelas visitadas.
     const tables = calls.selects.map((c) => c.table).sort();
     expect(tables).toEqual([
+      "pagamentos_pix",
+      "profiles",
       "veiculos",
       "whatsapp_conversation_states",
       "whatsapp_provider_instances",
     ]);
+
   });
 });
 
