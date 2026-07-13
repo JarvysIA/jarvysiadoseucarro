@@ -253,11 +253,9 @@ DO $grants$
 DECLARE
   r record;
   v_bad int := 0;
-  v_sig text;
 BEGIN
   FOR r IN
-    SELECT p.proname,
-           pg_get_function_identity_arguments(p.oid) AS args
+    SELECT p.oid, p.proname
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname='public'
@@ -268,11 +266,10 @@ BEGIN
          'cancel_whatsapp_km_prompt_request',
          'expire_whatsapp_km_prompt_requests')
   LOOP
-    v_sig := 'public.'||r.proname||'('||r.args||')';
-    IF has_function_privilege('anon', v_sig, 'EXECUTE')
-       OR has_function_privilege('authenticated', v_sig, 'EXECUTE') THEN
+    IF has_function_privilege('anon', r.oid, 'EXECUTE')
+       OR has_function_privilege('authenticated', r.oid, 'EXECUTE') THEN
       v_bad := v_bad + 1;
-      RAISE NOTICE 'GRANT LEAK on %', v_sig;
+      RAISE NOTICE 'GRANT LEAK on %', r.proname;
     END IF;
   END LOOP;
 
