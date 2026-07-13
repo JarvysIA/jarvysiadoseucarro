@@ -899,19 +899,40 @@ function parseKmAtual(raw: unknown): number | null {
   return raw;
 }
 
-function mapVehicleRow(row: Record<string, unknown>): ConversationVehicle {
+function mapVehicleRow(
+  row: Record<string, unknown>,
+  profile: WhatsappVehicleAccessProfileInput,
+  activationSet: ReadonlySet<string>,
+  expectedUserId: string,
+  now: Date,
+): ConversationVehicle {
   const status = typeof row.status === "string" ? row.status : "";
   const isArchived = status === "archived";
+  const id = String(row.id);
+  const userId = typeof row.user_id === "string" ? row.user_id : "";
+  const whatsappAccessMode = computeWhatsappVehicleAccessMode(
+    profile,
+    {
+      id,
+      userId,
+      status: typeof row.status === "string" ? row.status : null,
+      hasPaidActivation: activationSet.has(id),
+    },
+    expectedUserId,
+    now,
+  );
   return {
-    id: String(row.id),
+    id,
     brand: (row.marca as string | null) ?? null,
     model: (row.modelo as string | null) ?? null,
     plate: (row.placa as string | null) ?? null,
     isArchived,
     isEligible: !isArchived,
     kmAtual: parseKmAtual(row.km_atual),
+    whatsappAccessMode,
   };
 }
+
 
 // ============================================================
 // Erros vindos do PostgREST/supabase-js → RpcExceptionError.
