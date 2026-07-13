@@ -45,6 +45,10 @@ import {
   computeWhatsappVehicleAccessMode,
   type WhatsappVehicleAccessProfileInput,
 } from "../plan/vehicle-access-mode.ts";
+import {
+  isValidActivationContextRow,
+  isValidProfileContextRow,
+} from "./context-validation.ts";
 
 // ============================================================
 // Structural client — evita acoplar a supabase-js@X.Y.Z. Expõe .rpc() e .from().
@@ -709,6 +713,7 @@ export class WhatsappOrchestratorRepository {
       );
 
       // (6.1) Build 5.7F2E1A.5-MJ0 — perfil do usuário (fail-closed).
+      // Build 5.7F2E1A.5-MJ0.1 — distinguir lookup_failed / missing / context_invalid.
       let profileRow: Record<string, unknown> | null;
       try {
         profileRow = await this.selectOne(
@@ -719,10 +724,15 @@ export class WhatsappOrchestratorRepository {
       } catch (_e) {
         return this.loadCtxErr(queueItemId, "profile_lookup_failed", started);
       }
-      if (!profileRow) return this.loadCtxErr(queueItemId, "profile_missing", started);
+      if (profileRow === null) {
+        return this.loadCtxErr(queueItemId, "profile_missing", started);
+      }
+      if (!isValidProfileContextRow(profileRow)) {
+        return this.loadCtxErr(queueItemId, "profile_context_invalid", started);
+      }
       const profileInput: WhatsappVehicleAccessProfileInput = {
-        statusUsuario: typeof profileRow.status_usuario === "string" ? profileRow.status_usuario : null,
-        trialInicio: typeof profileRow.trial_inicio === "string" ? profileRow.trial_inicio : null,
+        statusUsuario: profileRow.status_usuario,
+        trialInicio: profileRow.trial_inicio,
       };
 
       // (6.2) ativações pagas do usuário (pagamentos_pix). Fail-closed.
@@ -736,11 +746,17 @@ export class WhatsappOrchestratorRepository {
       } catch (_e) {
         return this.loadCtxErr(queueItemId, "activations_lookup_failed", started);
       }
+      // Build 5.7F2E1A.5-MJ0.1 — uma única linha inválida invalida o contexto
+      // completo (nunca construir Set parcial que degrade full → passive_with_km).
+      for (const row of activationRows) {
+        if (!isValidActivationContextRow(row)) {
+          return this.loadCtxErr(queueItemId, "activations_context_invalid", started);
+        }
+      }
       const activationSet = new Set<string>();
       for (const row of activationRows) {
-        if (typeof row.veiculo_id === "string" && row.veiculo_id.length > 0) {
-          activationSet.add(row.veiculo_id);
-        }
+        // row já validada acima; guard estreita o tipo em runtime.
+        if (isValidActivationContextRow(row)) activationSet.add(row.veiculo_id);
       }
 
       const nowDate = new Date();

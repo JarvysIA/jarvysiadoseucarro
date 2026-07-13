@@ -1025,3 +1025,163 @@ describe("loadContext — kmAtual (Build 5.7F2E1A.5-MA)", () => {
   });
 });
 
+// ============================================================
+// Build 5.7F2E1A.5-MJ0.1 — profile_context_invalid / activations_context_invalid
+// ============================================================
+
+describe("loadContext — profile shape (Build 5.7F2E1A.5-MJ0.1)", () => {
+  test("profiles retorna erro → profile_lookup_failed", async () => {
+    const repo = new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows(), { errorOn: "profiles" }),
+    );
+    const res = await repo.loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_lookup_failed" });
+  });
+
+  test("profiles data=null (sem erro) → profile_missing", async () => {
+    const res = await new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows({ profiles: [] })),
+    ).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_missing" });
+  });
+
+  test("status_usuario=null → profile_context_invalid", async () => {
+    const res = await new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows({
+        profiles: [{ id: "u1", status_usuario: null, trial_inicio: null }],
+      })),
+    ).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_context_invalid" });
+  });
+
+  test("status_usuario não string (number) → profile_context_invalid", async () => {
+    const res = await new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows({
+        profiles: [{ id: "u1", status_usuario: 123, trial_inicio: null }],
+      })),
+    ).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_context_invalid" });
+  });
+
+  test("trial_inicio number → profile_context_invalid", async () => {
+    const res = await new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows({
+        profiles: [{ id: "u1", status_usuario: "vip", trial_inicio: 123 }],
+      })),
+    ).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_context_invalid" });
+  });
+
+  test("trial_inicio boolean → profile_context_invalid", async () => {
+    const res = await new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows({
+        profiles: [{ id: "u1", status_usuario: "vip", trial_inicio: true }],
+      })),
+    ).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "profile_context_invalid" });
+  });
+
+  test("status_usuario desconhecido (shape válido) → carrega contexto; veículos = denied", async () => {
+    const rows = baseRows({
+      profiles: [{ id: "u1", status_usuario: "totally_unknown", trial_inicio: null }],
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "Fiat", modelo: "Argo", placa: "ABC1D23", status: "ativo", km_atual: null },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.vehicles[0].whatsappAccessMode).toBe("denied");
+    }
+  });
+});
+
+describe("loadContext — activations shape (Build 5.7F2E1A.5-MJ0.1)", () => {
+  test("pagamentos_pix retorna erro → activations_lookup_failed", async () => {
+    const repo = new WhatsappOrchestratorRepository(
+      makeCtxClient(baseRows(), { errorOn: "pagamentos_pix" }),
+    );
+    const res = await repo.loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_lookup_failed" });
+  });
+
+  test("array vazio → contexto carregado; usuário ativo sem pagamento vira passive_with_km", async () => {
+    const rows = baseRows({
+      profiles: [{ id: "u1", status_usuario: "ativo", trial_inicio: null }],
+      pagamentos_pix: [],
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "F", modelo: "A", placa: "ABC1D23", status: "ativo", km_atual: null },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.vehicles[0].whatsappAccessMode).toBe("passive_with_km");
+    }
+  });
+
+  test("row sem veiculo_id → activations_context_invalid", async () => {
+    const rows = baseRows({
+      pagamentos_pix: [{ user_id: "u1", status: "pago", tipo_produto: "ativacao" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_context_invalid" });
+  });
+
+  test("veiculo_id=null → activations_context_invalid", async () => {
+    const rows = baseRows({
+      pagamentos_pix: [{ veiculo_id: null, user_id: "u1", status: "pago", tipo_produto: "ativacao" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_context_invalid" });
+  });
+
+  test("veiculo_id number → activations_context_invalid", async () => {
+    const rows = baseRows({
+      pagamentos_pix: [{ veiculo_id: 42, user_id: "u1", status: "pago", tipo_produto: "ativacao" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_context_invalid" });
+  });
+
+  test("veiculo_id='' → activations_context_invalid", async () => {
+    const rows = baseRows({
+      pagamentos_pix: [{ veiculo_id: "", user_id: "u1", status: "pago", tipo_produto: "ativacao" }],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_context_invalid" });
+  });
+
+  test("uma linha válida + uma inválida → activations_context_invalid (sem Set parcial)", async () => {
+    const rows = baseRows({
+      pagamentos_pix: [
+        { veiculo_id: "v1", user_id: "u1", status: "pago", tipo_produto: "ativacao" },
+        { veiculo_id: null, user_id: "u1", status: "pago", tipo_produto: "ativacao" },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res).toEqual({ kind: "error", reason: "activations_context_invalid" });
+  });
+
+  test("todas linhas válidas → Set correto; veículo com pagamento = full", async () => {
+    const rows = baseRows({
+      profiles: [{ id: "u1", status_usuario: "ativo", trial_inicio: null }],
+      pagamentos_pix: [
+        { veiculo_id: "v1", user_id: "u1", status: "pago", tipo_produto: "ativacao" },
+      ],
+      veiculos: [
+        { id: "v1", user_id: "u1", marca: "F", modelo: "A", placa: "ABC1D23", status: "ativo", km_atual: null },
+        { id: "v2", user_id: "u1", marca: "F", modelo: "B", placa: "XYZ9K88", status: "ativo", km_atual: null },
+      ],
+    });
+    const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      const byId = Object.fromEntries(res.context.vehicles.map((v) => [v.id, v.whatsappAccessMode]));
+      expect(byId["v1"]).toBe("full");
+      expect(byId["v2"]).toBe("passive_with_km");
+    }
+  });
+});
+
+
