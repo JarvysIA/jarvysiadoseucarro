@@ -704,10 +704,49 @@ export class WhatsappOrchestratorRepository {
       // (6) veículos do usuário — incluímos archived para diagnosticar issue
       const vehicleRows = await this.selectMany(
         "veiculos",
-        "id,marca,modelo,placa,status,km_atual",
+        "id,user_id,marca,modelo,placa,status,km_atual",
         { user_id: item.userId },
       );
-      const allVehicles = vehicleRows.map(mapVehicleRow);
+
+      // (6.1) Build 5.7F2E1A.5-MJ0 — perfil do usuário (fail-closed).
+      let profileRow: Record<string, unknown> | null;
+      try {
+        profileRow = await this.selectOne(
+          "profiles",
+          "id,status_usuario,trial_inicio",
+          { id: item.userId },
+        );
+      } catch (_e) {
+        return this.loadCtxErr(queueItemId, "profile_lookup_failed", started);
+      }
+      if (!profileRow) return this.loadCtxErr(queueItemId, "profile_missing", started);
+      const profileInput: WhatsappVehicleAccessProfileInput = {
+        statusUsuario: typeof profileRow.status_usuario === "string" ? profileRow.status_usuario : null,
+        trialInicio: typeof profileRow.trial_inicio === "string" ? profileRow.trial_inicio : null,
+      };
+
+      // (6.2) ativações pagas do usuário (pagamentos_pix). Fail-closed.
+      let activationRows: Record<string, unknown>[];
+      try {
+        activationRows = await this.selectMany(
+          "pagamentos_pix",
+          "veiculo_id,status,tipo_produto,user_id",
+          { user_id: item.userId, status: "pago", tipo_produto: "ativacao" },
+        );
+      } catch (_e) {
+        return this.loadCtxErr(queueItemId, "activations_lookup_failed", started);
+      }
+      const activationSet = new Set<string>();
+      for (const row of activationRows) {
+        if (typeof row.veiculo_id === "string" && row.veiculo_id.length > 0) {
+          activationSet.add(row.veiculo_id);
+        }
+      }
+
+      const nowDate = new Date();
+      const allVehicles = vehicleRows.map((row) =>
+        mapVehicleRow(row, profileInput, activationSet, item.userId, nowDate),
+      );
       const vehicles = allVehicles.filter((v) => !v.isArchived);
 
       // (7) active vehicle issue — sem escrita em qualquer caso
@@ -718,6 +757,7 @@ export class WhatsappOrchestratorRepository {
         if (!found) activeVehicleIssue = "invalid";
         else if (found.isArchived) activeVehicleIssue = "archived";
       }
+
 
       const context: ConversationContext = { state, stateVersion, fallbackCount, vehicles };
       this.log({
