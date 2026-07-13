@@ -5,7 +5,7 @@ export type ConversationStateName =
   | "idle"
   | "awaiting_vehicle"
   | "awaiting_km_confirmation"
-  | "awaiting_km_correction_confirmation"
+  | "awaiting_km_correction"
   | "completed"
   | "cancelled"
   | "expired"

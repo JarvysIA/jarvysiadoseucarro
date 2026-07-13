@@ -181,7 +181,7 @@ describe("core T1 — draft completo direto em idle", () => {
     const d = decideConversation(
       inp({ originalText: "km 15000", vehicles: [v] }),
     );
-    expect(d.nextState).toBe("awaiting_km_correction_confirmation");
+    expect(d.nextState).toBe("awaiting_km_correction");
     expect(d.responseKey).toBe("km_update_correction_confirmation");
     expect((d.statePatch.draftPayload as { isCorrection: boolean }).isCorrection).toBe(true);
   });
@@ -380,13 +380,13 @@ describe("core T1 — parser inerte em states não-idle", () => {
     assertNoT2Leakage(d);
   });
 
-  test("state awaiting_km_correction_confirmation → mesma inércia", () => {
+  test("state awaiting_km_correction → mesma inércia", () => {
     const d = decideConversation(
       inp({
         originalText: "km 42",
         vehicles: [v1],
         state: state({
-          state: "awaiting_km_correction_confirmation",
+          state: "awaiting_km_correction",
           draftType: "km_update",
           draftId: MSG_UUID_B,
           draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
@@ -432,7 +432,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     expect(d.eventKind).toBe("vehicle_reply");
     expect(d.decisionKind).toBe("transition");
     // Onix kmAtual=20000, newKm=15000 → redução → correção.
-    expect(d.nextState).toBe("awaiting_km_correction_confirmation");
+    expect(d.nextState).toBe("awaiting_km_correction");
     expect(d.responseKey).toBe("km_update_correction_confirmation");
 
     expect(d.statePatch.draftType).toBe("km_update");
@@ -551,7 +551,7 @@ describe("core T1 — completar draft parcial via seleção de veículo", () => 
     expect(d.responseKey).not.toBe("km_update_confirmation");
     expect(d.responseKey).not.toBe("km_update_correction_confirmation");
     expect(d.nextState).not.toBe("awaiting_km_confirmation");
-    expect(d.nextState).not.toBe("awaiting_km_correction_confirmation");
+    expect(d.nextState).not.toBe("awaiting_km_correction");
     assertNoT2Leakage(d);
   });
 
@@ -668,8 +668,8 @@ describe("core T1 — confirmações em states KM não emitem T2", () => {
     assertNoT2Leakage(d);
   });
 
-  test("'sim' em awaiting_km_correction_confirmation: mesmas garantias", () => {
-    const corr = { ...kmState, state: "awaiting_km_correction_confirmation" as const };
+  test("'sim' em awaiting_km_correction: mesmas garantias", () => {
+    const corr = { ...kmState, state: "awaiting_km_correction" as const };
     const d = decideConversation(
       inp({ originalText: "sim", state: corr, sourceMessageId: MSG_UUID_B }),
     );

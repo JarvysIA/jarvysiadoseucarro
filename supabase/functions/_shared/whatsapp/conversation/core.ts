@@ -311,7 +311,7 @@ export function decideConversation(
           validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
         if (validated.ok && isUuid(veh.id)) {
           const nextState: ConversationStateName = isCorrection
-            ? "awaiting_km_correction_confirmation"
+            ? "awaiting_km_correction"
             : "awaiting_km_confirmation";
           return buildDecision({
             eventKind: "vehicle_reply",
@@ -516,7 +516,7 @@ export function decideConversation(
           validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
         if (validated.ok && isUuid(veh.id)) {
           const nextState: ConversationStateName = isCorrection
-            ? "awaiting_km_correction_confirmation"
+            ? "awaiting_km_correction"
             : "awaiting_km_confirmation";
           return buildDecision({
             eventKind: KM_REPORTED_EVENT_KIND,
