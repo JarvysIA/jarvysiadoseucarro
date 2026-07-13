@@ -98,6 +98,13 @@ export type ConversationVehicle = {
    * - o core NÃO consome este campo neste build.
    */
   kmAtual: number | null;
+  /**
+   * Build 5.7F2E1A.5-MJ0 — modo de acesso ao WhatsApp para ESTE veículo.
+   * Fonte da verdade: computeWhatsappVehicleAccessMode. O core NÃO recomputa
+   * e NÃO consome este campo neste build; consumo será introduzido por
+   * builds subsequentes (MJ1/MJ2/E1B).
+   */
+  whatsappAccessMode: WhatsappVehicleAccessMode;
   optionalLabel?: string | null;
 };
 
