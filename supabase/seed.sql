@@ -27,7 +27,7 @@ BEGIN
   EXECUTE 'TRUNCATE TABLE jarvys_test_meta.local_marker';
 
   EXECUTE $sql$INSERT INTO jarvys_test_meta.local_marker (marker)
-    VALUES (''MJ1A_V_ENV_CI_LOCAL_V1'')$sql$;
+    VALUES ('MJ1A_V_ENV_CI_LOCAL_V1')$sql$;
 
   EXECUTE 'CREATE TABLE IF NOT EXISTS jarvys_test_meta.tx_smoke (
     test_id uuid primary key,
