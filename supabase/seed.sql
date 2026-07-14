@@ -5,54 +5,40 @@
 -- .github/workflows/jarvys-test-db.yml, após `supabase db reset --local`.
 --
 -- NÃO aplicar em produção. NÃO conter dados reais.
--- Nenhum profile, veículo, contato, mensagem, telefone, e-mail, placa,
--- CPF/CNPJ, provider id, token ou payload real.
 --
--- Cria um namespace isolado `jarvys_test_meta` com:
---   - local_marker: prova de que o guard está falando com o banco local certo;
---   - tx_smoke:     tabela mínima usada pelo smoke test multi-sessão.
---
--- Grants: revogados de PUBLIC/anon/authenticated; acesso reservado ao role
--- administrativo local (postgres) usado pelo harness.
+-- Tudo dentro de um único bloco DO $$ ... $$ com EXECUTE: o Supabase CLI
+-- envia seed.sql em lote (batch), e DDL seguido de DML dependente em
+-- statements separados pode falhar com "relation does not exist" mesmo
+-- em ordem correta (erro documentado do supabase/cli). Um bloco único
+-- elimina o problema — o servidor processa tudo sequencialmente.
 -- =============================================================================
+DO $$
+BEGIN
+  EXECUTE 'CREATE SCHEMA IF NOT EXISTS jarvys_test_meta';
 
-create schema if not exists jarvys_test_meta;
+  EXECUTE 'REVOKE ALL ON SCHEMA jarvys_test_meta FROM public';
+  EXECUTE 'REVOKE ALL ON SCHEMA jarvys_test_meta FROM anon';
+  EXECUTE 'REVOKE ALL ON SCHEMA jarvys_test_meta FROM authenticated';
 
-revoke all on schema jarvys_test_meta from public;
-revoke all on schema jarvys_test_meta from anon;
-revoke all on schema jarvys_test_meta from authenticated;
+  EXECUTE 'CREATE TABLE IF NOT EXISTS jarvys_test_meta.local_marker (
+    marker text primary key
+  )';
 
--- ---------------------------------------------------------------------------
--- Marker estático do ambiente local. Uma linha única, valor fixo.
--- Usado pelo guard pós-conexão para provar identidade do banco.
--- ---------------------------------------------------------------------------
-create table if not exists jarvys_test_meta.local_marker (
-  marker text primary key
-);
+  EXECUTE 'TRUNCATE TABLE jarvys_test_meta.local_marker';
 
--- Idempotente: reset local reexecuta o seed do zero, mas mesmo em reruns
--- pontuais garantimos exatamente um marker.
-truncate table jarvys_test_meta.local_marker;
-insert into jarvys_test_meta.local_marker (marker)
-values ('MJ1A_V_ENV_CI_LOCAL_V1');
+  EXECUTE $sql$INSERT INTO jarvys_test_meta.local_marker (marker)
+    VALUES (''MJ1A_V_ENV_CI_LOCAL_V1'')$sql$;
 
--- ---------------------------------------------------------------------------
--- Tabela sintética usada exclusivamente pelo smoke transacional.
--- Não referencia auth.users, tabelas produtivas, ou qualquer schema real.
--- ---------------------------------------------------------------------------
-create table if not exists jarvys_test_meta.tx_smoke (
-  test_id uuid primary key,
-  payload text not null,
-  created_at timestamptz not null default now()
-);
+  EXECUTE 'CREATE TABLE IF NOT EXISTS jarvys_test_meta.tx_smoke (
+    test_id uuid primary key,
+    payload text not null,
+    created_at timestamptz not null default now()
+  )';
 
--- ---------------------------------------------------------------------------
--- Fecha o namespace para roles do Data API. Apenas o superuser local (postgres),
--- usado pelo harness dedicado do CI, pode ler/escrever.
--- ---------------------------------------------------------------------------
-revoke all on all tables in schema jarvys_test_meta from public;
-revoke all on all tables in schema jarvys_test_meta from anon;
-revoke all on all tables in schema jarvys_test_meta from authenticated;
+  EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA jarvys_test_meta FROM public';
+  EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA jarvys_test_meta FROM anon';
+  EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA jarvys_test_meta FROM authenticated';
 
-alter default privileges in schema jarvys_test_meta
-  revoke all on tables from public, anon, authenticated;
+  EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA jarvys_test_meta
+    REVOKE ALL ON TABLES FROM public, anon, authenticated';
+END $$;
