@@ -138,6 +138,9 @@ jobs:
       - name: Smoke multi-sessão
         run: bun run scripts/test-db/smoke.ts
 
+      - name: MJ1A-V C1 — enqueue concorrente (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
