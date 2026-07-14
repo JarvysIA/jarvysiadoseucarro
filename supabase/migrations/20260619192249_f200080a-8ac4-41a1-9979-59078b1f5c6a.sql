@@ -294,6 +294,9 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.liberar_comissoes_indicacao() TO service_role;
 
+ALTER TABLE public.pagamentos_pix
+  ADD COLUMN IF NOT EXISTS metadata jsonb;
+
 -- ============ 9) BACKFILL idempotente do legado metadata.comissao_padrinho ============
 WITH inseridos AS (
   INSERT INTO public.movimentacoes_indicacao
