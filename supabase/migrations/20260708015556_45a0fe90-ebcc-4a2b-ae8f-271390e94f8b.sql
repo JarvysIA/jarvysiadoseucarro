@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- 1) Função utilitária para upsert no Vault (uso restrito a service_role/postgres)
 CREATE OR REPLACE FUNCTION public.upsert_vault_secret(_name text, _value text)
