@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "bun test"
+    "test": "bun test",
+    "test:db:guard": "bun test scripts/test-db/guard.test.ts",
+    "test:db:smoke": "bun run scripts/test-db/smoke.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
