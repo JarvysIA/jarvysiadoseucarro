@@ -23,7 +23,12 @@ REVOKE ALL ON FUNCTION public.upsert_vault_secret(text, text) FROM PUBLIC, anon,
 GRANT EXECUTE ON FUNCTION public.upsert_vault_secret(text, text) TO service_role;
 
 -- 2) Reagenda cron FIPE com header x-cron-secret vindo do Vault
-SELECT cron.unschedule(1);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobid = 1) THEN
+    PERFORM cron.unschedule(1);
+  END IF;
+END $$;
 SELECT cron.schedule(
   'fipe-monthly-refresh',
   '0 9 7 * *',
@@ -40,7 +45,12 @@ SELECT cron.schedule(
 );
 
 -- 3) Reagenda cron verificar-pagamentos com header x-cron-secret vindo do Vault
-SELECT cron.unschedule(2);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobid = 2) THEN
+    PERFORM cron.unschedule(2);
+  END IF;
+END $$;
 SELECT cron.schedule(
   'verificar-pagamentos-pix-5min',
   '*/5 * * * *',
