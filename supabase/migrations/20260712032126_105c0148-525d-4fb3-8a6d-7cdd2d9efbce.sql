@@ -284,4 +284,9 @@ REVOKE ALL ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, i
 REVOKE ALL ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, integer) FROM anon;
 REVOKE ALL ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, integer) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, integer) TO service_role;
-GRANT EXECUTE ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, integer) TO sandbox_exec;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.claim_whatsapp_orchestrator_items(text, integer, integer) TO sandbox_exec';
+  END IF;
+END $$;
