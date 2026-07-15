@@ -108,10 +108,13 @@ describeIfDb("MJ1B-V O2 — recuperação de lease expirado", () => {
     expect(tokenV1).toBeTruthy();
     expect(first.rows[0]?.was_recovered).toBe(false);
 
-    // (3) Simula o worker A sumindo: força o lease pro passado.
+    // (3) Simula o worker A sumindo: força claimed_at e lease_expires_at
+    // pro passado, nessa ordem — a constraint wpq_lease_expires_after_claim
+    // exige lease_expires_at > claimed_at mesmo quando ambos já expiraram.
     await session.query(
       `update public.whatsapp_processing_queue
-          set lease_expires_at = now() - interval '1 second'
+          set claimed_at = now() - interval '2 minutes',
+              lease_expires_at = now() - interval '1 minute'
         where id = $1`,
       [queueId],
     );
