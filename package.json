@@ -23,7 +23,8 @@
     "test:db:mj1b-v-o1": "bun test supabase/tests/mj1b-v/o1-claim-skip-locked.test.ts",
     "test:db:mj1b-v-o2": "bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts",
     "test:db:mj1b-v-o3": "bun test supabase/tests/mj1b-v/o3-apply-replay.test.ts",
-    "test:db:mj1b-v-o4": "bun test supabase/tests/mj1b-v/o4-apply-cas-lock.test.ts"
+    "test:db:mj1b-v-o4": "bun test supabase/tests/mj1b-v/o4-apply-cas-lock.test.ts",
+    "test:db:mj1b-v-o5": "bun test supabase/tests/mj1b-v/o5-apply-first-insert-race.test.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
