@@ -165,6 +165,9 @@ jobs:
       - name: MJ1B-V O2 — recuperação de lease expirado (Postgres real)
         run: bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts
 
+      - name: MJ1B-V O3 — replay durável do apply (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o3-apply-replay.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |

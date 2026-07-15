@@ -21,7 +21,8 @@
     "test:db:mj1a-v-c6": "bun test supabase/tests/mj1a-v/c6-finalize-failed-repair.test.ts",
     "test:db:mj1a-v-c7": "bun test supabase/tests/mj1a-v/c7-orphan-audit.test.ts",
     "test:db:mj1b-v-o1": "bun test supabase/tests/mj1b-v/o1-claim-skip-locked.test.ts",
-    "test:db:mj1b-v-o2": "bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts"
+    "test:db:mj1b-v-o2": "bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts",
+    "test:db:mj1b-v-o3": "bun test supabase/tests/mj1b-v/o3-apply-replay.test.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
