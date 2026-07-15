@@ -160,3 +160,35 @@ export async function countSyntheticResidue(
   );
   return Number(q.rows[0]?.n ?? "0");
 }
+
+export const SYNTH_VEHICLE_ID_B = "aaaaaaaa-aaaa-4aaa-8aaa-000000000004";
+export const SYNTH_PLACA_B = "MJ1AVC3B";
+
+/**
+ * Semeia um SEGUNDO veículo sintético, do MESMO usuário sintético. Usado
+ * pelo C3 para simular divergência de contexto realista: o mesmo usuário
+ * tem mais de um carro na garagem (cenário central do produto) e a mesma
+ * idempotency_key não pode ser reaproveitada entre veículos diferentes.
+ * NÃO abre transação própria — mesmo contrato de seedBaseFixtures.
+ */
+export async function seedSecondVehicle(client: QueryClient): Promise<void> {
+  await client.query("SET LOCAL search_path = public");
+
+  await client.query(
+    `INSERT INTO public.veiculos (id, user_id, placa, status)
+     VALUES ($1, $2, $3, 'ativo')
+     ON CONFLICT (id) DO NOTHING`,
+    [SYNTH_VEHICLE_ID_B, SYNTH_USER_ID, SYNTH_PLACA_B],
+  );
+}
+
+/**
+ * Remove o segundo veículo sintético.
+ */
+export async function cleanupSecondVehicle(client: QueryClient): Promise<void> {
+  await client.query("SET LOCAL search_path = public");
+
+  await client.query(`DELETE FROM public.veiculos WHERE id = $1`, [
+    SYNTH_VEHICLE_ID_B,
+  ]);
+}

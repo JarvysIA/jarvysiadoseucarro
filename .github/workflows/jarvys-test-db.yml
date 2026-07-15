@@ -144,6 +144,9 @@ jobs:
       - name: MJ1A-V C2 — enqueue + rollback libera lock (Postgres real)
         run: bun test supabase/tests/mj1a-v/c2-enqueue-rollback.test.ts
 
+      - name: MJ1A-V C3 — contexto divergente rejeitado (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c3-enqueue-context-mismatch.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
