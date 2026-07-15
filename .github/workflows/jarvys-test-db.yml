@@ -147,6 +147,9 @@ jobs:
       - name: MJ1A-V C3 — contexto divergente rejeitado (Postgres real)
         run: bun test supabase/tests/mj1a-v/c3-enqueue-context-mismatch.test.ts
 
+      - name: MJ1A-V C4 — finalize_sent webhook duplicado (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c4-finalize-sent-duplicate-webhook.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
