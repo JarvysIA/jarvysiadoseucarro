@@ -159,6 +159,9 @@ jobs:
       - name: MJ1A-V C7 — auditoria final zero órfão (Postgres real)
         run: bun test supabase/tests/mj1a-v/c7-orphan-audit.test.ts
 
+      - name: MJ1B-V O1 — claim SKIP LOCKED não bloqueia (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o1-claim-skip-locked.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
