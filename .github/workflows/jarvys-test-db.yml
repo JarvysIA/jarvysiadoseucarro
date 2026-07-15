@@ -162,6 +162,9 @@ jobs:
       - name: MJ1B-V O1 — claim SKIP LOCKED não bloqueia (Postgres real)
         run: bun test supabase/tests/mj1b-v/o1-claim-skip-locked.test.ts
 
+      - name: MJ1B-V O2 — recuperação de lease expirado (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
