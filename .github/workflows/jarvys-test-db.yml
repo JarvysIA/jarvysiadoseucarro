@@ -156,6 +156,9 @@ jobs:
       - name: MJ1A-V C6 — finalize_failed reparo self-heal (Postgres real)
         run: bun test supabase/tests/mj1a-v/c6-finalize-failed-repair.test.ts
 
+      - name: MJ1A-V C7 — auditoria final zero órfão (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c7-orphan-audit.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
