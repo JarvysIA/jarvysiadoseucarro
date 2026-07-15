@@ -171,6 +171,9 @@ jobs:
       - name: MJ1B-V O4 — CAS state_version sob lock real (Postgres real)
         run: bun test supabase/tests/mj1b-v/o4-apply-cas-lock.test.ts
 
+      - name: MJ1B-V O5 — corrida 1a insercao de estado (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o5-apply-first-insert-race.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
