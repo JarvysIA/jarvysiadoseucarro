@@ -239,7 +239,8 @@ describeIfDb("MJ1B-V O4 — CAS de state_version sob lock físico real", () => {
     };
 
     // (3) Sessão A aplica com a versão certa (1) — sucesso real, mas NÃO
-    // commita ainda. Segura o lock da linha de estado.
+    // commita ainda. Segura o lock da linha de whatsapp_contacts (ver
+    // nota no cabeçalho do arquivo).
     await a.begin();
     const applyAPromise = a.query<{ apply_whatsapp_orchestrator_transition: ApplyResult }>(
       `select public.apply_whatsapp_orchestrator_transition($1, $2, $3, $4, $5, $6)
@@ -263,7 +264,7 @@ describeIfDb("MJ1B-V O4 — CAS de state_version sob lock físico real", () => {
     await waitFor(
       () => waitingOnRowLock(ctl, b.backendPid),
       POLL_TIMEOUT_MS,
-      "B bloquear no lock da linha de whatsapp_conversation_states",
+      "B bloquear no lock da linha de whatsapp_contacts (segurado por A)",
     );
 
     // (5) A commita — libera a trava. B perde a corrida.
