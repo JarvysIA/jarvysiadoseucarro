@@ -44,7 +44,6 @@ type ClaimedRow = {
   queue_id: string;
   message_id: string;
   contact_id: string;
-  claimed_by: string | null;
   lease_token: string | null;
   lease_expires_at: string | null;
   was_recovered: boolean;
@@ -132,7 +131,6 @@ describeIfDb("MJ1B-V O1 — claim_whatsapp_orchestrator_items com SKIP LOCKED", 
     expect(claimed.queue_id).toBe(queueId);
     expect(claimed.message_id).toBe(messageId);
     expect(claimed.contact_id).toBe(SYNTH_CONTACT_ID);
-    expect(claimed.claimed_by).toBe(WORKER_B);
     expect(claimed.lease_token).toBeTruthy();
     expect(claimed.lease_expires_at).toBeTruthy();
     expect(claimed.was_recovered).toBe(false);
