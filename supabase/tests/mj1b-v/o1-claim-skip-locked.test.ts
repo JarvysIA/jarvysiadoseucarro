@@ -44,7 +44,6 @@ type ClaimedRow = {
   queue_id: string;
   message_id: string;
   contact_id: string;
-  claimed_by: string | null;
   lease_token: string | null;
   lease_expires_at: string | null;
   was_recovered: boolean;
