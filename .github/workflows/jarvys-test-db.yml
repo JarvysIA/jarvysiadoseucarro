@@ -153,6 +153,9 @@ jobs:
       - name: MJ1A-V C5 — sucesso vence sempre / terminal não flipa (Postgres real)
         run: bun test supabase/tests/mj1a-v/c5-finalize-terminal-precedence.test.ts
 
+      - name: MJ1A-V C6 — finalize_failed reparo self-heal (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c6-finalize-failed-repair.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
