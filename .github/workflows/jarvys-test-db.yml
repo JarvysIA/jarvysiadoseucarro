@@ -176,6 +176,44 @@ jobs:
       - name: MJ1B-V O5 — corrida 1a insercao de estado (Postgres real)
         run: bun test supabase/tests/mj1b-v/o5-apply-first-insert-race.test.ts
 
+      - name: MJ1C-V K1 — applied caminho feliz (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k1-applied.test.ts
+
+      - name: MJ1C-V K2 — no_op (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k2-no-op.test.ts
+
+      - name: MJ1C-V K3 — replay durável (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k3-replay.test.ts
+
+      - name: MJ1C-V K4 — km_conflict (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k4-km-conflict.test.ts
+
+      - name: MJ1C-V K5 — state_version_conflict (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k5-state-version-conflict.test.ts
+
+      - name: MJ1C-V K6 — correction_not_confirmed (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k6-correction-not-confirmed.test.ts
+
+      - name: MJ1C-V K7 — vehicle_archived (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k7-vehicle-archived.test.ts
+
+      - name: MJ1C-V K8 — vehicle_not_owned (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k8-vehicle-not-owned.test.ts
+
+      - name: MJ1C-V K9 — invariant_violation (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k9-invariant-violation.test.ts
+
+      - name: MJ1C-V K10 — action_execution_conflict (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k10-action-execution-conflict.test.ts
+
+      - name: MJ1C-V K11 — concorrência real no mesmo draft_id (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k11-concurrent-same-draft.test.ts
+
+      - name: MJ1C-V K12 — crash-window replay (Postgres real)
+        run: bun test supabase/tests/mj1c-v/k12-crash-window-replay.test.ts
+
+
+
       - name: Step Summary sanitizado
         if: always()
         run: |
