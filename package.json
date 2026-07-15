@@ -13,7 +13,8 @@
     "test": "bun test",
     "test:db:guard": "bun test scripts/test-db/guard.test.ts",
     "test:db:smoke": "bun run scripts/test-db/smoke.ts",
-    "test:db:mj1a-v-c1": "bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts"
+    "test:db:mj1a-v-c1": "bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts",
+    "test:db:mj1a-v-c2": "bun test supabase/tests/mj1a-v/c2-enqueue-rollback.test.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

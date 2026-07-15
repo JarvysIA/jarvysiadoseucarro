@@ -141,6 +141,9 @@ jobs:
       - name: MJ1A-V C1 — enqueue concorrente (Postgres real)
         run: bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts
 
+      - name: MJ1A-V C2 — enqueue + rollback libera lock (Postgres real)
+        run: bun test supabase/tests/mj1a-v/c2-enqueue-rollback.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
