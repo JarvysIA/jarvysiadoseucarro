@@ -71,9 +71,9 @@ export async function seedBaseFixtures(client: QueryClient): Promise<void> {
   );
   await client.query(
     `INSERT INTO public.profiles (id, nome, whatsapp)
-     VALUES ($1, $2, NULL)
+     VALUES ($1, $2, $3)
      ON CONFLICT (id) DO NOTHING`,
-    [SYNTH_OTHER_USER_ID, "MJ1C-V Other"],
+    [SYNTH_OTHER_USER_ID, "MJ1C-V Other", "+5511900001099"],
   );
 
   await client.query(
