@@ -153,7 +153,7 @@ describeIfDb("MJ1B-V O3 — replay durável de apply_whatsapp_orchestrator_trans
 
     // (4) Nada duplicou no banco.
     const stateRows = await session.query<{ state_version: number }>(
-      `select state_version
+      `select state_version::int as state_version
          from public.whatsapp_conversation_states
         where contact_id = $1`,
       [SYNTH_CONTACT_ID],
