@@ -2,15 +2,17 @@
 #
 # Ambiente PostgreSQL/Supabase local, isolado e efêmero, executado somente
 # sob demanda no GitHub Actions. NÃO conecta em produção. NÃO usa secrets.
-# NÃO faz deploy. NÃO liga runtime. NÃO executa MJ1A-V.
+# NÃO faz deploy. NÃO liga orchestrator_mode em produção. NÃO conecta
+# runtime produtivo.
 #
 # Fluxo: checkout → Bun fixo → deps congeladas → testes puros do guard →
 # Supabase CLI fixa → sanitização de ambiente → supabase start local →
-# supabase db reset --local (aplica 67 migrations + seed sintético) →
+# supabase db reset --local (aplica migrations + seed sintético) →
 # TEST_DATABASE_URL local sem fallback → smoke multi-sessão (2 pg.Client
 # físicos independentes, PID distinto, COMMIT, ROLLBACK, zero leaked rows)
-# → Step Summary sanitizado → teardown always (supabase stop) → runner
-# efêmero descartado.
+# → ratificação MJ1A-V (C1-C7) e MJ1B-V (O1-O5), RPCs reais contra este
+# Postgres local efêmero → Step Summary sanitizado → teardown always
+# (supabase stop) → runner efêmero descartado.
 #
 # Todas as `uses:` estão fixadas em SHA hexadecimal completa de 40 caracteres.
 # Tags nos comentários são meramente informativas.
@@ -195,7 +197,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V não executado neste build"
+            echo "- MJ1A-V (C1-C7) e MJ1B-V (O1-O5) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"

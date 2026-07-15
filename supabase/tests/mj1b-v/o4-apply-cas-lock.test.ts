@@ -5,11 +5,15 @@
  * Duas sessões físicas competem para aplicar uma transição na MESMA
  * conversa já existente (mesmo contato, mesma linha de
  * whatsapp_conversation_states), cada uma com seu próprio item de fila e
- * lease válidos. A que perde a corrida trava de verdade no
- * SELECT...FOR UPDATE que a própria RPC faz na linha de estado — não é
- * lógica sequencial, é bloqueio físico real (mesmo padrão do C4/C5 do
- * MJ1A-V, mas aqui a linha disputada é whatsapp_conversation_states, não
- * whatsapp_outbound_queue).
+ * lease válidos. A que perde a corrida trava de verdade — não é lógica
+ * sequencial, é bloqueio físico real (mesmo padrão do C4/C5 do MJ1A-V).
+ * CORREÇÃO (descoberta no O5): o bloqueio físico observado aqui acontece
+ * no SELECT...FOR UPDATE que a própria RPC faz em whatsapp_contacts logo
+ * no início — trava que ela segura pela transação inteira e que já
+ * serializa qualquer apply() concorrente pro mesmo contato, antes mesmo
+ * de chegar perto de whatsapp_conversation_states. O resultado do teste
+ * (CAS correto, versão certa devolvida) continua 100% válido — só a
+ * localização exata do lock físico estava descrita errado aqui.
  *
  * Setup: para ter duas sessões com leases válidos e simultâneos, contorno
  * deliberadamente a serialização por contato do claim() (que só libera um
@@ -247,8 +251,9 @@ describeIfDb("MJ1B-V O4 — CAS de state_version sob lock físico real", () => {
     expect(applyAResult?.orchestratorResult?.stateVersion).toBe(2);
 
     // (4) Sessão B tenta aplicar, também com expected_state_version=1 —
-    // bloqueia de verdade no FOR UPDATE da linha de estado (A ainda não
-    // commitou).
+    // bloqueia de verdade no FOR UPDATE que a RPC faz em whatsapp_contacts
+    // logo no início (A ainda não commitou) — ver nota no cabeçalho do
+    // arquivo, corrigida após o achado do O5.
     const applyBPromise = b.query<{ apply_whatsapp_orchestrator_transition: ApplyResult }>(
       `select public.apply_whatsapp_orchestrator_transition($1, $2, $3, $4, $5, $6)
          as apply_whatsapp_orchestrator_transition`,
