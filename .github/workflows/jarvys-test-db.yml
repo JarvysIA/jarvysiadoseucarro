@@ -168,6 +168,9 @@ jobs:
       - name: MJ1B-V O3 — replay durável do apply (Postgres real)
         run: bun test supabase/tests/mj1b-v/o3-apply-replay.test.ts
 
+      - name: MJ1B-V O4 — CAS state_version sob lock real (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o4-apply-cas-lock.test.ts
+
       - name: Step Summary sanitizado
         if: always()
         run: |
