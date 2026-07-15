@@ -1814,6 +1814,26 @@ export type Database = {
         }
         Returns: Json
       }
+      execute_whatsapp_km_update: {
+        Args: {
+          p_confirmation_message_id: string
+          p_contact_id: string
+          p_conversation_state_id: string
+          p_correction_confirmed: boolean
+          p_correction_reason: string
+          p_draft_id: string
+          p_expected_previous_km: number
+          p_expected_state_version: number
+          p_is_correction: boolean
+          p_new_km: number
+          p_orchestrator_version: string
+          p_queue_item_id: string
+          p_source_message_id: string
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: Json
+      }
       expire_whatsapp_km_prompt_requests: {
         Args: { p_batch?: number }
         Returns: {
