@@ -33,9 +33,10 @@ jobs:
   test-db:
     name: Supabase local + smoke multi-sessão
     runs-on: ubuntu-24.04
-    # 25 min: cabe checkout + bun install + 67 migrations aplicadas desde zero
-    # + seed + smoke. Curto o bastante para não segurar runner em travamentos.
-    timeout-minutes: 25
+    # 30 min: cabe checkout + bun install + migrations aplicadas desde zero
+    # + seed + smoke + MJ1A-V (C1-C7) + MJ1B-V (O1-O5) + MJ1C-V (K1-K12).
+    # Curto o bastante para não segurar runner em travamentos.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout (read-only)
