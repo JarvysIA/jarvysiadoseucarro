@@ -16,6 +16,7 @@ export type {
   SupabaseLike,
 } from "./repository.ts";
 export { runWhatsappOrchestratorTestCycle } from "./test-service.ts";
+export { buildKmFinalization } from "./test-service.ts";
 export type {
   ItemOutcome,
   TestCycleCounts,
@@ -25,6 +26,7 @@ export type {
   TestServiceLogEvent,
   TestServiceLogEventName,
   TestServiceLogger,
+  KmFinalization,
 } from "./test-service.ts";
 export { mapConversationDecisionToTransitionInput } from "./transition-mapper.ts";
 export type {
