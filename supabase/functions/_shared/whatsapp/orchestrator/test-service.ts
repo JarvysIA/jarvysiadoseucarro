@@ -430,12 +430,12 @@ function buildKmVehicleLabel(
   return label.length > 0 ? label : undefined;
 }
 
-type KmFinalization =
+export type KmFinalization =
   | { kind: "finalize"; decision: ConversationCoreDecision }
   | { kind: "retry" }
   | { kind: "invariant" };
 
-function buildKmFinalization(
+export function buildKmFinalization(
   result: ConfirmedKmUpdateResult,
   ctx: Extract<LoadContextResult, { kind: "ok" }>,
   vehicleId: string,
