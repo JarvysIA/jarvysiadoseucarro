@@ -784,7 +784,7 @@ export class WhatsappOrchestratorRepository {
       }
 
 
-      const context: ConversationContext = { state, stateVersion, fallbackCount, vehicles };
+      const context: ConversationContext = { state, stateVersion, fallbackCount, vehicles, conversationStateId };
       this.log({
         event: "orchestrator.load_context.ok",
         queueItemId,
