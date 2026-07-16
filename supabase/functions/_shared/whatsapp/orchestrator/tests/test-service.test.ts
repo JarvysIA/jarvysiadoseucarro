@@ -1245,6 +1245,7 @@ describe("confirm_km_update", () => {
       { workerId: "w" },
       baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
     );
+    console.log("DEBUG no_op counts", res.counts, "km calls", km.calls.length, "apply", m.calls.apply.length, "release", m.calls.release.length);
     expect(res.counts.completed).toBe(1);
     expect(m.calls.apply[0].response?.responseKey).toBe("km_update_no_change");
   });
