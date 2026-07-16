@@ -25,6 +25,7 @@ import type {
   ConversationResponseParams,
   ConversationState,
 } from "../../conversation/types.ts";
+import type { ConfirmedKmUpdateDeps } from "../../actions/types.ts";
 import {
   AmbiguousTimeoutError,
   MalformedResponseError,
@@ -81,6 +82,7 @@ function okContext(over: {
   activeVehicleIssue?: "invalid" | "archived" | null;
   stateVersion?: number;
   state?: ConversationState;
+  conversationStateId?: string | null;
 } = {}): Extract<LoadContextResult, { kind: "ok" }> {
   return {
     kind: "ok",
@@ -89,6 +91,7 @@ function okContext(over: {
       stateVersion: over.stateVersion ?? 0,
       fallbackCount: 0,
       vehicles: [],
+      conversationStateId: over.conversationStateId ?? "cs-default-1",
     },
     activeVehicleIssue: over.activeVehicleIssue ?? null,
   };
@@ -182,11 +185,19 @@ function baseDeps(
   repo: ReturnType<typeof mockRepo>["repo"],
   over: Partial<TestCycleDeps> = {},
 ): TestCycleDeps {
+  const stubKmActionDeps: ConfirmedKmUpdateDeps = {
+    executor: {
+      executeKmUpdate: async () => {
+        throw new Error("kmActionDeps.executor stub nao configurado para este teste — sobrescreva via baseDeps(repo, { kmActionDeps: ... })");
+      },
+    },
+  };
   return {
     repository: repo,
     loadMessageText: async () => "olá",
     clock: () => "2026-07-12T00:00:00.000Z",
     orchestratorVersion: "test-svc.1",
+    kmActionDeps: stubKmActionDeps,
     ...over,
   };
 }
