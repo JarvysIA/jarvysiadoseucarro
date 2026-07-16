@@ -650,6 +650,7 @@ describe("loadContext — happy path & state virtual", () => {
       expect(res.context.state.activeVehicleId).toBeNull();
       expect(res.context.vehicles).toEqual([]);
       expect(res.activeVehicleIssue).toBeNull();
+      expect(res.context.conversationStateId).toBeNull();
     }
   });
 
