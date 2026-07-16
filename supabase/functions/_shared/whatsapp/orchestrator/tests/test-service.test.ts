@@ -91,7 +91,7 @@ function okContext(over: {
       stateVersion: over.stateVersion ?? 0,
       fallbackCount: 0,
       vehicles: [],
-      conversationStateId: over.conversationStateId ?? "cs-default-1",
+      conversationStateId: "conversationStateId" in over ? over.conversationStateId! : "cs-default-1",
     },
     activeVehicleIssue: over.activeVehicleIssue ?? null,
   };
