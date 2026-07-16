@@ -218,6 +218,17 @@ jobs:
       - name: MJ1C-V K12 — crash-window replay (Postgres real)
         run: bun test supabase/tests/mj1c-v/k12-crash-window-replay.test.ts
 
+      - name: MJ1D-V D1 — corrente completa applied (Postgres real)
+        run: bun test supabase/tests/mj1d-v/d1-applied-happy-path.test.ts
+
+      - name: MJ1D-V D2 — km_conflict e retry_needed (Postgres real)
+        run: bun test supabase/tests/mj1d-v/d2-km-conflict-retry.test.ts
+
+      - name: MJ1D-V D3 — crash-window replay encadeado com apply (Postgres real)
+        run: bun test supabase/tests/mj1d-v/d3-crash-window-replay.test.ts
+
+
+
 
 
       - name: Step Summary sanitizado
@@ -241,7 +252,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6) e MJ1C-V (K1-K12) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
+            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12) e MJ1D-V (D1-D3) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"
