@@ -698,9 +698,17 @@ export class WhatsappOrchestratorRepository {
       // (5) conversation state (single ou nenhum) → virtual idle/v0
       const s = await this.selectOne(
         "whatsapp_conversation_states",
-        "state,current_intent,awaiting_field,request_source,draft_type,draft_id,draft_version,draft_payload,active_vehicle_id,confirmed_at,executed_at,last_message_id,expires_at,state_version,fallback_count",
+        "id,state,current_intent,awaiting_field,request_source,draft_type,draft_id,draft_version,draft_payload,active_vehicle_id,confirmed_at,executed_at,last_message_id,expires_at,state_version,fallback_count",
         { contact_id: item.contactId },
       );
+      let conversationStateId: string | null = null;
+      if (s) {
+        const rawId = (s as Record<string, unknown>).id;
+        if (typeof rawId !== "string" || rawId.length === 0) {
+          throw new MalformedResponseError("conversation_states.id ausente ou inválido");
+        }
+        conversationStateId = rawId;
+      }
       const state: ConversationState = s ? mapStateRow(s) : virtualIdleState();
       const stateVersion = s ? Number(s.state_version ?? 0) : 0;
       const fallbackCount = s ? Number(s.fallback_count ?? 0) : 0;
