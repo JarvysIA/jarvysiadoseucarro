@@ -388,6 +388,10 @@ async function processItem(
     return "deferredUnsupported";
   }
 
+  if (decision2.decisionKind === "confirm_km_update") {
+    return await handleConfirmKmUpdate(item, ctx2.result, deps, render, log, workerId, 2);
+  }
+
   const resp2 = buildResponse(decision2, render, log, workerId, item);
   if (resp2.kind !== "ok") {
     return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
