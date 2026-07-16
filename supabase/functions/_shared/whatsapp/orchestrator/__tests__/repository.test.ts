@@ -838,6 +838,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "33333333-3333-3333-3333-333333333333",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -855,6 +856,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     if (res.kind === "ok") {
       expect(res.activeVehicleIssue).toBe("archived");
       expect(res.context.vehicles).toEqual([]); // archived filtrado da lista viva
+      expect(res.context.conversationStateId).toBe("33333333-3333-3333-3333-333333333333");
     }
   });
 
@@ -862,6 +864,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "44444444-4444-4444-4444-444444444444",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -874,7 +877,10 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     });
     const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
     expect(res.kind).toBe("ok");
-    if (res.kind === "ok") expect(res.activeVehicleIssue).toBe("invalid");
+    if (res.kind === "ok") {
+      expect(res.activeVehicleIssue).toBe("invalid");
+      expect(res.context.conversationStateId).toBe("44444444-4444-4444-4444-444444444444");
+    }
   });
 });
 
