@@ -423,6 +423,40 @@ export function decideConversation(
   }
 
   // 7) Confirmação / negação
+  // 7) Confirmação / negação
+  if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "confirm",
+      decisionKind: CONFIRM_KM_UPDATE_HANDOFF_KIND,
+      previousState,
+      nextState: effectiveState.state,
+      outcome: "none",
+      statePatch: withLastMessage(basePatch, input.sourceMessageId),
+      responseKey: null,
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_km_correction"
+        ? "km_update_correction_confirmed_handoff"
+        : "km_update_confirmed_handoff",
+    });
+  }
+  if (command === "deny" && isEligibleKmConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "deny",
+      decisionKind: "reset_task",
+      previousState,
+      nextState: "idle",
+      outcome: "cancelled",
+      statePatch: withLastMessage(
+        mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+        input.sourceMessageId,
+      ),
+      responseKey: "task_cancelled",
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_km_correction"
+        ? "km_update_correction_denied"
+        : "km_update_denied",
+    });
+  }
   if (command === "confirm") {
     // Nenhuma pendência real neste build (awaiting_vehicle já capturado acima).
     return buildDecision({
