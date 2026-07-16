@@ -658,6 +658,7 @@ describe("loadContext — happy path & state virtual", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "11111111-1111-1111-1111-111111111111",
           state: "awaiting_vehicle",
           current_intent: "log_expense",
           awaiting_field: null,
@@ -686,6 +687,7 @@ describe("loadContext — happy path & state virtual", () => {
       expect(res.context.state.draftVersion).toBe(2);
       expect(res.context.stateVersion).toBe(7);
       expect(res.context.fallbackCount).toBe(3);
+      expect(res.context.conversationStateId).toBe("11111111-1111-1111-1111-111111111111");
     }
   });
 });
