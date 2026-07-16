@@ -423,7 +423,6 @@ export function decideConversation(
   }
 
   // 7) Confirmação / negação
-  // 7) Confirmação / negação
   if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
     return buildDecision({
       eventKind: "confirm",
