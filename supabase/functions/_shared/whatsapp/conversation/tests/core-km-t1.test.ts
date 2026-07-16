@@ -654,30 +654,36 @@ describe("core T1 — confirmações em states KM não emitem T2", () => {
     activeVehicleId: VEH_UUID_1,
   });
 
-  test("'sim' em awaiting_km_confirmation não produz sucesso/handoff/execução", () => {
+  test("'sim' em awaiting_km_confirmation com draft valido → handoff CONFIRM_KM_UPDATE_HANDOFF_KIND (nao muda state/draft)", () => {
     const d = decideConversation(
       inp({ originalText: "sim", state: kmState, sourceMessageId: MSG_UUID_B }),
     );
-    expect(d.decisionKind).toBe("respond");
-    expect(d.decisionKind).not.toBe("no_op");
-    expect(d.responseKey).toBe("nothing_to_confirm");
-    expect(d.outcome).not.toBe("completed");
-    // Draft não é limpo pelo T1.
-    expect(d.statePatch.draftType).toBeUndefined();
+    expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
+    expect(d.eventKind).toBe("confirm");
+    expect(d.nextState).toBe("awaiting_km_confirmation");
+    expect(d.responseKey).toBeNull();
+    expect(d.outcome).toBe("none");
+    // Draft preservado: ausencia no patch = manter valor atual (nao null).
     expect(d.statePatch.draftId).toBeUndefined();
+    expect(d.statePatch.draftType).toBeUndefined();
     expect(d.statePatch.draftPayload).toBeUndefined();
-    assertNoT2Leakage(d);
+    expect(d.statePatch.state).toBeUndefined();
   });
 
-  test("'sim' em awaiting_km_correction: mesmas garantias", () => {
+  test("'sim' em awaiting_km_correction com draft valido → handoff, nextState awaiting_km_correction", () => {
     const corr = { ...kmState, state: "awaiting_km_correction" as const };
     const d = decideConversation(
       inp({ originalText: "sim", state: corr, sourceMessageId: MSG_UUID_B }),
     );
-    expect(d.responseKey).toBe("nothing_to_confirm");
-    expect(d.outcome).not.toBe("completed");
+    expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
+    expect(d.eventKind).toBe("confirm");
+    expect(d.nextState).toBe("awaiting_km_correction");
+    expect(d.responseKey).toBeNull();
+    expect(d.outcome).toBe("none");
+    expect(d.statePatch.draftId).toBeUndefined();
     expect(d.statePatch.draftType).toBeUndefined();
-    assertNoT2Leakage(d);
+    expect(d.statePatch.draftPayload).toBeUndefined();
+    expect(d.statePatch.state).toBeUndefined();
   });
 });
 

@@ -39,6 +39,7 @@ export type ConversationDecisionKind =
   | "fallback"
   | "defer_legacy_media"
   | "defer_legacy_opt_out"
+  | "confirm_km_update"
   | "no_op";
 
 export type ConversationOutcome =

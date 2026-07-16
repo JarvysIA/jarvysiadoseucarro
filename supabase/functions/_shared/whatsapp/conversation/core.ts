@@ -25,7 +25,20 @@ import {
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
-import { KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
+import {
+  CONFIRM_KM_UPDATE_HANDOFF_KIND,
+  KM_REPORTED_EVENT_KIND,
+} from "./km-update-protocol.ts";
+
+function isEligibleKmConfirmationState(state: ConversationState): boolean {
+  if (
+    state.state !== "awaiting_km_confirmation" &&
+    state.state !== "awaiting_km_correction"
+  ) return false;
+  if (state.draftType !== "km_update") return false;
+  const v = validateAwaitingConfirmationKmUpdateDraft(state.draftPayload);
+  return v.ok;
+}
 
 const CLEAR_TASK_PATCH: ConversationStatePatch = {
   currentIntent: null,
@@ -410,6 +423,39 @@ export function decideConversation(
   }
 
   // 7) Confirmação / negação
+  if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "confirm",
+      decisionKind: CONFIRM_KM_UPDATE_HANDOFF_KIND,
+      previousState,
+      nextState: effectiveState.state,
+      outcome: "none",
+      statePatch: withLastMessage(basePatch, input.sourceMessageId),
+      responseKey: null,
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_km_correction"
+        ? "km_update_correction_confirmed_handoff"
+        : "km_update_confirmed_handoff",
+    });
+  }
+  if (command === "deny" && isEligibleKmConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "deny",
+      decisionKind: "reset_task",
+      previousState,
+      nextState: "idle",
+      outcome: "cancelled",
+      statePatch: withLastMessage(
+        mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+        input.sourceMessageId,
+      ),
+      responseKey: "task_cancelled",
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_km_correction"
+        ? "km_update_correction_denied"
+        : "km_update_denied",
+    });
+  }
   if (command === "confirm") {
     // Nenhuma pendência real neste build (awaiting_vehicle já capturado acima).
     return buildDecision({
