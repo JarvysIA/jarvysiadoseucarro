@@ -1117,8 +1117,320 @@ describe("batch sequencial", () => {
 });
 
 // ============================================================
+// CONFIRM KM UPDATE (integrador real)
+// ============================================================
+
+describe("confirm_km_update", () => {
+  const VEHICLE_ID = "11111111-1111-1111-1111-111111111111";
+  const REQUEST_MSG_ID = "22222222-2222-2222-2222-222222222222";
+
+  function validDraftPayload(over: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      phase: "awaiting_confirmation",
+      vehicleId: VEHICLE_ID,
+      expectedPreviousKm: 10000,
+      newKm: 20000,
+      requestMessageId: REQUEST_MSG_ID,
+      isCorrection: false,
+      ...over,
+    };
+  }
+
+  function kmState(payload: Record<string, unknown> | null = validDraftPayload()): ConversationState {
+    return makeState({
+      state: "awaiting_km_confirmation",
+      draftType: "km_update",
+      draftId: REQUEST_MSG_ID,
+      draftVersion: 1,
+      draftPayload: payload,
+    });
+  }
+
+  function decisionConfirmKm(): ConversationCoreDecision {
+    return decisionRespond({
+      eventKind: "confirm",
+      decisionKind: "confirm_km_update",
+      previousState: "awaiting_km_confirmation",
+      nextState: "awaiting_km_confirmation",
+      outcome: "none",
+      statePatch: { state: "awaiting_km_confirmation" },
+      responseKey: null,
+      responseParams: {},
+      reasonCode: "km_confirm",
+    });
+  }
+
+  type ExecutorResults = Array<
+    { kind: "applied"; actionExecutionId: string; previousKm: number | null; newKm: number }
+    | { kind: "replayed"; actionExecutionId: string; previousKm: number | null; newKm: number; noChange: boolean }
+    | { kind: "no_op"; actionExecutionId: string; currentKm: number | null }
+    | { kind: "rejected"; reason: string }
+    | { kind: "conflicted"; reason: string; currentKm?: number | null; currentStateVersion?: number }
+    | { kind: "transient_error"; reason: string }
+    | Error
+  >;
+
+  function mockKmDeps(results: ExecutorResults) {
+    const calls: Array<unknown> = [];
+    const queue = [...results];
+    const deps: ConfirmedKmUpdateDeps = {
+      executor: {
+        // deno-lint-ignore no-explicit-any
+        executeKmUpdate: async (cmd: any) => {
+          calls.push(cmd);
+          if (queue.length === 0) throw new Error("kmDeps queue empty");
+          const v = queue.shift()!;
+          if (v instanceof Error) throw v;
+          // deno-lint-ignore no-explicit-any
+          return v as any;
+        },
+      },
+    };
+    return { deps, calls };
+  }
+
+  const applyOk = { ok: true, wasReplay: false, orchestratorResult: {} as never } as const;
+
+  test("a) applied => completed, responseKey km_update_applied, patch limpa draft", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([{ kind: "applied", actionExecutionId: "ax-1", previousKm: 10000, newKm: 20000 }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(km.calls.length).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("km_update_applied");
+    const patch = m.calls.apply[0].patch;
+    expect(patch.state).toBe("idle");
+    expect(patch.draftId).toBeNull();
+    expect(patch.draftType).toBeNull();
+    expect(patch.draftVersion).toBe(0);
+    expect(patch.draftPayload).toBeNull();
+  });
+
+  test("b) replayed (km) + apply wasReplay=false => completed, km_update_applied", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([
+      { kind: "replayed", actionExecutionId: "ax-1", previousKm: 10000, newKm: 20000, noChange: false },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(km.calls.length).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("km_update_applied");
+  });
+
+  test("c) no_op => completed, km_update_no_change", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([{ kind: "no_op", actionExecutionId: "ax-1", currentKm: 20000 }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("km_update_no_change");
+  });
+
+  test("d) rejected (vehicle_archived) => completed (apply ok), km_update_retry_needed", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([{ kind: "rejected", reason: "vehicle_archived" }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("km_update_retry_needed");
+    const patch = m.calls.apply[0].patch;
+    expect(patch.state).toBe("idle");
+    expect(patch.draftId).toBeNull();
+  });
+
+  test("e) conflicted km_conflict => completed, km_update_retry_needed", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([{ kind: "conflicted", reason: "km_conflict", currentKm: 15000 }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("km_update_retry_needed");
+  });
+
+  test("f) transient_failure => releasedForRetry, apply NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const km = mockKmDeps([{ kind: "transient_error", reason: "executor_unavailable" }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+    expect(m.calls.release[0].reason).toBe("km_action_transient");
+  });
+
+  test("g) outcome_unknown (executor throws) => releasedForRetry, apply NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const km = mockKmDeps([new Error("executor boom")]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+    expect(m.calls.release[0].reason).toBe("km_action_transient");
+  });
+
+  test("h) malformed (via stateVersion inválido) => malformed, apply NÃO chamado, release cancelled/orchestrator_invariant", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState(), stateVersion: -1 })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    // Executor pode até ser chamado ou não — nesse caminho o serviço rejeita
+    // no validateInput ANTES de chamar o executor, mas mesmo assim mantemos
+    // o mock inerte para prova.
+    const km = mockKmDeps([{ kind: "applied", actionExecutionId: "n/a", previousKm: null, newKm: 20000 }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(km.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    expect(m.calls.release[0].retryKind).toBe("cancelled");
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("i) draftPayload inválido (isCorrection inconsistente) => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const badPayload = validDraftPayload({ isCorrection: true }); // newKm > previous => inconsistente
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState(badPayload) })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const km = mockKmDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(km.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("j) conversationStateId null => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState(), conversationStateId: null })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const km = mockKmDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(km.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("k) apply.expectedStateVersion === ctx.context.stateVersion", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState(), stateVersion: 42 })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([{ kind: "applied", actionExecutionId: "ax", previousKm: 10000, newKm: 20000 }]);
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(m.calls.apply[0].expectedStateVersion).toBe(42);
+    // E o comando enviado ao km-action também usou 42.
+    const cmd = km.calls[0] as { expectedStateVersion: number };
+    expect(cmd.expectedStateVersion).toBe(42);
+  });
+
+  test("l) segundo cálculo (recalculo pós-conflito) também dispara handleConfirmKmUpdate", async () => {
+    const it = makeItem();
+    // 1º ctx: state idle (decisão respond); 1º apply: state_version_conflict.
+    // 2º ctx: state awaiting_km_confirmation (decisão confirm_km_update); apply final ok.
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext(), okContext({ state: kmState(), stateVersion: 7 })],
+      apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
+    });
+    let call = 0;
+    const decide = () => {
+      call++;
+      return call === 1 ? decisionRespond() : decisionConfirmKm();
+    };
+    const km = mockKmDeps([{ kind: "applied", actionExecutionId: "ax", previousKm: 10000, newKm: 20000 }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide, kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(km.calls.length).toBe(1);
+    expect(m.calls.apply.length).toBe(2);
+    expect(m.calls.apply[1].response?.responseKey).toBe("km_update_applied");
+    expect(m.calls.apply[1].expectedStateVersion).toBe(7);
+  });
+});
+
+// ============================================================
 // SEGURANÇA ESTÁTICA
 // ============================================================
+
+
 
 describe("static safety", () => {
   test("módulo não importa Supabase/provider/sender/worker/IA/OCR nem lê env", async () => {
