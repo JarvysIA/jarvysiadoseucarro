@@ -809,6 +809,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "22222222-2222-2222-2222-222222222222",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -829,6 +830,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
       expect(res.context.vehicles.map((v) => v.id)).toEqual(["v_ok"]);
       expect(res.context.vehicles[0].isArchived).toBe(false);
       expect(res.context.vehicles[0].isEligible).toBe(true);
+      expect(res.context.conversationStateId).toBe("22222222-2222-2222-2222-222222222222");
     }
   });
 
