@@ -177,6 +177,11 @@ jobs:
       - name: MJ1B-V O5 — corrida 1a insercao de estado (Postgres real)
         run: bun test supabase/tests/mj1b-v/o5-apply-first-insert-race.test.ts
 
+      - name: MJ1B-V O6 — release nao reprocessa duplicata (Postgres real)
+        run: bun test supabase/tests/mj1b-v/o6-release-duplicate.test.ts
+
+
+
       - name: MJ1C-V K1 — applied caminho feliz (Postgres real)
         run: bun test supabase/tests/mj1c-v/k1-applied.test.ts
 
@@ -236,7 +241,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O5) e MJ1C-V (K1-K12) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
+            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6) e MJ1C-V (K1-K12) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"
