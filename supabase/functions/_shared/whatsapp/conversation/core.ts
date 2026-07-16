@@ -25,7 +25,20 @@ import {
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
-import { KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
+import {
+  CONFIRM_KM_UPDATE_HANDOFF_KIND,
+  KM_REPORTED_EVENT_KIND,
+} from "./km-update-protocol.ts";
+
+function isEligibleKmConfirmationState(state: ConversationState): boolean {
+  if (
+    state.state !== "awaiting_km_confirmation" &&
+    state.state !== "awaiting_km_correction"
+  ) return false;
+  if (state.draftType !== "km_update") return false;
+  const v = validateAwaitingConfirmationKmUpdateDraft(state.draftPayload);
+  return v.ok;
+}
 
 const CLEAR_TASK_PATCH: ConversationStatePatch = {
   currentIntent: null,
