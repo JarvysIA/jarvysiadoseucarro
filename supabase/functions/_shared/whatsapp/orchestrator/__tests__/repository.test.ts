@@ -896,7 +896,25 @@ describe("loadContext — erros e logs", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "55555555-5555-5555-5555-555555555555",
           state: "NOT_A_STATE", // inválido
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("linha de conversation_states sem id → MalformedResponseError", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
           active_vehicle_id: null,
