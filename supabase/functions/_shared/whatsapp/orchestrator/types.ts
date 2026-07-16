@@ -57,6 +57,7 @@ export type ConversationContext = {
   fallbackCount: number;
   stateVersion: number;
   vehicles: ConversationVehicle[];
+  conversationStateId: string | null;
 };
 
 /**

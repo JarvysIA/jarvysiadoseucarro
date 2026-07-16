@@ -650,6 +650,7 @@ describe("loadContext — happy path & state virtual", () => {
       expect(res.context.state.activeVehicleId).toBeNull();
       expect(res.context.vehicles).toEqual([]);
       expect(res.activeVehicleIssue).toBeNull();
+      expect(res.context.conversationStateId).toBeNull();
     }
   });
 
@@ -657,6 +658,7 @@ describe("loadContext — happy path & state virtual", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "11111111-1111-1111-1111-111111111111",
           state: "awaiting_vehicle",
           current_intent: "log_expense",
           awaiting_field: null,
@@ -685,6 +687,7 @@ describe("loadContext — happy path & state virtual", () => {
       expect(res.context.state.draftVersion).toBe(2);
       expect(res.context.stateVersion).toBe(7);
       expect(res.context.fallbackCount).toBe(3);
+      expect(res.context.conversationStateId).toBe("11111111-1111-1111-1111-111111111111");
     }
   });
 });
@@ -806,6 +809,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "22222222-2222-2222-2222-222222222222",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -826,6 +830,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
       expect(res.context.vehicles.map((v) => v.id)).toEqual(["v_ok"]);
       expect(res.context.vehicles[0].isArchived).toBe(false);
       expect(res.context.vehicles[0].isEligible).toBe(true);
+      expect(res.context.conversationStateId).toBe("22222222-2222-2222-2222-222222222222");
     }
   });
 
@@ -833,6 +838,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "33333333-3333-3333-3333-333333333333",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -850,6 +856,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     if (res.kind === "ok") {
       expect(res.activeVehicleIssue).toBe("archived");
       expect(res.context.vehicles).toEqual([]); // archived filtrado da lista viva
+      expect(res.context.conversationStateId).toBe("33333333-3333-3333-3333-333333333333");
     }
   });
 
@@ -857,6 +864,7 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "44444444-4444-4444-4444-444444444444",
           state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
@@ -869,7 +877,10 @@ describe("loadContext — veículos e activeVehicleIssue", () => {
     });
     const res = await new WhatsappOrchestratorRepository(makeCtxClient(rows)).loadContext(CLAIMED);
     expect(res.kind).toBe("ok");
-    if (res.kind === "ok") expect(res.activeVehicleIssue).toBe("invalid");
+    if (res.kind === "ok") {
+      expect(res.activeVehicleIssue).toBe("invalid");
+      expect(res.context.conversationStateId).toBe("44444444-4444-4444-4444-444444444444");
+    }
   });
 });
 
@@ -885,7 +896,25 @@ describe("loadContext — erros e logs", () => {
     const rows = baseRows({
       whatsapp_conversation_states: [
         {
+          id: "55555555-5555-5555-5555-555555555555",
           state: "NOT_A_STATE", // inválido
+          current_intent: null, awaiting_field: null, request_source: null,
+          draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null, executed_at: null, last_message_id: null, expires_at: null,
+          state_version: 1, fallback_count: 0, contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
+  test("linha de conversation_states sem id → MalformedResponseError", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          state: "idle",
           current_intent: null, awaiting_field: null, request_source: null,
           draft_type: null, draft_id: null, draft_version: 0, draft_payload: null,
           active_vehicle_id: null,
