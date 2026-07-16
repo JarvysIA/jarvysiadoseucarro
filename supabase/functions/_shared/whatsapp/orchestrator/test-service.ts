@@ -32,6 +32,7 @@ import type {
   ConversationResponseKey,
   ConversationResponseParams,
 } from "../conversation/types.ts";
+import type { ConfirmedKmUpdateDeps } from "../actions/types.ts";
 import { decideConversation } from "../conversation/core.ts";
 import { renderResponse } from "../conversation/responses.ts";
 
@@ -63,6 +64,7 @@ export type TestCycleDeps = {
   render?: typeof renderResponse;
   clock: () => string;
   orchestratorVersion: string;
+  kmActionDeps: ConfirmedKmUpdateDeps;
   logger?: TestServiceLogger;
 };
 
