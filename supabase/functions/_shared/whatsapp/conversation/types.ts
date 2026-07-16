@@ -155,7 +155,11 @@ export type ConversationResponseKey =
   | "fallback_second"
   | "fallback_reset"
   | "km_update_confirmation"
-  | "km_update_correction_confirmation";
+  | "km_update_correction_confirmation"
+  | "km_update_applied"
+  | "km_update_no_change"
+  | "km_update_retry_needed";
+
 
 export type ConversationResponseParams = {
   vehicleLabel?: string;
