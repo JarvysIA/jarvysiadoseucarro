@@ -59,6 +59,18 @@ export function renderResponse(
       const prev = formatKm(params.previousKm ?? undefined);
       return `O ${label} está com ${prev} km. Corrigir para ${nk} km (valor menor)? Responda sim para confirmar.`;
     }
+    case "km_update_applied": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const nk = formatKm(params.newKm);
+      return `Prontinho! Atualizei a quilometragem do ${label} para ${nk} km.`;
+    }
+    case "km_update_no_change": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const nk = formatKm(params.newKm);
+      return `O ${label} já estava com ${nk} km. Não mudei nada.`;
+    }
+    case "km_update_retry_needed":
+      return "Não consegui concluir agora. Pode me dizer a quilometragem de novo?";
   }
 }
 

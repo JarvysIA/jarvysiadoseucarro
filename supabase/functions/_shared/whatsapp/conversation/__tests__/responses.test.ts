@@ -15,6 +15,9 @@ const ALL_KEYS = [
   "fallback_first",
   "fallback_second",
   "fallback_reset",
+  "km_update_applied",
+  "km_update_no_change",
+  "km_update_retry_needed",
 ] as const;
 
 // Guarda de linguagem: nunca prometer recursos, expor infra ou erros internos.
@@ -54,5 +57,22 @@ describe("renderResponse guardrails", () => {
     const msg = renderResponse("vehicle_ambiguous", { options: ["Fiat Argo", "Fiat Uno"] });
     expect(msg).toContain("Fiat Argo");
     expect(msg).toContain("Fiat Uno");
+  });
+
+  test("km_update_applied uses label and km", () => {
+    const msg = renderResponse("km_update_applied", { vehicleLabel: "Fiat Argo", newKm: 45000 });
+    expect(msg).toContain("Fiat Argo");
+    expect(msg).toContain("45000");
+  });
+
+  test("km_update_no_change uses label and km", () => {
+    const msg = renderResponse("km_update_no_change", { vehicleLabel: "Fiat Argo", newKm: 45000 });
+    expect(msg).toContain("Fiat Argo");
+    expect(msg).toContain("45000");
+  });
+
+  test("km_update_retry_needed does not depend on params", () => {
+    const msg = renderResponse("km_update_retry_needed", {});
+    expect(msg.length).toBeGreaterThan(0);
   });
 });
