@@ -31,8 +31,16 @@ import type {
   ConversationCoreInput,
   ConversationResponseKey,
   ConversationResponseParams,
+  ConversationStatePatch,
+  ConversationVehicle,
 } from "../conversation/types.ts";
-import type { ConfirmedKmUpdateDeps } from "../actions/types.ts";
+import type {
+  ConfirmedKmUpdateDeps,
+  ConfirmedKmUpdateInput,
+  ConfirmedKmUpdateResult,
+} from "../actions/types.ts";
+import { executeConfirmedKmUpdate } from "../actions/service.ts";
+import { validateAwaitingConfirmationKmUpdateDraft } from "../conversation/km-update-draft.ts";
 import { decideConversation } from "../conversation/core.ts";
 import { renderResponse } from "../conversation/responses.ts";
 
