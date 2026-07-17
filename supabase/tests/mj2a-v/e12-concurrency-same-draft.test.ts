@@ -99,17 +99,21 @@ describeIfDb("MJ2A-V E12 — concorrência real no mesmo draft_id", () => {
     await a.begin();
     await b.begin();
 
-    const call = (s: Session) =>
-      s.query<{ execute_whatsapp_expense_create: Result }>(
+    const callAndCommit = async (s: Session) => {
+      const r = await s.query<{ execute_whatsapp_expense_create: Result }>(
         `select public.execute_whatsapp_expense_create(
            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
          ) as execute_whatsapp_expense_create`,
         params,
       );
+      await s.commit();
+      return r;
+    };
 
-    const [rA, rB] = await Promise.all([call(a), call(b)]);
-    await a.commit();
-    await b.commit();
+    const [rA, rB] = await Promise.all([
+      callAndCommit(a),
+      callAndCommit(b),
+    ]);
 
     const resA = rA.rows[0]?.execute_whatsapp_expense_create;
     const resB = rB.rows[0]?.execute_whatsapp_expense_create;
