@@ -706,6 +706,80 @@ describe("loadContext — happy path & state virtual", () => {
   });
 });
 
+// ============================================================
+// Build 5.7F2E1A.5-HARD — VALID_STATE_NAMES em sincronia com
+// ConversationStateName (mapStateRow via loadContext).
+// ============================================================
+describe("mapStateRow — VALID_STATE_NAMES em sincronia", () => {
+  const NEW_STATES = [
+    "awaiting_km_confirmation",
+    "awaiting_km_correction",
+    "awaiting_requested_km",
+    "awaiting_expense_category",
+    "awaiting_expense_confirmation",
+    "awaiting_expense_correction",
+  ] as const;
+
+  for (const s of NEW_STATES) {
+    test(`state=${s} → aceito sem MalformedResponseError`, async () => {
+      const rows = baseRows({
+        whatsapp_conversation_states: [
+          {
+            id: "22222222-2222-2222-2222-222222222222",
+            state: s,
+            current_intent: null,
+            awaiting_field: null,
+            request_source: null,
+            draft_type: null,
+            draft_id: null,
+            draft_version: 0,
+            draft_payload: null,
+            active_vehicle_id: null,
+            confirmed_at: null,
+            executed_at: null,
+            last_message_id: null,
+            expires_at: null,
+            state_version: 1,
+            fallback_count: 0,
+            contact_id: "c1",
+          },
+        ],
+      });
+      const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+      const res = await repo.loadContext(CLAIMED);
+      expect(res.kind).toBe("ok");
+      if (res.kind === "ok") expect(res.context.state.state).toBe(s);
+    });
+  }
+
+  test("state inválido → MalformedResponseError (regressão defensiva)", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          state: "estado_que_nao_existe",
+          current_intent: null,
+          awaiting_field: null,
+          request_source: null,
+          draft_type: null,
+          draft_id: null,
+          draft_version: 0,
+          draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null,
+          executed_at: null,
+          last_message_id: null,
+          expires_at: null,
+          state_version: 1,
+          fallback_count: 0,
+          contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
+  });
+
 describe("loadContext — queue/message/lease/contact/instance", () => {
   test("queue ausente → queue_not_found", async () => {
     const rows = baseRows({ whatsapp_processing_queue: [] });
