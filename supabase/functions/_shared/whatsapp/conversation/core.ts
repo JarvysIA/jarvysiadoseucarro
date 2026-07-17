@@ -669,7 +669,7 @@ export function decideConversation(
           decisionKind: "respond",
           previousState,
           nextState: "idle",
-          outcome: "completed",
+          outcome: "cancelled",
           statePatch: withLastMessage(
             mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
             input.sourceMessageId,
