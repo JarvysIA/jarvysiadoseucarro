@@ -1510,7 +1510,7 @@ describe("confirm_expense_create", () => {
 
   const applyOk = { ok: true, wasReplay: false, orchestratorResult: {} as never } as const;
 
-  test("a) applied => completed, responseKey expense_create_completed, patch limpa draft", async () => {
+  test("a) applied => completed, responseKey expense_create_completed_with_km_prompt, patch transiciona a awaiting_requested_km", async () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
@@ -1526,16 +1526,20 @@ describe("confirm_expense_create", () => {
     );
     expect(res.counts.completed).toBe(1);
     expect(xp.calls.length).toBe(1);
-    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed");
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
     const patch = m.calls.apply[0].patch;
-    expect(patch.state).toBe("idle");
+    expect(patch.state).toBe("awaiting_requested_km");
+    expect(patch.currentIntent).toBe("km_update");
+    expect(patch.awaitingField).toBe("requested_km");
     expect(patch.draftId).toBeNull();
     expect(patch.draftType).toBeNull();
     expect(patch.draftVersion).toBe(0);
     expect(patch.draftPayload).toBeNull();
+    // activeVehicleId omitido do patch (preservado por semântica de patch parcial).
+    expect(Object.prototype.hasOwnProperty.call(patch, "activeVehicleId")).toBe(false);
   });
 
-  test("b) replayed => completed, expense_create_completed", async () => {
+  test("b) replayed => completed, expense_create_completed_with_km_prompt, transiciona a awaiting_requested_km", async () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
@@ -1551,7 +1555,8 @@ describe("confirm_expense_create", () => {
     );
     expect(res.counts.completed).toBe(1);
     expect(xp.calls.length).toBe(1);
-    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed");
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
+    expect(m.calls.apply[0].patch.state).toBe("awaiting_requested_km");
   });
 
   test("c) rejected (categoria_invalid) => completed (apply ok), expense_create_retry_needed", async () => {
@@ -1750,7 +1755,7 @@ describe("confirm_expense_create", () => {
     expect(res.counts.completed).toBe(1);
     expect(xp.calls.length).toBe(1);
     expect(m.calls.apply.length).toBe(2);
-    expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed");
+    expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
     expect(m.calls.apply[1].expectedStateVersion).toBe(7);
   });
 });

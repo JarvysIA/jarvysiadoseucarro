@@ -201,7 +201,7 @@ describeIfDb("MJ2B-V F1 — corrente completa applied (despesa)", () => {
     expect(finalization.kind).toBe("finalize");
     if (finalization.kind !== "finalize") throw new Error("expected finalize");
     const decision = finalization.decision;
-    expect(decision.responseKey).toBe("expense_create_completed");
+    expect(decision.responseKey).toBe("expense_create_completed_with_km_prompt");
 
     const textBody = renderResponse(decision.responseKey, decision.responseParams);
     const patch = serializePatch(decision.statePatch);
@@ -256,7 +256,7 @@ describeIfDb("MJ2B-V F1 — corrente completa applied (despesa)", () => {
          from public.whatsapp_conversation_states where id = $1`,
       [conversationStateId],
     );
-    expect(st.rows[0]?.state).toBe("idle");
+    expect(st.rows[0]?.state).toBe("awaiting_requested_km");
     expect(st.rows[0]?.draft_id).toBeNull();
     expect(st.rows[0]?.draft_type).toBeNull();
     expect(st.rows[0]?.draft_payload).toBeNull();

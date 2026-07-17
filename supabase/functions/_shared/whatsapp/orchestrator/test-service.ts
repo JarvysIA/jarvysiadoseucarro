@@ -967,8 +967,32 @@ export function buildExpenseFinalization(
     confirmedAt: null,
     executedAt: null,
   };
+  // Pós-despesa confirmada, transiciona para awaiting_requested_km para
+  // encadear o gatilho de KM. NÃO inclui activeVehicleId (semântica de
+  // patch omitido preserva o valor atual). Rejected/conflicted mantém o
+  // clearingPatch original (idle) — comportamento anterior byte a byte.
+  const kmPromptPatch: ConversationStatePatch = {
+    state: "awaiting_requested_km",
+    currentIntent: "km_update",
+    awaitingField: "requested_km",
+    requestSource: "system",
+    draftType: null,
+    draftId: null,
+    draftVersion: 0,
+    draftPayload: null,
+    confirmedAt: null,
+    executedAt: null,
+  };
   const vehicleLabel = buildKmVehicleLabel(ctx.context.vehicles, vehicleId);
-  const base = {
+  const baseCompleted = {
+    previousState: ctx.context.state.state,
+    nextState: "awaiting_requested_km" as const,
+    statePatch: kmPromptPatch,
+    nextFallbackCount: ctx.context.fallbackCount,
+    deferToLegacyRouter: false,
+    deferToLegacyOptOut: false,
+  };
+  const baseCleared = {
     previousState: ctx.context.state.state,
     nextState: "idle" as const,
     statePatch: clearingPatch,
@@ -982,24 +1006,24 @@ export function buildExpenseFinalization(
       return {
         kind: "finalize",
         decision: {
-          ...base,
+          ...baseCompleted,
           eventKind: "confirm",
           decisionKind: "transition",
           outcome: "completed",
-          responseKey: "expense_create_completed",
+          responseKey: "expense_create_completed_with_km_prompt",
           responseParams: {
             vehicleLabel,
             valor: result.valor,
             categoria: result.categoria,
           },
-          reasonCode: `expense_action_${result.kind}`,
+          reasonCode: `expense_action_${result.kind}_with_km_trigger`,
         },
       };
     case "rejected":
       return {
         kind: "finalize",
         decision: {
-          ...base,
+          ...baseCleared,
           eventKind: "confirm",
           decisionKind: "transition",
           outcome: "cancelled",
@@ -1012,7 +1036,7 @@ export function buildExpenseFinalization(
       return {
         kind: "finalize",
         decision: {
-          ...base,
+          ...baseCleared,
           eventKind: "confirm",
           decisionKind: "transition",
           outcome: "cancelled",

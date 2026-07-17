@@ -96,6 +96,12 @@ export function renderResponse(
       const cat = params.categoria ?? "essa categoria";
       return `Prontinho! Anotei ${v} em ${cat} no ${label}.`;
     }
+    case "expense_create_completed_with_km_prompt": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const v = formatValor(params.valor);
+      const cat = params.categoria ?? "essa categoria";
+      return `Prontinho! Anotei ${v} em ${cat} no ${label}. Aproveitando, qual a km atual do carro?`;
+    }
     case "expense_create_retry_needed":
       return "Não consegui concluir agora. Pode me contar a despesa de novo?";
   }
