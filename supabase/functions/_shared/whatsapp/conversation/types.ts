@@ -27,6 +27,7 @@ export type ConversationEventKind =
   | "reset_conversation"
   | "explicit_opt_out"
   | "vehicle_reply"
+  | "category_reply"
   | "km_reported"
   | "expense_reported"
   | "media"

@@ -29,6 +29,22 @@ import {
   CONFIRM_KM_UPDATE_HANDOFF_KIND,
   KM_REPORTED_EVENT_KIND,
 } from "./km-update-protocol.ts";
+import {
+  parseExpenseValorText,
+  matchExpenseCategoria,
+} from "./expense-create-parser.ts";
+import {
+  EXPENSE_CATEGORIES,
+  type ExpenseCategory,
+  EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+  validateAwaitingCategoryExpenseDraft,
+  validateAwaitingVehicleExpenseDraft,
+  validateAwaitingConfirmationExpenseDraft,
+} from "./expense-create-draft.ts";
+import {
+  CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
+  EXPENSE_REPORTED_EVENT_KIND,
+} from "./expense-create-protocol.ts";
 
 function isEligibleKmConfirmationState(state: ConversationState): boolean {
   if (
@@ -37,6 +53,16 @@ function isEligibleKmConfirmationState(state: ConversationState): boolean {
   ) return false;
   if (state.draftType !== "km_update") return false;
   const v = validateAwaitingConfirmationKmUpdateDraft(state.draftPayload);
+  return v.ok;
+}
+
+function isEligibleExpenseConfirmationState(state: ConversationState): boolean {
+  if (
+    state.state !== "awaiting_expense_confirmation" &&
+    state.state !== "awaiting_expense_correction"
+  ) return false;
+  if (state.draftType !== "expense") return false;
+  const v = validateAwaitingConfirmationExpenseDraft(state.draftPayload);
   return v.ok;
 }
 
@@ -150,6 +176,27 @@ function extractPartialKmDraft(
   if (!v.ok) return null;
   if (v.value.requestMessageId !== state.draftId) return null;
   return { newKm: v.value.newKm, requestMessageId: v.value.requestMessageId };
+}
+
+/**
+ * Extrai draft parcial de expense do state atual (fase awaiting_vehicle).
+ * Aceita draftVersion 0 (categoria reconhecida direto no idle) ou 1
+ * (promovido depois de awaiting_expense_category).
+ */
+function extractPartialExpenseDraft(
+  state: ConversationState,
+): { categoria: ExpenseCategory; valor: number; requestMessageId: string } | null {
+  if (state.draftType !== "expense") return null;
+  if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
+  if (!isUuid(state.draftId)) return null;
+  const v = validateAwaitingVehicleExpenseDraft(state.draftPayload);
+  if (!v.ok) return null;
+  if (v.value.requestMessageId !== state.draftId) return null;
+  return {
+    categoria: v.value.categoria,
+    valor: v.value.valor,
+    requestMessageId: v.value.requestMessageId,
+  };
 }
 
 export function decideConversation(
@@ -360,6 +407,50 @@ export function decideConversation(
         }
         // Invariante violada — não persistir draft inválido; segue caminho legado.
       }
+      const expensePartial = extractPartialExpenseDraft(effectiveState);
+      if (expensePartial !== null) {
+        const veh = resolved.vehicle;
+        const candidate = {
+          phase: "awaiting_confirmation" as const,
+          categoria: expensePartial.categoria,
+          valor: expensePartial.valor,
+          vehicleId: veh.id,
+          requestMessageId: expensePartial.requestMessageId,
+        };
+        const validated =
+          validateAwaitingConfirmationExpenseDraft(candidate);
+        if (validated.ok && isUuid(veh.id)) {
+          const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+          return buildDecision({
+            eventKind: "vehicle_reply",
+            decisionKind: "transition",
+            previousState,
+            nextState: "awaiting_expense_confirmation",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: "awaiting_expense_confirmation",
+                currentIntent: "expense",
+                awaitingField: "confirmation",
+                draftType: "expense",
+                draftId: expensePartial.requestMessageId,
+                draftVersion: nextVersion,
+                draftPayload: validated.value as unknown as Record<string, unknown>,
+                activeVehicleId: veh.id,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: "expense_create_confirmation",
+            responseParams: {
+              vehicleLabel: labelFor(veh),
+              valor: expensePartial.valor,
+              categoria: expensePartial.categoria,
+            },
+            nextFallbackCount: 0,
+            reasonCode: "expense_create_complete_from_vehicle_reply",
+          });
+        }
+        // Invariante violada — cai no select_vehicle genérico abaixo.
+      }
       return buildDecision({
         eventKind: "vehicle_reply",
         decisionKind: "select_vehicle",
@@ -422,6 +513,137 @@ export function decideConversation(
     });
   }
 
+  // 6.5) Resposta a state pendente (awaiting_expense_category)
+  if (effectiveState.state === "awaiting_expense_category") {
+    const currentDraft = validateAwaitingCategoryExpenseDraft(
+      effectiveState.draftPayload,
+    );
+    if (
+      effectiveState.draftType === "expense" &&
+      isUuid(effectiveState.draftId) &&
+      currentDraft.ok &&
+      typeof input.originalText === "string"
+    ) {
+      const categoriaMatch = matchExpenseCategoria(input.originalText);
+      if (categoriaMatch.ok) {
+        const resolvedVeh = resolveVehicle({
+          text: null,
+          vehicles: input.vehicles,
+          activeVehicleId: effectiveState.activeVehicleId,
+        });
+        const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+        if (resolvedVeh.kind === "matched") {
+          const veh = resolvedVeh.vehicle;
+          const candidate = {
+            phase: "awaiting_confirmation" as const,
+            categoria: categoriaMatch.categoria,
+            valor: currentDraft.value.valor,
+            vehicleId: veh.id,
+            requestMessageId: effectiveState.draftId,
+          };
+          const validated =
+            validateAwaitingConfirmationExpenseDraft(candidate);
+          if (validated.ok && isUuid(veh.id)) {
+            return buildDecision({
+              eventKind: "category_reply",
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_expense_confirmation",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_expense_confirmation",
+                  currentIntent: "expense",
+                  awaitingField: "confirmation",
+                  draftType: "expense",
+                  draftId: effectiveState.draftId,
+                  draftVersion: nextVersion,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                  activeVehicleId: veh.id,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_create_confirmation",
+              responseParams: {
+                vehicleLabel: labelFor(veh),
+                valor: currentDraft.value.valor,
+                categoria: categoriaMatch.categoria,
+              },
+              nextFallbackCount: 0,
+              reasonCode: "expense_category_resolved_complete",
+            });
+          }
+        } else if (
+          resolvedVeh.kind === "ambiguous" ||
+          resolvedVeh.kind === "not_found"
+        ) {
+          const candidate = {
+            phase: "awaiting_vehicle" as const,
+            categoria: categoriaMatch.categoria,
+            valor: currentDraft.value.valor,
+            requestMessageId: effectiveState.draftId,
+          };
+          const validated = validateAwaitingVehicleExpenseDraft(candidate);
+          if (validated.ok) {
+            const pool = firstEligible(input.vehicles);
+            return buildDecision({
+              eventKind: "category_reply",
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_vehicle",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_vehicle",
+                  currentIntent: "expense",
+                  awaitingField: "vehicle",
+                  draftType: "expense",
+                  draftId: effectiveState.draftId,
+                  draftVersion: nextVersion,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "vehicle_ambiguous",
+              responseParams: { options: pool.map(labelFor) },
+              nextFallbackCount: 0,
+              reasonCode: "expense_category_resolved_awaiting_vehicle",
+            });
+          }
+        } else {
+          return buildDecision({
+            eventKind: "category_reply",
+            decisionKind: "respond",
+            previousState,
+            nextState: "idle",
+            outcome: "completed",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+              input.sourceMessageId,
+            ),
+            responseKey: "no_eligible_vehicle",
+            nextFallbackCount: 0,
+            reasonCode: "expense_category_no_eligible_vehicle",
+          });
+        }
+      }
+      // categoria não reconhecida — repete a pergunta, sem contar fallback.
+      return buildDecision({
+        eventKind: "category_reply",
+        decisionKind: "respond",
+        previousState,
+        nextState: "awaiting_expense_category",
+        statePatch: withLastMessage(basePatch, input.sourceMessageId),
+        responseKey: "expense_category_prompt",
+        responseParams: {
+          valor: currentDraft.value.valor,
+          options: [...EXPENSE_CATEGORIES],
+        },
+        nextFallbackCount: 0,
+        reasonCode: "expense_category_unrecognized_retry",
+      });
+    }
+    // draft corrompido — cai no fluxo geral abaixo.
+  }
+
   // 7) Confirmação / negação
   if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
     return buildDecision({
@@ -455,6 +677,96 @@ export function decideConversation(
         ? "km_update_correction_denied"
         : "km_update_denied",
     });
+  }
+  if (command === "confirm" && isEligibleExpenseConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "confirm",
+      decisionKind: CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
+      previousState,
+      nextState: effectiveState.state,
+      outcome: "none",
+      statePatch: withLastMessage(basePatch, input.sourceMessageId),
+      responseKey: null,
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_expense_correction"
+        ? "expense_create_correction_confirmed_handoff"
+        : "expense_create_confirmed_handoff",
+    });
+  }
+  if (command === "deny" && isEligibleExpenseConfirmationState(effectiveState)) {
+    return buildDecision({
+      eventKind: "deny",
+      decisionKind: "reset_task",
+      previousState,
+      nextState: "idle",
+      outcome: "cancelled",
+      statePatch: withLastMessage(
+        mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+        input.sourceMessageId,
+      ),
+      responseKey: "task_cancelled",
+      nextFallbackCount: 0,
+      reasonCode: effectiveState.state === "awaiting_expense_correction"
+        ? "expense_create_correction_denied"
+        : "expense_create_denied",
+    });
+  }
+  // Correção de categoria em awaiting_expense_confirmation/correction.
+  if (
+    (effectiveState.state === "awaiting_expense_confirmation" ||
+      effectiveState.state === "awaiting_expense_correction") &&
+    isEligibleExpenseConfirmationState(effectiveState) &&
+    command !== "confirm" &&
+    command !== "deny" &&
+    typeof input.originalText === "string"
+  ) {
+    const currentDraft = validateAwaitingConfirmationExpenseDraft(
+      effectiveState.draftPayload,
+    );
+    if (currentDraft.ok) {
+      const categoriaMatch = matchExpenseCategoria(input.originalText);
+      if (
+        categoriaMatch.ok &&
+        categoriaMatch.categoria !== currentDraft.value.categoria
+      ) {
+        const candidate = {
+          phase: "awaiting_confirmation" as const,
+          categoria: categoriaMatch.categoria,
+          valor: currentDraft.value.valor,
+          vehicleId: currentDraft.value.vehicleId,
+          requestMessageId: currentDraft.value.requestMessageId,
+        };
+        const validated =
+          validateAwaitingConfirmationExpenseDraft(candidate);
+        if (validated.ok) {
+          const veh = input.vehicles.find(
+            (v) => v.id === currentDraft.value.vehicleId,
+          );
+          return buildDecision({
+            eventKind: "category_reply",
+            decisionKind: "transition",
+            previousState,
+            nextState: "awaiting_expense_correction",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: "awaiting_expense_correction",
+                draftPayload: validated.value as unknown as Record<string, unknown>,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: "expense_create_correction_confirmation",
+            responseParams: {
+              vehicleLabel: veh ? labelFor(veh) : undefined,
+              valor: currentDraft.value.valor,
+              categoria: categoriaMatch.categoria,
+            },
+            nextFallbackCount: 0,
+            reasonCode: "expense_category_corrected_at_confirmation",
+          });
+        }
+      }
+    }
+    // sem categoria nova válida — segue fluxo padrão abaixo.
   }
   if (command === "confirm") {
     // Nenhuma pendência real neste build (awaiting_vehicle já capturado acima).
@@ -631,6 +943,146 @@ export function decideConversation(
           });
         }
         // Invariante violada — segue caminho de fallback.
+      }
+    }
+  }
+
+  // 9.6) Detecção T1 de despesa (idle, só se KM não reconheceu).
+  if (
+    effectiveState.state === "idle" &&
+    typeof input.originalText === "string" &&
+    isUuid(input.sourceMessageId)
+  ) {
+    const parsedValor = parseExpenseValorText(input.originalText);
+    if (parsedValor.ok) {
+      const pool = firstEligible(input.vehicles);
+      if (pool.length === 0) {
+        return buildDecision({
+          eventKind: EXPENSE_REPORTED_EVENT_KIND,
+          decisionKind: "respond",
+          previousState,
+          nextState: "idle",
+          outcome: expiredOutcome,
+          statePatch: withLastMessage(basePatch, input.sourceMessageId),
+          responseKey: "no_eligible_vehicle",
+          nextFallbackCount: 0,
+          reasonCode: "expense_reported_no_eligible_vehicle",
+        });
+      }
+      const categoriaMatch = matchExpenseCategoria(input.originalText);
+      if (!categoriaMatch.ok) {
+        const candidate = {
+          phase: "awaiting_category" as const,
+          valor: parsedValor.valor,
+          requestMessageId: input.sourceMessageId,
+        };
+        const validated = validateAwaitingCategoryExpenseDraft(candidate);
+        if (validated.ok) {
+          return buildDecision({
+            eventKind: EXPENSE_REPORTED_EVENT_KIND,
+            decisionKind: "transition",
+            previousState,
+            nextState: "awaiting_expense_category",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: "awaiting_expense_category",
+                currentIntent: "expense",
+                awaitingField: "categoria",
+                draftType: "expense",
+                draftId: input.sourceMessageId,
+                draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                draftPayload: validated.value as unknown as Record<string, unknown>,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: "expense_category_prompt",
+            responseParams: {
+              valor: parsedValor.valor,
+              options: [...EXPENSE_CATEGORIES],
+            },
+            nextFallbackCount: 0,
+            reasonCode: "expense_reported_awaiting_category",
+          });
+        }
+      } else {
+        const resolvedVeh = resolveVehicle({
+          text: null,
+          vehicles: input.vehicles,
+          activeVehicleId: effectiveState.activeVehicleId,
+        });
+        if (resolvedVeh.kind === "matched") {
+          const veh = resolvedVeh.vehicle;
+          const candidate = {
+            phase: "awaiting_confirmation" as const,
+            categoria: categoriaMatch.categoria,
+            valor: parsedValor.valor,
+            vehicleId: veh.id,
+            requestMessageId: input.sourceMessageId,
+          };
+          const validated =
+            validateAwaitingConfirmationExpenseDraft(candidate);
+          if (validated.ok && isUuid(veh.id)) {
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_expense_confirmation",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_expense_confirmation",
+                  currentIntent: "expense",
+                  awaitingField: "confirmation",
+                  draftType: "expense",
+                  draftId: input.sourceMessageId,
+                  draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                  activeVehicleId: veh.id,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_create_confirmation",
+              responseParams: {
+                vehicleLabel: labelFor(veh),
+                valor: parsedValor.valor,
+                categoria: categoriaMatch.categoria,
+              },
+              nextFallbackCount: 0,
+              reasonCode: "expense_reported_complete",
+            });
+          }
+        } else {
+          const candidate = {
+            phase: "awaiting_vehicle" as const,
+            categoria: categoriaMatch.categoria,
+            valor: parsedValor.valor,
+            requestMessageId: input.sourceMessageId,
+          };
+          const validated = validateAwaitingVehicleExpenseDraft(candidate);
+          if (validated.ok) {
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_vehicle",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_vehicle",
+                  currentIntent: "expense",
+                  awaitingField: "vehicle",
+                  draftType: "expense",
+                  draftId: input.sourceMessageId,
+                  draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "vehicle_ambiguous",
+              responseParams: { options: pool.map(labelFor) },
+              nextFallbackCount: 0,
+              reasonCode: "expense_reported_partial_awaiting_vehicle",
+            });
+          }
+        }
       }
     }
   }
