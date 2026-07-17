@@ -489,6 +489,7 @@ describe("mapeamento executor -> resultado público", () => {
     const { port } = makeExecutor({ kind: "rejected", reason: "valor_invalid" });
     const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
     expect(res).toEqual({ kind: "rejected", reason: "valor_invalid" });
+  });
 
   const rejReasons = [
     "contact_missing",
