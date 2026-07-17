@@ -245,7 +245,7 @@ describeIfDb("MJ2B-V F3 — crash-window replay encadeado com apply (despesa)", 
          from public.whatsapp_conversation_states where id = $1`,
       [conversationStateId],
     );
-    expect(st.rows[0]?.state).toBe("idle");
+    expect(st.rows[0]?.state).toBe("awaiting_requested_km");
     expect(st.rows[0]?.state_version).toBe(1);
 
     const outbound = await session.query<{ n: string }>(
