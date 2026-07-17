@@ -225,7 +225,7 @@ const PATCH_KEY_MAP: Record<keyof ConversationStatePatch, string> = {
   confirmedAt: "confirmed_at",
   executedAt: "executed_at",
   expiresAt: "expires_at",
-  lastMessageId: "last_message_id", // não aceito pela RPC; ver validação abaixo
+  lastMessageId: "last_message_id", // Build 5.7F2E1A.5-HARD: deliberadamente ignorado em serializePatch — a RPC grava last_message_id sozinha a partir de v_msg.id; core.ts inclui esse campo em quase toda decisão via withLastMessage().
 };
 
 // Somente estas chaves são aceitas pela RPC.
