@@ -943,3 +943,151 @@ async function releaseAs(
   if (!res.ok) return "transientFailure";
   return outcomeOnSuccess;
 }
+
+// ============================================================
+// Expense finalization (mirror de buildKmFinalization, sem no_op)
+// ============================================================
+
+export type ExpenseFinalization =
+  | { kind: "finalize"; decision: ConversationCoreDecision }
+  | { kind: "retry" }
+  | { kind: "invariant" };
+
+export function buildExpenseFinalization(
+  result: ConfirmedExpenseCreateResult,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  vehicleId: string,
+): ExpenseFinalization {
+  const clearingPatch: ConversationStatePatch = {
+    state: "idle",
+    draftType: null,
+    draftId: null,
+    draftVersion: 0,
+    draftPayload: null,
+    confirmedAt: null,
+    executedAt: null,
+  };
+  const vehicleLabel = buildKmVehicleLabel(ctx.context.vehicles, vehicleId);
+  const base = {
+    previousState: ctx.context.state.state,
+    nextState: "idle" as const,
+    statePatch: clearingPatch,
+    nextFallbackCount: ctx.context.fallbackCount,
+    deferToLegacyRouter: false,
+    deferToLegacyOptOut: false,
+  };
+  switch (result.kind) {
+    case "completed":
+    case "replayed":
+      return {
+        kind: "finalize",
+        decision: {
+          ...base,
+          eventKind: "confirm",
+          decisionKind: "transition",
+          outcome: "completed",
+          responseKey: "expense_create_completed",
+          responseParams: {
+            vehicleLabel,
+            valor: result.valor,
+            categoria: result.categoria,
+          },
+          reasonCode: `expense_action_${result.kind}`,
+        },
+      };
+    case "rejected":
+      return {
+        kind: "finalize",
+        decision: {
+          ...base,
+          eventKind: "confirm",
+          decisionKind: "transition",
+          outcome: "cancelled",
+          responseKey: "expense_create_retry_needed",
+          responseParams: {},
+          reasonCode: `expense_action_rejected_${result.reason}`,
+        },
+      };
+    case "conflicted":
+      return {
+        kind: "finalize",
+        decision: {
+          ...base,
+          eventKind: "confirm",
+          decisionKind: "transition",
+          outcome: "cancelled",
+          responseKey: "expense_create_retry_needed",
+          responseParams: {},
+          reasonCode: `expense_action_conflicted_${result.reason}`,
+        },
+      };
+    case "transient_failure":
+    case "outcome_unknown":
+      return { kind: "retry" };
+    case "malformed":
+      return { kind: "invariant" };
+  }
+}
+
+async function handleConfirmExpenseCreate(
+  item: ClaimedItem,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  deps: TestCycleDeps,
+  render: typeof renderResponse,
+  log: TestServiceLogger,
+  workerId: string,
+  attempt: number,
+): Promise<ItemOutcome> {
+  const draftCheck = validateAwaitingConfirmationExpenseDraft(ctx.context.state.draftPayload);
+  if (!draftCheck.ok) {
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  }
+  const draft = draftCheck.value;
+  const conversationStateId = ctx.context.conversationStateId;
+  const draftId = ctx.context.state.draftId;
+  const userId = item.userId;
+  if (conversationStateId === null || draftId === null || userId === null) {
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  }
+  const expenseInput: ConfirmedExpenseCreateInput = {
+    draftId,
+    conversationStateId,
+    confirmationMessageId: item.messageId,
+    sourceMessageId: draft.requestMessageId,
+    queueItemId: item.queueId,
+    userId,
+    contactId: item.contactId,
+    vehicleId: draft.vehicleId,
+    categoria: draft.categoria,
+    valor: draft.valor,
+    descricao: null,
+    expectedStateVersion: ctx.context.stateVersion,
+    orchestratorVersion: deps.orchestratorVersion,
+  };
+  const expenseResult = await executeConfirmedExpenseCreate(expenseInput, deps.expenseActionDeps);
+  const finalization = buildExpenseFinalization(expenseResult, ctx, draft.vehicleId);
+  if (finalization.kind === "retry") {
+    return await releaseAs(item, deps, "transient_error", "expense_action_transient", "releasedForRetry", log, workerId);
+  }
+  if (finalization.kind === "invariant") {
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  }
+  const resp = buildResponse(finalization.decision, render, log, workerId, item);
+  if (resp.kind !== "ok") {
+    return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+  }
+  const applyResult = await runApply(
+    item,
+    ctx.context.stateVersion,
+    finalization.decision,
+    resp.payload,
+    deps,
+    log,
+    workerId,
+    attempt,
+  );
+  if (applyResult.kind === "conflict") {
+    return await releaseAs(item, deps, "state_conflict", "state_version_conflict", "conflicted", log, workerId);
+  }
+  return applyResult.outcome;
+}
