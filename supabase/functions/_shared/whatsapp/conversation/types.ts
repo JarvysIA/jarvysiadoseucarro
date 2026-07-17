@@ -66,6 +66,11 @@ export type ConversationMessageType =
   | "document"
   | "system"
   | "unknown";
+export type RequestSource =
+  | "user_initiated"
+  | "proactive_maintenance"
+  | "reengagement"
+  | "system";
 
 /**
  * Estado corrente da conversa, exposto ao core como dados imutáveis.
@@ -75,7 +80,7 @@ export type ConversationState = {
   state: ConversationStateName;
   currentIntent: string | null;
   awaitingField: string | null;
-  requestSource: string | null;
+  requestSource: RequestSource | null;
   draftType: string | null;
   draftId: string | null;
   draftVersion: number | null;
