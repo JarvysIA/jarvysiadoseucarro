@@ -1436,6 +1436,326 @@ describe("confirm_km_update", () => {
 });
 
 // ============================================================
+// CONFIRM EXPENSE CREATE (integrador real)
+// ============================================================
+
+describe("confirm_expense_create", () => {
+  const VEHICLE_ID = "11111111-1111-4111-8111-111111111111";
+  const REQUEST_MSG_ID = "22222222-2222-4222-8222-222222222222";
+  const DESP_ID = "33333333-3333-4333-8333-333333333333";
+  const EXEC_ID = "44444444-4444-4444-8444-444444444444";
+
+  function validExpensePayload(over: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      phase: "awaiting_confirmation",
+      categoria: "Combustível",
+      valor: 149.9,
+      vehicleId: VEHICLE_ID,
+      requestMessageId: REQUEST_MSG_ID,
+      ...over,
+    };
+  }
+
+  function expenseState(payload: Record<string, unknown> | null = validExpensePayload()): ConversationState {
+    return makeState({
+      state: "awaiting_expense_confirmation",
+      draftType: "expense",
+      draftId: REQUEST_MSG_ID,
+      draftVersion: 1,
+      draftPayload: payload,
+    });
+  }
+
+  function decisionConfirmExpense(): ConversationCoreDecision {
+    return decisionRespond({
+      eventKind: "confirm",
+      decisionKind: "confirm_expense_create",
+      previousState: "awaiting_expense_confirmation",
+      nextState: "awaiting_expense_confirmation",
+      outcome: "none",
+      statePatch: { state: "awaiting_expense_confirmation" },
+      responseKey: null,
+      responseParams: {},
+      reasonCode: "expense_confirm",
+    });
+  }
+
+  type ExpenseExecutorResults = Array<
+    { kind: "applied"; actionExecutionId: string; despesaId: string; valor: number; categoria: string }
+    | { kind: "replayed"; actionExecutionId: string; despesaId: string; valor: number; categoria: string }
+    | { kind: "rejected"; reason: string }
+    | { kind: "conflicted"; reason: string; currentStateVersion?: number }
+    | { kind: "transient_error"; reason: string }
+    | Error
+  >;
+
+  function mockExpenseDeps(results: ExpenseExecutorResults) {
+    const calls: Array<unknown> = [];
+    const queue = [...results];
+    const deps: ConfirmedExpenseCreateDeps = {
+      executor: {
+        // deno-lint-ignore no-explicit-any
+        executeExpenseCreate: async (cmd: any) => {
+          calls.push(cmd);
+          if (queue.length === 0) throw new Error("expenseDeps queue empty");
+          const v = queue.shift()!;
+          if (v instanceof Error) throw v;
+          // deno-lint-ignore no-explicit-any
+          return v as any;
+        },
+      },
+    };
+    return { deps, calls };
+  }
+
+  const applyOk = { ok: true, wasReplay: false, orchestratorResult: {} as never } as const;
+
+  test("a) applied => completed, responseKey expense_create_completed, patch limpa draft", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(xp.calls.length).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed");
+    const patch = m.calls.apply[0].patch;
+    expect(patch.state).toBe("idle");
+    expect(patch.draftId).toBeNull();
+    expect(patch.draftType).toBeNull();
+    expect(patch.draftVersion).toBe(0);
+    expect(patch.draftPayload).toBeNull();
+  });
+
+  test("b) replayed => completed, expense_create_completed", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "replayed", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(xp.calls.length).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed");
+  });
+
+  test("c) rejected (categoria_invalid) => completed (apply ok), expense_create_retry_needed", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([{ kind: "rejected", reason: "categoria_invalid" }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_retry_needed");
+    const patch = m.calls.apply[0].patch;
+    expect(patch.state).toBe("idle");
+    expect(patch.draftId).toBeNull();
+  });
+
+  test("d) conflicted (state_version_conflict) => completed, expense_create_retry_needed", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "conflicted", reason: "state_version_conflict", currentStateVersion: 9 },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_retry_needed");
+  });
+
+  test("e) transient_failure => releasedForRetry, apply NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const xp = mockExpenseDeps([{ kind: "transient_error", reason: "executor_unavailable" }]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+    expect(m.calls.release[0].reason).toBe("expense_action_transient");
+  });
+
+  test("f) outcome_unknown (executor throws) => releasedForRetry, apply NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState() })],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const xp = mockExpenseDeps([new Error("executor boom")]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+    expect(m.calls.release[0].reason).toBe("expense_action_transient");
+  });
+
+  test("g) malformed (via stateVersion inválido) => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState(), stateVersion: -1 })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const xp = mockExpenseDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    expect(m.calls.release[0].retryKind).toBe("cancelled");
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("h) draftPayload inválido (valor negativo) => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const badPayload = validExpensePayload({ valor: -1 });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState(badPayload) })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const xp = mockExpenseDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(xp.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("i) conversationStateId null => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState(), conversationStateId: null })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const xp = mockExpenseDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(xp.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("j) draftId null => malformed, executor NÃO chamado", async () => {
+    const it = makeItem();
+    const stateNoDraft = makeState({
+      state: "awaiting_expense_confirmation",
+      draftType: "expense",
+      draftId: null,
+      draftVersion: 1,
+      draftPayload: validExpensePayload(),
+    });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: stateNoDraft })],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const xp = mockExpenseDeps([]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(xp.calls.length).toBe(0);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("k) apply.expectedStateVersion === ctx.context.stateVersion (e é o mesmo enviado à RPC)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: expenseState(), stateVersion: 42 })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(m.calls.apply[0].expectedStateVersion).toBe(42);
+    const cmd = xp.calls[0] as { expectedStateVersion: number };
+    expect(cmd.expectedStateVersion).toBe(42);
+  });
+
+  test("l) segundo cálculo (recalculo pós-conflito) também dispara handleConfirmExpenseCreate", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext(), okContext({ state: expenseState(), stateVersion: 7 })],
+      apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
+    });
+    let call = 0;
+    const decide = () => {
+      call++;
+      return call === 1 ? decisionRespond() : decisionConfirmExpense();
+    };
+    const xp = mockExpenseDeps([
+      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide, expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(xp.calls.length).toBe(1);
+    expect(m.calls.apply.length).toBe(2);
+    expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed");
+    expect(m.calls.apply[1].expectedStateVersion).toBe(7);
+  });
+});
+
+// ============================================================
 // SEGURANÇA ESTÁTICA
 // ============================================================
 
