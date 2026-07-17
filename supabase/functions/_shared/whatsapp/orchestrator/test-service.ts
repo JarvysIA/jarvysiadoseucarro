@@ -26,6 +26,8 @@ import type {
   TransitionResult,
 } from "./types.ts";
 import type { WhatsappOrchestratorRepository } from "./repository.ts";
+import { mapConversationDecisionToTransitionInput } from "./transition-mapper.ts";
+import { RepositoryError } from "./errors.ts";
 import type {
   ConversationCoreDecision,
   ConversationCoreInput,
