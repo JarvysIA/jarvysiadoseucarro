@@ -41,6 +41,13 @@ import type {
 } from "../actions/types.ts";
 import { executeConfirmedKmUpdate } from "../actions/service.ts";
 import { validateAwaitingConfirmationKmUpdateDraft } from "../conversation/km-update-draft.ts";
+import type {
+  ConfirmedExpenseCreateDeps,
+  ConfirmedExpenseCreateInput,
+  ConfirmedExpenseCreateResult,
+} from "../actions/expense-types.ts";
+import { executeConfirmedExpenseCreate } from "../actions/expense-service.ts";
+import { validateAwaitingConfirmationExpenseDraft } from "../conversation/expense-create-draft.ts";
 import { decideConversation } from "../conversation/core.ts";
 import { renderResponse } from "../conversation/responses.ts";
 
@@ -73,6 +80,7 @@ export type TestCycleDeps = {
   clock: () => string;
   orchestratorVersion: string;
   kmActionDeps: ConfirmedKmUpdateDeps;
+  expenseActionDeps: ConfirmedExpenseCreateDeps;
   logger?: TestServiceLogger;
 };
 
