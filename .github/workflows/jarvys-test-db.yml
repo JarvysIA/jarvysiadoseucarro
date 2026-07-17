@@ -263,6 +263,17 @@ jobs:
       - name: MJ2A-V E12 — expense_create concorrência real mesmo draft_id (Postgres real)
         run: bun test supabase/tests/mj2a-v/e12-concurrency-same-draft.test.ts
 
+      - name: MJ2B-V F1 — corrente completa applied despesa (Postgres real)
+        run: bun test supabase/tests/mj2b-v/f1-chain-applied.test.ts
+
+      - name: MJ2B-V F2 — despesa rejected vehicle_archived + retry_needed (Postgres real)
+        run: bun test supabase/tests/mj2b-v/f2-chain-rejected-retry.test.ts
+
+      - name: MJ2B-V F3 — despesa crash-window replay encadeado com apply (Postgres real)
+        run: bun test supabase/tests/mj2b-v/f3-chain-crash-replay.test.ts
+
+
+
 
 
 
