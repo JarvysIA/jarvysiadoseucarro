@@ -71,10 +71,45 @@ export function renderResponse(
     }
     case "km_update_retry_needed":
       return "Não consegui concluir agora. Pode me dizer a quilometragem de novo?";
+    case "expense_category_prompt": {
+      const v = formatValor(params.valor);
+      const opts = params.options && params.options.length > 0
+        ? params.options.join(" ou ")
+        : "qual categoria";
+      return `Registrei ${v}, mas não identifiquei a categoria. É ${opts}?`;
+    }
+    case "expense_create_confirmation": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const v = formatValor(params.valor);
+      const cat = params.categoria ?? "essa categoria";
+      return `Anotar ${v} em ${cat} no ${label}? Responda sim para confirmar ou não para cancelar.`;
+    }
+    case "expense_create_correction_confirmation": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const v = formatValor(params.valor);
+      const cat = params.categoria ?? "essa categoria";
+      return `Certo, corrigido. Anotar ${v} em ${cat} no ${label}? Responda sim para confirmar.`;
+    }
+    case "expense_create_completed": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const v = formatValor(params.valor);
+      const cat = params.categoria ?? "essa categoria";
+      return `Prontinho! Anotei ${v} em ${cat} no ${label}.`;
+    }
+    case "expense_create_retry_needed":
+      return "Não consegui concluir agora. Pode me contar a despesa de novo?";
   }
 }
 
 function formatKm(value: number | undefined | null): string {
   if (typeof value !== "number" || !Number.isFinite(value)) return "?";
   return String(Math.trunc(value));
+}
+
+function formatValor(value: number | undefined | null): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "?";
+  const fixed = value.toFixed(2);
+  const [intPart, decPart] = fixed.split(".");
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `R$ ${withThousands},${decPart}`;
 }
