@@ -26,6 +26,7 @@ import type {
   ConversationState,
 } from "../../conversation/types.ts";
 import type { ConfirmedKmUpdateDeps } from "../../actions/types.ts";
+import type { ConfirmedExpenseCreateDeps } from "../../actions/expense-types.ts";
 import {
   AmbiguousTimeoutError,
   MalformedResponseError,
@@ -192,12 +193,20 @@ function baseDeps(
       },
     },
   };
+  const stubExpenseActionDeps: ConfirmedExpenseCreateDeps = {
+    executor: {
+      executeExpenseCreate: async () => {
+        throw new Error("expenseActionDeps.executor stub nao configurado para este teste — sobrescreva via baseDeps(repo, { expenseActionDeps: ... })");
+      },
+    },
+  };
   return {
     repository: repo,
     loadMessageText: async () => "olá",
     clock: () => "2026-07-12T00:00:00.000Z",
     orchestratorVersion: "test-svc.1",
     kmActionDeps: stubKmActionDeps,
+    expenseActionDeps: stubExpenseActionDeps,
     ...over,
   };
 }
