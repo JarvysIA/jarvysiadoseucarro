@@ -1755,7 +1755,7 @@ describe("confirm_expense_create", () => {
     expect(res.counts.completed).toBe(1);
     expect(xp.calls.length).toBe(1);
     expect(m.calls.apply.length).toBe(2);
-    expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed");
+    expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
     expect(m.calls.apply[1].expectedStateVersion).toBe(7);
   });
 });
