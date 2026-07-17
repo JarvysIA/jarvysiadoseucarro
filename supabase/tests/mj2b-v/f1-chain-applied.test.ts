@@ -256,7 +256,7 @@ describeIfDb("MJ2B-V F1 — corrente completa applied (despesa)", () => {
          from public.whatsapp_conversation_states where id = $1`,
       [conversationStateId],
     );
-    expect(st.rows[0]?.state).toBe("idle");
+    expect(st.rows[0]?.state).toBe("awaiting_requested_km");
     expect(st.rows[0]?.draft_id).toBeNull();
     expect(st.rows[0]?.draft_type).toBeNull();
     expect(st.rows[0]?.draft_payload).toBeNull();
