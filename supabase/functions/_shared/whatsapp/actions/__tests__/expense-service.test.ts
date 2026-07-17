@@ -141,7 +141,7 @@ describe("ids obrigatórios", () => {
 
   for (const field of idFields) {
     test(`${field} vazio -> malformed/input_invalid`, async () => {
-      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", valor: 1, categoria: "Combustível" });
+      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
       const res = await executeConfirmedExpenseCreate(
         baseInput({ [field]: "" } as Partial<ConfirmedExpenseCreateInput>),
         { executor: port },
@@ -151,7 +151,7 @@ describe("ids obrigatórios", () => {
     });
 
     test(`${field} só espaços -> malformed/input_invalid`, async () => {
-      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", valor: 1, categoria: "Combustível" });
+      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
       const res = await executeConfirmedExpenseCreate(
         baseInput({ [field]: "   " } as Partial<ConfirmedExpenseCreateInput>),
         { executor: port },
@@ -161,7 +161,7 @@ describe("ids obrigatórios", () => {
     });
 
     test(`${field} não-string -> malformed/input_invalid`, async () => {
-      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", valor: 1, categoria: "Combustível" });
+      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "x", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
       const res = await executeConfirmedExpenseCreate(
         baseInput({ [field]: 123 as unknown as string }),
         { executor: port },
@@ -178,38 +178,38 @@ describe("ids obrigatórios", () => {
 
 describe("expectedStateVersion", () => {
   test("zero é aceito", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ expectedStateVersion: 0 }), { executor: port });
     expect(res.kind).toBe("completed");
   });
 
   test("positivo é aceito", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ expectedStateVersion: 42 }), { executor: port });
     expect(res.kind).toBe("completed");
   });
 
   test("negativo -> malformed/state_version_invalid", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ expectedStateVersion: -1 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "state_version_invalid" });
     expect(calls.length).toBe(0);
   });
 
   test("decimal -> malformed/state_version_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ expectedStateVersion: 1.5 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "state_version_invalid" });
   });
 
   test("NaN -> malformed/state_version_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ expectedStateVersion: Number.NaN }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "state_version_invalid" });
   });
 
   test("não-number -> malformed/state_version_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ expectedStateVersion: "3" as unknown as number }),
       { executor: port },
@@ -225,7 +225,7 @@ describe("expectedStateVersion", () => {
 describe("categoria", () => {
   for (const cat of EXPENSE_CATEGORIES) {
     test(`categoria válida "${cat}" é aceita`, async () => {
-      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: cat });
+      const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: cat });
       const res = await executeConfirmedExpenseCreate(baseInput({ categoria: cat }), { executor: port });
       expect(res.kind).toBe("completed");
       expect(calls[0].categoria).toBe(cat);
@@ -233,7 +233,7 @@ describe("categoria", () => {
   }
 
   test("string fora da lista -> malformed/categoria_invalid", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ categoria: "Outros" as unknown as typeof EXPENSE_CATEGORIES[number] }),
       { executor: port },
@@ -243,7 +243,7 @@ describe("categoria", () => {
   });
 
   test("string vazia -> malformed/categoria_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ categoria: "" as unknown as typeof EXPENSE_CATEGORIES[number] }),
       { executor: port },
@@ -252,7 +252,7 @@ describe("categoria", () => {
   });
 
   test("minúsculas -> malformed/categoria_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ categoria: "combustível" as unknown as typeof EXPENSE_CATEGORIES[number] }),
       { executor: port },
@@ -261,7 +261,7 @@ describe("categoria", () => {
   });
 
   test("sem acento -> malformed/categoria_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ categoria: "Combustivel" as unknown as typeof EXPENSE_CATEGORIES[number] }),
       { executor: port },
@@ -270,7 +270,7 @@ describe("categoria", () => {
   });
 
   test("não-string -> malformed/categoria_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ categoria: 1 as unknown as typeof EXPENSE_CATEGORIES[number] }),
       { executor: port },
@@ -285,64 +285,64 @@ describe("categoria", () => {
 
 describe("valor", () => {
   test("0.01 é aceito", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 0.01, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 0.01, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: 0.01 }), { executor: port });
     expect(res.kind).toBe("completed");
     expect(calls[0].valor).toBe(0.01);
   });
 
   test("149.90 é aceito", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: 149.9 }), { executor: port });
     expect(res.kind).toBe("completed");
     expect(calls[0].valor).toBe(149.9);
   });
 
   test("limite EXPENSE_MAX_VALOR é aceito", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: EXPENSE_MAX_VALOR, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: EXPENSE_MAX_VALOR, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: EXPENSE_MAX_VALOR }), { executor: port });
     expect(res.kind).toBe("completed");
   });
 
   test("0 -> malformed/valor_invalid", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: 0 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
     expect(calls.length).toBe(0);
   });
 
   test("negativo -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: -10 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
   });
 
   test("NaN -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: Number.NaN }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
   });
 
   test("Infinity -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: Number.POSITIVE_INFINITY }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
   });
 
   test("acima do limite -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: EXPENSE_MAX_VALOR + 1 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
   });
 
   test("fração de centavo 10.999 -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ valor: 10.999 }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "valor_invalid" });
   });
 
   test("não-number -> malformed/valor_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ valor: "10" as unknown as number }),
       { executor: port },
@@ -357,7 +357,7 @@ describe("valor", () => {
 
 describe("descricao", () => {
   test("undefined -> descricao null no comando", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const input = baseInput();
     delete (input as { descricao?: unknown }).descricao;
     const res = await executeConfirmedExpenseCreate(input, { executor: port });
@@ -366,28 +366,28 @@ describe("descricao", () => {
   });
 
   test("null -> descricao null no comando", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ descricao: null }), { executor: port });
     expect(res.kind).toBe("completed");
     expect(calls[0].descricao).toBeNull();
   });
 
   test("string normal é passada trim aplicado", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ descricao: "  posto shell  " }), { executor: port });
     expect(res.kind).toBe("completed");
     expect(calls[0].descricao).toBe("posto shell");
   });
 
   test("string vazia -> null", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput({ descricao: "   " }), { executor: port });
     expect(res.kind).toBe("completed");
     expect(calls[0].descricao).toBeNull();
   });
 
   test("string > 500 chars -> malformed/descricao_invalid", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const long = "a".repeat(501);
     const res = await executeConfirmedExpenseCreate(baseInput({ descricao: long }), { executor: port });
     expect(res).toEqual({ kind: "malformed", reason: "descricao_invalid" });
@@ -395,7 +395,7 @@ describe("descricao", () => {
   });
 
   test("string exatamente 500 chars é aceita", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const ok = "a".repeat(500);
     const res = await executeConfirmedExpenseCreate(baseInput({ descricao: ok }), { executor: port });
     expect(res.kind).toBe("completed");
@@ -403,7 +403,7 @@ describe("descricao", () => {
   });
 
   test("não-string -> malformed/descricao_invalid", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(
       baseInput({ descricao: 123 as unknown as string }),
       { executor: port },
@@ -418,7 +418,7 @@ describe("descricao", () => {
 
 describe("comando normalizado", () => {
   test("actionType fixo, sem hash/actionExecutionId/timestamp vazando", async () => {
-    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "aei-1", valor: 149.9, categoria: "Combustível" });
+    const { port, calls } = makeExecutor({ kind: "applied", actionExecutionId: "aei-1", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     await executeConfirmedExpenseCreate(baseInput(), { executor: port });
     expect(calls.length).toBe(1);
     const cmd = calls[0];
@@ -456,15 +456,15 @@ describe("comando normalizado", () => {
 
 describe("mapeamento executor -> resultado público", () => {
   test("applied -> completed", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-9", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
     expect(res).toEqual({ kind: "completed", actionExecutionId: "aei-9", valor: 149.9, categoria: "Combustível" });
   });
 
   test("replayed -> replayed", async () => {
-    const { port } = makeExecutor({ kind: "replayed", actionExecutionId: "aei-9", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "replayed", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
-    expect(res).toEqual({ kind: "replayed", actionExecutionId: "aei-9", valor: 149.9, categoria: "Combustível" });
+    expect(res).toEqual({ kind: "replayed", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
   });
 
   const rejReasons = [
@@ -571,7 +571,7 @@ describe("exceptions do executor -> outcome_unknown", () => {
 
 describe("logs sanitizados", () => {
   test("fluxo applied: só campos do whitelist, nada de dado sensível", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-1", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-1", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const { logger, entries } = makeLogger();
     await executeConfirmedExpenseCreate(baseInput({ descricao: "posto shell" }), { executor: port, logger });
     expect(entries.length).toBeGreaterThan(0);
@@ -583,7 +583,7 @@ describe("logs sanitizados", () => {
   });
 
   test("fluxo malformed: só started + validation_failed", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 1, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 1, categoria: "Combustível" });
     const { logger, entries } = makeLogger();
     await executeConfirmedExpenseCreate(baseInput({ valor: -1 }), { executor: port, logger });
     assertLogsSanitized(entries);
@@ -604,7 +604,7 @@ describe("logs sanitizados", () => {
   });
 
   test("logger que lança exception não afeta fluxo", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const logger: ConfirmedExpenseCreateLogger = {
       log() {
         throw new Error("logger boom");
@@ -621,7 +621,7 @@ describe("logs sanitizados", () => {
 
 describe("clock injetável", () => {
   test("durationMs usa o clock injetado", async () => {
-    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", valor: 149.9, categoria: "Combustível" });
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "a", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const { logger, entries } = makeLogger();
     let t = 1000;
     const clock = () => {
