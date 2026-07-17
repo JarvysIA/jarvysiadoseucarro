@@ -18,6 +18,11 @@ const ALL_KEYS = [
   "km_update_applied",
   "km_update_no_change",
   "km_update_retry_needed",
+  "expense_category_prompt",
+  "expense_create_confirmation",
+  "expense_create_correction_confirmation",
+  "expense_create_completed",
+  "expense_create_retry_needed",
 ] as const;
 
 // Guarda de linguagem: nunca prometer recursos, expor infra ou erros internos.
@@ -74,5 +79,71 @@ describe("renderResponse guardrails", () => {
   test("km_update_retry_needed does not depend on params", () => {
     const msg = renderResponse("km_update_retry_needed", {});
     expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test("expense_category_prompt uses valor and options", () => {
+    const msg = renderResponse("expense_category_prompt", {
+      valor: 30,
+      options: ["Manutenção", "Lavagem"],
+    });
+    expect(msg).toContain("R$ 30,00");
+    expect(msg).toContain("Manutenção");
+    expect(msg).toContain("Lavagem");
+  });
+
+  test("expense_create_confirmation uses valor/categoria/label", () => {
+    const msg = renderResponse("expense_create_confirmation", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+    });
+    expect(msg).toContain("R$ 149,90");
+    expect(msg).toContain("Combustível");
+    expect(msg).toContain("Fiat Argo");
+  });
+
+  test("expense_create_correction_confirmation uses valor/categoria/label", () => {
+    const msg = renderResponse("expense_create_correction_confirmation", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+    });
+    expect(msg).toContain("R$ 149,90");
+    expect(msg).toContain("Combustível");
+    expect(msg).toContain("Fiat Argo");
+  });
+
+  test("expense_create_completed uses valor/categoria/label", () => {
+    const msg = renderResponse("expense_create_completed", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+    });
+    expect(msg).toContain("R$ 149,90");
+    expect(msg).toContain("Combustível");
+    expect(msg).toContain("Fiat Argo");
+  });
+
+  test("expense_create_retry_needed does not depend on params", () => {
+    const msg = renderResponse("expense_create_retry_needed", {});
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test("formatValor formats thousands and cents", () => {
+    const msg = renderResponse("expense_create_confirmation", {
+      valor: 1234.5,
+      categoria: "Manutenção",
+      vehicleLabel: "Fiat Uno",
+    });
+    expect(msg).toContain("R$ 1.234,50");
+  });
+
+  test("formatValor with missing/invalid value does not throw", () => {
+    const msg = renderResponse("expense_create_confirmation", {
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+    });
+    expect(msg.length).toBeGreaterThan(0);
+    expect(msg).toContain("?");
   });
 });
