@@ -170,6 +170,7 @@ export type ConversationResponseKey =
   | "expense_create_confirmation"
   | "expense_create_correction_confirmation"
   | "expense_create_completed"
+  | "expense_create_completed_with_km_prompt"
   | "expense_create_retry_needed";
 
 
