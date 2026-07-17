@@ -186,8 +186,15 @@ describeIfDb("MJ2B-V F1 — corrente completa applied (despesa)", () => {
     expect(execResult?.despesaId).toBeTruthy();
 
     const ctxMock = buildCtxMock(conversationStateId, reportMsgId, draftPayload, 0);
+    const mappedResult: ConfirmedExpenseCreateResult = {
+      kind: "completed",
+      actionExecutionId: execResult?.actionExecutionId as string,
+      despesaId: execResult?.despesaId as string,
+      valor: Number(execResult?.valor),
+      categoria: execResult?.categoria as "Combustível",
+    };
     const finalization = buildExpenseFinalization(
-      execResult as unknown as ConfirmedExpenseCreateResult,
+      mappedResult,
       ctxMock,
       SYNTH_VEHICLE_ID,
     );
