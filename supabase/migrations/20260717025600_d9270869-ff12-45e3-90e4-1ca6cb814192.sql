@@ -247,4 +247,14 @@ REVOKE ALL ON FUNCTION public.execute_whatsapp_expense_create(
 
 GRANT EXECUTE ON FUNCTION public.execute_whatsapp_expense_create(
   uuid, uuid, uuid, uuid, uuid, uuid, uuid, uuid, text, numeric, text, bigint, text
-) TO postgres, service_role, sandbox_exec;
+) TO postgres, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sandbox_exec') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.execute_whatsapp_expense_create('
+         || 'uuid, uuid, uuid, uuid, uuid, uuid, uuid, uuid, '
+         || 'text, numeric, text, bigint, text'
+         || ') TO sandbox_exec';
+  END IF;
+END $$;
