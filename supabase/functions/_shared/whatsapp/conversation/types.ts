@@ -10,6 +10,7 @@ export type ConversationStateName =
   | "awaiting_vehicle"
   | "awaiting_km_confirmation"
   | "awaiting_km_correction"
+  | "awaiting_requested_km"
   | "awaiting_expense_category"
   | "awaiting_expense_confirmation"
   | "awaiting_expense_correction"
