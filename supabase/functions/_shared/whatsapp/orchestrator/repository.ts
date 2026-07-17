@@ -32,6 +32,7 @@ import type {
   ConversationStateName,
   ConversationStatePatch,
   ConversationVehicle,
+  RequestSource,
 } from "../conversation/types.ts";
 import {
   AmbiguousTimeoutError,
@@ -908,7 +909,7 @@ export function mapStateRow(row: Record<string, unknown>): ConversationState {
     state: stateName as ConversationStateName,
     currentIntent: (row.current_intent as string | null) ?? null,
     awaitingField: (row.awaiting_field as string | null) ?? null,
-    requestSource: (row.request_source as string | null) ?? null,
+    requestSource: (row.request_source as RequestSource | null) ?? null,
     draftType: (row.draft_type as string | null) ?? null,
     draftId: (row.draft_id as string | null) ?? null,
     draftVersion: row.draft_version == null ? null : Number(row.draft_version),
