@@ -349,6 +349,10 @@ async function processItem(
     return await handleConfirmKmUpdate(item, ctx1.result, deps, render, log, workerId, 1);
   }
 
+  if (decision1.decisionKind === "confirm_expense_create") {
+    return await handleConfirmExpenseCreate(item, ctx1.result, deps, render, log, workerId, 1);
+  }
+
   const resp1 = buildResponse(decision1, render, log, workerId, item);
   if (resp1.kind !== "ok") {
     return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
@@ -398,6 +402,10 @@ async function processItem(
 
   if (decision2.decisionKind === "confirm_km_update") {
     return await handleConfirmKmUpdate(item, ctx2.result, deps, render, log, workerId, 2);
+  }
+
+  if (decision2.decisionKind === "confirm_expense_create") {
+    return await handleConfirmExpenseCreate(item, ctx2.result, deps, render, log, workerId, 2);
   }
 
   const resp2 = buildResponse(decision2, render, log, workerId, item);
