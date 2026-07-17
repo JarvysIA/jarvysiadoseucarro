@@ -140,7 +140,7 @@ export type ConversationStatePatch = Partial<{
   state: ConversationStateName;
   currentIntent: string | null;
   awaitingField: string | null;
-  requestSource: string | null;
+  requestSource: RequestSource | null;
   draftType: string | null;
   draftId: string | null;
   draftVersion: number | null;
