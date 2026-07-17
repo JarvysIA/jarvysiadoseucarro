@@ -644,6 +644,94 @@ export function decideConversation(
     // draft corrompido — cai no fluxo geral abaixo.
   }
 
+  // 6.6) Resposta a state pendente (awaiting_requested_km) — gatilho pós-despesa.
+  // Não há draft nesse estado (draftId permanece null). Só interceptamos se o
+  // parseKmUpdateText tiver sucesso; parse falhando cai no fallback genérico
+  // da seção 10 (que já tem contador/reset). "Deny" puro (usuário responde
+  // só "não") cai no nothing_to_confirm da seção 7 e permanece no mesmo
+  // estado — escopo deliberadamente não coberto neste microbuild.
+  if (
+    effectiveState.state === "awaiting_requested_km" &&
+    typeof input.originalText === "string" &&
+    isUuid(input.sourceMessageId)
+  ) {
+    const parsed = parseKmUpdateText(input.originalText, "value_reply");
+    if (parsed.ok) {
+      const activeId = effectiveState.activeVehicleId;
+      const veh = activeId === null
+        ? null
+        : input.vehicles.find(
+            (v) => v.id === activeId && v.isEligible && !v.isArchived,
+          ) ?? null;
+      if (veh === null) {
+        return buildDecision({
+          eventKind: KM_REPORTED_EVENT_KIND,
+          decisionKind: "respond",
+          previousState,
+          nextState: "idle",
+          outcome: "completed",
+          statePatch: withLastMessage(
+            mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+            input.sourceMessageId,
+          ),
+          responseKey: "no_eligible_vehicle",
+          nextFallbackCount: 0,
+          reasonCode: "requested_km_active_vehicle_unavailable",
+        });
+      }
+      const prev = veh.kmAtual;
+      const isCorrection = prev !== null && parsed.newKm < prev;
+      const completeCandidate = {
+        phase: "awaiting_confirmation" as const,
+        vehicleId: veh.id,
+        expectedPreviousKm: prev,
+        newKm: parsed.newKm,
+        requestMessageId: input.sourceMessageId,
+        isCorrection,
+      };
+      const validated =
+        validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
+      if (validated.ok && isUuid(veh.id)) {
+        const nextState: ConversationStateName = isCorrection
+          ? "awaiting_km_correction"
+          : "awaiting_km_confirmation";
+        return buildDecision({
+          eventKind: KM_REPORTED_EVENT_KIND,
+          decisionKind: "transition",
+          previousState,
+          nextState,
+          statePatch: withLastMessage(
+            mergePatch(basePatch, {
+              state: nextState,
+              currentIntent: "km_update",
+              awaitingField: "confirmation",
+              draftType: "km_update",
+              draftId: input.sourceMessageId,
+              draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
+              draftPayload: validated.value as unknown as Record<string, unknown>,
+              activeVehicleId: veh.id,
+            }),
+            input.sourceMessageId,
+          ),
+          responseKey: isCorrection
+            ? "km_update_correction_confirmation"
+            : "km_update_confirmation",
+          responseParams: {
+            vehicleLabel: labelFor(veh),
+            newKm: parsed.newKm,
+            previousKm: prev,
+          },
+          nextFallbackCount: 0,
+          reasonCode: isCorrection
+            ? "requested_km_reply_correction"
+            : "requested_km_reply_complete",
+        });
+      }
+      // Invariante violada — cai no fallback genérico.
+    }
+    // parse falhou — cai no fallback genérico da seção 10.
+  }
+
   // 7) Confirmação / negação
   if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
     return buildDecision({
