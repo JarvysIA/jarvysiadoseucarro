@@ -211,7 +211,7 @@ describeIfDb("MJ2B-V F3 — crash-window replay encadeado com apply (despesa)", 
     expect(finalization.kind).toBe("finalize");
     if (finalization.kind !== "finalize") throw new Error("expected finalize");
     const decision = finalization.decision;
-    expect(decision.responseKey).toBe("expense_create_completed");
+    expect(decision.responseKey).toBe("expense_create_completed_with_km_prompt");
 
     const textBody = renderResponse(decision.responseKey, decision.responseParams);
     const patch = serializePatch(decision.statePatch);
