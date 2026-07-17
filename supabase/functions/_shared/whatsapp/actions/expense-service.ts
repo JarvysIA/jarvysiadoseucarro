@@ -238,6 +238,7 @@ export async function executeConfirmedExpenseCreate(
       return {
         kind: "completed",
         actionExecutionId: executorResult.actionExecutionId,
+        despesaId: executorResult.despesaId,
         valor: executorResult.valor,
         categoria: executorResult.categoria,
       };
@@ -252,6 +253,7 @@ export async function executeConfirmedExpenseCreate(
       return {
         kind: "replayed",
         actionExecutionId: executorResult.actionExecutionId,
+        despesaId: executorResult.despesaId,
         valor: executorResult.valor,
         categoria: executorResult.categoria,
       };

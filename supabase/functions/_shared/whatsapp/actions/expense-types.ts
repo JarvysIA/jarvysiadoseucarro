@@ -85,7 +85,9 @@ export type ExpenseCreateRejectedReason =
   | "vehicle_not_found"
   | "vehicle_not_owned"
   | "vehicle_archived"
-  | "invariant_violation";
+  | "invariant_violation"
+  | "categoria_invalid"
+  | "valor_invalid";
 
 export type ExpenseCreateConflictReason =
   | "state_version_conflict"
@@ -111,12 +113,14 @@ export type ExpenseCreateExecutorResult =
   | {
       kind: "applied";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
   | {
       kind: "replayed";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
@@ -148,12 +152,14 @@ export type ConfirmedExpenseCreateResult =
   | {
       kind: "completed";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
   | {
       kind: "replayed";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
