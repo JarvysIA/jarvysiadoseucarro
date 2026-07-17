@@ -85,9 +85,23 @@ describe("serializePatch", () => {
     expect(() => serializePatch({ state: null } as never)).toThrow(/next_state/);
   });
 
-  test("lastMessageId (não aceito pela RPC) rejeita", () => {
+  test("Build 5.7F2E1A.5-HARD: lastMessageId é ignorado (não vai para o payload) e não lança", () => {
+    const out = serializePatch({
+      state: "idle",
+      lastMessageId: "11111111-1111-1111-1111-111111111111",
+    });
+    expect(out.next_state).toBe("idle");
+    expect(Object.prototype.hasOwnProperty.call(out, "last_message_id")).toBe(false);
+  });
+
+  test("Build 5.7F2E1A.5-HARD: sem lastMessageId continua funcionando (regressão)", () => {
+    const out = serializePatch({ state: "idle" });
+    expect(out).toEqual({ next_state: "idle" });
+  });
+
+  test("Build 5.7F2E1A.5-HARD: chave realmente desconhecida ainda lança (regressão defensiva)", () => {
     expect(() =>
-      serializePatch({ state: "idle", lastMessageId: "xx" } as never),
+      serializePatch({ state: "idle", chaveInexistente: "x" } as never),
     ).toThrow(/not accepted/);
   });
 });
@@ -689,6 +703,81 @@ describe("loadContext — happy path & state virtual", () => {
       expect(res.context.fallbackCount).toBe(3);
       expect(res.context.conversationStateId).toBe("11111111-1111-1111-1111-111111111111");
     }
+  });
+});
+
+// ============================================================
+// Build 5.7F2E1A.5-HARD — VALID_STATE_NAMES em sincronia com
+// ConversationStateName (mapStateRow via loadContext).
+// ============================================================
+describe("mapStateRow — VALID_STATE_NAMES em sincronia", () => {
+  const NEW_STATES = [
+    "awaiting_km_confirmation",
+    "awaiting_km_correction",
+    "awaiting_requested_km",
+    "awaiting_expense_category",
+    "awaiting_expense_confirmation",
+    "awaiting_expense_correction",
+  ] as const;
+
+  for (const s of NEW_STATES) {
+    test(`state=${s} → aceito sem MalformedResponseError`, async () => {
+      const rows = baseRows({
+        whatsapp_conversation_states: [
+          {
+            id: "22222222-2222-2222-2222-222222222222",
+            state: s,
+            current_intent: null,
+            awaiting_field: null,
+            request_source: null,
+            draft_type: null,
+            draft_id: null,
+            draft_version: 0,
+            draft_payload: null,
+            active_vehicle_id: null,
+            confirmed_at: null,
+            executed_at: null,
+            last_message_id: null,
+            expires_at: null,
+            state_version: 1,
+            fallback_count: 0,
+            contact_id: "c1",
+          },
+        ],
+      });
+      const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+      const res = await repo.loadContext(CLAIMED);
+      expect(res.kind).toBe("ok");
+      if (res.kind === "ok") expect(res.context.state.state).toBe(s);
+    });
+  }
+
+  test("state inválido → MalformedResponseError (regressão defensiva)", async () => {
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          state: "estado_que_nao_existe",
+          current_intent: null,
+          awaiting_field: null,
+          request_source: null,
+          draft_type: null,
+          draft_id: null,
+          draft_version: 0,
+          draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null,
+          executed_at: null,
+          last_message_id: null,
+          expires_at: null,
+          state_version: 1,
+          fallback_count: 0,
+          contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
   });
 });
 

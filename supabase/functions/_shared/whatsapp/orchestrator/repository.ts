@@ -225,7 +225,7 @@ const PATCH_KEY_MAP: Record<keyof ConversationStatePatch, string> = {
   confirmedAt: "confirmed_at",
   executedAt: "executed_at",
   expiresAt: "expires_at",
-  lastMessageId: "last_message_id", // não aceito pela RPC; ver validação abaixo
+  lastMessageId: "last_message_id", // Build 5.7F2E1A.5-HARD: deliberadamente ignorado em serializePatch — a RPC grava last_message_id sozinha a partir de v_msg.id; core.ts inclui esse campo em quase toda decisão via withLastMessage().
 };
 
 // Somente estas chaves são aceitas pela RPC.
@@ -263,6 +263,10 @@ export function serializePatch(patch: ConversationStatePatch): Record<string, un
     unknown,
   ][]) {
     if (tsKey === "state") continue;
+    // Build 5.7F2E1A.5-HARD: lastMessageId é gravado pela própria RPC (a partir
+    // de v_msg.id); core.ts inclui esse campo em quase toda decisão normal via
+    // withLastMessage(). Ignorar em vez de lançar.
+    if (tsKey === "lastMessageId") continue;
     if (value === undefined) continue; // omitido
     const sqlKey = PATCH_KEY_MAP[tsKey];
     if (!sqlKey || !RPC_PATCH_KEYS_ALLOWED.has(sqlKey)) {
@@ -858,9 +862,19 @@ export class WhatsappOrchestratorRepository {
 // Mapeadores read-only para loadContext.
 // ============================================================
 
+// Build 5.7F2E1A.5-HARD: precisa ficar em sincronia MANUAL com
+// ConversationStateName em conversation/types.ts. Se um novo estado for
+// adicionado lá, adicionar aqui também — mapStateRow lança
+// MalformedResponseError para qualquer valor fora deste Set.
 const VALID_STATE_NAMES: ReadonlySet<ConversationStateName> = new Set<ConversationStateName>([
   "idle",
   "awaiting_vehicle",
+  "awaiting_km_confirmation",
+  "awaiting_km_correction",
+  "awaiting_requested_km",
+  "awaiting_expense_category",
+  "awaiting_expense_confirmation",
+  "awaiting_expense_correction",
   "completed",
   "cancelled",
   "expired",
