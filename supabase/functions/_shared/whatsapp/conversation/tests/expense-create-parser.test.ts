@@ -150,10 +150,16 @@ describe("parseExpenseValorText — fora de escopo (sem âncora)", () => {
 });
 
 describe("parseExpenseValorText — formato inválido", () => {
-  test("vírgula com 3+ dígitos depois", () => {
-    expect(parseExpenseValorText("30,000")).toEqual({
+  test("vírgula com 3+ dígitos depois (ancorado por R$)", () => {
+    expect(parseExpenseValorText("R$ 30,000")).toEqual({
       ok: false,
       code: "invalid_valor_format",
+    });
+  });
+  test('"30,000" bare — sem âncora e fora do padrão (c) -> no_valor_candidate', () => {
+    expect(parseExpenseValorText("30,000")).toEqual({
+      ok: false,
+      code: "no_valor_candidate",
     });
   });
   test('"1,234,56" — duas vírgulas', () => {
