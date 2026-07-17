@@ -467,6 +467,29 @@ describe("mapeamento executor -> resultado público", () => {
     expect(res).toEqual({ kind: "replayed", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
   });
 
+  test("applied propaga despesaId específico", async () => {
+    const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-a1", despesaId: "desp-applied-1", valor: 149.9, categoria: "Combustível" });
+    const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
+    expect(res).toEqual({ kind: "completed", actionExecutionId: "aei-a1", despesaId: "desp-applied-1", valor: 149.9, categoria: "Combustível" });
+  });
+
+  test("replayed propaga despesaId específico", async () => {
+    const { port } = makeExecutor({ kind: "replayed", actionExecutionId: "aei-r1", despesaId: "desp-replayed-2", valor: 149.9, categoria: "Combustível" });
+    const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
+    expect(res).toEqual({ kind: "replayed", actionExecutionId: "aei-r1", despesaId: "desp-replayed-2", valor: 149.9, categoria: "Combustível" });
+  });
+
+  test("rejected/categoria_invalid vindo do executor -> passthrough", async () => {
+    const { port } = makeExecutor({ kind: "rejected", reason: "categoria_invalid" });
+    const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
+    expect(res).toEqual({ kind: "rejected", reason: "categoria_invalid" });
+  });
+
+  test("rejected/valor_invalid vindo do executor -> passthrough", async () => {
+    const { port } = makeExecutor({ kind: "rejected", reason: "valor_invalid" });
+    const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
+    expect(res).toEqual({ kind: "rejected", reason: "valor_invalid" });
+
   const rejReasons = [
     "contact_missing",
     "contact_unlinked",
