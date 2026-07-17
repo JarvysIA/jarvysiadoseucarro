@@ -10,6 +10,9 @@ export type ConversationStateName =
   | "awaiting_vehicle"
   | "awaiting_km_confirmation"
   | "awaiting_km_correction"
+  | "awaiting_expense_category"
+  | "awaiting_expense_confirmation"
+  | "awaiting_expense_correction"
   | "completed"
   | "cancelled"
   | "expired"
@@ -25,6 +28,7 @@ export type ConversationEventKind =
   | "explicit_opt_out"
   | "vehicle_reply"
   | "km_reported"
+  | "expense_reported"
   | "media"
   | "unknown"
   | "replay"
@@ -40,6 +44,7 @@ export type ConversationDecisionKind =
   | "defer_legacy_media"
   | "defer_legacy_opt_out"
   | "confirm_km_update"
+  | "confirm_expense_create"
   | "no_op";
 
 export type ConversationOutcome =
@@ -158,7 +163,12 @@ export type ConversationResponseKey =
   | "km_update_correction_confirmation"
   | "km_update_applied"
   | "km_update_no_change"
-  | "km_update_retry_needed";
+  | "km_update_retry_needed"
+  | "expense_category_prompt"
+  | "expense_create_confirmation"
+  | "expense_create_correction_confirmation"
+  | "expense_create_completed"
+  | "expense_create_retry_needed";
 
 
 export type ConversationResponseParams = {
@@ -166,6 +176,8 @@ export type ConversationResponseParams = {
   options?: string[];
   newKm?: number;
   previousKm?: number | null;
+  valor?: number;
+  categoria?: string;
 };
 
 export type ConversationCoreDecision = {
