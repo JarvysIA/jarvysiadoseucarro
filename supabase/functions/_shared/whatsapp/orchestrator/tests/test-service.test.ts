@@ -1833,8 +1833,7 @@ describe("HARD2 transition-mapper adoption", () => {
     const logs = collectLogger();
     const res = await runWhatsappOrchestratorTestCycle(
       { workerId: "w" },
-      baseDeps(m.repo, { decide: () => decision }),
-      logs.logger,
+      baseDeps(m.repo, { decide: () => decision, logger: logs.logger }),
     );
     expect(res.counts.malformed).toBe(1);
     expect(m.calls.apply.length).toBe(0);
@@ -1863,8 +1862,7 @@ describe("HARD2 transition-mapper adoption", () => {
     const logs = collectLogger();
     const res = await runWhatsappOrchestratorTestCycle(
       { workerId: "w" },
-      baseDeps(m.repo, { decide: () => decision }),
-      logs.logger,
+      baseDeps(m.repo, { decide: () => decision, logger: logs.logger }),
     );
     expect(res.counts.malformed).toBe(1);
     expect(m.calls.apply.length).toBe(0);
