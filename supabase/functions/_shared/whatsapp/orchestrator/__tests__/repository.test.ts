@@ -779,6 +779,7 @@ describe("mapStateRow — VALID_STATE_NAMES em sincronia", () => {
     const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
     await expect(repo.loadContext(CLAIMED)).rejects.toBeInstanceOf(MalformedResponseError);
   });
+});
 
 describe("loadContext — queue/message/lease/contact/instance", () => {
   test("queue ausente → queue_not_found", async () => {
