@@ -32,6 +32,7 @@ import type {
   ConversationStateName,
   ConversationStatePatch,
   ConversationVehicle,
+  RequestSource,
 } from "../conversation/types.ts";
 import {
   AmbiguousTimeoutError,
