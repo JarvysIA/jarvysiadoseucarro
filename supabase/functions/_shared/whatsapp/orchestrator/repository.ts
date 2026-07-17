@@ -263,6 +263,10 @@ export function serializePatch(patch: ConversationStatePatch): Record<string, un
     unknown,
   ][]) {
     if (tsKey === "state") continue;
+    // Build 5.7F2E1A.5-HARD: lastMessageId é gravado pela própria RPC (a partir
+    // de v_msg.id); core.ts inclui esse campo em quase toda decisão normal via
+    // withLastMessage(). Ignorar em vez de lançar.
+    if (tsKey === "lastMessageId") continue;
     if (value === undefined) continue; // omitido
     const sqlKey = PATCH_KEY_MAP[tsKey];
     if (!sqlKey || !RPC_PATCH_KEYS_ALLOWED.has(sqlKey)) {
