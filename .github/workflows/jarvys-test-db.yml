@@ -227,6 +227,44 @@ jobs:
       - name: MJ1D-V D3 — crash-window replay encadeado com apply (Postgres real)
         run: bun test supabase/tests/mj1d-v/d3-crash-window-replay.test.ts
 
+      - name: MJ2A-V E1 — expense_create applied happy path (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e1-happy-path-applied.test.ts
+
+      - name: MJ2A-V E2 — expense_create replay idempotente (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e2-replay-idempotent.test.ts
+
+      - name: MJ2A-V E3 — expense_create replay payload mismatch (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e3-replay-payload-mismatch.test.ts
+
+      - name: MJ2A-V E4 — expense_create state_version_conflict (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e4-state-version-conflict.test.ts
+
+      - name: MJ2A-V E5 — expense_create invalid state (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e5-invalid-state.test.ts
+
+      - name: MJ2A-V E6 — expense_create draft_type mismatch (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e6-draft-type-mismatch.test.ts
+
+      - name: MJ2A-V E7 — expense_create draft_payload mismatch (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e7-draft-payload-mismatch.test.ts
+
+      - name: MJ2A-V E8 — expense_create categoria_invalid (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e8-categoria-invalid.test.ts
+
+      - name: MJ2A-V E9 — expense_create valor_invalid (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e9-valor-invalid.test.ts
+
+      - name: MJ2A-V E10 — expense_create vehicle_not_owned (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e10-vehicle-not-owned.test.ts
+
+      - name: MJ2A-V E11 — expense_create vehicle_archived (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e11-vehicle-archived.test.ts
+
+      - name: MJ2A-V E12 — expense_create concorrência real mesmo draft_id (Postgres real)
+        run: bun test supabase/tests/mj2a-v/e12-concurrency-same-draft.test.ts
+
+
+
 
 
 
@@ -252,7 +290,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12) e MJ1D-V (D1-D3) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
+            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12), MJ1D-V (D1-D3) e MJ2A-V (E1-E12) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"
