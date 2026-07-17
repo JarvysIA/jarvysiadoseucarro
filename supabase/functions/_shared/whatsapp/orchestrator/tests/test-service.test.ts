@@ -1789,5 +1789,91 @@ describe("static safety", () => {
   });
 });
 
+// ============================================================
+// HARD2 — transition-mapper adoption inside runApply
+// ============================================================
+
+describe("HARD2 transition-mapper adoption", () => {
+  test("statePatch sem chave state => mapper injeta decision.nextState", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    // decisão de greeting real: nextState === previousState, statePatch SEM `state`
+    const decision = decisionRespond({
+      previousState: "idle",
+      nextState: "idle",
+      statePatch: {},
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decision }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply.length).toBe(1);
+    // mapper injetou o state ausente
+    expect(m.calls.apply[0].patch.state).toBe("idle");
+    expect(m.calls.release.length).toBe(0);
+  });
+
+  test("statePatch.state divergente de nextState => malformed, Repository nunca chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      // sem apply enfileirado — se runApply chamar, mock joga "queue empty"
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const decision = decisionRespond({
+      nextState: "idle",
+      statePatch: { state: "completed" },
+    });
+    const logs = collectLogger();
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decision, logger: logs.logger }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+    const failLog = logs.events.find(
+      (e) => e.event === "item_failed" && (e as { reasonCode?: string }).reasonCode === "transition_mapping_failed",
+    );
+    expect(failLog).toBeDefined();
+    expect((failLog as { errorCategory?: string }).errorCategory).toBe("state_mismatch");
+  });
+
+  test("decisionKind fora do allowlist (no_op) => malformed via mapper, Repository nunca chamado", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const decision = decisionRespond({
+      decisionKind: "no_op",
+      responseKey: null,
+      nextState: "idle",
+      statePatch: { state: "idle" },
+    });
+    const logs = collectLogger();
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decision, logger: logs.logger }),
+    );
+    expect(res.counts.malformed).toBe(1);
+    expect(m.calls.apply.length).toBe(0);
+    expect(m.calls.release.length).toBe(1);
+    const failLog = logs.events.find(
+      (e) => e.event === "item_failed" && (e as { reasonCode?: string }).reasonCode === "transition_mapping_failed",
+    );
+    expect((failLog as { errorCategory?: string }).errorCategory).toBe("non_persistible_decision");
+  });
+});
+
 // Guard para o TS não reclamar de importações não-utilizadas em cenários.
 type _KeepTypes = ItemOutcome | TestCycleCounts;
+
