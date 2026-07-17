@@ -1814,6 +1814,24 @@ export type Database = {
         }
         Returns: Json
       }
+      execute_whatsapp_expense_create: {
+        Args: {
+          p_categoria: string
+          p_confirmation_message_id: string
+          p_contact_id: string
+          p_conversation_state_id: string
+          p_descricao: string
+          p_draft_id: string
+          p_expected_state_version: number
+          p_orchestrator_version: string
+          p_queue_item_id: string
+          p_source_message_id: string
+          p_user_id: string
+          p_valor: number
+          p_vehicle_id: string
+        }
+        Returns: Json
+      }
       execute_whatsapp_km_update: {
         Args: {
           p_confirmation_message_id: string
