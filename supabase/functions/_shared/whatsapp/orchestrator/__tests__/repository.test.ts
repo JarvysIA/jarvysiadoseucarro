@@ -85,9 +85,23 @@ describe("serializePatch", () => {
     expect(() => serializePatch({ state: null } as never)).toThrow(/next_state/);
   });
 
-  test("lastMessageId (não aceito pela RPC) rejeita", () => {
+  test("Build 5.7F2E1A.5-HARD: lastMessageId é ignorado (não vai para o payload) e não lança", () => {
+    const out = serializePatch({
+      state: "idle",
+      lastMessageId: "11111111-1111-1111-1111-111111111111",
+    });
+    expect(out.next_state).toBe("idle");
+    expect(Object.prototype.hasOwnProperty.call(out, "last_message_id")).toBe(false);
+  });
+
+  test("Build 5.7F2E1A.5-HARD: sem lastMessageId continua funcionando (regressão)", () => {
+    const out = serializePatch({ state: "idle" });
+    expect(out).toEqual({ next_state: "idle" });
+  });
+
+  test("Build 5.7F2E1A.5-HARD: chave realmente desconhecida ainda lança (regressão defensiva)", () => {
     expect(() =>
-      serializePatch({ state: "idle", lastMessageId: "xx" } as never),
+      serializePatch({ state: "idle", chaveInexistente: "x" } as never),
     ).toThrow(/not accepted/);
   });
 });
