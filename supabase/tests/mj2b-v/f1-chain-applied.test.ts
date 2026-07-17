@@ -89,7 +89,7 @@ function buildCtxMock(
     isArchived: false,
     isEligible: true,
     kmAtual: null,
-    whatsappAccessMode: "premium",
+    whatsappAccessMode: "full",
   };
   return {
     kind: "ok",
