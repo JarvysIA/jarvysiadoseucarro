@@ -862,9 +862,19 @@ export class WhatsappOrchestratorRepository {
 // Mapeadores read-only para loadContext.
 // ============================================================
 
+// Build 5.7F2E1A.5-HARD: precisa ficar em sincronia MANUAL com
+// ConversationStateName em conversation/types.ts. Se um novo estado for
+// adicionado lá, adicionar aqui também — mapStateRow lança
+// MalformedResponseError para qualquer valor fora deste Set.
 const VALID_STATE_NAMES: ReadonlySet<ConversationStateName> = new Set<ConversationStateName>([
   "idle",
   "awaiting_vehicle",
+  "awaiting_km_confirmation",
+  "awaiting_km_correction",
+  "awaiting_requested_km",
+  "awaiting_expense_category",
+  "awaiting_expense_confirmation",
+  "awaiting_expense_correction",
   "completed",
   "cancelled",
   "expired",
