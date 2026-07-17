@@ -290,7 +290,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12) e MJ1D-V (D1-D3) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
+            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12), MJ1D-V (D1-D3) e MJ2A-V (E1-E12) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"
