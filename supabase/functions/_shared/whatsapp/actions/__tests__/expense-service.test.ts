@@ -458,7 +458,7 @@ describe("mapeamento executor -> resultado público", () => {
   test("applied -> completed", async () => {
     const { port } = makeExecutor({ kind: "applied", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
     const res = await executeConfirmedExpenseCreate(baseInput(), { executor: port });
-    expect(res).toEqual({ kind: "completed", actionExecutionId: "aei-9", valor: 149.9, categoria: "Combustível" });
+    expect(res).toEqual({ kind: "completed", actionExecutionId: "aei-9", despesaId: "desp-0001", valor: 149.9, categoria: "Combustível" });
   });
 
   test("replayed -> replayed", async () => {
