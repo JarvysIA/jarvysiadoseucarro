@@ -899,7 +899,7 @@ function virtualIdleState(): ConversationState {
   };
 }
 
-function mapStateRow(row: Record<string, unknown>): ConversationState {
+export function mapStateRow(row: Record<string, unknown>): ConversationState {
   const stateName = row.state;
   if (typeof stateName !== "string" || !VALID_STATE_NAMES.has(stateName as ConversationStateName)) {
     throw new MalformedResponseError("conversation_states.state inválido ou ausente");
