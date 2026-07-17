@@ -886,11 +886,12 @@ describe("F. mapeamento de retornos da RPC", () => {
 // ===========================================================================
 
 describe("G. guardas anti-escrita paralela", () => {
-  test("serializePatch rejeita last_message_id (contrato preservado)", () => {
-    expect(() =>
-      serializePatch({ state: "idle", lastMessageId: MSG_T1 } as unknown as ConversationStatePatch),
-    ).toThrow(/not accepted/);
+  test("serializePatch ignora last_message_id (Build 5.7F2E1A.5-HARD: RPC grava sozinha a partir de v_msg.id)", () => {
+    const out = serializePatch({ state: "idle", lastMessageId: MSG_T1 });
+    expect("last_message_id" in out).toBe(false);
+    expect(out.next_state).toBe("idle");
   });
+
 
   test("mock recusa RPCs fora do allowlist (nenhuma escrita paralela)", async () => {
     const mock = makeFaithfulMock({
