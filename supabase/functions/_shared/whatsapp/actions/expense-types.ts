@@ -113,12 +113,14 @@ export type ExpenseCreateExecutorResult =
   | {
       kind: "applied";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
   | {
       kind: "replayed";
       actionExecutionId: string;
+      despesaId: string;
       valor: number;
       categoria: ExpenseCategory;
     }
