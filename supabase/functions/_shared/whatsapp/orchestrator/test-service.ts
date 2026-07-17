@@ -827,19 +827,36 @@ async function runApply(
   workerId: string,
   attempt: number,
 ): Promise<ApplyOutcome> {
-  const transitionInput: TransitionInput = {
-    queueItemId: item.queueId,
-    leaseToken: item.leaseToken,
-    expectedStateVersion,
-    patch: decision.statePatch,
-    orchestratorVersion: deps.orchestratorVersion,
-    resultSummary: {
-      decisionKind: decision.decisionKind,
-      eventKind: decision.eventKind,
-      outcome: decision.outcome,
-    },
-    response,
-  };
+  let transitionInput: TransitionInput;
+  try {
+    transitionInput = mapConversationDecisionToTransitionInput({
+      decision,
+      queueItemId: item.queueId,
+      leaseToken: item.leaseToken,
+      expectedStateVersion,
+      orchestratorVersion: deps.orchestratorVersion,
+      response,
+    });
+  } catch (err) {
+    log({
+      event: "item_failed",
+      workerId,
+      queueItemId: item.queueId,
+      reasonCode: "transition_mapping_failed",
+      errorCategory: err instanceof RepositoryError ? err.code : classifyError(err),
+    });
+    const outcome = await releaseAs(
+      item,
+      deps,
+      "cancelled",
+      "orchestrator_invariant",
+      "malformed",
+      log,
+      workerId,
+    );
+    return { kind: "terminal", outcome };
+  }
+
 
   let res: TransitionResult;
   try {
