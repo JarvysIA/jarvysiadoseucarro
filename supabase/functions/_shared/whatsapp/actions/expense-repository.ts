@@ -1,7 +1,7 @@
 // Build expense-repository — Repository TS estrito para
-// execute_whatsapp_expense_create. Mirror estrutural de actions/repository.ts
-// (KM), adaptado ao domínio de despesa. Backend-only. Não conectado ao runtime.
-// Não importa Deno, fetch, React, node:crypto.
+// execute_whatsapp_expense_create. Mirror estrutural do repositório de KM,
+// adaptado ao domínio de despesa. Backend-only. Não conectado ao runtime.
+// Sem dependências de runtime de browser ou edge.
 
 import {
   EXPENSE_CATEGORIES,
