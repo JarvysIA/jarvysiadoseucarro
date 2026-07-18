@@ -98,8 +98,18 @@ export function renderResponse(
       const label = params.vehicleLabel ?? "seu carro";
       const v = formatValor(params.valor);
       const cat = params.categoria ?? "essa categoria";
-      return `Anotar ${v} em ${cat} no ${label}? Responda sim para confirmar ou não para cancelar.`;
+      const itemsLabel = joinRecognizedTags(params.recognizedTags);
+      const itemsSuffix = itemsLabel ? ` (${itemsLabel})` : "";
+      const base = `Anotar ${v} em ${cat}${itemsSuffix} no ${label}? Responda sim para confirmar ou não para cancelar.`;
+      if (params.needsFilterClarification) {
+        return `${base} Qual filtro foi trocado (ar, cabine ou combustível)?`;
+      }
+      if (params.needsDescriptionInvite) {
+        return `${base} Se quiser contar mais sobre o que foi feito, pode falar 🙂`;
+      }
+      return base;
     }
+
     case "expense_create_correction_confirmation": {
       const label = params.vehicleLabel ?? "seu carro";
       const v = formatValor(params.valor);
