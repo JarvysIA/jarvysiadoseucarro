@@ -94,20 +94,20 @@ describe("core — unknown (no text) during confirmation nudge", () => {
   test("unknown + text 'sim' during awaiting_expense_confirmation → confirm, not nudge", () => {
     const d = decideConversation(
       inp({
-        sourceMessageId: "aaaaaaaa-1111-2222-3333-444444444444",
+        sourceMessageId: "aaaaaaaa-1111-4222-8333-444444444444",
         messageType: "unknown",
         originalText: "sim",
         state: state({
           state: "awaiting_expense_confirmation",
           draftType: "expense",
-          draftId: "aaaaaaaa-1111-2222-3333-444444444444",
+          draftId: "aaaaaaaa-1111-4222-8333-444444444444",
           draftVersion: 2,
           draftPayload: {
             phase: "awaiting_confirmation",
-            vehicleId: "aaaaaaaa-1111-2222-3333-555555555555",
+            vehicleId: "aaaaaaaa-1111-4222-8333-555555555555",
             valor: 150,
             categoria: "Combustível",
-            requestMessageId: "aaaaaaaa-1111-2222-3333-444444444444",
+            requestMessageId: "aaaaaaaa-1111-4222-8333-444444444444",
           },
         }),
       }),
