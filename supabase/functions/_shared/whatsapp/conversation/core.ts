@@ -31,6 +31,7 @@ import {
 } from "./km-update-protocol.ts";
 import {
   parseExpenseValorText,
+  parseExpenseValorBareNumber,
   matchExpenseCategoria,
 } from "./expense-create-parser.ts";
 import {
