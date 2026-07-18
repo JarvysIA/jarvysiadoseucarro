@@ -104,6 +104,8 @@ export function renderResponse(
     }
     case "expense_create_retry_needed":
       return "Não consegui concluir agora. Pode me contar a despesa de novo?";
+    case "requested_km_unknown":
+      return "Sem problema! Quando souber a km, é só me contar 😉";
   }
 }
 
