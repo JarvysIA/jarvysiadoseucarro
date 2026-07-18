@@ -211,6 +211,25 @@ function gateMaintenanceItemsByCategory(
   };
 }
 
+/**
+ * Build 4c/9 do item 6 — placeholder de rendering. A rendering final dos
+ * itens/descricao/ambiguidade de filtro em cima do texto de resposta é um
+ * build posterior (responses.ts). Por enquanto, extras vivem apenas no
+ * draftPayload; este helper devolve um objeto vazio pra manter o call site
+ * pronto sem ampliar ConversationResponseParams neste build.
+ */
+function buildMaintenanceResponseExtras(
+  _raw:
+    | {
+        recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+        descricao?: string | null;
+        ambiguousFilterMention?: boolean;
+      }
+    | null,
+): Record<string, never> {
+  return {};
+}
+
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
 // um marco de manutenção, não um número de verdade a ser gravado.
