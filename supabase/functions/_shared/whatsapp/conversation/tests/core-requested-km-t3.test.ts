@@ -191,7 +191,7 @@ describe("awaiting_requested_km — reply parsing", () => {
     const d = decideConversation(
       inp({
         state: requestedKmState(VEH_1),
-        originalText: "não sei",
+        originalText: "xyz123abc",
         vehicles: [veh(VEH_1, 30000)],
       }),
     );
