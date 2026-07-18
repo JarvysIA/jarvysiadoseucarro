@@ -329,6 +329,7 @@ function extractPartialExpenseDraft(
   requestMessageId: string;
   recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   descricaoPreliminar?: string | null;
+  ambiguousFilterMention?: boolean;
 } | null {
   if (state.draftType !== "expense") return null;
   if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
@@ -344,8 +345,12 @@ function extractPartialExpenseDraft(
     ...("descricaoPreliminar" in v.value
       ? { descricaoPreliminar: v.value.descricaoPreliminar }
       : {}),
+    ...("ambiguousFilterMention" in v.value
+      ? { ambiguousFilterMention: v.value.ambiguousFilterMention }
+      : {}),
   };
 }
+
 
 export function decideConversation(
   input: ConversationCoreInput,
