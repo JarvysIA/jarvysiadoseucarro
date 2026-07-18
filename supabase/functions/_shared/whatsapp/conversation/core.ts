@@ -1270,8 +1270,6 @@ export function decideConversation(
     }
   }
 
-    }
-  }
 
   // 10) Fallback (unknown)
   const nextFallback = fallbackCount + 1;
