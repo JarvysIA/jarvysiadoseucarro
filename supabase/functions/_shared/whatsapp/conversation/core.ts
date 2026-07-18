@@ -1220,10 +1220,14 @@ export function decideConversation(
       }
       const categoriaMatch = matchExpenseCategoria(input.originalText);
       if (!categoriaMatch.ok) {
+        const rawItems = computeMaintenanceItemsRaw(input.originalText);
         const candidate = {
           phase: "awaiting_category" as const,
           valor: parsedValor.valor,
           requestMessageId: input.sourceMessageId,
+          recognizedTags: rawItems.recognizedTags,
+          descricaoPreliminar: rawItems.descricaoPreliminar,
+          ambiguousFilterMention: rawItems.ambiguousFilterMention,
         };
         const validated = validateAwaitingCategoryExpenseDraft(candidate);
         if (validated.ok) {
