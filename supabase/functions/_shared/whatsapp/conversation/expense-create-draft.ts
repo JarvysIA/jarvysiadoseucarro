@@ -22,6 +22,13 @@ export type AwaitingCategoryExpenseDraft = {
   readonly phase: "awaiting_category";
   readonly valor: number;
   readonly requestMessageId: string;
+  // Build 4c/9 do item 6 — calculado especulativamente ANTES de saber a
+  // categoria (o parser de itens não depende dela). Só é efetivamente
+  // aproveitado depois, se a categoria resolvida vier a ser Revisão ou
+  // Manutenção — ver gateMaintenanceItemsByCategory em core.ts.
+  readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly descricaoPreliminar?: string | null;
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type AwaitingVehicleExpenseDraft = {
