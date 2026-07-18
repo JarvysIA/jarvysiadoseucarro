@@ -1,20 +1,8 @@
-// Build expense-create-draft — Contratos e validators puros dos drafts de
-// criação de despesa via WhatsApp. Módulo 100% puro: sem I/O, sem Supabase,
-// sem env, sem clock, sem crypto, sem rede. Não importa de actions/*.
-
-// ---------------------------------------------------------------------------
-// Constantes de versão de PERSISTÊNCIA do draft (não pertencem ao payload).
-// Despesa tem até 2 perguntas pendentes (categoria, depois veículo), logo 3
-// níveis de promoção: INITIAL (novo), PROMOTED_ONCE, PROMOTED_TWICE.
-// ---------------------------------------------------------------------------
+import type { MaintenanceTriggerTag } from "./expense-maintenance-items-parser.ts";
 
 export const EXPENSE_CREATE_INITIAL_DRAFT_VERSION = 0 as const;
 export const EXPENSE_CREATE_PROMOTED_ONCE_VERSION = 1 as const;
 export const EXPENSE_CREATE_PROMOTED_TWICE_VERSION = 2 as const;
-
-// ---------------------------------------------------------------------------
-// Limites e vocabulários locais (duplicados de propósito, não importar).
-// ---------------------------------------------------------------------------
 
 const EXPENSE_MAX_VALOR = 999999999.99;
 
@@ -30,10 +18,6 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
 
-// ---------------------------------------------------------------------------
-// Contratos
-// ---------------------------------------------------------------------------
-
 export type AwaitingCategoryExpenseDraft = {
   readonly phase: "awaiting_category";
   readonly valor: number;
@@ -45,6 +29,12 @@ export type AwaitingVehicleExpenseDraft = {
   readonly categoria: ExpenseCategory;
   readonly valor: number;
   readonly requestMessageId: string;
+  // Build 3/9 do item 6 — aditivo, só populado quando categoria já veio
+  // como Revisão/Manutenção e o parser de itens (build 2) já rodou sobre a
+  // mensagem original, antes de saber o veículo. Nenhum outro fluxo (KM,
+  // despesas de outras categorias) usa esses campos.
+  readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly descricaoPreliminar?: string | null;
 };
 
 export type AwaitingConfirmationExpenseDraft = {
@@ -53,16 +43,15 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly valor: number;
   readonly vehicleId: string;
   readonly requestMessageId: string;
+  // Build 3/9 do item 6 — aditivo, mesma regra do campo acima.
+  readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly descricao?: string | null;
 };
 
 export type ExpenseCreateDraft =
   | AwaitingCategoryExpenseDraft
   | AwaitingVehicleExpenseDraft
   | AwaitingConfirmationExpenseDraft;
-
-// ---------------------------------------------------------------------------
-// Erros e resultados
-// ---------------------------------------------------------------------------
 
 export type ExpenseDraftValidationErrorCode =
   | "not_an_object"
@@ -72,15 +61,13 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_valor"
   | "invalid_categoria"
   | "invalid_request_message_id"
-  | "invalid_vehicle_id";
+  | "invalid_vehicle_id"
+  | "invalid_recognized_tags"
+  | "invalid_descricao";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: ExpenseDraftValidationErrorCode };
-
-// ---------------------------------------------------------------------------
-// Helpers puros
-// ---------------------------------------------------------------------------
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object") return false;
@@ -105,7 +92,6 @@ function isValidValor(value: unknown): value is number {
   if (!Number.isFinite(value)) return false;
   if (value <= 0) return false;
   if (value > EXPENSE_MAX_VALOR) return false;
-  // rejeita fração de centavo
   if (Math.round(value * 100) / 100 !== value) return false;
   return true;
 }
@@ -116,24 +102,68 @@ function isValidCategoria(value: unknown): value is ExpenseCategory {
   return typeof value === "string" && CATEGORIES_SET.has(value);
 }
 
+const MAINTENANCE_TAGS_SET = new Set<string>([
+  "oleo",
+  "filtro",
+  "pastilha",
+  "arrefecimento",
+]);
+
+// Aditivo (build 3/9 do item 6): array de 0 a 4 tags válidas, sem
+// duplicatas — o parser (build 2) já garante isso na origem, mas
+// validamos aqui de novo, pois o draft vem do banco, não direto do parser.
+function isValidRecognizedTags(
+  value: unknown,
+): value is ReadonlyArray<MaintenanceTriggerTag> {
+  if (!Array.isArray(value)) return false;
+  if (value.length > 4) return false;
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string" || !MAINTENANCE_TAGS_SET.has(item)) return false;
+    if (seen.has(item)) return false;
+    seen.add(item);
+  }
+  return true;
+}
+
+const DESCRICAO_MAX_CHARS = 500;
+
+// Aditivo (build 3/9 do item 6): texto livre opcional, null explícito
+// significa "sem descrição ainda" — diferente de campo ausente (undefined),
+// que significa "essa categoria nem usa esse conceito".
+function isValidDescricaoField(value: unknown): value is string | null {
+  if (value === null) return true;
+  if (typeof value !== "string") return false;
+  if (value.length > DESCRICAO_MAX_CHARS) return false;
+  return true;
+}
+
 const CATEGORY_KEYS = ["phase", "valor", "requestMessageId"] as const;
-const VEHICLE_KEYS = [
+
+const VEHICLE_REQUIRED_KEYS = [
   "phase",
   "categoria",
   "valor",
   "requestMessageId",
 ] as const;
-const CONFIRMATION_KEYS = [
+const VEHICLE_OPTIONAL_KEYS = ["recognizedTags", "descricaoPreliminar"] as const;
+const VEHICLE_ALL_KEYS: ReadonlyArray<string> = [
+  ...VEHICLE_REQUIRED_KEYS,
+  ...VEHICLE_OPTIONAL_KEYS,
+];
+
+const CONFIRMATION_REQUIRED_KEYS = [
   "phase",
   "categoria",
   "valor",
   "vehicleId",
   "requestMessageId",
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Validators
-// ---------------------------------------------------------------------------
+const CONFIRMATION_OPTIONAL_KEYS = ["recognizedTags", "descricao"] as const;
+const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
+  ...CONFIRMATION_REQUIRED_KEYS,
+  ...CONFIRMATION_OPTIONAL_KEYS,
+];
 
 export function validateAwaitingCategoryExpenseDraft(
   input: unknown,
@@ -175,11 +205,11 @@ export function validateAwaitingVehicleExpenseDraft(
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
 
   for (const k of Object.keys(input)) {
-    if (!(VEHICLE_KEYS as ReadonlyArray<string>).includes(k)) {
+    if (!VEHICLE_ALL_KEYS.includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  for (const k of VEHICLE_KEYS) {
+  for (const k of VEHICLE_REQUIRED_KEYS) {
     if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
 
@@ -196,6 +226,15 @@ export function validateAwaitingVehicleExpenseDraft(
     return { ok: false, code: "invalid_request_message_id" };
   }
 
+  const hasRecognizedTags = hasOwn(input, "recognizedTags");
+  if (hasRecognizedTags && !isValidRecognizedTags(input.recognizedTags)) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  const hasDescricaoPreliminar = hasOwn(input, "descricaoPreliminar");
+  if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+
   return {
     ok: true,
     value: {
@@ -203,6 +242,12 @@ export function validateAwaitingVehicleExpenseDraft(
       categoria: input.categoria,
       valor: input.valor,
       requestMessageId: input.requestMessageId,
+      ...(hasRecognizedTags
+        ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
+        : {}),
+      ...(hasDescricaoPreliminar
+        ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
     },
   };
 }
@@ -213,11 +258,11 @@ export function validateAwaitingConfirmationExpenseDraft(
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
 
   for (const k of Object.keys(input)) {
-    if (!(CONFIRMATION_KEYS as ReadonlyArray<string>).includes(k)) {
+    if (!CONFIRMATION_ALL_KEYS.includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  for (const k of CONFIRMATION_KEYS) {
+  for (const k of CONFIRMATION_REQUIRED_KEYS) {
     if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
 
@@ -237,6 +282,15 @@ export function validateAwaitingConfirmationExpenseDraft(
     return { ok: false, code: "invalid_request_message_id" };
   }
 
+  const hasRecognizedTags = hasOwn(input, "recognizedTags");
+  if (hasRecognizedTags && !isValidRecognizedTags(input.recognizedTags)) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  const hasDescricao = hasOwn(input, "descricao");
+  if (hasDescricao && !isValidDescricaoField(input.descricao)) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+
   return {
     ok: true,
     value: {
@@ -245,6 +299,10 @@ export function validateAwaitingConfirmationExpenseDraft(
       valor: input.valor,
       vehicleId: input.vehicleId,
       requestMessageId: input.requestMessageId,
+      ...(hasRecognizedTags
+        ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
+        : {}),
+      ...(hasDescricao ? { descricao: input.descricao as string | null } : {}),
     },
   };
 }
