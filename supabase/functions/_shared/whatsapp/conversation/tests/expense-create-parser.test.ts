@@ -313,26 +313,32 @@ describe("matchExpenseCategoria — Combustível (2+ keywords)", () => {
 });
 
 describe("matchExpenseCategoria — Manutenção (2+ keywords)", () => {
-  test('"troquei a correia"', () => {
-    expect(matchExpenseCategoria("troquei a correia")).toEqual({
-      ok: true,
-      categoria: "Manutenção",
-    });
-  });
   test('"fui na oficina"', () => {
     expect(matchExpenseCategoria("fui na oficina")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
   });
-  test('"conserto do freio" — duas keywords MESMA categoria', () => {
-    expect(matchExpenseCategoria("conserto do freio")).toEqual({
+  test('"pneus novos"', () => {
+    expect(matchExpenseCategoria("pneus novos")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
   });
-  test('"pneus novos"', () => {
-    expect(matchExpenseCategoria("pneus novos")).toEqual({
+  test('"conserto do ar condicionado"', () => {
+    expect(matchExpenseCategoria("conserto do ar condicionado")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"troquei a suspensão"', () => {
+    expect(matchExpenseCategoria("troquei a suspensão")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"bateria nova"', () => {
+    expect(matchExpenseCategoria("bateria nova")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
