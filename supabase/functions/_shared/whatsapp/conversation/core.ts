@@ -1154,12 +1154,22 @@ export function decideConversation(
         });
         if (resolvedVeh.kind === "matched") {
           const veh = resolvedVeh.vehicle;
+          const extras = computeMaintenanceDraftExtras(
+            categoriaMatch.categoria,
+            input.originalText,
+          );
           const candidate = {
             phase: "awaiting_confirmation" as const,
             categoria: categoriaMatch.categoria,
             valor: parsedValor.valor,
             vehicleId: veh.id,
             requestMessageId: input.sourceMessageId,
+            ...(extras
+              ? {
+                  recognizedTags: extras.recognizedTags,
+                  descricao: extras.descricaoPreliminar,
+                }
+              : {}),
           };
           const validated =
             validateAwaitingConfirmationExpenseDraft(candidate);
@@ -1193,11 +1203,21 @@ export function decideConversation(
             });
           }
         } else {
+          const extras = computeMaintenanceDraftExtras(
+            categoriaMatch.categoria,
+            input.originalText,
+          );
           const candidate = {
             phase: "awaiting_vehicle" as const,
             categoria: categoriaMatch.categoria,
             valor: parsedValor.valor,
             requestMessageId: input.sourceMessageId,
+            ...(extras
+              ? {
+                  recognizedTags: extras.recognizedTags,
+                  descricaoPreliminar: extras.descricaoPreliminar,
+                }
+              : {}),
           };
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
