@@ -56,6 +56,8 @@ export type AwaitingConfirmationExpenseDraft = {
   // Build 3/9 do item 6 — aditivo, mesma regra do campo acima.
   readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   readonly descricao?: string | null;
+  // Build 4c/9 do item 6.
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type ExpenseCreateDraft =
