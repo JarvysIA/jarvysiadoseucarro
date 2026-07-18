@@ -271,8 +271,30 @@ export function decideConversation(
     expiredHandled = true;
   }
 
-  // 4) Mídia — defer para roteador legado
+  // 4) Mídia — defer para roteador legado, exceto durante confirmação pendente
   if (MEDIA_TYPES.has(input.messageType)) {
+    const isDuringConfirmation =
+      effectiveState.state === "awaiting_km_confirmation" ||
+      effectiveState.state === "awaiting_km_correction" ||
+      effectiveState.state === "awaiting_expense_confirmation" ||
+      effectiveState.state === "awaiting_expense_correction";
+
+    if (isDuringConfirmation) {
+      return buildDecision({
+        eventKind: "media",
+        decisionKind: "respond",
+        previousState,
+        nextState: effectiveState.state,
+        outcome: expiredOutcome,
+        statePatch: withLastMessage(basePatch, input.sourceMessageId),
+        responseKey: "media_unclear_during_confirmation",
+        nextFallbackCount: fallbackCount,
+        reasonCode: expiredHandled
+          ? "expired_then_media_during_confirmation"
+          : "media_during_confirmation_nudge",
+      });
+    }
+
     return buildDecision({
       eventKind: "media",
       decisionKind: "defer_legacy_media",
@@ -286,6 +308,7 @@ export function decideConversation(
       reasonCode: expiredHandled ? "expired_then_media" : "media_deferred_to_legacy",
     });
   }
+
 
   // Somente texto (ou tipo desconhecido / system) daqui em diante
   const normalized = normalizeCommandText(input.originalText);
