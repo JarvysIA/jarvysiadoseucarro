@@ -349,6 +349,10 @@ export function validateAwaitingConfirmationExpenseDraft(
   if (hasDescricao && !isValidDescricaoField(input.descricao)) {
     return { ok: false, code: "invalid_descricao" };
   }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
 
   return {
     ok: true,
@@ -362,6 +366,9 @@ export function validateAwaitingConfirmationExpenseDraft(
         ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
         : {}),
       ...(hasDescricao ? { descricao: input.descricao as string | null } : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
     },
   };
 }
