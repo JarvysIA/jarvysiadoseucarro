@@ -170,12 +170,10 @@ describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", (
       valor: 1200,
     });
   });
-  test('"revisão 20.000km 1.800" → continua protegido pela guarda de marco (não é chamado aqui, mas se fosse, devolveria 1800)', () => {
-    // A guarda de marco de revisão fica no core.ts; o parser puro, se chamado,
-    // apenas encontra o número 1.800. Não regressa para "180"+"0".
+  test('"revisão 20.000km 1.800" → ambíguo (dois números; a guarda de marco fica no core.ts)', () => {
     expect(parseExpenseValorBareNumber("revisão 20.000km 1.800")).toEqual({
-      ok: true,
-      valor: 1800,
+      ok: false,
+      code: "ambiguous_valor_candidate",
     });
   });
   test('"oficina 300" → 300 (regressão)', () => {
@@ -193,15 +191,16 @@ describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", (
       valor: 220,
     });
   });
-  test('"conserto 800,00" → 800 (vírgula, regressão)', () => {
+  test('"conserto 800,00" → fallback de vírgula não entra aqui (é parseExpenseValorText); aqui devolve no_valor_candidate', () => {
+    // Regressão geral protegida pelo core.ts, que tenta parseExpenseValorText
+    // primeiro e só depois o fallback.
     expect(parseExpenseValorBareNumber("conserto 800,00")).toEqual({
-      ok: true,
-      valor: 800,
+      ok: false,
+      code: "no_valor_candidate",
     });
   });
-  test('"300" sozinho → continua sem categoria, mas valor é reconhecido', () => {
-    // O parser puro reconhece o número; a decisão de exigir categoria fica no
-    // core.ts. Aqui garantimos que não regrediu para "30"+"0".
+  test('"300" sozinho → valor reconhecido pelo parser puro; sem categoria é regra do core.ts', () => {
+    // Aqui garantimos que não regrediu para "30"+"0".
     expect(parseExpenseValorBareNumber("300")).toEqual({ ok: true, valor: 300 });
   });
   test('"12.345" → 12345', () => {
@@ -210,10 +209,9 @@ describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", (
       valor: 12345,
     });
   });
-  test('"R$ 1.800" → não é número pelado (âncora presente)', () => {
-    // Quando há âncora, a função de fallback não deve ser usada; se chamada,
-    // ela ainda encontra 1.800 (ponto de milhar) e retorna 1800. O teste documenta
-    // que o fallback é independente da âncora.
+  test('"R$ 1.800" → se chamado, encontra 1.800 como ponto de milhar', () => {
+    // Documenta que o fallback puro não sabe de âncora; o core.ts evita usá-lo
+    // quando há R$.
     expect(parseExpenseValorBareNumber("R$ 1.800")).toEqual({
       ok: true,
       valor: 1800,
@@ -238,6 +236,7 @@ describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", (
     });
   });
 });
+
 
 describe("parseExpenseValorText — formato inválido", () => {
 
