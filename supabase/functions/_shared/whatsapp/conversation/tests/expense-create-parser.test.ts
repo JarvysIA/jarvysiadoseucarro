@@ -313,26 +313,32 @@ describe("matchExpenseCategoria — Combustível (2+ keywords)", () => {
 });
 
 describe("matchExpenseCategoria — Manutenção (2+ keywords)", () => {
-  test('"troquei a correia"', () => {
-    expect(matchExpenseCategoria("troquei a correia")).toEqual({
-      ok: true,
-      categoria: "Manutenção",
-    });
-  });
   test('"fui na oficina"', () => {
     expect(matchExpenseCategoria("fui na oficina")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
   });
-  test('"conserto do freio" — duas keywords MESMA categoria', () => {
-    expect(matchExpenseCategoria("conserto do freio")).toEqual({
+  test('"pneus novos"', () => {
+    expect(matchExpenseCategoria("pneus novos")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
   });
-  test('"pneus novos"', () => {
-    expect(matchExpenseCategoria("pneus novos")).toEqual({
+  test('"conserto do ar condicionado"', () => {
+    expect(matchExpenseCategoria("conserto do ar condicionado")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"troquei a suspensão"', () => {
+    expect(matchExpenseCategoria("troquei a suspensão")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"bateria nova"', () => {
+    expect(matchExpenseCategoria("bateria nova")).toEqual({
       ok: true,
       categoria: "Manutenção",
     });
@@ -350,6 +356,375 @@ describe("matchExpenseCategoria — Revisão (2+ keywords)", () => {
     expect(matchExpenseCategoria("revisão preventiva")).toEqual({
       ok: true,
       categoria: "Revisão",
+    });
+  });
+  test('"óleo"', () => {
+    expect(matchExpenseCategoria("óleo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"pastilha de freio"', () => {
+    expect(matchExpenseCategoria("pastilha de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"freio" sozinho', () => {
+    expect(matchExpenseCategoria("freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"disco de freio"', () => {
+    expect(matchExpenseCategoria("disco de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"vela de ignição"', () => {
+    expect(matchExpenseCategoria("vela de ignição")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"correia dentada"', () => {
+    expect(matchExpenseCategoria("correia dentada")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"kit sincronismo"', () => {
+    expect(matchExpenseCategoria("kit sincronismo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"arrefecimento"', () => {
+    expect(matchExpenseCategoria("arrefecimento")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"radiador"', () => {
+    expect(matchExpenseCategoria("radiador")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"palhetas"', () => {
+    expect(matchExpenseCategoria("palhetas")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"alinhamento e balanceamento"', () => {
+    expect(matchExpenseCategoria("alinhamento e balanceamento")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"câmbio"', () => {
+    expect(matchExpenseCategoria("câmbio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"direção hidráulica"', () => {
+    expect(matchExpenseCategoria("direção hidráulica")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro de cabine"', () => {
+    expect(matchExpenseCategoria("filtro de cabine")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro de ar"', () => {
+    expect(matchExpenseCategoria("filtro de ar")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+});
+
+// Build CORRETIVO 4/6 — alinhamento com motor determinístico
+// (Revisão = itens rastreados por marco de km; Manutenção = corretivos)
+
+describe("matchExpenseCategoria — Revisão: itens do motor determinístico (adicionais)", () => {
+  test('"pastilha"', () => {
+    expect(matchExpenseCategoria("pastilha")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"velas"', () => {
+    expect(matchExpenseCategoria("velas")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"correia"', () => {
+    expect(matchExpenseCategoria("correia")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"fluido de freio"', () => {
+    expect(matchExpenseCategoria("fluido de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"geometria"', () => {
+    expect(matchExpenseCategoria("geometria")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"cambagem"', () => {
+    expect(matchExpenseCategoria("cambagem")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"câmbio" sozinho', () => {
+    expect(matchExpenseCategoria("câmbio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"óleo do câmbio"', () => {
+    expect(matchExpenseCategoria("óleo do câmbio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"direção hidráulica"', () => {
+    expect(matchExpenseCategoria("direção hidráulica")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"óleo da direção"', () => {
+    expect(matchExpenseCategoria("óleo da direção")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"sangria de freio"', () => {
+    expect(matchExpenseCategoria("sangria de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"discos de freio"', () => {
+    expect(matchExpenseCategoria("discos de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"correia banhada"', () => {
+    expect(matchExpenseCategoria("correia banhada")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"correia poly v"', () => {
+    expect(matchExpenseCategoria("correia poly v")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"aditivo do radiador"', () => {
+    expect(matchExpenseCategoria("aditivo do radiador")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"troca de óleo"', () => {
+    expect(matchExpenseCategoria("troca de óleo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro do óleo"', () => {
+    expect(matchExpenseCategoria("filtro do óleo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro do ar"', () => {
+    expect(matchExpenseCategoria("filtro do ar")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+});
+
+describe("matchExpenseCategoria — Manutenção: corretivos não rastreados por km (adicionais)", () => {
+  test('"amortecedor"', () => {
+    expect(matchExpenseCategoria("amortecedor")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"bucha"', () => {
+    expect(matchExpenseCategoria("bucha")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"buchas"', () => {
+    expect(matchExpenseCategoria("buchas")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"batente"', () => {
+    expect(matchExpenseCategoria("batente")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"ar condicionado"', () => {
+    expect(matchExpenseCategoria("ar condicionado")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"carga de gás"', () => {
+    expect(matchExpenseCategoria("carga de gás")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"higienização do ar condicionado"', () => {
+    expect(matchExpenseCategoria("higienização do ar condicionado")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"alternador"', () => {
+    expect(matchExpenseCategoria("alternador")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"mecânico"', () => {
+    expect(matchExpenseCategoria("mecânico")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"conserto"', () => {
+    expect(matchExpenseCategoria("conserto")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"pneu"', () => {
+    expect(matchExpenseCategoria("pneu")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"embreagem"', () => {
+    expect(matchExpenseCategoria("embreagem")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+});
+
+describe("matchExpenseCategoria — frases naturais completas (Build 4/6)", () => {
+  test('"troquei a pastilha de freio" → Revisão', () => {
+    expect(matchExpenseCategoria("troquei a pastilha de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"fiz o alinhamento e balanceamento" → Revisão', () => {
+    expect(matchExpenseCategoria("fiz o alinhamento e balanceamento")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"consertei o ar condicionado, tava sem gelar" → Manutenção', () => {
+    expect(matchExpenseCategoria("consertei o ar condicionado, tava sem gelar")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"troquei a bucha do amortecedor" → Manutenção', () => {
+    expect(matchExpenseCategoria("troquei a bucha do amortecedor")).toEqual({
+      ok: true,
+      categoria: "Manutenção",
+    });
+  });
+  test('"pastilha e disco de freio, vela nova também" → Revisão', () => {
+    expect(matchExpenseCategoria("pastilha e disco de freio, vela nova também")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"óleo, filtro e correia" → Revisão', () => {
+    expect(matchExpenseCategoria("óleo, filtro e correia")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+});
+
+describe("matchExpenseCategoria — concessões técnicas confirmadas (Build 4/6)", () => {
+  test('"ar" sozinho não classifica nenhuma categoria', () => {
+    expect(matchExpenseCategoria("ar")).toEqual({
+      ok: false,
+      code: "no_categoria_candidate",
+    });
+  });
+  test('"filtro de combustível" → Combustível (não Revisão)', () => {
+    expect(matchExpenseCategoria("filtro de combustível")).toEqual({
+      ok: true,
+      categoria: "Combustível",
+    });
+  });
+});
+
+describe("matchExpenseCategoria — Combustível (expansão Build 4/6)", () => {
+  test('"completei o tanque"', () => {
+    expect(matchExpenseCategoria("completei o tanque")).toEqual({
+      ok: true,
+      categoria: "Combustível",
+    });
+  });
+  test('"enchi o tanque"', () => {
+    expect(matchExpenseCategoria("enchi o tanque")).toEqual({
+      ok: true,
+      categoria: "Combustível",
+    });
+  });
+  test('"tanque cheio"', () => {
+    expect(matchExpenseCategoria("tanque cheio")).toEqual({
+      ok: true,
+      categoria: "Combustível",
+    });
+  });
+  test('"encher o tanque"', () => {
+    expect(matchExpenseCategoria("encher o tanque")).toEqual({
+      ok: true,
+      categoria: "Combustível",
+    });
+  });
+});
+
+describe("matchExpenseCategoria — Acessórios (expansão Build 4/6)", () => {
+  test('"som" sozinho', () => {
+    expect(matchExpenseCategoria("som")).toEqual({
+      ok: true,
+      categoria: "Acessórios",
     });
   });
 });
