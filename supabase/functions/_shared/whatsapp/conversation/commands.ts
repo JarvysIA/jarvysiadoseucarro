@@ -1,5 +1,13 @@
 // Build 5.7F2A — Classificação determinística de comandos WhatsApp.
 // Grupos disjuntos. Match EXATO no texto normalizado (após normalizeCommandText).
+//
+// BUILD CORRETIVO 1/5: expandido o vocabulário de confirm/deny/cancel_task
+// com variações casuais reais (testadas antes deste build) + emojis de
+// polegar checados no texto original, antes da normalização apagar
+// emojis. Continua sendo match EXATO (lista fechada) — nenhuma tentativa
+// de reconhecer "contém uma palavra parecida com sim/não" no meio de uma
+// frase qualquer, pra não criar falso positivo perigoso (uma despesa/km
+// sendo confirmada sem o usuário ter dito sim de verdade).
 
 import type { NormalizedText } from "./normalize.ts";
 
@@ -43,6 +51,22 @@ const CONFIRM = new Set<string>([
   "OK",
   "PODE SIM",
   "PODE CONFIRMAR",
+  "BLZ",
+  "BELEZA",
+  "SHOW",
+  "FECHADO",
+  "MANDA",
+  "PODE IR",
+  "ISSO MESMO",
+  "YES",
+  "COM CERTEZA",
+  "SIM PODE",
+  "CLARO",
+  "TA BOM",
+  "TA BOM E AI",
+  "TA CERTO",
+  "TA OTIMO",
+  "PERFEITO",
 ]);
 
 const DENY = new Set<string>([
@@ -50,6 +74,11 @@ const DENY = new Set<string>([
   "ERRADO",
   "NEGATIVO",
   "NAO ESTA CERTO",
+  "NAO PERA",
+  "NAO, PERA",
+  "ACHO QUE NAO",
+  "MELHOR NAO",
+  "NAO ISSO NAO",
 ]);
 
 const CANCEL_TASK = new Set<string>([
@@ -60,7 +89,16 @@ const CANCEL_TASK = new Set<string>([
   "ESQUECE",
   "PODE IGNORAR",
   "NAO QUERO CONTINUAR ISSO",
+  "DEIXA QUIETO",
+  "CANCELA ISSO AI",
 ]);
+
+// Emojis inequívocos de sim/não, checados no texto ORIGINAL (antes da
+// normalização apagar emojis). Só variações de tom de pele do polegar —
+// a mensagem inteira precisa ser só o emoji (trim simples), sem mais
+// nada junto.
+const THUMBS_UP = new Set<string>(["👍", "👍🏻", "👍🏼", "👍🏽", "👍🏾", "👍🏿"]);
+const THUMBS_DOWN = new Set<string>(["👎", "👎🏻", "👎🏼", "👎🏽", "👎🏾", "👎🏿"]);
 
 const RESET_CONVERSATION = new Set<string>([
   "RECOMECAR",
@@ -69,7 +107,6 @@ const RESET_CONVERSATION = new Set<string>([
 ]);
 
 // Opt-out EXPLÍCITO. Match exato no texto normalizado inteiro.
-// Palavras isoladas ambíguas (ex.: "REMOVER", "NAO QUERO") NUNCA são opt-out.
 const EXPLICIT_OPT_OUT = new Set<string>([
   "SAIR",
   "PARAR",
@@ -80,12 +117,11 @@ const EXPLICIT_OPT_OUT = new Set<string>([
   "CANCELAR MENSAGENS",
 ]);
 
-/**
- * Classifica um texto já normalizado. Retorna "none" quando nada casa.
- * Ordem interna importa quando um mesmo token aparece em dois grupos —
- * por design, GREETING vem antes de HELP para que "OI" nunca vire ajuda.
- */
 export function classifyCommand(n: NormalizedText): CommandKind {
+  const rawTrimmed = n.originalText.trim();
+  if (THUMBS_UP.has(rawTrimmed)) return "confirm";
+  if (THUMBS_DOWN.has(rawTrimmed)) return "deny";
+
   if (n.isEmpty && !n.isQuestionMarkOnly) return "none";
   const t = n.normalizedText;
   if (t === "") return "none";
@@ -100,14 +136,9 @@ export function classifyCommand(n: NormalizedText): CommandKind {
   return "none";
 }
 
-/**
- * Diferencia negação simples de possível indício de correção futura.
- * O core NÃO implementa correção de valor/KM neste build; apenas expõe o sinal.
- */
 export function looksLikeCorrectionHint(n: NormalizedText): boolean {
   const t = n.normalizedText;
   if (t === "") return false;
-  // negativa curta seguida de complemento ("NAO ESTA CERTO", "NAO E ISSO", etc.)
   if (t.startsWith("NAO ") && t.length > 4) return true;
   return false;
 }
