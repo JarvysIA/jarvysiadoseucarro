@@ -148,7 +148,7 @@ describe("Build 4a — extras de manutenção no draftPayload de despesa", () =>
     expect("descricaoPreliminar" in p2).toBe(false);
   });
 
-  test("(6) responseKey/responseParams não mudam quando o extra é populado", () => {
+  test("(6) responseKey mantém, responseParams ganha extras de rendering (build 4b)", () => {
     const d = decideConversation(
       inp({
         originalText: "Troquei a pastilha de freio, 220 reais",
@@ -156,16 +156,19 @@ describe("Build 4a — extras de manutenção no draftPayload de despesa", () =>
       }),
     );
     expect(d.responseKey).toBe("expense_create_confirmation");
-    // responseParams continua exatamente com as 3 chaves visíveis de sempre
-    expect(Object.keys(d.responseParams).sort()).toEqual(
-      ["categoria", "valor", "vehicleLabel"],
-    );
-    expect((d.responseParams as Record<string, unknown>).categoria).toBe("Revisão");
-    expect((d.responseParams as Record<string, unknown>).valor).toBe(220);
-    // Não vaza extras nos params visíveis
-    expect("recognizedTags" in d.responseParams).toBe(false);
-    expect("descricao" in d.responseParams).toBe(false);
+    const params = d.responseParams as Record<string, unknown>;
+    expect(params.categoria).toBe("Revisão");
+    expect(params.valor).toBe(220);
+    expect(params.vehicleLabel).toBeDefined();
+    // Build 4b — extras de rendering agora chegam nos responseParams
+    expect(params.recognizedTags).toEqual(["pastilha"]);
+    expect(params.needsFilterClarification).toBe(false);
+    expect(params.needsDescriptionInvite).toBe(false);
+    // Extras internos do draft (descricao/descricaoPreliminar) NÃO vazam nos params visíveis
+    expect("descricao" in params).toBe(false);
+    expect("descricaoPreliminar" in params).toBe(false);
   });
+
 
   test("(7) Regressão: fluxo de KM não recebe extras", () => {
     const d = decideConversation(
