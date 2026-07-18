@@ -140,6 +140,42 @@ function mergePatch(
 
 const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "document"]);
 
+const MAINTENANCE_DESCRIPTION_MIN_LETTERS = 15;
+
+function countLetters(text: string): number {
+  const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const matches = normalized.match(/[a-zA-Z]/g);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Build 4a/9 do item 6 — quando a categoria for Revisão/Manutenção, roda o
+ * parser de itens (build 2) sobre a mensagem original e decide se já há
+ * descrição suficiente pra dispensar o convite de descrição (usado pelo
+ * build 4b, ainda não implementado). Fora dessas 2 categorias, devolve
+ * null — nenhum campo novo é adicionado ao draft, comportamento idêntico
+ * ao anterior a este build.
+ */
+function computeMaintenanceDraftExtras(
+  categoria: ExpenseCategory,
+  originalText: string,
+): {
+  recognizedTags: ReadonlyArray<MaintenanceTriggerTag>;
+  descricaoPreliminar: string | null;
+} | null {
+  if (categoria !== "Revisão" && categoria !== "Manutenção") return null;
+  const parsed = parseMaintenanceItemsText(originalText);
+  const recognizedTags = parsed.items.map((i) => i.tag);
+  const trimmed = originalText.trim();
+  const sufficient =
+    recognizedTags.length > 0 ||
+    countLetters(trimmed) >= MAINTENANCE_DESCRIPTION_MIN_LETTERS;
+  return {
+    recognizedTags,
+    descricaoPreliminar: sufficient ? trimmed : null,
+  };
+}
+
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
 // um marco de manutenção, não um número de verdade a ser gravado.
