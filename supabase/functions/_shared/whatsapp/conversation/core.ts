@@ -136,6 +136,18 @@ function mergePatch(
 
 const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "document"]);
 
+// Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
+// lida como um valor literal (nem km, nem dinheiro) — é uma referência a
+// um marco de manutenção, não um número de verdade a ser gravado.
+const REVISAO_MILESTONE_RE = /\brevisao\b[\s\S]{0,25}?\b[0-9]{1,3}\s+mil\b/;
+function looksLikeMaintenanceMilestoneReference(text: string): boolean {
+  const normalized = text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return REVISAO_MILESTONE_RE.test(normalized);
+}
+
 const REQUESTED_KM_UNKNOWN_PHRASES = new Set<string>([
   "NAO SEI",
   "NAO SEI AGORA",
