@@ -146,7 +146,16 @@ function isValidDescricaoField(value: unknown): value is string | null {
   return true;
 }
 
-const CATEGORY_KEYS = ["phase", "valor", "requestMessageId"] as const;
+const CATEGORY_REQUIRED_KEYS = ["phase", "valor", "requestMessageId"] as const;
+const CATEGORY_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricaoPreliminar",
+  "ambiguousFilterMention",
+] as const;
+const CATEGORY_ALL_KEYS: ReadonlyArray<string> = [
+  ...CATEGORY_REQUIRED_KEYS,
+  ...CATEGORY_OPTIONAL_KEYS,
+];
 
 const VEHICLE_REQUIRED_KEYS = [
   "phase",
