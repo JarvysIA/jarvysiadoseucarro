@@ -106,6 +106,8 @@ export function renderResponse(
       return "Não consegui concluir agora. Pode me contar a despesa de novo?";
     case "requested_km_unknown":
       return "Sem problema! Quando souber a km, é só me contar 😉";
+    case "media_unclear_during_confirmation":
+      return "Recebi algo que ainda não consigo entender. Pode descrever em texto, ou só confirmar com 'sim' ou 'não'?";
   }
 }
 
