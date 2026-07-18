@@ -168,7 +168,11 @@ const VEHICLE_REQUIRED_KEYS = [
   "valor",
   "requestMessageId",
 ] as const;
-const VEHICLE_OPTIONAL_KEYS = ["recognizedTags", "descricaoPreliminar"] as const;
+const VEHICLE_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricaoPreliminar",
+  "ambiguousFilterMention",
+] as const;
 const VEHICLE_ALL_KEYS: ReadonlyArray<string> = [
   ...VEHICLE_REQUIRED_KEYS,
   ...VEHICLE_OPTIONAL_KEYS,
