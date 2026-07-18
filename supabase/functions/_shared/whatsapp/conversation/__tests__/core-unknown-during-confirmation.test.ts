@@ -94,18 +94,20 @@ describe("core — unknown (no text) during confirmation nudge", () => {
   test("unknown + text 'sim' during awaiting_expense_confirmation → confirm, not nudge", () => {
     const d = decideConversation(
       inp({
+        sourceMessageId: "aaaaaaaa-1111-2222-3333-444444444444",
         messageType: "unknown",
         originalText: "sim",
         state: state({
           state: "awaiting_expense_confirmation",
           draftType: "expense",
-          draftId: "draft-exp-1",
+          draftId: "aaaaaaaa-1111-2222-3333-444444444444",
           draftVersion: 2,
           draftPayload: {
             phase: "awaiting_confirmation",
-            vehicleId: "veh-1",
+            vehicleId: "aaaaaaaa-1111-2222-3333-555555555555",
             valor: 150,
-            categoria: "combustivel",
+            categoria: "Combustível",
+            requestMessageId: "aaaaaaaa-1111-2222-3333-444444444444",
           },
         }),
       }),
@@ -114,7 +116,7 @@ describe("core — unknown (no text) during confirmation nudge", () => {
     expect(d.eventKind).toBe("confirm");
     expect(d.responseKey).toBeNull();
     expect(d.deferToLegacyRouter).toBe(false);
-    expect(d.nextState).toBe("awaiting_requested_km");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
   });
 
   test("image during awaiting_expense_confirmation still nudges (no regression)", () => {
