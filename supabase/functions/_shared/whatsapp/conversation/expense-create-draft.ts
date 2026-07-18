@@ -70,7 +70,8 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_request_message_id"
   | "invalid_vehicle_id"
   | "invalid_recognized_tags"
-  | "invalid_descricao";
+  | "invalid_descricao"
+  | "invalid_ambiguous_filter_mention";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
