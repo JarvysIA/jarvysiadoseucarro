@@ -151,7 +151,96 @@ describe("parseExpenseValorText — fora de escopo (sem âncora)", () => {
   });
 });
 
+describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", () => {
+  test('"mecanico 1.800" → 1800', () => {
+    expect(parseExpenseValorBareNumber("mecanico 1.800")).toEqual({
+      ok: true,
+      valor: 1800,
+    });
+  });
+  test('"oficina 2.500" → 2500', () => {
+    expect(parseExpenseValorBareNumber("oficina 2.500")).toEqual({
+      ok: true,
+      valor: 2500,
+    });
+  });
+  test('"conserto 1.200" → 1200', () => {
+    expect(parseExpenseValorBareNumber("conserto 1.200")).toEqual({
+      ok: true,
+      valor: 1200,
+    });
+  });
+  test('"revisão 20.000km 1.800" → continua protegido pela guarda de marco (não é chamado aqui, mas se fosse, devolveria 1800)', () => {
+    // A guarda de marco de revisão fica no core.ts; o parser puro, se chamado,
+    // apenas encontra o número 1.800. Não regressa para "180"+"0".
+    expect(parseExpenseValorBareNumber("revisão 20.000km 1.800")).toEqual({
+      ok: true,
+      valor: 1800,
+    });
+  });
+  test('"oficina 300" → 300 (regressão)', () => {
+    expect(parseExpenseValorBareNumber("oficina 300")).toEqual({
+      ok: true,
+      valor: 300,
+    });
+  });
+  test('"GNV 30" → 30 (regressão)', () => {
+    expect(parseExpenseValorBareNumber("GNV 30")).toEqual({ ok: true, valor: 30 });
+  });
+  test('"óleo 220" → 220 (regressão)', () => {
+    expect(parseExpenseValorBareNumber("óleo 220")).toEqual({
+      ok: true,
+      valor: 220,
+    });
+  });
+  test('"conserto 800,00" → 800 (vírgula, regressão)', () => {
+    expect(parseExpenseValorBareNumber("conserto 800,00")).toEqual({
+      ok: true,
+      valor: 800,
+    });
+  });
+  test('"300" sozinho → continua sem categoria, mas valor é reconhecido', () => {
+    // O parser puro reconhece o número; a decisão de exigir categoria fica no
+    // core.ts. Aqui garantimos que não regrediu para "30"+"0".
+    expect(parseExpenseValorBareNumber("300")).toEqual({ ok: true, valor: 300 });
+  });
+  test('"12.345" → 12345', () => {
+    expect(parseExpenseValorBareNumber("12.345")).toEqual({
+      ok: true,
+      valor: 12345,
+    });
+  });
+  test('"R$ 1.800" → não é número pelado (âncora presente)', () => {
+    // Quando há âncora, a função de fallback não deve ser usada; se chamada,
+    // ela ainda encontra 1.800 (ponto de milhar) e retorna 1800. O teste documenta
+    // que o fallback é independente da âncora.
+    expect(parseExpenseValorBareNumber("R$ 1.800")).toEqual({
+      ok: true,
+      valor: 1800,
+    });
+  });
+  test("não-string: null", () => {
+    expect(parseExpenseValorBareNumber(null)).toEqual({
+      ok: false,
+      code: "not_a_string",
+    });
+  });
+  test("texto vazio", () => {
+    expect(parseExpenseValorBareNumber("")).toEqual({
+      ok: false,
+      code: "empty_text",
+    });
+  });
+  test('"texto sem número" → no_valor_candidate', () => {
+    expect(parseExpenseValorBareNumber("gastei muito hoje")).toEqual({
+      ok: false,
+      code: "no_valor_candidate",
+    });
+  });
+});
+
 describe("parseExpenseValorText — formato inválido", () => {
+
   test("vírgula com 3+ dígitos depois (ancorado por R$)", () => {
     expect(parseExpenseValorText("R$ 30,000")).toEqual({
       ok: false,
