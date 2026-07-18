@@ -188,11 +188,11 @@ export function validateAwaitingCategoryExpenseDraft(
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
 
   for (const k of Object.keys(input)) {
-    if (!(CATEGORY_KEYS as ReadonlyArray<string>).includes(k)) {
+    if (!CATEGORY_ALL_KEYS.includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  for (const k of CATEGORY_KEYS) {
+  for (const k of CATEGORY_REQUIRED_KEYS) {
     if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
 
@@ -206,12 +206,34 @@ export function validateAwaitingCategoryExpenseDraft(
     return { ok: false, code: "invalid_request_message_id" };
   }
 
+  const hasRecognizedTags = hasOwn(input, "recognizedTags");
+  if (hasRecognizedTags && !isValidRecognizedTags(input.recognizedTags)) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  const hasDescricaoPreliminar = hasOwn(input, "descricaoPreliminar");
+  if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
+
   return {
     ok: true,
     value: {
       phase: "awaiting_category",
       valor: input.valor,
       requestMessageId: input.requestMessageId,
+      ...(hasRecognizedTags
+        ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
+        : {}),
+      ...(hasDescricaoPreliminar
+        ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
     },
   };
 }
