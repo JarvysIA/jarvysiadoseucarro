@@ -185,7 +185,11 @@ const CONFIRMATION_REQUIRED_KEYS = [
   "vehicleId",
   "requestMessageId",
 ] as const;
-const CONFIRMATION_OPTIONAL_KEYS = ["recognizedTags", "descricao"] as const;
+const CONFIRMATION_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricao",
+  "ambiguousFilterMention",
+] as const;
 const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
   ...CONFIRMATION_REQUIRED_KEYS,
   ...CONFIRMATION_OPTIONAL_KEYS,
