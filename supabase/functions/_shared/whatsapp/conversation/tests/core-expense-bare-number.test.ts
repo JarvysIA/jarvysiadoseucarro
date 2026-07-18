@@ -151,7 +151,9 @@ describe("segurança — número pelado acima do teto não vira despesa", () => 
 // ---------------------------------------------------------------------------
 
 describe("build 4 — ainda não funcionam (documentação)", () => {
-  const cases = ["ar 800", "completei 270", "óleo 220", "som 960"];
+  // "completei", "óleo" e "som" agora têm categoria (Build 4/6) e passam
+  // a funcionar com número pelado. Mantemos aqui apenas palavras sem categoria.
+  const cases = ["ar 800", "guincho 100", "lâmpada 45", "escapamento 200"];
   for (const text of cases) {
     test(`"${text}" → ainda cai no fallback (esperado)`, () => {
       const d = decideConversation(inp({ originalText: text }));
