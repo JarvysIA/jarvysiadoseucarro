@@ -212,23 +212,30 @@ function gateMaintenanceItemsByCategory(
 }
 
 /**
- * Build 4c/9 do item 6 — placeholder de rendering. A rendering final dos
- * itens/descricao/ambiguidade de filtro em cima do texto de resposta é um
- * build posterior (responses.ts). Por enquanto, extras vivem apenas no
- * draftPayload; este helper devolve um objeto vazio pra manter o call site
- * pronto sem ampliar ConversationResponseParams neste build.
+ * Build 4b/9 do item 6 — deriva os sinais que a MENSAGEM de confirmação
+ * precisa (não persistidos, só usados no responseParams desta resposta):
+ * lista de itens reconhecidos (pra mostrar), se deve perguntar qual filtro
+ * (prioridade máxima) e se deve convidar a descrever (só quando não há
+ * nem itens nem descrição suficiente, e não há pergunta de filtro pendente).
  */
-function buildMaintenanceResponseExtras(
-  _raw:
-    | {
-        recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
-        descricao?: string | null;
-        ambiguousFilterMention?: boolean;
-      }
-    | null,
-): Record<string, never> {
-  return {};
+function buildMaintenanceResponseExtras(data: {
+  recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  descricao: string | null | undefined;
+  ambiguousFilterMention?: boolean;
+} | null): Pick<
+  ConversationResponseParams,
+  "recognizedTags" | "needsDescriptionInvite" | "needsFilterClarification"
+> {
+  if (data === null) return {};
+  const needsFilterClarification = data.ambiguousFilterMention === true;
+  const hasDescricao = data.descricao !== null && data.descricao !== undefined;
+  return {
+    recognizedTags: data.recognizedTags,
+    needsFilterClarification,
+    needsDescriptionInvite: !needsFilterClarification && !hasDescricao,
+  };
 }
+
 
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
@@ -322,6 +329,7 @@ function extractPartialExpenseDraft(
   requestMessageId: string;
   recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   descricaoPreliminar?: string | null;
+  ambiguousFilterMention?: boolean;
 } | null {
   if (state.draftType !== "expense") return null;
   if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
@@ -337,8 +345,12 @@ function extractPartialExpenseDraft(
     ...("descricaoPreliminar" in v.value
       ? { descricaoPreliminar: v.value.descricaoPreliminar }
       : {}),
+    ...("ambiguousFilterMention" in v.value
+      ? { ambiguousFilterMention: v.value.ambiguousFilterMention }
+      : {}),
   };
 }
+
 
 export function decideConversation(
   input: ConversationCoreInput,
@@ -643,7 +655,17 @@ export function decideConversation(
               vehicleLabel: labelFor(veh),
               valor: expensePartial.valor,
               categoria: expensePartial.categoria,
+              ...buildMaintenanceResponseExtras(
+                "recognizedTags" in expensePartial || "ambiguousFilterMention" in expensePartial
+                  ? {
+                      recognizedTags: expensePartial.recognizedTags,
+                      descricao: expensePartial.descricaoPreliminar,
+                      ambiguousFilterMention: expensePartial.ambiguousFilterMention,
+                    }
+                  : null,
+              ),
             },
+
             nextFallbackCount: 0,
             reasonCode: "expense_create_complete_from_vehicle_reply",
           });
@@ -1253,6 +1275,7 @@ export function decideConversation(
               ? {
                   recognizedTags: extras.recognizedTags,
                   descricao: extras.descricaoPreliminar,
+                  ambiguousFilterMention: extras.ambiguousFilterMention,
                 }
               : {}),
           };
@@ -1282,11 +1305,21 @@ export function decideConversation(
                 vehicleLabel: labelFor(veh),
                 valor: parsedValor.valor,
                 categoria: categoriaMatch.categoria,
+                ...buildMaintenanceResponseExtras(
+                  extras
+                    ? {
+                        recognizedTags: extras.recognizedTags,
+                        descricao: extras.descricaoPreliminar,
+                        ambiguousFilterMention: extras.ambiguousFilterMention,
+                      }
+                    : null,
+                ),
               },
               nextFallbackCount: 0,
               reasonCode: "expense_reported_complete",
             });
           }
+
         } else {
           const extras = computeMaintenanceDraftExtras(
             categoriaMatch.categoria,
@@ -1301,9 +1334,11 @@ export function decideConversation(
               ? {
                   recognizedTags: extras.recognizedTags,
                   descricaoPreliminar: extras.descricaoPreliminar,
+                  ambiguousFilterMention: extras.ambiguousFilterMention,
                 }
               : {}),
           };
+
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
             return buildDecision({

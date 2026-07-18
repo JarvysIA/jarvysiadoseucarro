@@ -188,7 +188,11 @@ export type ConversationResponseParams = {
   previousKm?: number | null;
   valor?: number;
   categoria?: string;
+  recognizedTags?: ReadonlyArray<string>;
+  needsDescriptionInvite?: boolean;
+  needsFilterClarification?: boolean;
 };
+
 
 export type ConversationCoreDecision = {
   eventKind: ConversationEventKind;

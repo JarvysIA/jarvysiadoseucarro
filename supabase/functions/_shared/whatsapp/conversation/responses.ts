@@ -7,6 +7,22 @@ import type {
   ConversationResponseParams,
 } from "./types.ts";
 
+const MAINTENANCE_TAG_LABELS: Record<string, string> = {
+  oleo: "óleo",
+  filtro: "filtro",
+  pastilha: "pastilha",
+  arrefecimento: "arrefecimento",
+};
+
+function joinRecognizedTags(tags: ReadonlyArray<string> | undefined): string | null {
+  if (!tags || tags.length === 0) return null;
+  const labels = tags.map((t) => MAINTENANCE_TAG_LABELS[t] ?? t);
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} e ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")} e ${labels[labels.length - 1]}`;
+}
+
+
 export function renderResponse(
   key: ConversationResponseKey,
   params: ConversationResponseParams = {},
@@ -82,8 +98,18 @@ export function renderResponse(
       const label = params.vehicleLabel ?? "seu carro";
       const v = formatValor(params.valor);
       const cat = params.categoria ?? "essa categoria";
-      return `Anotar ${v} em ${cat} no ${label}? Responda sim para confirmar ou não para cancelar.`;
+      const itemsLabel = joinRecognizedTags(params.recognizedTags);
+      const itemsSuffix = itemsLabel ? ` (${itemsLabel})` : "";
+      const base = `Anotar ${v} em ${cat}${itemsSuffix} no ${label}? Responda sim para confirmar ou não para cancelar.`;
+      if (params.needsFilterClarification) {
+        return `${base} Qual filtro foi trocado (ar, cabine ou combustível)?`;
+      }
+      if (params.needsDescriptionInvite) {
+        return `${base} Se quiser contar mais sobre o que foi feito, pode falar 🙂`;
+      }
+      return base;
     }
+
     case "expense_create_correction_confirmation": {
       const label = params.vehicleLabel ?? "seu carro";
       const v = formatValor(params.valor);
