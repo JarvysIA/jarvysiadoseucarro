@@ -135,6 +135,22 @@ function mergePatch(
 
 const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "document"]);
 
+const REQUESTED_KM_UNKNOWN_PHRASES = new Set<string>([
+  "NAO SEI",
+  "NAO SEI AGORA",
+  "AGORA NAO SEI",
+  "NAO LEMBRO",
+  "NAO ME LEMBRO",
+  "NAO TENHO CERTEZA",
+  "SEI LA",
+  "NAO ANOTEI",
+  "DEPOIS TE FALO",
+  "DEPOIS EU FALO",
+  "DEPOIS FALO",
+  "TE FALO DEPOIS",
+  "MAIS TARDE",
+]);
+
 /**
  * Aplica idempotente do sourceMessageId em lastMessageId no patch final.
  */
