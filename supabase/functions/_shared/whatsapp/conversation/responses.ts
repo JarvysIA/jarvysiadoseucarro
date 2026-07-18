@@ -7,6 +7,22 @@ import type {
   ConversationResponseParams,
 } from "./types.ts";
 
+const MAINTENANCE_TAG_LABELS: Record<string, string> = {
+  oleo: "óleo",
+  filtro: "filtro",
+  pastilha: "pastilha",
+  arrefecimento: "arrefecimento",
+};
+
+function joinRecognizedTags(tags: ReadonlyArray<string> | undefined): string | null {
+  if (!tags || tags.length === 0) return null;
+  const labels = tags.map((t) => MAINTENANCE_TAG_LABELS[t] ?? t);
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} e ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")} e ${labels[labels.length - 1]}`;
+}
+
+
 export function renderResponse(
   key: ConversationResponseKey,
   params: ConversationResponseParams = {},
