@@ -42,6 +42,9 @@ export type AwaitingVehicleExpenseDraft = {
   // despesas de outras categorias) usa esses campos.
   readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   readonly descricaoPreliminar?: string | null;
+  // Build 4c/9 do item 6 — carregado ao longo do fluxo pra a resposta final
+  // poder perguntar "qual filtro?" quando aplicável.
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type AwaitingConfirmationExpenseDraft = {
