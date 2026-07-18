@@ -19,20 +19,60 @@ describe("classifyCommand groups", () => {
     }
   });
 
-  test("confirm", () => {
+  test("confirm — vocabulário original", () => {
     for (const t of ["sim", "pode", "confirma", "OK", "isso", "pode confirmar"]) {
       expect(c(t)).toBe("confirm");
     }
   });
 
-  test("deny", () => {
+  test("confirm — variações casuais (build corretivo 1/5)", () => {
+    for (const t of [
+      "ta bom e ai",
+      "blz",
+      "beleza",
+      "show",
+      "fechado",
+      "manda",
+      "pode ir",
+      "isso mesmo",
+      "yes",
+      "sim pode",
+      "com certeza",
+    ]) {
+      expect(c(t)).toBe("confirm");
+    }
+  });
+
+  test("confirm — emojis polegar pra cima (com e sem tom de pele)", () => {
+    for (const t of ["👍", "👍🏽"]) {
+      expect(c(t)).toBe("confirm");
+    }
+  });
+
+  test("deny — vocabulário original", () => {
     for (const t of ["não", "NAO", "errado", "negativo", "não está certo"]) {
       expect(c(t)).toBe("deny");
     }
   });
 
-  test("cancel_task", () => {
+  test("deny — variações casuais com vírgula/dúvida (build corretivo 1/5)", () => {
+    for (const t of ["nao, pera", "acho que nao", "melhor nao"]) {
+      expect(c(t)).toBe("deny");
+    }
+  });
+
+  test("deny — emoji polegar pra baixo", () => {
+    expect(c("👎")).toBe("deny");
+  });
+
+  test("cancel_task — vocabulário original", () => {
     for (const t of ["cancela", "cancelar", "deixa pra lá", "esquece", "pode ignorar"]) {
+      expect(c(t)).toBe("cancel_task");
+    }
+  });
+
+  test("cancel_task — variações casuais (build corretivo 1/5)", () => {
+    for (const t of ["deixa quieto", "cancela isso ai"]) {
       expect(c(t)).toBe("cancel_task");
     }
   });
@@ -69,6 +109,12 @@ describe("classifyCommand groups", () => {
     ]) {
       expect(c(t)).not.toBe("explicit_opt_out");
     }
+  });
+
+  test("ambíguos continuam none (não podem virar confirm/deny/cancel por engano)", () => {
+    expect(c("talvez")).toBe("none");
+    expect(c("nao sei")).toBe("none");
+    expect(c("é 350 na verdade")).toBe("none");
   });
 
   test("none for random text", () => {
