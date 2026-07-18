@@ -67,6 +67,8 @@ describe("revisão N mil — não vira despesa nem km", () => {
     "revisao dos 40 mil, troquei oleo e filtro",
     "revisao de 90 mil",
     "revisao dos 200 mil km",
+    "revisão 20.000km 1.800",
+    "revisao 60000km",
   ];
   for (const text of cases) {
     test(`"${text}" → fallback`, () => {
