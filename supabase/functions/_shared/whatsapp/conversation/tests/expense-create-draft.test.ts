@@ -541,3 +541,295 @@ describe("validateExpenseCreateDraft (união)", () => {
     if (!r.ok) expect(r.code).toBe("missing_field");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Build 3/9 do item 6 — campos aditivos (recognizedTags / descricao*)
+// ---------------------------------------------------------------------------
+
+const LONG_STR_501 = "a".repeat(501);
+const LONG_STR_500 = "a".repeat(500);
+
+describe("awaiting_vehicle — campos aditivos (build 3/9 do item 6)", () => {
+  it("aceita draft antigo sem os campos novos (regressão)", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("recognizedTags" in r.value).toBe(false);
+      expect("descricaoPreliminar" in r.value).toBe(false);
+    }
+  });
+
+  it("aceita recognizedTags=['oleo','filtro'] + descricaoPreliminar texto", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo", "filtro"],
+      descricaoPreliminar: "troquei oleo e filtro",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.recognizedTags).toEqual(["oleo", "filtro"]);
+      expect(r.value.descricaoPreliminar).toBe("troquei oleo e filtro");
+    }
+  });
+
+  it("aceita recognizedTags=[] + descricaoPreliminar=null", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Manutenção",
+      valor: 50,
+      requestMessageId: UUID_A,
+      recognizedTags: [],
+      descricaoPreliminar: null,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.recognizedTags).toEqual([]);
+      expect(r.value.descricaoPreliminar).toBeNull();
+    }
+  });
+
+  it("aceita descricaoPreliminar com exatamente 500 chars", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      descricaoPreliminar: LONG_STR_500,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejeita recognizedTags com tag desconhecida", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo", "bogus"] as unknown as string[],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita recognizedTags com duplicata", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo", "oleo"],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita recognizedTags com mais de 4 itens", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo", "filtro", "pastilha", "arrefecimento", "oleo"],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita recognizedTags não-array", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: "oleo" as unknown as string[],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita descricaoPreliminar não-string e não-null", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      descricaoPreliminar: 42 as unknown as string,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_descricao");
+  });
+
+  it("rejeita descricaoPreliminar com mais de 500 chars", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      descricaoPreliminar: LONG_STR_501,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_descricao");
+  });
+
+  it("continua rejeitando campo desconhecido como unexpected_field", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      phase: "awaiting_vehicle",
+      categoria: "Revisão",
+      valor: 100,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo"],
+      descricaoPreliminar: "ok",
+      foo: "bar",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("unexpected_field");
+  });
+});
+
+describe("awaiting_confirmation — campos aditivos (build 3/9 do item 6)", () => {
+  it("aceita draft antigo sem os campos novos (regressão)", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Manutenção",
+      valor: 250.5,
+      vehicleId: UUID_B,
+      requestMessageId: UUID_A,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("recognizedTags" in r.value).toBe(false);
+      expect("descricao" in r.value).toBe(false);
+    }
+  });
+
+  it("aceita recognizedTags=['pastilha'] + descricao texto", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      recognizedTags: ["pastilha"],
+      descricao: "troquei as pastilhas dianteiras",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.recognizedTags).toEqual(["pastilha"]);
+      expect(r.value.descricao).toBe("troquei as pastilhas dianteiras");
+    }
+  });
+
+  it("aceita descricao=null", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      descricao: null,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.descricao).toBeNull();
+  });
+
+  it("aceita descricao com exatamente 500 chars", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      descricao: LONG_STR_500,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejeita recognizedTags com tag desconhecida", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      recognizedTags: ["bogus"] as unknown as string[],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita recognizedTags com duplicata", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      recognizedTags: ["filtro", "filtro"],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita recognizedTags com mais de 4 itens", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo", "filtro", "pastilha", "arrefecimento", "oleo"],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_recognized_tags");
+  });
+
+  it("rejeita descricao não-string e não-null", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      descricao: 42 as unknown as string,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_descricao");
+  });
+
+  it("rejeita descricao com mais de 500 chars", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      descricao: LONG_STR_501,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_descricao");
+  });
+
+  it("continua rejeitando campo desconhecido como unexpected_field", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      phase: "awaiting_confirmation",
+      categoria: "Revisão",
+      valor: 100,
+      vehicleId: UUID_V,
+      requestMessageId: UUID_A,
+      recognizedTags: ["oleo"],
+      descricao: "ok",
+      foo: "bar",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("unexpected_field");
+  });
+});
+
