@@ -795,11 +795,22 @@ export function decideConversation(
           resolvedVeh.kind === "ambiguous" ||
           resolvedVeh.kind === "not_found"
         ) {
+          const gated = gateMaintenanceItemsByCategory(
+            categoriaMatch.categoria,
+            currentDraft.value,
+          );
           const candidate = {
             phase: "awaiting_vehicle" as const,
             categoria: categoriaMatch.categoria,
             valor: currentDraft.value.valor,
             requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricaoPreliminar: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
           };
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
