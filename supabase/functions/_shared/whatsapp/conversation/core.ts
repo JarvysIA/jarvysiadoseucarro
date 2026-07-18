@@ -20,6 +20,10 @@ import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
 import { parseKmUpdateText } from "./km-update-parser.ts";
 import {
+  parseMaintenanceItemsText,
+  type MaintenanceTriggerTag,
+} from "./expense-maintenance-items-parser.ts";
+import {
   KM_UPDATE_INITIAL_DRAFT_VERSION,
   KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
