@@ -22,6 +22,13 @@ export type AwaitingCategoryExpenseDraft = {
   readonly phase: "awaiting_category";
   readonly valor: number;
   readonly requestMessageId: string;
+  // Build 4c/9 do item 6 — calculado especulativamente ANTES de saber a
+  // categoria (o parser de itens não depende dela). Só é efetivamente
+  // aproveitado depois, se a categoria resolvida vier a ser Revisão ou
+  // Manutenção — ver gateMaintenanceItemsByCategory em core.ts.
+  readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly descricaoPreliminar?: string | null;
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type AwaitingVehicleExpenseDraft = {
@@ -35,6 +42,9 @@ export type AwaitingVehicleExpenseDraft = {
   // despesas de outras categorias) usa esses campos.
   readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   readonly descricaoPreliminar?: string | null;
+  // Build 4c/9 do item 6 — carregado ao longo do fluxo pra a resposta final
+  // poder perguntar "qual filtro?" quando aplicável.
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type AwaitingConfirmationExpenseDraft = {
@@ -46,6 +56,8 @@ export type AwaitingConfirmationExpenseDraft = {
   // Build 3/9 do item 6 — aditivo, mesma regra do campo acima.
   readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   readonly descricao?: string | null;
+  // Build 4c/9 do item 6.
+  readonly ambiguousFilterMention?: boolean;
 };
 
 export type ExpenseCreateDraft =
@@ -63,7 +75,8 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_request_message_id"
   | "invalid_vehicle_id"
   | "invalid_recognized_tags"
-  | "invalid_descricao";
+  | "invalid_descricao"
+  | "invalid_ambiguous_filter_mention";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -138,7 +151,16 @@ function isValidDescricaoField(value: unknown): value is string | null {
   return true;
 }
 
-const CATEGORY_KEYS = ["phase", "valor", "requestMessageId"] as const;
+const CATEGORY_REQUIRED_KEYS = ["phase", "valor", "requestMessageId"] as const;
+const CATEGORY_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricaoPreliminar",
+  "ambiguousFilterMention",
+] as const;
+const CATEGORY_ALL_KEYS: ReadonlyArray<string> = [
+  ...CATEGORY_REQUIRED_KEYS,
+  ...CATEGORY_OPTIONAL_KEYS,
+];
 
 const VEHICLE_REQUIRED_KEYS = [
   "phase",
@@ -146,7 +168,11 @@ const VEHICLE_REQUIRED_KEYS = [
   "valor",
   "requestMessageId",
 ] as const;
-const VEHICLE_OPTIONAL_KEYS = ["recognizedTags", "descricaoPreliminar"] as const;
+const VEHICLE_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricaoPreliminar",
+  "ambiguousFilterMention",
+] as const;
 const VEHICLE_ALL_KEYS: ReadonlyArray<string> = [
   ...VEHICLE_REQUIRED_KEYS,
   ...VEHICLE_OPTIONAL_KEYS,
@@ -159,7 +185,11 @@ const CONFIRMATION_REQUIRED_KEYS = [
   "vehicleId",
   "requestMessageId",
 ] as const;
-const CONFIRMATION_OPTIONAL_KEYS = ["recognizedTags", "descricao"] as const;
+const CONFIRMATION_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricao",
+  "ambiguousFilterMention",
+] as const;
 const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
   ...CONFIRMATION_REQUIRED_KEYS,
   ...CONFIRMATION_OPTIONAL_KEYS,
@@ -171,11 +201,11 @@ export function validateAwaitingCategoryExpenseDraft(
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
 
   for (const k of Object.keys(input)) {
-    if (!(CATEGORY_KEYS as ReadonlyArray<string>).includes(k)) {
+    if (!CATEGORY_ALL_KEYS.includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  for (const k of CATEGORY_KEYS) {
+  for (const k of CATEGORY_REQUIRED_KEYS) {
     if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
 
@@ -189,12 +219,34 @@ export function validateAwaitingCategoryExpenseDraft(
     return { ok: false, code: "invalid_request_message_id" };
   }
 
+  const hasRecognizedTags = hasOwn(input, "recognizedTags");
+  if (hasRecognizedTags && !isValidRecognizedTags(input.recognizedTags)) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  const hasDescricaoPreliminar = hasOwn(input, "descricaoPreliminar");
+  if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
+
   return {
     ok: true,
     value: {
       phase: "awaiting_category",
       valor: input.valor,
       requestMessageId: input.requestMessageId,
+      ...(hasRecognizedTags
+        ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
+        : {}),
+      ...(hasDescricaoPreliminar
+        ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
     },
   };
 }
@@ -234,6 +286,10 @@ export function validateAwaitingVehicleExpenseDraft(
   if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
     return { ok: false, code: "invalid_descricao" };
   }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
 
   return {
     ok: true,
@@ -247,6 +303,9 @@ export function validateAwaitingVehicleExpenseDraft(
         : {}),
       ...(hasDescricaoPreliminar
         ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
         : {}),
     },
   };
@@ -290,6 +349,10 @@ export function validateAwaitingConfirmationExpenseDraft(
   if (hasDescricao && !isValidDescricaoField(input.descricao)) {
     return { ok: false, code: "invalid_descricao" };
   }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
 
   return {
     ok: true,
@@ -303,6 +366,9 @@ export function validateAwaitingConfirmationExpenseDraft(
         ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
         : {}),
       ...(hasDescricao ? { descricao: input.descricao as string | null } : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
     },
   };
 }

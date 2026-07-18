@@ -149,21 +149,17 @@ function countLetters(text: string): number {
 }
 
 /**
- * Build 4a/9 do item 6 — quando a categoria for Revisão/Manutenção, roda o
- * parser de itens (build 2) sobre a mensagem original e decide se já há
- * descrição suficiente pra dispensar o convite de descrição (usado pelo
- * build 4b, ainda não implementado). Fora dessas 2 categorias, devolve
- * null — nenhum campo novo é adicionado ao draft, comportamento idêntico
- * ao anterior a este build.
+ * Build 4c/9 do item 6 — cálculo puro dos itens de manutenção, independente
+ * de categoria (o parser não precisa saber a categoria pra funcionar).
+ * Usado tanto quando a categoria já é conhecida (build 4a/4b) quanto
+ * especulativamente, ANTES de saber a categoria (build 4c, quando a
+ * mensagem original vai para awaiting_category).
  */
-function computeMaintenanceDraftExtras(
-  categoria: ExpenseCategory,
-  originalText: string,
-): {
+function computeMaintenanceItemsRaw(originalText: string): {
   recognizedTags: ReadonlyArray<MaintenanceTriggerTag>;
   descricaoPreliminar: string | null;
-} | null {
-  if (categoria !== "Revisão" && categoria !== "Manutenção") return null;
+  ambiguousFilterMention: boolean;
+} {
   const parsed = parseMaintenanceItemsText(originalText);
   const recognizedTags = parsed.items.map((i) => i.tag);
   const trimmed = originalText.trim();
@@ -173,7 +169,65 @@ function computeMaintenanceDraftExtras(
   return {
     recognizedTags,
     descricaoPreliminar: sufficient ? trimmed : null,
+    ambiguousFilterMention: parsed.ambiguousFilterMention,
   };
+}
+
+/**
+ * Build 4a-4b/9 do item 6 — quando a categoria for Revisão/Manutenção, roda
+ * o parser de itens sobre a mensagem original. Fora dessas 2 categorias,
+ * devolve null — nenhum campo novo é adicionado ao draft.
+ */
+function computeMaintenanceDraftExtras(
+  categoria: ExpenseCategory,
+  originalText: string,
+): ReturnType<typeof computeMaintenanceItemsRaw> | null {
+  if (categoria !== "Revisão" && categoria !== "Manutenção") return null;
+  return computeMaintenanceItemsRaw(originalText);
+}
+
+/**
+ * Build 4c/9 do item 6 — aplica o mesmo filtro de categoria (só Revisão/
+ * Manutenção) sobre dados JÁ calculados especulativamente (vindos do
+ * draft awaiting_category), em vez de reparsear o texto original.
+ */
+function gateMaintenanceItemsByCategory(
+  categoria: ExpenseCategory,
+  raw:
+    | {
+        recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+        descricaoPreliminar?: string | null;
+        ambiguousFilterMention?: boolean;
+      }
+    | undefined,
+): ReturnType<typeof computeMaintenanceItemsRaw> | null {
+  if (!raw) return null;
+  if (categoria !== "Revisão" && categoria !== "Manutenção") return null;
+  if (raw.recognizedTags === undefined) return null;
+  return {
+    recognizedTags: raw.recognizedTags,
+    descricaoPreliminar: raw.descricaoPreliminar ?? null,
+    ambiguousFilterMention: raw.ambiguousFilterMention === true,
+  };
+}
+
+/**
+ * Build 4c/9 do item 6 — placeholder de rendering. A rendering final dos
+ * itens/descricao/ambiguidade de filtro em cima do texto de resposta é um
+ * build posterior (responses.ts). Por enquanto, extras vivem apenas no
+ * draftPayload; este helper devolve um objeto vazio pra manter o call site
+ * pronto sem ampliar ConversationResponseParams neste build.
+ */
+function buildMaintenanceResponseExtras(
+  _raw:
+    | {
+        recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+        descricao?: string | null;
+        ambiguousFilterMention?: boolean;
+      }
+    | null,
+): Record<string, never> {
+  return {};
 }
 
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
@@ -679,12 +733,23 @@ export function decideConversation(
         const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
         if (resolvedVeh.kind === "matched") {
           const veh = resolvedVeh.vehicle;
+          const gated = gateMaintenanceItemsByCategory(
+            categoriaMatch.categoria,
+            currentDraft.value,
+          );
           const candidate = {
             phase: "awaiting_confirmation" as const,
             categoria: categoriaMatch.categoria,
             valor: currentDraft.value.valor,
             vehicleId: veh.id,
             requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricao: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
           };
           const validated =
             validateAwaitingConfirmationExpenseDraft(candidate);
@@ -712,6 +777,15 @@ export function decideConversation(
                 vehicleLabel: labelFor(veh),
                 valor: currentDraft.value.valor,
                 categoria: categoriaMatch.categoria,
+                ...buildMaintenanceResponseExtras(
+                  gated
+                    ? {
+                        recognizedTags: gated.recognizedTags,
+                        descricao: gated.descricaoPreliminar,
+                        ambiguousFilterMention: gated.ambiguousFilterMention,
+                      }
+                    : null,
+                ),
               },
               nextFallbackCount: 0,
               reasonCode: "expense_category_resolved_complete",
@@ -721,11 +795,22 @@ export function decideConversation(
           resolvedVeh.kind === "ambiguous" ||
           resolvedVeh.kind === "not_found"
         ) {
+          const gated = gateMaintenanceItemsByCategory(
+            categoriaMatch.categoria,
+            currentDraft.value,
+          );
           const candidate = {
             phase: "awaiting_vehicle" as const,
             categoria: categoriaMatch.categoria,
             valor: currentDraft.value.valor,
             requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricaoPreliminar: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
           };
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
