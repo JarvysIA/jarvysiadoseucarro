@@ -237,6 +237,42 @@ export function parseExpenseValorText(input: unknown): ExpenseValorParseResult {
   return combineValorResults(results);
 }
 
+const BARE_NUMBER_RE = /(?<![0-9.,])[0-9]{1,9}(?![0-9.,])/g;
+const BARE_NUMBER_MAX_REASONABLE_VALOR = 20000;
+
+/**
+ * Fallback pra número "pelado" (sem R$, sem "reais", sem vírgula-decimal).
+ * NUNCA chamar isoladamente — só deve ser usado pelo core.ts quando já
+ * houver confirmado que existe uma categoria reconhecida na mesma
+ * mensagem.
+ */
+export function parseExpenseValorBareNumber(input: unknown): ExpenseValorParseResult {
+  if (typeof input !== "string") return { ok: false, code: "not_a_string" };
+  if (input.trim() === "") return { ok: false, code: "empty_text" };
+  const normalized = normalizeForValor(input);
+  if (normalized === "") return { ok: false, code: "no_valor_candidate" };
+
+  const matches: string[] = [];
+  BARE_NUMBER_RE.lastIndex = 0;
+  let iter = 0;
+  let m: RegExpExecArray | null;
+  while ((m = BARE_NUMBER_RE.exec(normalized)) !== null) {
+    if (++iter > MAX_MATCH_ITER) break;
+    matches.push(m[0]);
+    if (BARE_NUMBER_RE.lastIndex === m.index) BARE_NUMBER_RE.lastIndex++;
+  }
+  if (matches.length === 0) return { ok: false, code: "no_valor_candidate" };
+  const distinct = new Set(matches);
+  if (distinct.size > 1) return { ok: false, code: "ambiguous_valor_candidate" };
+  const check = validateBrlAmountFormat(matches[0]!);
+  if (check.kind === "range") return { ok: false, code: "valor_out_of_range" };
+  if (check.kind === "format") return { ok: false, code: "invalid_valor_format" };
+  if (check.value > BARE_NUMBER_MAX_REASONABLE_VALOR) {
+    return { ok: false, code: "valor_out_of_range" };
+  }
+  return { ok: true, valor: check.value };
+}
+
 // ---------------------------------------------------------------------------
 // Categorias — tabela de keywords (normalizadas, sem acento)
 // ---------------------------------------------------------------------------
