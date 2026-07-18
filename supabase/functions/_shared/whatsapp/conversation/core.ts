@@ -139,13 +139,21 @@ const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
 // um marco de manutenção, não um número de verdade a ser gravado.
-const REVISAO_MILESTONE_RE = /\brevisao\b[\s\S]{0,25}?\b[0-9]{1,3}\s+mil\b/;
+// Build corretivo 6/6 (revisado) — "revisão dos 40 mil" ou "revisão
+// 20.000km" não devem ser lidos como valor literal (nem km, nem dinheiro)
+// — são referências a um marco de manutenção, não um número de verdade a
+// ser gravado. Em vez de tentar cobrir cada formato manualmente (mil, km,
+// ponto, etc.), reaproveita o próprio parser de KM: se "revisao" aparece
+// E o texto TAMBÉM parece conter um valor de km (em qualquer formato que
+// o parser de KM já reconheça), trata como marco.
 function looksLikeMaintenanceMilestoneReference(text: string): boolean {
   const normalized = text
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  return REVISAO_MILESTONE_RE.test(normalized);
+  if (!/\brevisao\b/.test(normalized)) return false;
+  const kmLike = parseKmUpdateText(text, "explicit_report");
+  return kmLike.ok;
 }
 
 const REQUESTED_KM_UNKNOWN_PHRASES = new Set<string>([

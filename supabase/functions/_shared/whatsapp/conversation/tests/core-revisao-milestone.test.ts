@@ -67,6 +67,8 @@ describe("revisão N mil — não vira despesa nem km", () => {
     "revisao dos 40 mil, troquei oleo e filtro",
     "revisao de 90 mil",
     "revisao dos 200 mil km",
+    "revisão 20.000km 1.800",
+    "revisao 60000km",
   ];
   for (const text of cases) {
     test(`"${text}" → fallback`, () => {
@@ -153,6 +155,29 @@ describe("regressão geral — builds anteriores", () => {
   });
   test("rodei 105000 km hoje → km 105000", () => {
     const d = decideConversation(inp({ originalText: "rodei 105000 km hoje" }));
+    expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
+  });
+});
+
+describe("revisão com valor explícito — não regride (novo formato km)", () => {
+  test("revisão dos 20.000km, gastei 1.800 reais → Revisão R$1800", () => {
+    const d = decideConversation(
+      inp({ originalText: "revisão dos 20.000km, gastei 1.800 reais" }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.responseParams.valor).toBe(1800);
+    expect(d.responseParams.categoria).toBe("Revisão");
+  });
+  test("revisao de 60.000 km, R$900,00 → Revisão R$900", () => {
+    const d = decideConversation(
+      inp({ originalText: "revisao de 60.000 km, R$900,00" }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.responseParams.valor).toBe(900);
+    expect(d.responseParams.categoria).toBe("Revisão");
+  });
+  test("rodei 60000km hoje → km 60000 (sem revisão, correção genuína)", () => {
+    const d = decideConversation(inp({ originalText: "rodei 60000km hoje" }));
     expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
   });
 });
