@@ -286,6 +286,10 @@ export function validateAwaitingVehicleExpenseDraft(
   if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
     return { ok: false, code: "invalid_descricao" };
   }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
 
   return {
     ok: true,
@@ -299,6 +303,9 @@ export function validateAwaitingVehicleExpenseDraft(
         : {}),
       ...(hasDescricaoPreliminar
         ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
         : {}),
     },
   };
