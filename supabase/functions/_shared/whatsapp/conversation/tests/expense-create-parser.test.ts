@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   matchExpenseCategoria,
+  parseExpenseValorBareNumber,
   parseExpenseValorText,
 } from "../expense-create-parser.ts";
+
 
 // ===========================================================================
 // parseExpenseValorText
