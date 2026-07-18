@@ -714,12 +714,23 @@ export function decideConversation(
         const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
         if (resolvedVeh.kind === "matched") {
           const veh = resolvedVeh.vehicle;
+          const gated = gateMaintenanceItemsByCategory(
+            categoriaMatch.categoria,
+            currentDraft.value,
+          );
           const candidate = {
             phase: "awaiting_confirmation" as const,
             categoria: categoriaMatch.categoria,
             valor: currentDraft.value.valor,
             vehicleId: veh.id,
             requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricao: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
           };
           const validated =
             validateAwaitingConfirmationExpenseDraft(candidate);
@@ -747,6 +758,15 @@ export function decideConversation(
                 vehicleLabel: labelFor(veh),
                 valor: currentDraft.value.valor,
                 categoria: categoriaMatch.categoria,
+                ...buildMaintenanceResponseExtras(
+                  gated
+                    ? {
+                        recognizedTags: gated.recognizedTags,
+                        descricao: gated.descricaoPreliminar,
+                        ambiguousFilterMention: gated.ambiguousFilterMention,
+                      }
+                    : null,
+                ),
               },
               nextFallbackCount: 0,
               reasonCode: "expense_category_resolved_complete",
