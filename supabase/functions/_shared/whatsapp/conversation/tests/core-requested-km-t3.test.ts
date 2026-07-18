@@ -210,5 +210,81 @@ describe("awaiting_requested_km — reply parsing", () => {
     );
     expect(d.decisionKind).toBe("reset_task");
     expect(d.nextState).toBe("idle");
+});
+
+describe("core — awaiting_requested_km + 'não sei' (HARD4)", () => {
+  const unknownPhrases = [
+    "não sei",
+    "não lembro",
+    "depois te falo",
+    "sei lá",
+    "mais tarde",
+    "NÃO SEI AGORA",
+    "não me lembro",
+    "não anotei",
+  ];
+
+  for (const phrase of unknownPhrases) {
+    test(`"${phrase}" → responde requested_km_unknown e volta pra idle`, () => {
+      const d = decideConversation(
+        inp({
+          state: requestedKmState(VEH_1),
+          originalText: phrase,
+          vehicles: [veh(VEH_1, 30000)],
+        }),
+      );
+      expect(d.decisionKind).toBe("respond");
+      expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
+      expect(d.responseKey).toBe("requested_km_unknown");
+      expect(d.nextState).toBe("idle");
+      expect(d.outcome).toBe("cancelled");
+      expect(d.nextFallbackCount).toBe(0);
+      expect(d.statePatch.state).toBe("idle");
+      expect(d.statePatch.draftId).toBeNull();
+      expect(d.statePatch.currentIntent).toBeNull();
+      expect(d.statePatch.lastMessageId).toBe(MSG_B);
+    });
+  }
+
+  test("km numérica válida continua funcionando (caminho feliz)", () => {
+    const d = decideConversation(
+      inp({
+        state: requestedKmState(VEH_1),
+        originalText: "47560",
+        vehicles: [veh(VEH_1, 30000)],
+      }),
+    );
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_km_confirmation");
+    expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
+    expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
+  });
+
+  test("texto incompreensível continua caindo em fallback", () => {
+    const d = decideConversation(
+      inp({
+        state: requestedKmState(VEH_1),
+        originalText: "xyz123abc",
+        vehicles: [veh(VEH_1, 30000)],
+      }),
+    );
+    expect(d.responseKey).not.toBe("requested_km_unknown");
+    // fallback genérico da seção 10
+    expect(["fallback_first", "fallback_second", "fallback_reset"]).toContain(
+      d.responseKey,
+    );
+  });
+
+  test("'cancelar' continua caindo em cancel_task (seção 5)", () => {
+    const d = decideConversation(
+      inp({
+        state: requestedKmState(VEH_1),
+        originalText: "cancelar",
+        vehicles: [veh(VEH_1, 30000)],
+      }),
+    );
+    expect(d.decisionKind).toBe("reset_task");
+    expect(d.responseKey).toBe("task_cancelled");
   });
 });
+
