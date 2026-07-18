@@ -210,6 +210,7 @@ describe("awaiting_requested_km — reply parsing", () => {
     );
     expect(d.decisionKind).toBe("reset_task");
     expect(d.nextState).toBe("idle");
+  });
 });
 
 describe("core — awaiting_requested_km + 'não sei' (HARD4)", () => {
