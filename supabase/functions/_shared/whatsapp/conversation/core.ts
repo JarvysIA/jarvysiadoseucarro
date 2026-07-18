@@ -1334,9 +1334,11 @@ export function decideConversation(
               ? {
                   recognizedTags: extras.recognizedTags,
                   descricaoPreliminar: extras.descricaoPreliminar,
+                  ambiguousFilterMention: extras.ambiguousFilterMention,
                 }
               : {}),
           };
+
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
             return buildDecision({
