@@ -1275,6 +1275,7 @@ export function decideConversation(
               ? {
                   recognizedTags: extras.recognizedTags,
                   descricao: extras.descricaoPreliminar,
+                  ambiguousFilterMention: extras.ambiguousFilterMention,
                 }
               : {}),
           };
@@ -1304,11 +1305,21 @@ export function decideConversation(
                 vehicleLabel: labelFor(veh),
                 valor: parsedValor.valor,
                 categoria: categoriaMatch.categoria,
+                ...buildMaintenanceResponseExtras(
+                  extras
+                    ? {
+                        recognizedTags: extras.recognizedTags,
+                        descricao: extras.descricaoPreliminar,
+                        ambiguousFilterMention: extras.ambiguousFilterMention,
+                      }
+                    : null,
+                ),
               },
               nextFallbackCount: 0,
               reasonCode: "expense_reported_complete",
             });
           }
+
         } else {
           const extras = computeMaintenanceDraftExtras(
             categoriaMatch.categoria,
