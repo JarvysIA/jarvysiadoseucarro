@@ -31,6 +31,7 @@ import {
 } from "./km-update-protocol.ts";
 import {
   parseExpenseValorText,
+  parseExpenseValorBareNumber,
   matchExpenseCategoria,
 } from "./expense-create-parser.ts";
 import {
@@ -1126,7 +1127,16 @@ export function decideConversation(
     typeof input.originalText === "string" &&
     isUuid(input.sourceMessageId)
   ) {
-    const parsedValor = parseExpenseValorText(input.originalText);
+    let parsedValor = parseExpenseValorText(input.originalText);
+    if (!parsedValor.ok) {
+      const categoriaHint = matchExpenseCategoria(input.originalText);
+      if (categoriaHint.ok) {
+        const bareValor = parseExpenseValorBareNumber(input.originalText);
+        if (bareValor.ok) {
+          parsedValor = bareValor;
+        }
+      }
+    }
     if (parsedValor.ok) {
       const pool = firstEligible(input.vehicles);
       if (pool.length === 0) {
