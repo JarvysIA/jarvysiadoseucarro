@@ -655,7 +655,17 @@ export function decideConversation(
               vehicleLabel: labelFor(veh),
               valor: expensePartial.valor,
               categoria: expensePartial.categoria,
+              ...buildMaintenanceResponseExtras(
+                "recognizedTags" in expensePartial || "ambiguousFilterMention" in expensePartial
+                  ? {
+                      recognizedTags: expensePartial.recognizedTags,
+                      descricao: expensePartial.descricaoPreliminar,
+                      ambiguousFilterMention: expensePartial.ambiguousFilterMention,
+                    }
+                  : null,
+              ),
             },
+
             nextFallbackCount: 0,
             reasonCode: "expense_create_complete_from_vehicle_reply",
           });
