@@ -237,7 +237,13 @@ export function parseExpenseValorText(input: unknown): ExpenseValorParseResult {
   return combineValorResults(results);
 }
 
-const BARE_NUMBER_RE = /(?<![0-9.,])[0-9]{1,9}(?![0-9.,])/g;
+// Aceita número puro (220, 1800) OU agrupado por ponto de milhar (1.800,
+// 12.345) — mas nunca os dois ao mesmo tempo dentro do mesmo trecho,
+// evita capturar "1800" partido em "180"+"0". validateBrlAmountFormat já
+// sabia interpretar o formato com ponto corretamente; só faltava esta
+// regex conseguir ENCONTRAR esse formato no texto.
+const BARE_NUMBER_RE = /(?<![0-9.,])(?:[0-9]{1,3}(?:\.[0-9]{3})+|[0-9]{1,9})(?![0-9.,])/g;
+
 const BARE_NUMBER_MAX_REASONABLE_VALOR = 20000;
 
 /**
