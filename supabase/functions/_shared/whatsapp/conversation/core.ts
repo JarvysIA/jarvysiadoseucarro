@@ -1169,7 +1169,8 @@ export function decideConversation(
   if (
     effectiveState.state === "idle" &&
     typeof input.originalText === "string" &&
-    isUuid(input.sourceMessageId)
+    isUuid(input.sourceMessageId) &&
+    !looksLikeMaintenanceMilestoneReference(input.originalText)
   ) {
     const parsed = parseKmUpdateText(input.originalText, "explicit_report");
     if (parsed.ok) {
