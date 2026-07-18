@@ -342,7 +342,7 @@ export function decideConversation(
   // Somente texto (ou tipo desconhecido / system) daqui em diante
   const normalized = normalizeCommandText(input.originalText);
 
-  // 4.1) Explicit opt-out (match exato) — defer para roteador legado
+  // 4.2) Explicit opt-out (match exato) — defer para roteador legado
   const command = classifyCommand(normalized);
   if (command === "explicit_opt_out") {
     return buildDecision({
