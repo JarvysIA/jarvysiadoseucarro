@@ -1025,7 +1025,7 @@ export function decideConversation(
     let parsedValor = parseExpenseValorText(input.originalText);
     if (!parsedValor.ok) {
       const categoriaHint = matchExpenseCategoria(input.originalText);
-      if (categoriaHint.ok) {
+      if (categoriaHint.ok && !looksLikeMaintenanceMilestoneReference(input.originalText)) {
         const bareValor = parseExpenseValorBareNumber(input.originalText);
         if (bareValor.ok) {
           parsedValor = bareValor;
