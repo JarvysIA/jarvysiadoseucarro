@@ -358,6 +358,96 @@ describe("matchExpenseCategoria — Revisão (2+ keywords)", () => {
       categoria: "Revisão",
     });
   });
+  test('"óleo"', () => {
+    expect(matchExpenseCategoria("óleo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"pastilha de freio"', () => {
+    expect(matchExpenseCategoria("pastilha de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"freio" sozinho', () => {
+    expect(matchExpenseCategoria("freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"disco de freio"', () => {
+    expect(matchExpenseCategoria("disco de freio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"vela de ignição"', () => {
+    expect(matchExpenseCategoria("vela de ignição")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"correia dentada"', () => {
+    expect(matchExpenseCategoria("correia dentada")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"kit sincronismo"', () => {
+    expect(matchExpenseCategoria("kit sincronismo")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"arrefecimento"', () => {
+    expect(matchExpenseCategoria("arrefecimento")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"radiador"', () => {
+    expect(matchExpenseCategoria("radiador")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"palhetas"', () => {
+    expect(matchExpenseCategoria("palhetas")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"alinhamento e balanceamento"', () => {
+    expect(matchExpenseCategoria("alinhamento e balanceamento")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"câmbio"', () => {
+    expect(matchExpenseCategoria("câmbio")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"direção hidráulica"', () => {
+    expect(matchExpenseCategoria("direção hidráulica")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro de cabine"', () => {
+    expect(matchExpenseCategoria("filtro de cabine")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
+  test('"filtro de ar"', () => {
+    expect(matchExpenseCategoria("filtro de ar")).toEqual({
+      ok: true,
+      categoria: "Revisão",
+    });
+  });
 });
 
 describe("matchExpenseCategoria — Lavagem (2+ keywords)", () => {
