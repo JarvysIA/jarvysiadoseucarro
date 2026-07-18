@@ -309,11 +309,40 @@ export function decideConversation(
     });
   }
 
+  // 4.1) messageType "unknown" SEM nenhum texto (figurinha, reação,
+  // contato, localização, etc.) durante confirmação pendente — mesmo
+  // aviso gentil do bloco de mídia acima, já que não há texto a processar.
+  if (
+    input.messageType === "unknown" &&
+    (input.originalText === null || input.originalText.trim() === "")
+  ) {
+    const isDuringConfirmation =
+      effectiveState.state === "awaiting_km_confirmation" ||
+      effectiveState.state === "awaiting_km_correction" ||
+      effectiveState.state === "awaiting_expense_confirmation" ||
+      effectiveState.state === "awaiting_expense_correction";
+
+    if (isDuringConfirmation) {
+      return buildDecision({
+        eventKind: "media",
+        decisionKind: "respond",
+        previousState,
+        nextState: effectiveState.state,
+        outcome: expiredOutcome,
+        statePatch: withLastMessage(basePatch, input.sourceMessageId),
+        responseKey: "media_unclear_during_confirmation",
+        nextFallbackCount: fallbackCount,
+        reasonCode: expiredHandled
+          ? "expired_then_unknown_notext_during_confirmation"
+          : "unknown_notext_during_confirmation_nudge",
+      });
+    }
+  }
 
   // Somente texto (ou tipo desconhecido / system) daqui em diante
   const normalized = normalizeCommandText(input.originalText);
 
-  // 4.1) Explicit opt-out (match exato) — defer para roteador legado
+  // 4.2) Explicit opt-out (match exato) — defer para roteador legado
   const command = classifyCommand(normalized);
   if (command === "explicit_opt_out") {
     return buildDecision({
