@@ -135,6 +135,22 @@ function mergePatch(
 
 const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "document"]);
 
+const REQUESTED_KM_UNKNOWN_PHRASES = new Set<string>([
+  "NAO SEI",
+  "NAO SEI AGORA",
+  "AGORA NAO SEI",
+  "NAO LEMBRO",
+  "NAO ME LEMBRO",
+  "NAO TENHO CERTEZA",
+  "SEI LA",
+  "NAO ANOTEI",
+  "DEPOIS TE FALO",
+  "DEPOIS EU FALO",
+  "DEPOIS FALO",
+  "TE FALO DEPOIS",
+  "MAIS TARDE",
+]);
+
 /**
  * Aplica idempotente do sourceMessageId em lastMessageId no patch final.
  */
@@ -655,6 +671,23 @@ export function decideConversation(
     typeof input.originalText === "string" &&
     isUuid(input.sourceMessageId)
   ) {
+    const requestedKmUnknownNormalized = normalizeCommandText(input.originalText).normalizedText;
+    if (REQUESTED_KM_UNKNOWN_PHRASES.has(requestedKmUnknownNormalized)) {
+      return buildDecision({
+        eventKind: KM_REPORTED_EVENT_KIND,
+        decisionKind: "respond",
+        previousState,
+        nextState: "idle",
+        outcome: "cancelled",
+        statePatch: withLastMessage(
+          mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+          input.sourceMessageId,
+        ),
+        responseKey: "requested_km_unknown",
+        nextFallbackCount: 0,
+        reasonCode: "requested_km_declined_unknown",
+      });
+    }
     const parsed = parseKmUpdateText(input.originalText, "value_reply");
     if (parsed.ok) {
       const activeId = effectiveState.activeVehicleId;
