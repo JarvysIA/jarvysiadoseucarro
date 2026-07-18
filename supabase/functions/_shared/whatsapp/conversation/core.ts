@@ -262,7 +262,13 @@ function extractPartialKmDraft(
  */
 function extractPartialExpenseDraft(
   state: ConversationState,
-): { categoria: ExpenseCategory; valor: number; requestMessageId: string } | null {
+): {
+  categoria: ExpenseCategory;
+  valor: number;
+  requestMessageId: string;
+  recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  descricaoPreliminar?: string | null;
+} | null {
   if (state.draftType !== "expense") return null;
   if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
   if (!isUuid(state.draftId)) return null;
@@ -273,6 +279,10 @@ function extractPartialExpenseDraft(
     categoria: v.value.categoria,
     valor: v.value.valor,
     requestMessageId: v.value.requestMessageId,
+    ...("recognizedTags" in v.value ? { recognizedTags: v.value.recognizedTags } : {}),
+    ...("descricaoPreliminar" in v.value
+      ? { descricaoPreliminar: v.value.descricaoPreliminar }
+      : {}),
   };
 }
 
