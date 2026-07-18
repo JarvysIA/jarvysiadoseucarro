@@ -20,6 +20,10 @@ import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
 import { parseKmUpdateText } from "./km-update-parser.ts";
 import {
+  parseMaintenanceItemsText,
+  type MaintenanceTriggerTag,
+} from "./expense-maintenance-items-parser.ts";
+import {
   KM_UPDATE_INITIAL_DRAFT_VERSION,
   KM_UPDATE_PROMOTED_DRAFT_VERSION,
   validateAwaitingConfirmationKmUpdateDraft,
@@ -136,6 +140,42 @@ function mergePatch(
 
 const MEDIA_TYPES = new Set<string>(["image", "pdf", "audio", "video", "file", "document"]);
 
+const MAINTENANCE_DESCRIPTION_MIN_LETTERS = 15;
+
+function countLetters(text: string): number {
+  const normalized = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const matches = normalized.match(/[a-zA-Z]/g);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Build 4a/9 do item 6 — quando a categoria for Revisão/Manutenção, roda o
+ * parser de itens (build 2) sobre a mensagem original e decide se já há
+ * descrição suficiente pra dispensar o convite de descrição (usado pelo
+ * build 4b, ainda não implementado). Fora dessas 2 categorias, devolve
+ * null — nenhum campo novo é adicionado ao draft, comportamento idêntico
+ * ao anterior a este build.
+ */
+function computeMaintenanceDraftExtras(
+  categoria: ExpenseCategory,
+  originalText: string,
+): {
+  recognizedTags: ReadonlyArray<MaintenanceTriggerTag>;
+  descricaoPreliminar: string | null;
+} | null {
+  if (categoria !== "Revisão" && categoria !== "Manutenção") return null;
+  const parsed = parseMaintenanceItemsText(originalText);
+  const recognizedTags = parsed.items.map((i) => i.tag);
+  const trimmed = originalText.trim();
+  const sufficient =
+    recognizedTags.length > 0 ||
+    countLetters(trimmed) >= MAINTENANCE_DESCRIPTION_MIN_LETTERS;
+  return {
+    recognizedTags,
+    descricaoPreliminar: sufficient ? trimmed : null,
+  };
+}
+
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
 // um marco de manutenção, não um número de verdade a ser gravado.
@@ -222,7 +262,13 @@ function extractPartialKmDraft(
  */
 function extractPartialExpenseDraft(
   state: ConversationState,
-): { categoria: ExpenseCategory; valor: number; requestMessageId: string } | null {
+): {
+  categoria: ExpenseCategory;
+  valor: number;
+  requestMessageId: string;
+  recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  descricaoPreliminar?: string | null;
+} | null {
   if (state.draftType !== "expense") return null;
   if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
   if (!isUuid(state.draftId)) return null;
@@ -233,6 +279,10 @@ function extractPartialExpenseDraft(
     categoria: v.value.categoria,
     valor: v.value.valor,
     requestMessageId: v.value.requestMessageId,
+    ...("recognizedTags" in v.value ? { recognizedTags: v.value.recognizedTags } : {}),
+    ...("descricaoPreliminar" in v.value
+      ? { descricaoPreliminar: v.value.descricaoPreliminar }
+      : {}),
   };
 }
 
@@ -505,6 +555,12 @@ export function decideConversation(
           valor: expensePartial.valor,
           vehicleId: veh.id,
           requestMessageId: expensePartial.requestMessageId,
+          ...("recognizedTags" in expensePartial
+            ? { recognizedTags: expensePartial.recognizedTags }
+            : {}),
+          ...("descricaoPreliminar" in expensePartial
+            ? { descricao: expensePartial.descricaoPreliminar }
+            : {}),
         };
         const validated =
           validateAwaitingConfirmationExpenseDraft(candidate);
@@ -1098,12 +1154,22 @@ export function decideConversation(
         });
         if (resolvedVeh.kind === "matched") {
           const veh = resolvedVeh.vehicle;
+          const extras = computeMaintenanceDraftExtras(
+            categoriaMatch.categoria,
+            input.originalText,
+          );
           const candidate = {
             phase: "awaiting_confirmation" as const,
             categoria: categoriaMatch.categoria,
             valor: parsedValor.valor,
             vehicleId: veh.id,
             requestMessageId: input.sourceMessageId,
+            ...(extras
+              ? {
+                  recognizedTags: extras.recognizedTags,
+                  descricao: extras.descricaoPreliminar,
+                }
+              : {}),
           };
           const validated =
             validateAwaitingConfirmationExpenseDraft(candidate);
@@ -1137,11 +1203,21 @@ export function decideConversation(
             });
           }
         } else {
+          const extras = computeMaintenanceDraftExtras(
+            categoriaMatch.categoria,
+            input.originalText,
+          );
           const candidate = {
             phase: "awaiting_vehicle" as const,
             categoria: categoriaMatch.categoria,
             valor: parsedValor.valor,
             requestMessageId: input.sourceMessageId,
+            ...(extras
+              ? {
+                  recognizedTags: extras.recognizedTags,
+                  descricaoPreliminar: extras.descricaoPreliminar,
+                }
+              : {}),
           };
           const validated = validateAwaitingVehicleExpenseDraft(candidate);
           if (validated.ok) {
