@@ -555,6 +555,12 @@ export function decideConversation(
           valor: expensePartial.valor,
           vehicleId: veh.id,
           requestMessageId: expensePartial.requestMessageId,
+          ...("recognizedTags" in expensePartial
+            ? { recognizedTags: expensePartial.recognizedTags }
+            : {}),
+          ...("descricaoPreliminar" in expensePartial
+            ? { descricao: expensePartial.descricaoPreliminar }
+            : {}),
         };
         const validated =
           validateAwaitingConfirmationExpenseDraft(candidate);
