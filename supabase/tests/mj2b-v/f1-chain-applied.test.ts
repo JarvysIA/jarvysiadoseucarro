@@ -257,7 +257,9 @@ describeIfDb("MJ2B-V F1 — corrente completa applied (despesa)", () => {
       [conversationStateId],
     );
     expect(st.rows[0]?.state).toBe("awaiting_requested_km");
-    expect(st.rows[0]?.draft_id).toBeNull();
+    // Build 6a do item 6 — draft_id agora guarda o despesaId (não mais
+    // null), pra sobreviver até a km chegar e ser ligada depois.
+    expect(st.rows[0]?.draft_id).toBe(execResult?.despesaId as string);
     expect(st.rows[0]?.draft_type).toBeNull();
     expect(st.rows[0]?.draft_payload).toBeNull();
     expect(st.rows[0]?.state_version).toBe(1);
