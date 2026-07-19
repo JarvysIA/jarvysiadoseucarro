@@ -116,7 +116,8 @@ export type MalformedReason =
   | "input_invalid"
   | "km_invalid"
   | "state_version_invalid"
-  | "correction_reason_invalid";
+  | "correction_reason_invalid"
+  | "linked_despesa_id_invalid";
 
 // ---------------------------------------------------------------------------
 // Resultado da porta (executor)
