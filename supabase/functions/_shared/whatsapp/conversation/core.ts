@@ -933,23 +933,6 @@ export function decideConversation(
     typeof input.originalText === "string" &&
     isUuid(input.sourceMessageId)
   ) {
-    const requestedKmUnknownNormalized = normalizeCommandText(input.originalText).normalizedText;
-    if (REQUESTED_KM_UNKNOWN_PHRASES.has(requestedKmUnknownNormalized)) {
-      return buildDecision({
-        eventKind: KM_REPORTED_EVENT_KIND,
-        decisionKind: "respond",
-        previousState,
-        nextState: "idle",
-        outcome: "cancelled",
-        statePatch: withLastMessage(
-          mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
-          input.sourceMessageId,
-        ),
-        responseKey: "requested_km_unknown",
-        nextFallbackCount: 0,
-        reasonCode: "requested_km_declined_unknown",
-      });
-    }
     const parsed = parseKmUpdateText(input.originalText, "value_reply");
     if (parsed.ok) {
       const activeId = effectiveState.activeVehicleId;
@@ -1030,9 +1013,29 @@ export function decideConversation(
             : "requested_km_reply_complete",
         });
       }
-      // Invariante violada — cai no fallback genérico.
+      // Invariante violada — cai no fallback genérico da seção 10.
+    } else {
+      // Não reconheceu km — verifica se é uma recusa/adiamento reconhecível
+      // (padrão amplo) antes de cair no fallback genérico.
+      const requestedKmNormalized = normalizeCommandText(input.originalText).normalizedText;
+      if (looksLikeRequestedKmUnclearResponse(requestedKmNormalized)) {
+        return buildDecision({
+          eventKind: KM_REPORTED_EVENT_KIND,
+          decisionKind: "respond",
+          previousState,
+          nextState: "idle",
+          outcome: "cancelled",
+          statePatch: withLastMessage(
+            mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+            input.sourceMessageId,
+          ),
+          responseKey: "requested_km_unknown",
+          nextFallbackCount: 0,
+          reasonCode: "requested_km_declined_unknown",
+        });
+      }
+      // nem número nem recusa reconhecida — cai no fallback genérico da seção 10.
     }
-    // parse falhou — cai no fallback genérico da seção 10.
   }
 
   // 7) Confirmação / negação
