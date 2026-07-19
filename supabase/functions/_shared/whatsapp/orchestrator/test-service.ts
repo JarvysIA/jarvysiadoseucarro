@@ -1015,31 +1015,7 @@ export function buildExpenseFinalization(
     confirmedAt: null,
     executedAt: null,
   };
-  // Pós-despesa confirmada, transiciona para awaiting_requested_km para
-  // encadear o gatilho de KM. NÃO inclui activeVehicleId (semântica de
-  // patch omitido preserva o valor atual). Rejected/conflicted mantém o
-  // clearingPatch original (idle) — comportamento anterior byte a byte.
-  const kmPromptPatch: ConversationStatePatch = {
-    state: "awaiting_requested_km",
-    currentIntent: "km_update",
-    awaitingField: "requested_km",
-    requestSource: "system",
-    draftType: null,
-    draftId: null,
-    draftVersion: 0,
-    draftPayload: null,
-    confirmedAt: null,
-    executedAt: null,
-  };
   const vehicleLabel = buildKmVehicleLabel(ctx.context.vehicles, vehicleId);
-  const baseCompleted = {
-    previousState: ctx.context.state.state,
-    nextState: "awaiting_requested_km" as const,
-    statePatch: kmPromptPatch,
-    nextFallbackCount: ctx.context.fallbackCount,
-    deferToLegacyRouter: false,
-    deferToLegacyOptOut: false,
-  };
   const baseCleared = {
     previousState: ctx.context.state.state,
     nextState: "idle" as const,
@@ -1050,11 +1026,31 @@ export function buildExpenseFinalization(
   };
   switch (result.kind) {
     case "completed":
-    case "replayed":
+    case "replayed": {
+      // Build 6a/9 do item 6 — guarda o ID da despesa recém-criada em
+      // draftId, pra "viajar" durante o awaiting_requested_km e ser
+      // recuperado quando a km for confirmada (ver core.ts, seção 6.6).
+      const kmPromptPatch: ConversationStatePatch = {
+        state: "awaiting_requested_km",
+        currentIntent: "km_update",
+        awaitingField: "requested_km",
+        requestSource: "system",
+        draftType: null,
+        draftId: result.despesaId,
+        draftVersion: 0,
+        draftPayload: null,
+        confirmedAt: null,
+        executedAt: null,
+      };
       return {
         kind: "finalize",
         decision: {
-          ...baseCompleted,
+          previousState: ctx.context.state.state,
+          nextState: "awaiting_requested_km" as const,
+          statePatch: kmPromptPatch,
+          nextFallbackCount: ctx.context.fallbackCount,
+          deferToLegacyRouter: false,
+          deferToLegacyOptOut: false,
           eventKind: "confirm",
           decisionKind: "transition",
           outcome: "completed",
@@ -1067,6 +1063,7 @@ export function buildExpenseFinalization(
           reasonCode: `expense_action_${result.kind}_with_km_trigger`,
         },
       };
+    }
     case "rejected":
       return {
         kind: "finalize",
