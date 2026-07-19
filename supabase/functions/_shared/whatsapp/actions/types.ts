@@ -40,6 +40,15 @@ export type ConfirmedKmUpdateInput = {
   correctionReason?: string | null;
   expectedStateVersion: number;
   orchestratorVersion: string;
+  /**
+   * Build 6c/9 do item 6 — ID da despesa que originou a pergunta de km
+   * (fluxo despesa→km), quando houver. Ausente (undefined) em km avulsa
+   * (item 1) — comportamento idêntico ao atual quando omitido. A escolha de
+   * qual RPC chamar com base neste campo é responsabilidade do executor
+   * (porta), implementada em build futuro (7/9) — este build só transporta
+   * o dado até o comando.
+   */
+  linkedDespesaId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -67,6 +76,14 @@ export type KmUpdateExecutionCommand = {
   correctionReason: string | null;
   expectedStateVersion: number;
   orchestratorVersion: string;
+  /**
+   * Build 6c/9 do item 6 — presente somente quando a atualização de km foi
+   * originada por uma despesa confirmada. Campo OPCIONAL (ausente quando não
+   * aplicável) — nunca `null` — para não alterar o shape do comando em
+   * fluxos existentes (km avulsa) e não quebrar comparações estruturais em
+   * testes já existentes.
+   */
+  linkedDespesaId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -99,7 +116,8 @@ export type MalformedReason =
   | "input_invalid"
   | "km_invalid"
   | "state_version_invalid"
-  | "correction_reason_invalid";
+  | "correction_reason_invalid"
+  | "linked_despesa_id_invalid";
 
 // ---------------------------------------------------------------------------
 // Resultado da porta (executor)

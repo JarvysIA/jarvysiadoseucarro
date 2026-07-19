@@ -61,6 +61,26 @@ function readCorrectionReason(
   return { ok: true, value: raw };
 }
 
+// Build 6c/9 do item 6 — leitura defensiva do campo opcional
+// linkedDespesaId, no mesmo padrão de readCorrectionReason: ausente
+// (undefined/null) é válido (nada a transportar); string vazia é inválida
+// (malformed) — evita gravar um vínculo "vazio" por engano.
+function readLinkedDespesaId(
+  raw: string | null | undefined,
+): { ok: true; value: string | null } | { ok: false } {
+  if (raw === undefined || raw === null) {
+    return { ok: true, value: null };
+  }
+  if (typeof raw !== "string") {
+    return { ok: false };
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return { ok: false };
+  }
+  return { ok: true, value: raw };
+}
+
 type ValidationOutcome =
   | { ok: true }
   | { ok: false; reason: MalformedReason };
@@ -102,6 +122,11 @@ function validateInput(input: ConfirmedKmUpdateInput): ValidationOutcome {
   const reason = readCorrectionReason(input.correctionReason);
   if (!reason.ok) {
     return { ok: false, reason: "correction_reason_invalid" };
+  }
+
+  const linkedDespesaId = readLinkedDespesaId(input.linkedDespesaId);
+  if (!linkedDespesaId.ok) {
+    return { ok: false, reason: "linked_despesa_id_invalid" };
   }
 
   return { ok: true };
@@ -198,6 +223,10 @@ export async function executeConfirmedKmUpdate(
   const correctionReason =
     correctionReasonNormalized.ok ? correctionReasonNormalized.value : null;
 
+  const linkedDespesaIdNormalized = readLinkedDespesaId(input.linkedDespesaId);
+  const linkedDespesaId =
+    linkedDespesaIdNormalized.ok ? linkedDespesaIdNormalized.value : null;
+
   const command: KmUpdateExecutionCommand = {
     actionType: KM_UPDATE_ACTION_TYPE,
     draftId: input.draftId,
@@ -215,6 +244,10 @@ export async function executeConfirmedKmUpdate(
     correctionReason,
     expectedStateVersion: input.expectedStateVersion,
     orchestratorVersion: input.orchestratorVersion,
+    // Build 6c/9 — só entra no objeto quando presente, pra não mudar o
+    // shape do comando (e não quebrar comparações estruturais em testes
+    // existentes) quando não há despesa vinculada.
+    ...(linkedDespesaId !== null ? { linkedDespesaId } : {}),
   };
 
   safeLog(deps.logger, {

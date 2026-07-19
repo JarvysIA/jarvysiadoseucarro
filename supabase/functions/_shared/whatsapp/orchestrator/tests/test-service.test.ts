@@ -1433,6 +1433,49 @@ describe("confirm_km_update", () => {
     expect(m.calls.apply[1].response?.responseKey).toBe("km_update_applied");
     expect(m.calls.apply[1].expectedStateVersion).toBe(7);
   });
+
+  // Build 6c/9 do item 6 — transporte de linkedExpenseId (draft) →
+  // linkedDespesaId (comando do executor).
+  test("m) draft com linkedExpenseId → comando do executor recebe linkedDespesaId igual", async () => {
+    const LINKED = "dddddddd-dddd-4ddd-8ddd-dddddddddd01";
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState(validDraftPayload({ linkedExpenseId: LINKED })) })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([
+      { kind: "applied", actionExecutionId: "ax-1", previousKm: 10000, newKm: 20000 },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(km.calls.length).toBe(1);
+    const cmd = km.calls[0] as Record<string, unknown>;
+    expect(cmd.linkedDespesaId).toBe(LINKED);
+  });
+
+  test("n) draft sem linkedExpenseId → comando NÃO tem a chave linkedDespesaId", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state: kmState() })],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([
+      { kind: "applied", actionExecutionId: "ax-1", previousKm: 10000, newKm: 20000 },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(km.calls.length).toBe(1);
+    const cmd = km.calls[0] as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(cmd, "linkedDespesaId")).toBe(false);
+  });
 });
 
 // ============================================================
