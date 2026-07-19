@@ -77,11 +77,10 @@ describeIfDb("MJ4x-V G3 — replay não reprocessa a ligação", () => {
       stateVersion: 1,
     });
     const msgId = await seedConfirmationMessage(setup, "G3 confirm");
-    const confirmationMessageId = crypto.randomUUID();
     const queueItemId = crypto.randomUUID();
 
     const params = [
-      draftId, stateId, confirmationMessageId, msgId, queueItemId,
+      draftId, stateId, msgId, msgId, queueItemId,
       SYNTH_USER_ID, SYNTH_CONTACT_ID, SYNTH_VEHICLE_ID,
       null, 700, false, false, null,
       1, ORCH_VERSION,
