@@ -108,6 +108,13 @@ describeIfDb("MJ4x-V G5 — trava de identidade (vehicle_id e user_id)", () => {
   });
 
   test("despesa com user_id divergente (mesmo veículo) -> não é ligada", async () => {
+    // Limpa o estado de conversa do sub-teste anterior — whatsapp_conversation_states
+    // só permite 1 linha por contact_id (índice único wcs_contact_unique).
+    await setup.query(
+      `DELETE FROM public.whatsapp_conversation_states WHERE contact_id = $1`,
+      [SYNTH_CONTACT_ID],
+    );
+
     await setVehicleKm(setup, SYNTH_VEHICLE_ID, 100);
     const despesaId = await seedDespesa(setup, {
       userId: SYNTH_OTHER_USER_ID,
