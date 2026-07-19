@@ -1,28 +1,8 @@
-// Build 5.7F2E1A.5-MB — Contratos e validators puros dos drafts de atualização de KM.
-// Módulo 100% puro: sem I/O, sem Supabase, sem env, sem clock, sem crypto, sem rede.
-
-// ---------------------------------------------------------------------------
-// Constantes de versão de PERSISTÊNCIA do draft (não pertencem ao payload).
-// draftVersion representa evolução persistida/concorrência (CAS), não a phase:
-//   - INITIAL (0): todo draft novo, independentemente da phase (parcial ou
-//     completo direto criado no idle).
-//   - PROMOTED (1): mesmo draftId promovido uma vez após seleção válida
-//     (partial → complete). Phase e version são conceitos independentes.
-// ---------------------------------------------------------------------------
-
 export const KM_UPDATE_INITIAL_DRAFT_VERSION = 0 as const;
 export const KM_UPDATE_PROMOTED_DRAFT_VERSION = 1 as const;
 
-// ---------------------------------------------------------------------------
-// Limites locais (independentes de banco)
-// ---------------------------------------------------------------------------
-
 const KM_MIN_VALUE = 0;
 const KM_MAX_VALUE = 2147483647;
-
-// ---------------------------------------------------------------------------
-// Contratos
-// ---------------------------------------------------------------------------
 
 export type AwaitingVehicleKmUpdateDraft = {
   readonly phase: "awaiting_vehicle";
@@ -37,15 +17,14 @@ export type AwaitingConfirmationKmUpdateDraft = {
   readonly newKm: number;
   readonly requestMessageId: string;
   readonly isCorrection: boolean;
+  // Build 6a/9 do item 6 — ID da despesa que originou esta pergunta de km
+  // (fluxo despesa→km), quando houver. Ausente em km avulsa (item 1).
+  readonly linkedExpenseId?: string;
 };
 
 export type KmUpdateDraft =
   | AwaitingVehicleKmUpdateDraft
   | AwaitingConfirmationKmUpdateDraft;
-
-// ---------------------------------------------------------------------------
-// Erros e resultados
-// ---------------------------------------------------------------------------
 
 export type KmUpdateDraftValidationErrorCode =
   | "not_an_object"
@@ -57,15 +36,12 @@ export type KmUpdateDraftValidationErrorCode =
   | "invalid_vehicle_id"
   | "invalid_expected_previous_km"
   | "invalid_is_correction"
-  | "inconsistent_is_correction";
+  | "inconsistent_is_correction"
+  | "invalid_linked_expense_id";
 
 export type KmUpdateDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly code: KmUpdateDraftValidationErrorCode };
-
-// ---------------------------------------------------------------------------
-// Helpers puros
-// ---------------------------------------------------------------------------
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object") return false;
@@ -84,7 +60,6 @@ function isValidKmInteger(value: unknown): value is number {
   );
 }
 
-// UUID canônico (aceita v1..v5 conforme padrão RFC 4122 usado pelo Postgres uuid).
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -113,7 +88,7 @@ function hasOwn(obj: Record<string, unknown>, key: string): boolean {
 }
 
 const PARTIAL_KEYS = ["phase", "newKm", "requestMessageId"] as const;
-const COMPLETE_KEYS = [
+const COMPLETE_REQUIRED_KEYS = [
   "phase",
   "vehicleId",
   "expectedPreviousKm",
@@ -121,28 +96,25 @@ const COMPLETE_KEYS = [
   "requestMessageId",
   "isCorrection",
 ] as const;
-
-// ---------------------------------------------------------------------------
-// Validators
-// ---------------------------------------------------------------------------
+const COMPLETE_OPTIONAL_KEYS = ["linkedExpenseId"] as const;
+const COMPLETE_ALL_KEYS: ReadonlyArray<string> = [
+  ...COMPLETE_REQUIRED_KEYS,
+  ...COMPLETE_OPTIONAL_KEYS,
+];
 
 export function validateAwaitingVehicleKmUpdateDraft(
   input: unknown,
 ): KmUpdateDraftValidationResult<AwaitingVehicleKmUpdateDraft> {
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
-
   const keys = Object.keys(input);
-  // detectar campos não permitidos
   for (const k of keys) {
     if (!(PARTIAL_KEYS as ReadonlyArray<string>).includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  // obrigatórios presentes
   for (const k of PARTIAL_KEYS) {
     if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
-
   if (input.phase !== "awaiting_vehicle") {
     return { ok: false, code: "invalid_phase" };
   }
@@ -152,7 +124,6 @@ export function validateAwaitingVehicleKmUpdateDraft(
   if (!isValidUuid(input.requestMessageId)) {
     return { ok: false, code: "invalid_request_message_id" };
   }
-
   return {
     ok: true,
     value: {
@@ -167,28 +138,20 @@ export function validateAwaitingConfirmationKmUpdateDraft(
   input: unknown,
 ): KmUpdateDraftValidationResult<AwaitingConfirmationKmUpdateDraft> {
   if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
-
-  const keys = Object.keys(input);
-  for (const k of keys) {
-    if (!(COMPLETE_KEYS as ReadonlyArray<string>).includes(k)) {
+  for (const k of Object.keys(input)) {
+    if (!COMPLETE_ALL_KEYS.includes(k)) {
       return { ok: false, code: "unexpected_field" };
     }
   }
-  if (!hasExactOwnKeys(input, COMPLETE_KEYS)) {
-    // faltando algum campo obrigatório
-    for (const k of COMPLETE_KEYS) {
-      if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
-    }
-    return { ok: false, code: "unexpected_field" };
+  for (const k of COMPLETE_REQUIRED_KEYS) {
+    if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
   }
-
   if (input.phase !== "awaiting_confirmation") {
     return { ok: false, code: "invalid_phase" };
   }
   if (!isValidUuid(input.vehicleId)) {
     return { ok: false, code: "invalid_vehicle_id" };
   }
-
   const expectedPreviousKm = input.expectedPreviousKm;
   if (expectedPreviousKm !== null && !isValidKmInteger(expectedPreviousKm)) {
     return { ok: false, code: "invalid_expected_previous_km" };
@@ -202,15 +165,16 @@ export function validateAwaitingConfirmationKmUpdateDraft(
   if (typeof input.isCorrection !== "boolean") {
     return { ok: false, code: "invalid_is_correction" };
   }
-
-  // Consistência de isCorrection
+  const hasLinkedExpenseId = hasOwn(input, "linkedExpenseId");
+  if (hasLinkedExpenseId && !isValidUuid(input.linkedExpenseId)) {
+    return { ok: false, code: "invalid_linked_expense_id" };
+  }
   const prev = expectedPreviousKm as number | null;
   const nk = input.newKm as number;
   const derived = prev !== null && nk < prev;
   if (derived !== input.isCorrection) {
     return { ok: false, code: "inconsistent_is_correction" };
   }
-
   return {
     ok: true,
     value: {
@@ -220,6 +184,9 @@ export function validateAwaitingConfirmationKmUpdateDraft(
       newKm: nk,
       requestMessageId: input.requestMessageId,
       isCorrection: input.isCorrection,
+      ...(hasLinkedExpenseId
+        ? { linkedExpenseId: input.linkedExpenseId as string }
+        : {}),
     },
   };
 }
