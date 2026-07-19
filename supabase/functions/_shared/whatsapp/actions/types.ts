@@ -76,6 +76,14 @@ export type KmUpdateExecutionCommand = {
   correctionReason: string | null;
   expectedStateVersion: number;
   orchestratorVersion: string;
+  /**
+   * Build 6c/9 do item 6 — presente somente quando a atualização de km foi
+   * originada por uma despesa confirmada. Campo OPCIONAL (ausente quando não
+   * aplicável) — nunca `null` — para não alterar o shape do comando em
+   * fluxos existentes (km avulsa) e não quebrar comparações estruturais em
+   * testes já existentes.
+   */
+  linkedDespesaId?: string;
 };
 
 // ---------------------------------------------------------------------------
