@@ -299,7 +299,7 @@ export class WhatsappKmActionRepository implements KmUpdateExecutorPort {
   async executeKmUpdate(
     command: KmUpdateExecutionCommand,
   ): Promise<KmUpdateExecutorResult> {
-    const data = await invokeRpc(this.client, "execute_whatsapp_km_update", {
+    const baseParams = {
       p_draft_id: command.draftId,
       p_conversation_state_id: command.conversationStateId,
       p_confirmation_message_id: command.confirmationMessageId,
@@ -315,7 +315,20 @@ export class WhatsappKmActionRepository implements KmUpdateExecutorPort {
       p_correction_reason: command.correctionReason,
       p_expected_state_version: command.expectedStateVersion,
       p_orchestrator_version: command.orchestratorVersion,
-    });
+    };
+
+    // Build 7/9 do item 6 — decisão de qual RPC chamar, com base
+    // exclusivamente na presença de linkedDespesaId no comando. A RPC nova
+    // (execute_whatsapp_km_update_with_expense_link) chama por dentro a RPC
+    // original e devolve o MESMO shape de jsonb — por isso parseExecuteKmUpdate
+    // não precisa de nenhuma mudança, serve para as duas.
+    const data = command.linkedDespesaId !== undefined
+      ? await invokeRpc(
+          this.client,
+          "execute_whatsapp_km_update_with_expense_link",
+          { ...baseParams, p_linked_despesa_id: command.linkedDespesaId },
+        )
+      : await invokeRpc(this.client, "execute_whatsapp_km_update", baseParams);
     return parseExecuteKmUpdate(data);
   }
 }
