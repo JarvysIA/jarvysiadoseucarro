@@ -272,6 +272,24 @@ jobs:
       - name: MJ2B-V F3 — despesa crash-window replay encadeado com apply (Postgres real)
         run: bun test supabase/tests/mj2b-v/f3-chain-crash-replay.test.ts
 
+      - name: MJ4x-V G1 — caminho feliz, liga despesa (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g1-happy-path-link.test.ts
+
+      - name: MJ4x-V G2 — no_op ainda liga despesa (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g2-no-op-links.test.ts
+
+      - name: MJ4x-V G3 — replay não reprocessa a ligação (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g3-replay-idempotent.test.ts
+
+      - name: MJ4x-V G4 — trava impede sobrescrever despesa já ligada (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g4-guard-prevents-overwrite.test.ts
+
+      - name: MJ4x-V G5 — trava de identidade vehicle/user (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g5-guard-identity-mismatch.test.ts
+
+      - name: MJ4x-V G6 — RPC rejeitada não toca despesa (Postgres real)
+        run: bun test supabase/tests/mj4x-v/g6-rejected-no-link.test.ts
+
 
 
 
@@ -301,7 +319,7 @@ jobs:
             echo "## Invariantes de segurança"
             echo ""
             echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12), MJ1D-V (D1-D3), MJ2A-V (E1-E12) e MJ2B-V (F1-F3) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
+            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12), MJ1D-V (D1-D3), MJ2A-V (E1-E12), MJ2B-V (F1-F3) e MJ4x-V (G1-G6) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
             echo "- nenhum secret referenciado"
             echo "- nenhum environment declarado"
             echo "- nenhum acesso a banco remoto"
