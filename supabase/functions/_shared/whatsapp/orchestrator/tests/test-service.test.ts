@@ -1758,6 +1758,125 @@ describe("confirm_expense_create", () => {
     expect(m.calls.apply[1].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
     expect(m.calls.apply[1].expectedStateVersion).toBe(7);
   });
+
+  describe("buildFinalDescricao", () => {
+    test("1) descricao + recognizedTags -> texto + tags na ordem fixa", async () => {
+      const it = makeItem();
+      const payload = validExpensePayload({
+        categoria: "Revisão",
+        descricao: "troquei a pastilha",
+        recognizedTags: ["pastilha"],
+      });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext({ state: expenseState(payload) })],
+        apply: [applyOk],
+      });
+      const xp = mockExpenseDeps([
+        { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Revisão" },
+      ]);
+      await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+      );
+      const cmd = xp.calls[0] as { descricao: string | null };
+      expect(cmd.descricao).toBe("troquei a pastilha [pastilha]");
+    });
+
+    test("2) apenas tags, sem texto -> so as tags", async () => {
+      const it = makeItem();
+      const payload = validExpensePayload({
+        categoria: "Revisão",
+        descricao: null,
+        recognizedTags: ["oleo", "filtro"],
+      });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext({ state: expenseState(payload) })],
+        apply: [applyOk],
+      });
+      const xp = mockExpenseDeps([
+        { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Revisão" },
+      ]);
+      await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+      );
+      const cmd = xp.calls[0] as { descricao: string | null };
+      expect(cmd.descricao).toBe("[oleo] [filtro]");
+    });
+
+    test("3) sem tags nem descricao (categoria fora de manutencao) -> null", async () => {
+      const it = makeItem();
+      const payload = validExpensePayload({
+        categoria: "Combustível",
+        descricao: null,
+      });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext({ state: expenseState(payload) })],
+        apply: [applyOk],
+      });
+      const xp = mockExpenseDeps([
+        { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+      ]);
+      await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+      );
+      const cmd = xp.calls[0] as { descricao: string | null };
+      expect(cmd.descricao).toBeNull();
+    });
+
+    test("4) descricao longa + 2 tags -> texto truncado, tags preservadas, total <= 500", async () => {
+      const it = makeItem();
+      const longText = "a".repeat(490);
+      const payload = validExpensePayload({
+        categoria: "Manutenção",
+        descricao: longText,
+        recognizedTags: ["oleo", "filtro"],
+      });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext({ state: expenseState(payload) })],
+        apply: [applyOk],
+      });
+      const xp = mockExpenseDeps([
+        { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Manutenção" },
+      ]);
+      await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+      );
+      const cmd = xp.calls[0] as { descricao: string };
+      expect(cmd.descricao.length).toBeLessThanOrEqual(500);
+      expect(cmd.descricao.endsWith("[oleo] [filtro]")).toBe(true);
+      expect(cmd.descricao.startsWith("a".repeat(484))).toBe(true);
+    });
+
+    test("5) tags vazias + descricao -> so o texto, sem colchetes", async () => {
+      const it = makeItem();
+      const payload = validExpensePayload({
+        categoria: "Manutenção",
+        descricao: "revisão geral, troquei um monte de coisa",
+        recognizedTags: [],
+      });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext({ state: expenseState(payload) })],
+        apply: [applyOk],
+      });
+      const xp = mockExpenseDeps([
+        { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Manutenção" },
+      ]);
+      await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+      );
+      const cmd = xp.calls[0] as { descricao: string | null };
+      expect(cmd.descricao).toBe("revisão geral, troquei um monte de coisa");
+    });
+  });
 });
 
 // ============================================================

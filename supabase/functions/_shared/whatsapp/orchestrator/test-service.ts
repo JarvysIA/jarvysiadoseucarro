@@ -157,6 +157,35 @@ export type TestServiceLogEvent = {
 
 const REASON_REGEX = /^[a-z0-9_.:-]{1,120}$/;
 
+const MAINTENANCE_TAG_ORDER: ReadonlyArray<string> = [
+  "oleo",
+  "filtro",
+  "pastilha",
+  "arrefecimento",
+];
+
+const DESCRICAO_FINAL_MAX_CHARS = 500;
+
+/**
+ * Compõe a descrição final da despesa: texto livre do usuário (se houver)
+ * + as tags reconhecidas (na ordem fixa oleo/filtro/pastilha/arrefecimento),
+ * que o gatilho atualizar_revisao_veiculo já sabe interpretar. Trunca o
+ * texto livre se necessário pra nunca estourar o limite de 500 caracteres
+ * que a validação de despesa já impõe — prioriza preservar as tags.
+ */
+function buildFinalDescricao(
+  descricao: string | null | undefined,
+  recognizedTags: ReadonlyArray<string> | undefined,
+): string | null {
+  const tags = recognizedTags ?? [];
+  const orderedTags = MAINTENANCE_TAG_ORDER.filter((t) => tags.includes(t));
+  const tagsSuffix = orderedTags.map((t) => ` [${t}]`).join("");
+  const maxTextLen = Math.max(0, DESCRICAO_FINAL_MAX_CHARS - tagsSuffix.length);
+  const baseText = (descricao ?? "").trim().slice(0, maxTextLen);
+  const combined = (baseText + tagsSuffix).trim();
+  return combined.length > 0 ? combined : null;
+}
+
 const CONTEXT_DEFINITIVE_REASONS = new Set<string>([
   "message_mismatch",
   "message_missing",
@@ -1103,7 +1132,10 @@ async function handleConfirmExpenseCreate(
     vehicleId: draft.vehicleId,
     categoria: draft.categoria,
     valor: draft.valor,
-    descricao: null,
+    descricao: buildFinalDescricao(
+      "descricao" in draft ? draft.descricao : null,
+      "recognizedTags" in draft ? draft.recognizedTags : undefined,
+    ),
     expectedStateVersion: ctx.context.stateVersion,
     orchestratorVersion: deps.orchestratorVersion,
   };
