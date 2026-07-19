@@ -124,6 +124,11 @@ function validateInput(input: ConfirmedKmUpdateInput): ValidationOutcome {
     return { ok: false, reason: "correction_reason_invalid" };
   }
 
+  const linkedDespesaId = readLinkedDespesaId(input.linkedDespesaId);
+  if (!linkedDespesaId.ok) {
+    return { ok: false, reason: "linked_despesa_id_invalid" };
+  }
+
   return { ok: true };
 }
 
