@@ -601,6 +601,11 @@ async function handleConfirmKmUpdate(
     correctionConfirmed: true,
     expectedStateVersion: ctx.context.stateVersion,
     orchestratorVersion: deps.orchestratorVersion,
+    // Build 6c/9 do item 6 — carrega adiante o ID da despesa (se houver)
+    // que o build 6a já preserva no draft. Ausente em km avulsa (item 1).
+    ...(draft.linkedExpenseId !== undefined
+      ? { linkedDespesaId: draft.linkedExpenseId }
+      : {}),
   };
   const kmResult = await executeConfirmedKmUpdate(kmInput, deps.kmActionDeps);
   const finalization = buildKmFinalization(kmResult, ctx, draft.vehicleId);
