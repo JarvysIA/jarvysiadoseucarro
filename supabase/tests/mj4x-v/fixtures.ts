@@ -3,7 +3,7 @@
  * execute_whatsapp_km_update_with_expense_link (item 6 — Revisão/
  * Manutenção via WhatsApp).
  *
- * Prefixo dos IDs sintéticos: gggggggg-... (dando sequência a aaaaaaaa
+ * Prefixo dos IDs sintéticos: 77777777-... (dando sequência a aaaaaaaa
  * do MJ1A-V, bbbbbbbb do MJ1B-V, cccccccc do MJ1C-V, dddddddd do
  * MJ1D-V, eeeeeeee do MJ2A-V e ffffffff do MJ2B-V, sem overlap). MJ3 foi
  * reservado pelo item 3 e não é reaproveitado aqui.
