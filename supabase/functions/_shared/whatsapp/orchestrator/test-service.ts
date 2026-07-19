@@ -1132,7 +1132,10 @@ async function handleConfirmExpenseCreate(
     vehicleId: draft.vehicleId,
     categoria: draft.categoria,
     valor: draft.valor,
-    descricao: null,
+    descricao: buildFinalDescricao(
+      "descricao" in draft ? draft.descricao : null,
+      "recognizedTags" in draft ? draft.recognizedTags : undefined,
+    ),
     expectedStateVersion: ctx.context.stateVersion,
     orchestratorVersion: deps.orchestratorVersion,
   };
