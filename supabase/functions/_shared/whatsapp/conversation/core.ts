@@ -950,6 +950,13 @@ export function decideConversation(
       }
       const prev = veh.kmAtual;
       const isCorrection = prev !== null && parsed.newKm < prev;
+      // Build 6a/9 do item 6 — o ID da despesa que originou esta pergunta de
+      // km (se houver) foi guardado em effectiveState.draftId por
+      // buildExpenseFinalization. Carrega adiante pro draft de km, pra ser
+      // recuperado quando a km for confirmada (builds 6b/6c ligam a RPC).
+      const linkedExpenseId = isUuid(effectiveState.draftId)
+        ? effectiveState.draftId
+        : undefined;
       const completeCandidate = {
         phase: "awaiting_confirmation" as const,
         vehicleId: veh.id,
@@ -957,6 +964,7 @@ export function decideConversation(
         newKm: parsed.newKm,
         requestMessageId: input.sourceMessageId,
         isCorrection,
+        ...(linkedExpenseId !== undefined ? { linkedExpenseId } : {}),
       };
       const validated =
         validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
