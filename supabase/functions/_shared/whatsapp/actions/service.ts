@@ -223,6 +223,10 @@ export async function executeConfirmedKmUpdate(
   const correctionReason =
     correctionReasonNormalized.ok ? correctionReasonNormalized.value : null;
 
+  const linkedDespesaIdNormalized = readLinkedDespesaId(input.linkedDespesaId);
+  const linkedDespesaId =
+    linkedDespesaIdNormalized.ok ? linkedDespesaIdNormalized.value : null;
+
   const command: KmUpdateExecutionCommand = {
     actionType: KM_UPDATE_ACTION_TYPE,
     draftId: input.draftId,
@@ -240,6 +244,10 @@ export async function executeConfirmedKmUpdate(
     correctionReason,
     expectedStateVersion: input.expectedStateVersion,
     orchestratorVersion: input.orchestratorVersion,
+    // Build 6c/9 — só entra no objeto quando presente, pra não mudar o
+    // shape do comando (e não quebrar comparações estruturais em testes
+    // existentes) quando não há despesa vinculada.
+    ...(linkedDespesaId !== null ? { linkedDespesaId } : {}),
   };
 
   safeLog(deps.logger, {
