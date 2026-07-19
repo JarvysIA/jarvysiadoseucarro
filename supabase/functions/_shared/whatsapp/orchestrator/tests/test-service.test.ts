@@ -1531,7 +1531,7 @@ describe("confirm_expense_create", () => {
     expect(patch.state).toBe("awaiting_requested_km");
     expect(patch.currentIntent).toBe("km_update");
     expect(patch.awaitingField).toBe("requested_km");
-    expect(patch.draftId).toBeNull();
+    expect(patch.draftId).toBe(DESP_ID);
     expect(patch.draftType).toBeNull();
     expect(patch.draftVersion).toBe(0);
     expect(patch.draftPayload).toBeNull();
