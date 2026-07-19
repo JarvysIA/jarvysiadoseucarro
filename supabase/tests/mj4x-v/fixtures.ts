@@ -3,7 +3,7 @@
  * execute_whatsapp_km_update_with_expense_link (item 6 — Revisão/
  * Manutenção via WhatsApp).
  *
- * Prefixo dos IDs sintéticos: gggggggg-... (dando sequência a aaaaaaaa
+ * Prefixo dos IDs sintéticos: 77777777-... (dando sequência a aaaaaaaa
  * do MJ1A-V, bbbbbbbb do MJ1B-V, cccccccc do MJ1C-V, dddddddd do
  * MJ1D-V, eeeeeeee do MJ2A-V e ffffffff do MJ2B-V, sem overlap). MJ3 foi
  * reservado pelo item 3 e não é reaproveitado aqui.
@@ -27,12 +27,12 @@ import type { Client } from "pg";
 
 type QueryClient = Pick<Client, "query">;
 
-export const SYNTH_USER_ID = "gggggggg-gggg-4ggg-8ggg-000000000001";
-export const SYNTH_OTHER_USER_ID = "gggggggg-gggg-4ggg-8ggg-000000000002";
-export const SYNTH_CONTACT_ID = "gggggggg-gggg-4ggg-8ggg-000000000003";
-export const SYNTH_VEHICLE_ID = "gggggggg-gggg-4ggg-8ggg-000000000004";
-export const SYNTH_VEHICLE_ARCHIVED_ID = "gggggggg-gggg-4ggg-8ggg-000000000005";
-export const SYNTH_OTHER_VEHICLE_ID = "gggggggg-gggg-4ggg-8ggg-000000000006";
+export const SYNTH_USER_ID = "77777777-7777-4777-8777-000000000001";
+export const SYNTH_OTHER_USER_ID = "77777777-7777-4777-8777-000000000002";
+export const SYNTH_CONTACT_ID = "77777777-7777-4777-8777-000000000003";
+export const SYNTH_VEHICLE_ID = "77777777-7777-4777-8777-000000000004";
+export const SYNTH_VEHICLE_ARCHIVED_ID = "77777777-7777-4777-8777-000000000005";
+export const SYNTH_OTHER_VEHICLE_ID = "77777777-7777-4777-8777-000000000006";
 
 export const SYNTH_CONTACT_PHONE = "+5511900007001";
 export const SYNTH_EMAIL = "mj4xv+owner@example.invalid";
