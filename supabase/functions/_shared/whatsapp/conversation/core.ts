@@ -257,21 +257,47 @@ function looksLikeMaintenanceMilestoneReference(text: string): boolean {
   return kmLike.ok;
 }
 
-const REQUESTED_KM_UNKNOWN_PHRASES = new Set<string>([
+// Build corretivo (item 6 — ponta solta 2) — reconhecimento amplo de recusa/
+// adiamento em awaiting_requested_km. Substitui a lista fechada de match
+// exato por reconhecimento de padrões (substring/regex) sobre o texto
+// normalizado: cobre incerteza ("não sei", "não faço ideia", "sem ideia",
+// "não conferi" etc.) e adiamento ("depois eu confirmo", "mais tarde", "já
+// te aviso"). Verificado SOMENTE depois de tentar reconhecer um número de
+// km explícito (ver ordem no bloco 6.6 abaixo) — assim "não sei, acho que é
+// uns 50000" não perde o número por causa da hesitação ao redor.
+const REQUESTED_KM_UNCERTAINTY_SUBSTRINGS: ReadonlyArray<string> = [
   "NAO SEI",
-  "NAO SEI AGORA",
-  "AGORA NAO SEI",
   "NAO LEMBRO",
   "NAO ME LEMBRO",
   "NAO TENHO CERTEZA",
+  "NAO FACO IDEIA",
+  "NAO FACO A MENOR IDEIA",
+  "NAO FACO A MINIMA IDEIA",
   "SEI LA",
+  "SEM IDEIA",
+  "NENHUMA IDEIA",
   "NAO ANOTEI",
-  "DEPOIS TE FALO",
-  "DEPOIS EU FALO",
-  "DEPOIS FALO",
-  "TE FALO DEPOIS",
-  "MAIS TARDE",
-]);
+  "NAO CHEQUEI",
+  "NAO CONFERI",
+  "NAO VERIFIQUEI",
+  "NAO OLHEI",
+  "NAO MEDI",
+  "NAO SEI DE CABECA",
+  "NAO SEI DE MEMORIA",
+];
+
+const REQUESTED_KM_DEFER_VERBS_RE = /\b(FALO|AVISO|DIGO|CONTO|CHECO|CONFIRMO|MANDO|VERIFICO)\b/;
+
+function looksLikeRequestedKmUnclearResponse(normalizedText: string): boolean {
+  if (normalizedText === "") return false;
+  for (const s of REQUESTED_KM_UNCERTAINTY_SUBSTRINGS) {
+    if (normalizedText.includes(s)) return true;
+  }
+  if (/\bMAIS TARDE\b/.test(normalizedText)) return true;
+  if (/\bDEPOIS\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText)) return true;
+  if (/\bJA\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText)) return true;
+  return false;
+}
 
 /**
  * Aplica idempotente do sourceMessageId em lastMessageId no patch final.
