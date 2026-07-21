@@ -14,10 +14,26 @@ export type ConversationStateName =
   | "awaiting_expense_category"
   | "awaiting_expense_confirmation"
   | "awaiting_expense_correction"
+  | "awaiting_maintenance_confirmation"
   | "completed"
   | "cancelled"
   | "expired"
   | "failed";
+
+/**
+ * Campos de coleta conhecidos pelo contrato conversacional. `awaitingField`
+ * permanece aberto no estado persistido para compatibilidade com drafts
+ * legados, enquanto este union oferece o contrato fechado para fluxos novos.
+ */
+export type ConversationAwaitingField =
+  | "vehicle"
+  | "categoria"
+  | "category"
+  | "confirmation"
+  | "requested_km"
+  | "maintenance_items"
+  | "maintenance_value"
+  | "maintenance_filter";
 
 export type ConversationEventKind =
   | "greeting"
