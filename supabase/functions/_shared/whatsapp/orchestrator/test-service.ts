@@ -52,6 +52,7 @@ import { executeConfirmedExpenseCreate } from "../actions/expense-service.ts";
 import { validateAwaitingConfirmationExpenseDraft } from "../conversation/expense-create-draft.ts";
 import { decideConversation } from "../conversation/core.ts";
 import { renderResponse } from "../conversation/responses.ts";
+import { canVehiclePerformFullAction } from "../conversation/vehicle-access-policy.ts";
 
 // ============================================================
 // Porta local do Repository — só o subconjunto usado aqui.
@@ -567,6 +568,80 @@ export function buildKmFinalization(
   }
 }
 
+async function finalizeRestrictedVehicleHandoff(
+  item: ClaimedItem,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  vehicleId: string,
+  deps: TestCycleDeps,
+  render: typeof renderResponse,
+  log: TestServiceLogger,
+  workerId: string,
+  attempt: number,
+): Promise<ItemOutcome> {
+  const decision: ConversationCoreDecision = {
+    eventKind: "confirm",
+    decisionKind: "respond",
+    previousState: ctx.context.state.state,
+    nextState: "idle",
+    outcome: "cancelled",
+    statePatch: {
+      state: "idle",
+      currentIntent: null,
+      awaitingField: null,
+      requestSource: null,
+      draftType: null,
+      draftId: null,
+      draftVersion: null,
+      draftPayload: null,
+      confirmedAt: null,
+      executedAt: null,
+      expiresAt: null,
+      ...(ctx.context.state.activeVehicleId === vehicleId ? { activeVehicleId: null } : {}),
+      lastMessageId: item.messageId,
+    },
+    responseKey: "vehicle_access_restricted",
+    responseParams: {},
+    nextFallbackCount: 0,
+    deferToLegacyRouter: false,
+    deferToLegacyOptOut: false,
+    reasonCode: "vehicle_access_restricted",
+  };
+  const response = buildResponse(decision, render, log, workerId, item);
+  if (response.kind !== "ok") {
+    return await releaseAs(
+      item,
+      deps,
+      "cancelled",
+      "orchestrator_invariant",
+      "malformed",
+      log,
+      workerId,
+    );
+  }
+  const applied = await runApply(
+    item,
+    ctx.context.stateVersion,
+    decision,
+    response.payload,
+    deps,
+    log,
+    workerId,
+    attempt,
+  );
+  if (applied.kind === "conflict") {
+    return await releaseAs(
+      item,
+      deps,
+      "state_conflict",
+      "state_version_conflict",
+      "conflicted",
+      log,
+      workerId,
+    );
+  }
+  return applied.outcome;
+}
+
 async function handleConfirmKmUpdate(
   item: ClaimedItem,
   ctx: Extract<LoadContextResult, { kind: "ok" }>,
@@ -607,6 +682,19 @@ async function handleConfirmKmUpdate(
       ? { linkedDespesaId: draft.linkedExpenseId }
       : {}),
   };
+  const vehicle = ctx.context.vehicles.find((candidate) => candidate.id === draft.vehicleId);
+  if (!canVehiclePerformFullAction(vehicle)) {
+    return await finalizeRestrictedVehicleHandoff(
+      item,
+      ctx,
+      draft.vehicleId,
+      deps,
+      render,
+      log,
+      workerId,
+      attempt,
+    );
+  }
   const kmResult = await executeConfirmedKmUpdate(kmInput, deps.kmActionDeps);
   const finalization = buildKmFinalization(kmResult, ctx, draft.vehicleId);
   if (finalization.kind === "retry") {
@@ -1141,6 +1229,19 @@ async function handleConfirmExpenseCreate(
     expectedStateVersion: ctx.context.stateVersion,
     orchestratorVersion: deps.orchestratorVersion,
   };
+  const vehicle = ctx.context.vehicles.find((candidate) => candidate.id === draft.vehicleId);
+  if (!canVehiclePerformFullAction(vehicle)) {
+    return await finalizeRestrictedVehicleHandoff(
+      item,
+      ctx,
+      draft.vehicleId,
+      deps,
+      render,
+      log,
+      workerId,
+      attempt,
+    );
+  }
   const expenseResult = await executeConfirmedExpenseCreate(expenseInput, deps.expenseActionDeps);
   const finalization = buildExpenseFinalization(expenseResult, ctx, draft.vehicleId);
   if (finalization.kind === "retry") {

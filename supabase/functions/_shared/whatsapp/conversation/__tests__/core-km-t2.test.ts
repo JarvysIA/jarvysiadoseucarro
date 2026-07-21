@@ -93,7 +93,11 @@ function validKmState(over: Partial<ConversationState> = {}): ConversationState 
 describe("core T2 — handoff de confirmacao KM", () => {
   test("confirm em awaiting_km_confirmation com draft valido → handoff", () => {
     const d = decideConversation(
-      inp({ originalText: "sim", state: validKmState() }),
+      inp({
+        originalText: "sim",
+        state: validKmState(),
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000)],
+      }),
     );
     expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
     expect(d.eventKind).toBe("confirm");
@@ -125,6 +129,7 @@ describe("core T2 — handoff de confirmacao KM", () => {
           state: "awaiting_km_correction",
           draftPayload: payload,
         }),
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 20000)],
       }),
     );
     expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
@@ -174,6 +179,7 @@ describe("core T2 — deny em states KM", () => {
             isCorrection: true,
           },
         }),
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 20000)],
       }),
     );
     expect(d.decisionKind).toBe("reset_task");
@@ -201,7 +207,13 @@ describe("core T2 — defesa contra drafts invalidos", () => {
         isCorrection: false,
       },
     });
-    const d = decideConversation(inp({ originalText: "sim", state: bad }));
+    const d = decideConversation(
+      inp({
+        originalText: "sim",
+        state: bad,
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000)],
+      }),
+    );
     expect(d.decisionKind).toBe("respond");
     expect(d.responseKey).toBe("nothing_to_confirm");
     expect(d.eventKind).toBe("confirm");
@@ -213,7 +225,13 @@ describe("core T2 — defesa contra drafts invalidos", () => {
       draftPayload: null,
       draftId: null,
     });
-    const d = decideConversation(inp({ originalText: "sim", state: bad }));
+    const d = decideConversation(
+      inp({
+        originalText: "sim",
+        state: bad,
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000)],
+      }),
+    );
     expect(d.decisionKind).toBe("respond");
     expect(d.responseKey).toBe("nothing_to_confirm");
   });

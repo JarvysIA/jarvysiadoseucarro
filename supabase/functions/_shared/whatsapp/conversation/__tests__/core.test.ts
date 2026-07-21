@@ -60,7 +60,13 @@ describe("core — validation & replay", () => {
 
 describe("core — media", () => {
   test("image defers to legacy without writing lastMessageId", () => {
-    const d = decideConversation(inp({ messageType: "image", originalText: null }));
+    const d = decideConversation(
+      inp({
+        messageType: "image",
+        originalText: null,
+        vehicles: [veh("v1", "Fiat", "Argo", "ABC1D23")],
+      }),
+    );
     expect(d.decisionKind).toBe("defer_legacy_media");
     expect(d.deferToLegacyRouter).toBe(true);
     expect(d.responseKey).toBeNull();
@@ -248,6 +254,7 @@ describe("core — expiração", () => {
           expiresAt: past,
           activeVehicleId: "v-keep",
         }),
+        vehicles: [veh("v-keep", "Fiat", "Argo", "ABC1D23")],
       }),
     );
     expect(d.responseKey).toBe("nothing_to_confirm");
@@ -265,6 +272,7 @@ describe("core — expiração", () => {
         originalText: null,
         now,
         state: state({ state: "awaiting_vehicle", expiresAt: past }),
+        vehicles: [veh("v1", "Fiat", "Argo", "ABC1D23")],
       }),
     );
     expect(d.decisionKind).toBe("defer_legacy_media");

@@ -54,6 +54,8 @@ export function renderResponse(
       return "Não achei esse carro na sua lista. Pode me dizer o modelo ou a placa?";
     case "no_eligible_vehicle":
       return "Você ainda não tem carro cadastrado no app.";
+    case "vehicle_access_restricted":
+      return "Essa ação não está disponível por aqui agora.";
     case "fallback_first":
       return "Não entendi direito. Pode me explicar de outro jeito?";
     case "fallback_second":

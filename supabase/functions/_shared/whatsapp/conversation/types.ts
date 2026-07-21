@@ -114,8 +114,7 @@ export type ConversationVehicle = {
   /**
    * Build 5.7F2E1A.5-MJ0 — modo de acesso ao WhatsApp para ESTE veículo.
    * Fonte da verdade: computeWhatsappVehicleAccessMode. O core NÃO recomputa
-   * e NÃO consome este campo neste build; consumo será introduzido por
-   * builds subsequentes (MJ1/MJ2/E1B).
+   * este campo e aplica seu valor de forma fail-closed por veículo.
    */
   whatsappAccessMode: WhatsappVehicleAccessMode;
   optionalLabel?: string | null;
@@ -163,6 +162,7 @@ export type ConversationResponseKey =
   | "vehicle_ambiguous"
   | "vehicle_not_found"
   | "no_eligible_vehicle"
+  | "vehicle_access_restricted"
   | "fallback_first"
   | "fallback_second"
   | "fallback_reset"

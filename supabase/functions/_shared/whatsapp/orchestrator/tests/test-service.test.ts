@@ -2,6 +2,7 @@
 // Runner: bun test. Sem rede, sem banco, sem Supabase.
 
 import { describe, expect, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 import {
   runWhatsappOrchestratorTestCycle,
   type ItemOutcome,
@@ -24,6 +25,7 @@ import type {
   ConversationResponseKey,
   ConversationResponseParams,
   ConversationState,
+  ConversationVehicle,
 } from "../../conversation/types.ts";
 import type { ConfirmedKmUpdateDeps } from "../../actions/types.ts";
 import type { ConfirmedExpenseCreateDeps } from "../../actions/expense-types.ts";
@@ -79,23 +81,77 @@ function makeState(over: Partial<ConversationState> = {}): ConversationState {
   };
 }
 
-function okContext(over: {
-  activeVehicleIssue?: "invalid" | "archived" | null;
-  stateVersion?: number;
-  state?: ConversationState;
-  conversationStateId?: string | null;
-} = {}): Extract<LoadContextResult, { kind: "ok" }> {
+function makeVehicle(
+  id: string,
+  whatsappAccessMode: ConversationVehicle["whatsappAccessMode"] = "full",
+): ConversationVehicle {
+  return {
+    id,
+    brand: "Fiat",
+    model: "Argo",
+    plate: "ABC1D23",
+    isArchived: false,
+    isEligible: true,
+    kmAtual: 10000,
+    whatsappAccessMode,
+    optionalLabel: null,
+  };
+}
+
+function makeRuntimeVehicle(id: string, mode: unknown): ConversationVehicle {
+  const value = makeVehicle(id) as unknown as Record<string, unknown>;
+  if (mode === undefined) delete value.whatsappAccessMode;
+  else value.whatsappAccessMode = mode;
+  return value as unknown as ConversationVehicle;
+}
+
+function okContext(
+  over: {
+    activeVehicleIssue?: "invalid" | "archived" | null;
+    stateVersion?: number;
+    state?: ConversationState;
+    conversationStateId?: string | null;
+    vehicles?: ConversationVehicle[];
+  } = {},
+): Extract<LoadContextResult, { kind: "ok" }> {
   return {
     kind: "ok",
     context: {
       state: over.state ?? makeState(),
       stateVersion: over.stateVersion ?? 0,
       fallbackCount: 0,
-      vehicles: [],
-      conversationStateId: "conversationStateId" in over ? over.conversationStateId! : "cs-default-1",
+      vehicles: over.vehicles ?? [],
+      conversationStateId:
+        "conversationStateId" in over ? over.conversationStateId! : "cs-default-1",
     },
     activeVehicleIssue: over.activeVehicleIssue ?? null,
   };
+}
+
+function expectRestrictedTransition(input: TransitionInput) {
+  expect(input.patch).toMatchObject({
+    state: "idle",
+    currentIntent: null,
+    awaitingField: null,
+    requestSource: null,
+    draftType: null,
+    draftId: null,
+    draftVersion: null,
+    draftPayload: null,
+    activeVehicleId: null,
+    confirmedAt: null,
+    executedAt: null,
+    expiresAt: null,
+  });
+  expect(input.resultSummary).toMatchObject({
+    decisionKind: "respond",
+    eventKind: "confirm",
+    outcome: "cancelled",
+  });
+  expect(input.response).toMatchObject({
+    responseKey: "vehicle_access_restricted",
+    textBody: "Essa ação não está disponível por aqui agora.",
+  });
 }
 
 function decisionRespond(over: Partial<ConversationCoreDecision> = {}): ConversationCoreDecision {
@@ -1133,6 +1189,12 @@ describe("confirm_km_update", () => {
   const VEHICLE_ID = "11111111-1111-4111-8111-111111111111";
   const REQUEST_MSG_ID = "22222222-2222-4222-8222-222222222222";
 
+  function kmContext(
+    over: Parameters<typeof okContext>[0] = {},
+  ): Extract<LoadContextResult, { kind: "ok" }> {
+    return okContext({ ...over, vehicles: over.vehicles ?? [makeVehicle(VEHICLE_ID)] });
+  }
+
   function validDraftPayload(over: Record<string, unknown> = {}): Record<string, unknown> {
     return {
       phase: "awaiting_confirmation",
@@ -1204,7 +1266,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([{ kind: "applied", actionExecutionId: "ax-1", previousKm: 10000, newKm: 20000 }]);
@@ -1227,7 +1289,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([
@@ -1246,7 +1308,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([{ kind: "no_op", actionExecutionId: "ax-1", currentKm: 20000 }]);
@@ -1262,7 +1324,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([{ kind: "rejected", reason: "vehicle_archived" }]);
@@ -1281,7 +1343,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([{ kind: "conflicted", reason: "km_conflict", currentKm: 15000 }]);
@@ -1297,7 +1359,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
     });
     const km = mockKmDeps([{ kind: "transient_error", reason: "executor_unavailable" }]);
@@ -1316,7 +1378,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
     });
     const km = mockKmDeps([new Error("executor boom")]);
@@ -1334,7 +1396,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState(), stateVersion: -1 })],
+      loadContext: [kmContext({ state: kmState(), stateVersion: -1 })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     // Executor pode até ser chamado ou não — nesse caminho o serviço rejeita
@@ -1358,7 +1420,7 @@ describe("confirm_km_update", () => {
     const badPayload = validDraftPayload({ isCorrection: true }); // newKm > previous => inconsistente
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState(badPayload) })],
+      loadContext: [kmContext({ state: kmState(badPayload) })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     const km = mockKmDeps([]);
@@ -1376,7 +1438,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState(), conversationStateId: null })],
+      loadContext: [kmContext({ state: kmState(), conversationStateId: null })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     const km = mockKmDeps([]);
@@ -1394,7 +1456,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState(), stateVersion: 42 })],
+      loadContext: [kmContext({ state: kmState(), stateVersion: 42 })],
       apply: [applyOk],
     });
     const km = mockKmDeps([{ kind: "applied", actionExecutionId: "ax", previousKm: 10000, newKm: 20000 }]);
@@ -1414,7 +1476,7 @@ describe("confirm_km_update", () => {
     // 2º ctx: state awaiting_km_confirmation (decisão confirm_km_update); apply final ok.
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext(), okContext({ state: kmState(), stateVersion: 7 })],
+      loadContext: [okContext(), kmContext({ state: kmState(), stateVersion: 7 })],
       apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
     });
     let call = 0;
@@ -1441,7 +1503,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState(validDraftPayload({ linkedExpenseId: LINKED })) })],
+      loadContext: [kmContext({ state: kmState(validDraftPayload({ linkedExpenseId: LINKED })) })],
       apply: [applyOk],
     });
     const km = mockKmDeps([
@@ -1461,7 +1523,7 @@ describe("confirm_km_update", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: kmState() })],
+      loadContext: [kmContext({ state: kmState() })],
       apply: [applyOk],
     });
     const km = mockKmDeps([
@@ -1476,6 +1538,132 @@ describe("confirm_km_update", () => {
     const cmd = km.calls[0] as Record<string, unknown>;
     expect(Object.prototype.hasOwnProperty.call(cmd, "linkedDespesaId")).toBe(false);
   });
+
+  test.each(["passive_with_km", "denied", undefined, "invalid"])(
+    "vehicle access %s bloqueia executor de KM fail-closed",
+    async (mode) => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [
+          kmContext({
+            state: { ...kmState(), activeVehicleId: VEHICLE_ID },
+            vehicles: [makeRuntimeVehicle(VEHICLE_ID, mode)],
+          }),
+        ],
+        apply: [applyOk],
+      });
+      const km = mockKmDeps([]);
+      const result = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+      );
+      expect(result.counts.completed).toBe(1);
+      expect(km.calls).toHaveLength(0);
+      expect(m.calls.release).toHaveLength(0);
+      expect(m.calls.apply).toHaveLength(1);
+      expectRestrictedTransition(m.calls.apply[0]!);
+    },
+  );
+
+  test("veículo archived bloqueia executor de KM e finaliza state/fila", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        kmContext({
+          state: { ...kmState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [{ ...makeVehicle(VEHICLE_ID), isArchived: true }],
+        }),
+      ],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(km.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("veículo isEligible=false bloqueia executor de KM e finaliza state/fila", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        kmContext({
+          state: { ...kmState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [{ ...makeVehicle(VEHICLE_ID), isEligible: false }],
+        }),
+      ],
+      apply: [applyOk],
+    });
+    const km = mockKmDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(km.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("replay da finalização restrita de KM não executa action", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        kmContext({
+          state: { ...kmState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [makeVehicle(VEHICLE_ID, "denied")],
+        }),
+      ],
+      apply: [{ ok: true, wasReplay: true, orchestratorResult: {} as never }],
+    });
+    const km = mockKmDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmKm(), kmActionDeps: km.deps }),
+    );
+    expect(result.counts.replayed).toBe(1);
+    expect(km.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("recalculo após conflito bloqueia executor de KM após downgrade", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        okContext({ vehicles: [makeVehicle(VEHICLE_ID)] }),
+        kmContext({
+          state: { ...kmState(), activeVehicleId: VEHICLE_ID },
+          stateVersion: 7,
+          vehicles: [makeVehicle(VEHICLE_ID, "passive_with_km")],
+        }),
+      ],
+      apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
+    });
+    let calls = 0;
+    const km = mockKmDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => (++calls === 1 ? decisionRespond() : decisionConfirmKm()),
+        kmActionDeps: km.deps,
+      }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(km.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expect(m.calls.apply).toHaveLength(2);
+    expectRestrictedTransition(m.calls.apply[1]!);
+  });
 });
 
 // ============================================================
@@ -1487,6 +1675,12 @@ describe("confirm_expense_create", () => {
   const REQUEST_MSG_ID = "22222222-2222-4222-8222-222222222222";
   const DESP_ID = "33333333-3333-4333-8333-333333333333";
   const EXEC_ID = "44444444-4444-4444-8444-444444444444";
+
+  function expenseContext(
+    over: Parameters<typeof okContext>[0] = {},
+  ): Extract<LoadContextResult, { kind: "ok" }> {
+    return okContext({ ...over, vehicles: over.vehicles ?? [makeVehicle(VEHICLE_ID)] });
+  }
 
   function validExpensePayload(over: Record<string, unknown> = {}): Record<string, unknown> {
     return {
@@ -1557,7 +1751,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
@@ -1586,7 +1780,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
@@ -1606,7 +1800,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([{ kind: "rejected", reason: "categoria_invalid" }]);
@@ -1625,7 +1819,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
@@ -1643,7 +1837,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
     });
     const xp = mockExpenseDeps([{ kind: "transient_error", reason: "executor_unavailable" }]);
@@ -1662,7 +1856,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState() })],
+      loadContext: [expenseContext({ state: expenseState() })],
       release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
     });
     const xp = mockExpenseDeps([new Error("executor boom")]);
@@ -1680,7 +1874,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState(), stateVersion: -1 })],
+      loadContext: [expenseContext({ state: expenseState(), stateVersion: -1 })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     const xp = mockExpenseDeps([]);
@@ -1700,7 +1894,7 @@ describe("confirm_expense_create", () => {
     const badPayload = validExpensePayload({ valor: -1 });
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState(badPayload) })],
+      loadContext: [expenseContext({ state: expenseState(badPayload) })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     const xp = mockExpenseDeps([]);
@@ -1718,7 +1912,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState(), conversationStateId: null })],
+      loadContext: [expenseContext({ state: expenseState(), conversationStateId: null })],
       release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
     });
     const xp = mockExpenseDeps([]);
@@ -1761,7 +1955,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext({ state: expenseState(), stateVersion: 42 })],
+      loadContext: [expenseContext({ state: expenseState(), stateVersion: 42 })],
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
@@ -1780,7 +1974,7 @@ describe("confirm_expense_create", () => {
     const it = makeItem();
     const m = mockRepo({
       claim: [[it]],
-      loadContext: [okContext(), okContext({ state: expenseState(), stateVersion: 7 })],
+      loadContext: [okContext(), expenseContext({ state: expenseState(), stateVersion: 7 })],
       apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
     });
     let call = 0;
@@ -1802,6 +1996,144 @@ describe("confirm_expense_create", () => {
     expect(m.calls.apply[1].expectedStateVersion).toBe(7);
   });
 
+  test.each(["passive_with_km", "denied", undefined, "invalid"])(
+    "vehicle access %s bloqueia executor de despesa fail-closed",
+    async (mode) => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [
+          expenseContext({
+            state: { ...expenseState(), activeVehicleId: VEHICLE_ID },
+            vehicles: [makeRuntimeVehicle(VEHICLE_ID, mode)],
+          }),
+        ],
+        apply: [applyOk],
+      });
+      const expense = mockExpenseDeps([]);
+      const result = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionConfirmExpense(),
+          expenseActionDeps: expense.deps,
+        }),
+      );
+      expect(result.counts.completed).toBe(1);
+      expect(expense.calls).toHaveLength(0);
+      expect(m.calls.release).toHaveLength(0);
+      expect(m.calls.apply).toHaveLength(1);
+      expectRestrictedTransition(m.calls.apply[0]!);
+    },
+  );
+
+  test("veículo archived bloqueia executor de despesa e finaliza state/fila", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        expenseContext({
+          state: { ...expenseState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [{ ...makeVehicle(VEHICLE_ID), isArchived: true }],
+        }),
+      ],
+      apply: [applyOk],
+    });
+    const expense = mockExpenseDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionConfirmExpense(),
+        expenseActionDeps: expense.deps,
+      }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(expense.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("veículo isEligible=false bloqueia executor de despesa e finaliza state/fila", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        expenseContext({
+          state: { ...expenseState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [{ ...makeVehicle(VEHICLE_ID), isEligible: false }],
+        }),
+      ],
+      apply: [applyOk],
+    });
+    const expense = mockExpenseDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionConfirmExpense(),
+        expenseActionDeps: expense.deps,
+      }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(expense.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("replay da finalização restrita de despesa não executa action", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        expenseContext({
+          state: { ...expenseState(), activeVehicleId: VEHICLE_ID },
+          vehicles: [makeVehicle(VEHICLE_ID, "denied")],
+        }),
+      ],
+      apply: [{ ok: true, wasReplay: true, orchestratorResult: {} as never }],
+    });
+    const expense = mockExpenseDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionConfirmExpense(),
+        expenseActionDeps: expense.deps,
+      }),
+    );
+    expect(result.counts.replayed).toBe(1);
+    expect(expense.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expectRestrictedTransition(m.calls.apply[0]!);
+  });
+
+  test("recalculo após conflito bloqueia executor de despesa após downgrade", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        okContext({ vehicles: [makeVehicle(VEHICLE_ID)] }),
+        expenseContext({
+          state: { ...expenseState(), activeVehicleId: VEHICLE_ID },
+          stateVersion: 7,
+          vehicles: [makeVehicle(VEHICLE_ID, "passive_with_km")],
+        }),
+      ],
+      apply: [{ ok: false, reason: "state_version_conflict" }, applyOk],
+    });
+    let calls = 0;
+    const expense = mockExpenseDeps([]);
+    const result = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => (++calls === 1 ? decisionRespond() : decisionConfirmExpense()),
+        expenseActionDeps: expense.deps,
+      }),
+    );
+    expect(result.counts.completed).toBe(1);
+    expect(expense.calls).toHaveLength(0);
+    expect(m.calls.release).toHaveLength(0);
+    expect(m.calls.apply).toHaveLength(2);
+    expectRestrictedTransition(m.calls.apply[1]!);
+  });
+
   describe("buildFinalDescricao", () => {
     test("1) descricao + recognizedTags -> texto + tags na ordem fixa", async () => {
       const it = makeItem();
@@ -1812,7 +2144,7 @@ describe("confirm_expense_create", () => {
       });
       const m = mockRepo({
         claim: [[it]],
-        loadContext: [okContext({ state: expenseState(payload) })],
+        loadContext: [expenseContext({ state: expenseState(payload) })],
         apply: [applyOk],
       });
       const xp = mockExpenseDeps([
@@ -1835,7 +2167,7 @@ describe("confirm_expense_create", () => {
       });
       const m = mockRepo({
         claim: [[it]],
-        loadContext: [okContext({ state: expenseState(payload) })],
+        loadContext: [expenseContext({ state: expenseState(payload) })],
         apply: [applyOk],
       });
       const xp = mockExpenseDeps([
@@ -1857,7 +2189,7 @@ describe("confirm_expense_create", () => {
       });
       const m = mockRepo({
         claim: [[it]],
-        loadContext: [okContext({ state: expenseState(payload) })],
+        loadContext: [expenseContext({ state: expenseState(payload) })],
         apply: [applyOk],
       });
       const xp = mockExpenseDeps([
@@ -1881,7 +2213,7 @@ describe("confirm_expense_create", () => {
       });
       const m = mockRepo({
         claim: [[it]],
-        loadContext: [okContext({ state: expenseState(payload) })],
+        loadContext: [expenseContext({ state: expenseState(payload) })],
         apply: [applyOk],
       });
       const xp = mockExpenseDeps([
@@ -1906,7 +2238,7 @@ describe("confirm_expense_create", () => {
       });
       const m = mockRepo({
         claim: [[it]],
-        loadContext: [okContext({ state: expenseState(payload) })],
+        loadContext: [expenseContext({ state: expenseState(payload) })],
         apply: [applyOk],
       });
       const xp = mockExpenseDeps([
@@ -1930,7 +2262,9 @@ describe("confirm_expense_create", () => {
 
 describe("static safety", () => {
   test("módulo não importa Supabase/provider/sender/worker/IA/OCR nem lê env", async () => {
-    const src = await Bun.file(new URL("../test-service.ts", import.meta.url).pathname).text();
+    const src = await Bun.file(
+      fileURLToPath(new URL("../test-service.ts", import.meta.url)),
+    ).text();
     const banned = [
       "@supabase/",
       "createClient",

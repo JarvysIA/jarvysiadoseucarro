@@ -4,7 +4,20 @@ import type {
   ConversationCoreInput,
   ConversationState,
   ConversationStateName,
+  ConversationVehicle,
 } from "../types.ts";
+
+const FULL_VEHICLE: ConversationVehicle = {
+  id: "aaaaaaaa-1111-4222-8333-555555555555",
+  brand: "Fiat",
+  model: "Argo",
+  plate: "ABC1D23",
+  isArchived: false,
+  isEligible: true,
+  kmAtual: 10000,
+  whatsappAccessMode: "full",
+  optionalLabel: null,
+};
 
 function state(overrides: Partial<ConversationState> = {}): ConversationState {
   return {
@@ -110,6 +123,7 @@ describe("core — unknown (no text) during confirmation nudge", () => {
             requestMessageId: "aaaaaaaa-1111-4222-8333-444444444444",
           },
         }),
+        vehicles: [FULL_VEHICLE],
       }),
     );
     expect(d.decisionKind).toBe("confirm_expense_create");
@@ -121,7 +135,11 @@ describe("core — unknown (no text) during confirmation nudge", () => {
 
   test("image during awaiting_expense_confirmation still nudges (no regression)", () => {
     const d = decideConversation(
-      inp({ messageType: "image", state: state({ state: "awaiting_expense_confirmation" }) }),
+      inp({
+        messageType: "image",
+        state: state({ state: "awaiting_expense_confirmation" }),
+        vehicles: [FULL_VEHICLE],
+      }),
     );
     expect(d.decisionKind).toBe("respond");
     expect(d.eventKind).toBe("media");

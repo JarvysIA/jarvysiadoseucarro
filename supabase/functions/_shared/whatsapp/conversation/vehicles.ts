@@ -3,10 +3,12 @@
 
 import type { ConversationVehicle } from "./types.ts";
 import { normalizeCommandText } from "./normalize.ts";
+import { canVehiclePerformFullAction, fullAccessVehicles } from "./vehicle-access-policy.ts";
 
 export type VehicleResolveResult =
   | { kind: "matched"; vehicle: ConversationVehicle }
   | { kind: "ambiguous"; candidates: ConversationVehicle[]; options: string[] }
+  | { kind: "restricted"; vehicle?: ConversationVehicle }
   | { kind: "not_found" }
   | { kind: "no_eligible_vehicle" };
 
@@ -42,7 +44,7 @@ export type VehicleResolveInput = {
   contextVehicleId?: string | null;
 };
 
-export function resolveVehicle(input: VehicleResolveInput): VehicleResolveResult {
+function resolveEligibleVehicle(input: VehicleResolveInput): VehicleResolveResult {
   const pool = eligible(input.vehicles);
   if (pool.length === 0) return { kind: "no_eligible_vehicle" };
 
@@ -121,6 +123,34 @@ export function resolveVehicle(input: VehicleResolveInput): VehicleResolveResult
   }
 
   return { kind: "not_found" };
+}
+
+export function resolveVehicle(input: VehicleResolveInput): VehicleResolveResult {
+  const resolved = resolveEligibleVehicle(input);
+  if (resolved.kind === "matched") {
+    return canVehiclePerformFullAction(resolved.vehicle)
+      ? resolved
+      : { kind: "restricted", vehicle: resolved.vehicle };
+  }
+  if (resolved.kind === "ambiguous") {
+    const candidates = resolved.candidates.filter(canVehiclePerformFullAction);
+    if (candidates.length === 0) return { kind: "restricted" };
+    if (candidates.length === 1) return { kind: "matched", vehicle: candidates[0]! };
+    return {
+      kind: "ambiguous",
+      candidates,
+      options: unique(candidates.map(labelOf)),
+    };
+  }
+  if (resolved.kind === "no_eligible_vehicle") return resolved;
+
+  const fullVehicles = fullAccessVehicles(input.vehicles);
+  if (fullVehicles.length === 0) {
+    return eligible(input.vehicles).length === 0
+      ? { kind: "no_eligible_vehicle" }
+      : { kind: "restricted" };
+  }
+  return resolveEligibleVehicle({ ...input, vehicles: fullVehicles });
 }
 
 export function vehicleLabel(v: ConversationVehicle): string {

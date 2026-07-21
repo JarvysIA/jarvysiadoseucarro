@@ -5,7 +5,20 @@ import type {
   ConversationState,
   ConversationStateName,
   ConversationMessageType,
+  ConversationVehicle,
 } from "../types.ts";
+
+const FULL_VEHICLE: ConversationVehicle = {
+  id: "aaaaaaaa-1111-4111-8111-111111111111",
+  brand: "Fiat",
+  model: "Argo",
+  plate: "ABC1D23",
+  isArchived: false,
+  isEligible: true,
+  kmAtual: 10000,
+  whatsappAccessMode: "full",
+  optionalLabel: null,
+};
 
 function state(overrides: Partial<ConversationState> = {}): ConversationState {
   return {
@@ -33,7 +46,7 @@ function inp(overrides: Partial<ConversationCoreInput> = {}): ConversationCoreIn
     originalText: null,
     now: "2026-07-18T12:00:00.000Z",
     state: state(),
-    vehicles: [],
+    vehicles: [FULL_VEHICLE],
     fallbackCount: 3,
     isReplay: false,
     ...overrides,
