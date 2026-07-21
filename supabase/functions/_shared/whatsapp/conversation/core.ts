@@ -18,6 +18,7 @@ import type {
 import { normalizeCommandText } from "./normalize.ts";
 import { classifyCommand } from "./commands.ts";
 import { resolveVehicle, vehicleLabel } from "./vehicles.ts";
+import { canVehiclePerformFullAction, fullAccessVehicles } from "./vehicle-access-policy.ts";
 import { parseKmUpdateText } from "./km-update-parser.ts";
 import {
   parseMaintenanceItemsText,
@@ -317,7 +318,68 @@ function isUuid(value: string | null | undefined): value is string {
 }
 
 function firstEligible(vehicles: ConversationVehicle[]): ConversationVehicle[] {
-  return vehicles.filter((v) => v.isEligible && !v.isArchived);
+  return fullAccessVehicles(vehicles);
+}
+
+function draftVehicleId(state: ConversationState): string | null {
+  const value = state.draftPayload?.vehicleId;
+  return typeof value === "string" ? value : null;
+}
+
+function isVehicleAccessRestricted(
+  state: ConversationState,
+  vehicles: ConversationVehicle[],
+): boolean {
+  const focalId = draftVehicleId(state) ?? state.activeVehicleId;
+  if (focalId !== null) {
+    return !canVehiclePerformFullAction(vehicles.find((v) => v.id === focalId));
+  }
+  const available = vehicles.filter((v) => v.isEligible && !v.isArchived);
+  return available.length > 0 && fullAccessVehicles(available).length === 0;
+}
+
+function isMediaAccessRestricted(
+  state: ConversationState,
+  vehicles: ConversationVehicle[],
+): boolean {
+  const focalId = draftVehicleId(state) ?? state.activeVehicleId;
+  if (focalId !== null) {
+    return !canVehiclePerformFullAction(vehicles.find((v) => v.id === focalId));
+  }
+  const available = vehicles.filter((v) => v.isEligible && !v.isArchived);
+  return available.length !== 1 || !canVehiclePerformFullAction(available[0]);
+}
+
+function restrictedDecision(args: {
+  eventKind: ConversationEventKind;
+  previousState: ConversationStateName;
+  effectiveState: ConversationState;
+  basePatch: ConversationStatePatch;
+  sourceMessageId: string;
+}): ConversationCoreDecision {
+  const blockedVehicleId =
+    draftVehicleId(args.effectiveState) ?? args.effectiveState.activeVehicleId;
+  const shouldInvalidateTask = hasPendingDraft(args.effectiveState);
+  const restrictedPatch = shouldInvalidateTask
+    ? mergePatch(args.basePatch, {
+        ...CLEAR_TASK_PATCH,
+        state: "idle",
+        ...(blockedVehicleId !== null && args.effectiveState.activeVehicleId === blockedVehicleId
+          ? { activeVehicleId: null }
+          : {}),
+      })
+    : args.basePatch;
+  return buildDecision({
+    eventKind: args.eventKind,
+    decisionKind: "respond",
+    previousState: args.previousState,
+    nextState: shouldInvalidateTask ? "idle" : args.effectiveState.state,
+    outcome: shouldInvalidateTask ? "cancelled" : "none",
+    statePatch: withLastMessage(restrictedPatch, args.sourceMessageId),
+    responseKey: "vehicle_access_restricted",
+    nextFallbackCount: 0,
+    reasonCode: "vehicle_access_restricted",
+  });
 }
 
 function labelFor(v: ConversationVehicle): string {
@@ -436,6 +498,15 @@ export function decideConversation(
 
   // 4) Mídia — defer para roteador legado, exceto durante confirmação pendente
   if (MEDIA_TYPES.has(input.messageType)) {
+    if (isMediaAccessRestricted(effectiveState, input.vehicles)) {
+      return restrictedDecision({
+        eventKind: "media",
+        previousState,
+        effectiveState,
+        basePatch,
+        sourceMessageId: input.sourceMessageId,
+      });
+    }
     const isDuringConfirmation =
       effectiveState.state === "awaiting_km_confirmation" ||
       effectiveState.state === "awaiting_km_correction" ||
@@ -507,6 +578,24 @@ export function decideConversation(
 
   // 4.2) Explicit opt-out (match exato) — defer para roteador legado
   const command = classifyCommand(normalized);
+  if (
+    command !== "cancel_task" &&
+    command !== "reset_conversation" &&
+    effectiveState.state !== "awaiting_vehicle" &&
+    isVehicleAccessRestricted(effectiveState, input.vehicles)
+  ) {
+    const eventKind: ConversationEventKind =
+      command === "greeting" || command === "help" || command === "confirm" || command === "deny"
+        ? command
+        : "unknown";
+    return restrictedDecision({
+      eventKind,
+      previousState,
+      effectiveState,
+      basePatch,
+      sourceMessageId: input.sourceMessageId,
+    });
+  }
   if (command === "explicit_opt_out") {
     return buildDecision({
       eventKind: "explicit_opt_out",
@@ -729,6 +818,15 @@ export function decideConversation(
         responseParams: { options: resolved.options },
         nextFallbackCount: 0,
         reasonCode: "awaiting_vehicle_ambiguous",
+      });
+    }
+    if (resolved.kind === "restricted") {
+      return restrictedDecision({
+        eventKind: "vehicle_reply",
+        previousState,
+        effectiveState,
+        basePatch,
+        sourceMessageId: input.sourceMessageId,
       });
     }
     if (resolved.kind === "no_eligible_vehicle") {

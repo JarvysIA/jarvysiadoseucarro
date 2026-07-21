@@ -149,7 +149,7 @@ describe("awaiting_requested_km — reply parsing", () => {
     expect(payload?.isCorrection).toBe(false);
   });
 
-  test("veículo ativo arquivado → no_eligible_vehicle e limpa estado", () => {
+  test("veículo ativo arquivado → vehicle_access_restricted e limpa estado", () => {
     const d = decideConversation(
       inp({
         state: requestedKmState(VEH_1),
@@ -159,12 +159,14 @@ describe("awaiting_requested_km — reply parsing", () => {
     );
     expect(d.decisionKind).toBe("respond");
     expect(d.nextState).toBe("idle");
-    expect(d.responseKey).toBe("no_eligible_vehicle");
+    // Há referência focal explícita, mas ela não pode executar ação full.
+    expect(d.responseKey).toBe("vehicle_access_restricted");
+    expect(d.reasonCode).toBe("vehicle_access_restricted");
     expect(d.statePatch.currentIntent).toBeNull();
     expect(d.statePatch.awaitingField).toBeNull();
   });
 
-  test("activeVehicleId não bate com nenhum veículo → no_eligible_vehicle", () => {
+  test("activeVehicleId não bate com nenhum veículo → vehicle_access_restricted", () => {
     const d = decideConversation(
       inp({
         state: requestedKmState(VEH_1),
@@ -172,7 +174,9 @@ describe("awaiting_requested_km — reply parsing", () => {
         vehicles: [veh(VEH_2, 30000)],
       }),
     );
-    expect(d.responseKey).toBe("no_eligible_vehicle");
+    // Referência focal ausente do contexto falha fechada, não como frota vazia.
+    expect(d.responseKey).toBe("vehicle_access_restricted");
+    expect(d.reasonCode).toBe("vehicle_access_restricted");
     expect(d.nextState).toBe("idle");
   });
 

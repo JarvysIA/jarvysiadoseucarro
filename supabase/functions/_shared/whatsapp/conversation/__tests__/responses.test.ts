@@ -12,6 +12,7 @@ const ALL_KEYS = [
   "vehicle_ambiguous",
   "vehicle_not_found",
   "no_eligible_vehicle",
+  "vehicle_access_restricted",
   "fallback_first",
   "fallback_second",
   "fallback_reset",
@@ -52,6 +53,12 @@ describe("renderResponse guardrails", () => {
       expect(emojiCount).toBeLessThanOrEqual(1);
     });
   }
+
+  test("vehicle_access_restricted uses the safe deterministic message", () => {
+    expect(renderResponse("vehicle_access_restricted", {})).toBe(
+      "Essa ação não está disponível por aqui agora.",
+    );
+  });
 
   test("vehicle_selected uses label", () => {
     expect(renderResponse("vehicle_selected", { vehicleLabel: "Fiat Argo" })).toContain(

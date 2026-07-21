@@ -656,7 +656,12 @@ describe("core T1 — confirmações em states KM não emitem T2", () => {
 
   test("'sim' em awaiting_km_confirmation com draft valido → handoff CONFIRM_KM_UPDATE_HANDOFF_KIND (nao muda state/draft)", () => {
     const d = decideConversation(
-      inp({ originalText: "sim", state: kmState, sourceMessageId: MSG_UUID_B }),
+      inp({
+        originalText: "sim",
+        state: kmState,
+        sourceMessageId: MSG_UUID_B,
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000)],
+      }),
     );
     expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
     expect(d.eventKind).toBe("confirm");
@@ -673,7 +678,12 @@ describe("core T1 — confirmações em states KM não emitem T2", () => {
   test("'sim' em awaiting_km_correction com draft valido → handoff, nextState awaiting_km_correction", () => {
     const corr = { ...kmState, state: "awaiting_km_correction" as const };
     const d = decideConversation(
-      inp({ originalText: "sim", state: corr, sourceMessageId: MSG_UUID_B }),
+      inp({
+        originalText: "sim",
+        state: corr,
+        sourceMessageId: MSG_UUID_B,
+        vehicles: [veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 2000)],
+      }),
     );
     expect(d.decisionKind).toBe(CONFIRM_KM_UPDATE_HANDOFF_KIND);
     expect(d.eventKind).toBe("confirm");
