@@ -1,4 +1,11 @@
-import type { MaintenanceTriggerTag } from "./expense-maintenance-items-parser.ts";
+import {
+  isMaintenanceItemKey,
+  MAINTENANCE_ITEM_KEYS,
+  MAINTENANCE_TRIGGER_TAGS,
+  recognizedTagsFromMaintenanceItemKeys,
+  type MaintenanceItemKey,
+  type MaintenanceTriggerTag,
+} from "./expense-maintenance-items-parser.ts";
 
 export const EXPENSE_CREATE_INITIAL_DRAFT_VERSION = 0 as const;
 export const EXPENSE_CREATE_PROMOTED_ONCE_VERSION = 1 as const;
@@ -16,7 +23,7 @@ export const EXPENSE_CATEGORIES = [
   "Seguro",
   "Acessórios",
 ] as const;
-export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 export type AwaitingCategoryExpenseDraft = {
   readonly phase: "awaiting_category";
@@ -60,10 +67,23 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly ambiguousFilterMention?: boolean;
 };
 
+export type CollectingMaintenanceExpenseDraft = {
+  readonly phase: "collecting_maintenance";
+  readonly categoria: "Revisão" | "Manutenção";
+  readonly valor?: number;
+  readonly vehicleId?: string;
+  readonly requestMessageId: string;
+  readonly recognizedTags: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly maintenanceItemKeys: ReadonlyArray<MaintenanceItemKey>;
+  readonly descricaoPreliminar?: string;
+  readonly ambiguousFilterMention: boolean;
+};
+
 export type ExpenseCreateDraft =
   | AwaitingCategoryExpenseDraft
   | AwaitingVehicleExpenseDraft
-  | AwaitingConfirmationExpenseDraft;
+  | AwaitingConfirmationExpenseDraft
+  | CollectingMaintenanceExpenseDraft;
 
 export type ExpenseDraftValidationErrorCode =
   | "not_an_object"
@@ -75,6 +95,10 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_request_message_id"
   | "invalid_vehicle_id"
   | "invalid_recognized_tags"
+  | "duplicate_recognized_tags"
+  | "recognized_tags_mismatch"
+  | "invalid_maintenance_item_keys"
+  | "duplicate_maintenance_item_keys"
   | "invalid_descricao"
   | "invalid_ambiguous_filter_mention";
 
@@ -93,8 +117,7 @@ function hasOwn(obj: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function isValidUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_REGEX.test(value);
@@ -115,28 +138,49 @@ function isValidCategoria(value: unknown): value is ExpenseCategory {
   return typeof value === "string" && CATEGORIES_SET.has(value);
 }
 
-const MAINTENANCE_TAGS_SET = new Set<string>([
-  "oleo",
-  "filtro",
-  "pastilha",
-  "arrefecimento",
-]);
+const MAINTENANCE_TAGS_SET: ReadonlySet<string> = new Set(MAINTENANCE_TRIGGER_TAGS);
 
 // Aditivo (build 3/9 do item 6): array de 0 a 4 tags válidas, sem
 // duplicatas — o parser (build 2) já garante isso na origem, mas
 // validamos aqui de novo, pois o draft vem do banco, não direto do parser.
-function isValidRecognizedTags(
+function validateRecognizedTags(
   value: unknown,
-): value is ReadonlyArray<MaintenanceTriggerTag> {
-  if (!Array.isArray(value)) return false;
-  if (value.length > 4) return false;
-  const seen = new Set<string>();
-  for (const item of value) {
-    if (typeof item !== "string" || !MAINTENANCE_TAGS_SET.has(item)) return false;
-    if (seen.has(item)) return false;
-    seen.add(item);
+):
+  | { readonly ok: true; readonly value: ReadonlyArray<MaintenanceTriggerTag> }
+  | { readonly ok: false; readonly code: "invalid_recognized_tags" | "duplicate_recognized_tags" } {
+  if (!Array.isArray(value) || value.length > 4) {
+    return { ok: false, code: "invalid_recognized_tags" };
   }
-  return true;
+  if (value.some((item) => typeof item !== "string" || !MAINTENANCE_TAGS_SET.has(item))) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  if (new Set(value).size !== value.length) {
+    return { ok: false, code: "duplicate_recognized_tags" };
+  }
+  return { ok: true, value: [...value] as ReadonlyArray<MaintenanceTriggerTag> };
+}
+
+function isValidRecognizedTags(value: unknown): value is ReadonlyArray<MaintenanceTriggerTag> {
+  return validateRecognizedTags(value).ok;
+}
+
+function validateMaintenanceItemKeys(value: unknown):
+  | { readonly ok: true; readonly value: ReadonlyArray<MaintenanceItemKey> }
+  | {
+      readonly ok: false;
+      readonly code: "invalid_maintenance_item_keys" | "duplicate_maintenance_item_keys";
+    } {
+  if (
+    !Array.isArray(value) ||
+    value.length > MAINTENANCE_ITEM_KEYS.length ||
+    !value.every(isMaintenanceItemKey)
+  ) {
+    return { ok: false, code: "invalid_maintenance_item_keys" };
+  }
+  if (new Set(value).size !== value.length) {
+    return { ok: false, code: "duplicate_maintenance_item_keys" };
+  }
+  return { ok: true, value: [...value] };
 }
 
 const DESCRICAO_MAX_CHARS = 500;
@@ -162,12 +206,7 @@ const CATEGORY_ALL_KEYS: ReadonlyArray<string> = [
   ...CATEGORY_OPTIONAL_KEYS,
 ];
 
-const VEHICLE_REQUIRED_KEYS = [
-  "phase",
-  "categoria",
-  "valor",
-  "requestMessageId",
-] as const;
+const VEHICLE_REQUIRED_KEYS = ["phase", "categoria", "valor", "requestMessageId"] as const;
 const VEHICLE_OPTIONAL_KEYS = [
   "recognizedTags",
   "descricaoPreliminar",
@@ -194,6 +233,82 @@ const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
   ...CONFIRMATION_REQUIRED_KEYS,
   ...CONFIRMATION_OPTIONAL_KEYS,
 ];
+
+const COLLECTING_REQUIRED_KEYS = [
+  "phase",
+  "categoria",
+  "requestMessageId",
+  "recognizedTags",
+  "maintenanceItemKeys",
+  "ambiguousFilterMention",
+] as const;
+const COLLECTING_OPTIONAL_KEYS = ["valor", "vehicleId", "descricaoPreliminar"] as const;
+const COLLECTING_ALL_KEYS: ReadonlyArray<string> = [
+  ...COLLECTING_REQUIRED_KEYS,
+  ...COLLECTING_OPTIONAL_KEYS,
+];
+
+export function validateCollectingMaintenanceExpenseDraft(
+  input: unknown,
+): ExpenseDraftValidationResult<CollectingMaintenanceExpenseDraft> {
+  if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
+  for (const key of Object.keys(input)) {
+    if (!COLLECTING_ALL_KEYS.includes(key)) return { ok: false, code: "unexpected_field" };
+  }
+  for (const key of COLLECTING_REQUIRED_KEYS) {
+    if (!hasOwn(input, key)) return { ok: false, code: "missing_field" };
+  }
+  if (input.phase !== "collecting_maintenance") return { ok: false, code: "invalid_phase" };
+  if (input.categoria !== "Revisão" && input.categoria !== "Manutenção") {
+    return { ok: false, code: "invalid_categoria" };
+  }
+  if (hasOwn(input, "valor") && !isValidValor(input.valor)) {
+    return { ok: false, code: "invalid_valor" };
+  }
+  if (hasOwn(input, "vehicleId") && !isValidUuid(input.vehicleId)) {
+    return { ok: false, code: "invalid_vehicle_id" };
+  }
+  if (!isValidUuid(input.requestMessageId)) {
+    return { ok: false, code: "invalid_request_message_id" };
+  }
+  const recognizedTags = validateRecognizedTags(input.recognizedTags);
+  if (!recognizedTags.ok) return recognizedTags;
+  const maintenanceItemKeys = validateMaintenanceItemKeys(input.maintenanceItemKeys);
+  if (!maintenanceItemKeys.ok) return maintenanceItemKeys;
+  const expectedRecognizedTags = recognizedTagsFromMaintenanceItemKeys(maintenanceItemKeys.value);
+  if (
+    recognizedTags.value.length !== expectedRecognizedTags.length ||
+    recognizedTags.value.some((tag, index) => tag !== expectedRecognizedTags[index])
+  ) {
+    return { ok: false, code: "recognized_tags_mismatch" };
+  }
+  if (
+    hasOwn(input, "descricaoPreliminar") &&
+    (typeof input.descricaoPreliminar !== "string" ||
+      !isValidDescricaoField(input.descricaoPreliminar))
+  ) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+  if (typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
+  return {
+    ok: true,
+    value: {
+      phase: "collecting_maintenance",
+      categoria: input.categoria,
+      requestMessageId: input.requestMessageId,
+      recognizedTags: expectedRecognizedTags,
+      maintenanceItemKeys: maintenanceItemKeys.value,
+      ambiguousFilterMention: input.ambiguousFilterMention,
+      ...(hasOwn(input, "valor") ? { valor: input.valor as number } : {}),
+      ...(hasOwn(input, "vehicleId") ? { vehicleId: input.vehicleId as string } : {}),
+      ...(hasOwn(input, "descricaoPreliminar")
+        ? { descricaoPreliminar: input.descricaoPreliminar as string }
+        : {}),
+    },
+  };
+}
 
 export function validateAwaitingCategoryExpenseDraft(
   input: unknown,
@@ -386,6 +501,9 @@ export function validateExpenseCreateDraft(
   }
   if (phase === "awaiting_confirmation") {
     return validateAwaitingConfirmationExpenseDraft(input);
+  }
+  if (phase === "collecting_maintenance") {
+    return validateCollectingMaintenanceExpenseDraft(input);
   }
   return { ok: false, code: "invalid_phase" };
 }

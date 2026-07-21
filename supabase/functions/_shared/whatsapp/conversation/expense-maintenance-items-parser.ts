@@ -17,18 +17,75 @@
 // As únicas 4 tags que o trigger atualizar_revisao_veiculo reconhece na
 // descrição são, literalmente: [oleo] [filtro] [pastilha] [arrefecimento].
 
-export type MaintenanceTriggerTag = "oleo" | "filtro" | "pastilha" | "arrefecimento";
+export const MAINTENANCE_TRIGGER_TAGS = ["oleo", "filtro", "pastilha", "arrefecimento"] as const;
+export type MaintenanceTriggerTag = (typeof MAINTENANCE_TRIGGER_TAGS)[number];
+const MAINTENANCE_TRIGGER_TAG_SET: ReadonlySet<string> = new Set(MAINTENANCE_TRIGGER_TAGS);
 
-export type MaintenanceItemKey =
-  | "oleo_motor"
-  | "filtro_oleo"
-  | "filtro_ar_motor"
-  | "filtro_cabine"
-  | "filtro_combustivel"
-  | "pastilhas_freio"
-  | "aditivo_radiador"
-  | "limpeza_arrefecimento"
-  | "aditivo_arrefecimento";
+export function isMaintenanceTriggerTag(value: unknown): value is MaintenanceTriggerTag {
+  return typeof value === "string" && MAINTENANCE_TRIGGER_TAG_SET.has(value);
+}
+
+export const MAINTENANCE_ITEM_KEYS = [
+  "oleo_motor",
+  "filtro_oleo",
+  "filtro_ar_motor",
+  "filtro_cabine",
+  "filtro_combustivel",
+  "pastilhas_freio",
+  "aditivo_radiador",
+  "limpeza_arrefecimento",
+  "aditivo_arrefecimento",
+] as const;
+export type MaintenanceItemKey = (typeof MAINTENANCE_ITEM_KEYS)[number];
+
+const MAINTENANCE_ITEM_KEY_SET: ReadonlySet<string> = new Set(MAINTENANCE_ITEM_KEYS);
+
+export function isMaintenanceItemKey(value: unknown): value is MaintenanceItemKey {
+  return typeof value === "string" && MAINTENANCE_ITEM_KEY_SET.has(value);
+}
+
+export const MAINTENANCE_ITEM_TAG: Readonly<Record<MaintenanceItemKey, MaintenanceTriggerTag>> = {
+  oleo_motor: "oleo",
+  filtro_oleo: "oleo",
+  filtro_ar_motor: "filtro",
+  filtro_cabine: "filtro",
+  filtro_combustivel: "filtro",
+  pastilhas_freio: "pastilha",
+  aditivo_radiador: "arrefecimento",
+  limpeza_arrefecimento: "arrefecimento",
+  aditivo_arrefecimento: "arrefecimento",
+};
+
+export const MAINTENANCE_ITEM_LABEL: Readonly<Record<MaintenanceItemKey, string>> = {
+  oleo_motor: "óleo do motor",
+  filtro_oleo: "filtro de óleo",
+  filtro_ar_motor: "filtro de ar",
+  filtro_cabine: "filtro de cabine",
+  filtro_combustivel: "filtro de combustível",
+  pastilhas_freio: "pastilhas de freio",
+  aditivo_radiador: "aditivo do radiador",
+  limpeza_arrefecimento: "limpeza do arrefecimento",
+  aditivo_arrefecimento: "aditivo do arrefecimento",
+};
+
+export function dedupeMaintenanceItemKeys(
+  values: ReadonlyArray<MaintenanceItemKey>,
+): ReadonlyArray<MaintenanceItemKey> {
+  return [...new Set(values)];
+}
+
+export function recognizedTagsFromMaintenanceItemKeys(
+  values: ReadonlyArray<MaintenanceItemKey>,
+): ReadonlyArray<MaintenanceTriggerTag> {
+  const found = new Set(values.map((value) => MAINTENANCE_ITEM_TAG[value]));
+  return MAINTENANCE_TRIGGER_TAGS.filter((tag) => found.has(tag));
+}
+
+export function maintenanceItemKeysFromParseResult(
+  result: MaintenanceItemsParseResult,
+): ReadonlyArray<MaintenanceItemKey> {
+  return dedupeMaintenanceItemKeys(result.items.flatMap((item) => item.itemKeys));
+}
 
 export type RecognizedMaintenanceItem = {
   readonly tag: MaintenanceTriggerTag;
@@ -60,7 +117,7 @@ function anyKeyword(haystack: string, keywords: ReadonlyArray<string>): boolean 
   return keywords.some((kw) => hasKeyword(haystack, kw));
 }
 
-const TAG_ORDER: ReadonlyArray<MaintenanceTriggerTag> = ["oleo", "filtro", "pastilha", "arrefecimento"];
+const TAG_ORDER: ReadonlyArray<MaintenanceTriggerTag> = MAINTENANCE_TRIGGER_TAGS;
 
 export function parseMaintenanceItemsText(
   text: string | null | undefined,
