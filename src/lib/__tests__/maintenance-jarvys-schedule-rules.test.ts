@@ -18,7 +18,9 @@ import { describe, test, expect } from "bun:test";
 import {
   HIGH_MILEAGE_NOTE,
   buildJarvysMilestone,
+  buildJarvysScheduleRange,
   getJarvysBaseMilestoneItems,
+  isDeterministicRevisionItem,
   mapRealKmToBaseKm,
   type JarvysMilestone,
   type JarvysVehicleProfile,
@@ -80,8 +82,8 @@ const PROFILES = {
 } as const satisfies Record<string, JarvysVehicleProfile>;
 
 const KM_MATRIX = [
-  10000, 20000, 40000, 60000, 80000, 90000, 120000, 130000, 160000, 180000,
-  200000, 220000, 260000, 410000,
+  10000, 20000, 40000, 60000, 80000, 90000, 120000, 130000, 160000, 180000, 200000, 220000, 260000,
+  410000,
 ] as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -124,11 +126,7 @@ function itemKeys(m: JarvysMilestone): string[] {
   return m.items.map((i) => i.item_key);
 }
 
-function expectHasItems(
-  m: JarvysMilestone,
-  keys: readonly string[],
-  ctx: string,
-) {
+function expectHasItems(m: JarvysMilestone, keys: readonly string[], ctx: string) {
   const present = new Set(itemKeys(m));
   const missing = keys.filter((k) => !present.has(k));
   if (missing.length > 0) {
@@ -138,11 +136,7 @@ function expectHasItems(
   }
 }
 
-function expectNotHasItems(
-  m: JarvysMilestone,
-  keys: readonly string[],
-  ctx: string,
-) {
+function expectNotHasItems(m: JarvysMilestone, keys: readonly string[], ctx: string) {
   const present = new Set(itemKeys(m));
   const leaked = keys.filter((k) => present.has(k));
   if (leaked.length > 0) {
@@ -171,6 +165,129 @@ function itemNotesText(m: JarvysMilestone, key: string): string {
 function buildAll(profile: JarvysVehicleProfile): JarvysMilestone[] {
   return KM_MATRIX.map((km) => buildJarvysMilestone(km, profile));
 }
+
+// Perfis suficientes para materializar todas as factories do catalogo atual.
+const CATALOG_PROFILES: readonly JarvysVehicleProfile[] = [
+  ...Object.values(PROFILES),
+  {
+    fuelKind: "combustao",
+    timingSystem: "correia_dentada",
+    transmissionKind: "manual",
+    steeringKind: "desconhecida",
+  },
+];
+
+function catalogMilestones(): JarvysMilestone[] {
+  return CATALOG_PROFILES.flatMap((profile) =>
+    buildJarvysScheduleRange({ fromKm: 10000, toKm: 200000, profile }),
+  );
+}
+
+describe("isDeterministicRevisionItem", () => {
+  const revisionKeys = [
+    "oleo_motor",
+    "filtro_oleo",
+    "limpeza_arrefecimento",
+    "alinhamento_balanceamento",
+    "sangria_freio",
+    "inspecao_suspensao",
+    "diagnostico_e_cvt",
+    "limpeza_tbi_bicos",
+    "inspecao_mangueiras",
+    "oleo_cambio_automatico",
+  ] as const;
+
+  for (const itemKey of revisionKeys) {
+    test(`reconhece key canonica do motor: ${itemKey}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(true);
+    });
+  }
+
+  const externalKeys = [
+    "pneus",
+    "lavagem",
+    "ar_condicionado",
+    "botao_vidro_eletrico",
+    "item_que_nao_existe_9f72",
+  ] as const;
+
+  for (const itemKey of externalKeys) {
+    test(`rejeita key externa ao motor: ${itemKey}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(false);
+    });
+  }
+
+  const invalidInputs = [
+    "",
+    "   ",
+    " oleo_motor ",
+    "OLEO_MOTOR",
+    "limpeza de arrefecimento",
+  ] as const;
+
+  for (const itemKey of invalidInputs) {
+    test(`nao normaliza entrada: ${JSON.stringify(itemKey)}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(false);
+    });
+  }
+
+  test("catalogo materializado possui 28 keys unicas, todas nao vazias", () => {
+    const items = catalogMilestones().flatMap((milestone) => milestone.items);
+    const keys = items.map((item) => item.item_key);
+    const uniqueKeys = new Set(keys);
+
+    expect(keys.every((key) => key.length > 0)).toBe(true);
+    expect(uniqueKeys.size).toBe(28);
+    for (const key of uniqueKeys) {
+      expect(isDeterministicRevisionItem(key)).toBe(true);
+    }
+  });
+
+  test("cada milestone continua sem duplicatas de item_key", () => {
+    for (const milestone of catalogMilestones()) {
+      const keys = milestone.items.map((item) => item.item_key);
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+  });
+
+  test("pertencimento independe de shopping_classification", () => {
+    const items = catalogMilestones().flatMap((milestone) => milestone.items);
+    const classifications = new Set(items.map((item) => item.shopping_classification));
+
+    expect(classifications.size).toBe(4);
+    for (const classification of [
+      "safe_to_buy",
+      "inspect_before_buy",
+      "bundle_preferred",
+      "service_only",
+    ] as const) {
+      expect(classifications.has(classification)).toBe(true);
+    }
+    for (const item of items) {
+      expect(isDeterministicRevisionItem(item.item_key)).toBe(true);
+    }
+  });
+
+  test("service_only, inspecao e diagnostico pertencem ao catalogo", () => {
+    expect(isDeterministicRevisionItem("sangria_freio")).toBe(true);
+    expect(isDeterministicRevisionItem("inspecao_suspensao")).toBe(true);
+    expect(isDeterministicRevisionItem("diagnostico_e_cvt")).toBe(true);
+  });
+
+  test("buildJarvysScheduleRange preserva a saida dos builders existentes", () => {
+    const profile = PROFILES.bmw320iAT;
+    const range = buildJarvysScheduleRange({
+      fromKm: 10000,
+      toKm: 200000,
+      profile,
+    });
+    const individual = Array.from({ length: 20 }, (_, index) =>
+      buildJarvysMilestone((index + 1) * 10000, profile),
+    );
+
+    expect(JSON.stringify(range)).toBe(JSON.stringify(individual));
+  });
+});
 
 // ─────────────────────────────────────────────────────────────
 // mapRealKmToBaseKm — tabela oficial do brief
@@ -427,19 +544,11 @@ describe("BYD Dolphin — elétrico puro", () => {
   }
   test("Dolphin — 20k contém filtro cabine + fluido freio + sangria", () => {
     const m = buildJarvysMilestone(20000, PROFILES.bydDolphinEV);
-    expectHasItems(
-      m,
-      ["filtro_cabine", "fluido_freio", "sangria_freio"],
-      "Dolphin 20k",
-    );
+    expectHasItems(m, ["filtro_cabine", "fluido_freio", "sangria_freio"], "Dolphin 20k");
   });
   test("Dolphin — 30k contém aditivo + limpeza arrefecimento", () => {
     const m = buildJarvysMilestone(30000, PROFILES.bydDolphinEV);
-    expectHasItems(
-      m,
-      ["aditivo_arrefecimento", "limpeza_arrefecimento"],
-      "Dolphin 30k",
-    );
+    expectHasItems(m, ["aditivo_arrefecimento", "limpeza_arrefecimento"], "Dolphin 30k");
     expect(itemNotesText(m, "aditivo_arrefecimento")).toContain("confirm");
     expect(itemNotesText(m, "aditivo_arrefecimento")).toContain("arrefec");
   });
@@ -458,11 +567,7 @@ describe("BYD Dolphin — elétrico puro", () => {
   test("Dolphin — 220k usa base 20k e mantém regras EV", () => {
     const m = buildJarvysMilestone(220000, PROFILES.bydDolphinEV);
     expect(m.revisionKmBase).toBe(20000);
-    expectHasItems(
-      m,
-      ["filtro_cabine", "fluido_freio", "sangria_freio"],
-      "Dolphin 220k",
-    );
+    expectHasItems(m, ["filtro_cabine", "fluido_freio", "sangria_freio"], "Dolphin 220k");
     expectNotHasItems(m, FORBIDDEN_EV_ITEMS, "Dolphin 220k");
   });
   test("Dolphin — 260k usa base 60k", () => {

@@ -33,10 +33,7 @@ import type {
 // Tipos públicos
 // ─────────────────────────────────────────────────────────────
 
-export type JarvysFuelKind =
-  | "combustao"
-  | "hibrido_combustao"
-  | "eletrico_puro";
+export type JarvysFuelKind = "combustao" | "hibrido_combustao" | "eletrico_puro";
 
 export type JarvysTransmissionKind =
   | "manual"
@@ -144,9 +141,7 @@ export function mapRealKmToBaseKm(realKm: number): {
   if (!Number.isFinite(realKm) || realKm < JARVYS_BASE_CYCLE_MIN_KM) {
     return { baseKm: JARVYS_BASE_CYCLE_MIN_KM, cycleIndex: 0 };
   }
-  const normalized =
-    Math.round(realKm / JARVYS_BASE_CYCLE_STEP_KM) *
-    JARVYS_BASE_CYCLE_STEP_KM;
+  const normalized = Math.round(realKm / JARVYS_BASE_CYCLE_STEP_KM) * JARVYS_BASE_CYCLE_STEP_KM;
   const offset = normalized - JARVYS_BASE_CYCLE_MIN_KM;
   const baseOffset = offset % RECURRING_MODULUS_KM;
   const baseKm = baseOffset + JARVYS_BASE_CYCLE_MIN_KM;
@@ -172,15 +167,10 @@ function detectFuelKind(plan: MaintenancePlanJson): JarvysFuelKind {
   const fuel = normalize(plan.vehicle_summary.combustivel);
   const motor = normalize(plan.vehicle_summary.motor_textual);
   const hay = `${fuel} ${motor}`;
-  const isElectricMarker = /(\beletrico\b|\belectric\b|\bev\b|\bbev\b)/.test(
-    hay,
-  );
+  const isElectricMarker = /(\beletrico\b|\belectric\b|\bev\b|\bbev\b)/.test(hay);
   const combustionMarker =
-    /(flex|gasolina|etanol|alcool|diesel|combustao|otto|tsi|firefly|turbo|aspirado)/.test(
-      hay,
-    );
-  const hybridMarker =
-    /(hibrid|hybrid|hev|phev|mhev|dm i|dmi|hsd|hybrid synergy)/.test(hay);
+    /(flex|gasolina|etanol|alcool|diesel|combustao|otto|tsi|firefly|turbo|aspirado)/.test(hay);
+  const hybridMarker = /(hibrid|hybrid|hev|phev|mhev|dm i|dmi|hsd|hybrid synergy)/.test(hay);
   if (isElectricMarker && !combustionMarker && !hybridMarker) {
     return "eletrico_puro";
   }
@@ -192,9 +182,7 @@ function detectFuelKind(plan: MaintenancePlanJson): JarvysFuelKind {
   return "combustao";
 }
 
-function detectTransmissionKind(
-  plan: MaintenancePlanJson,
-): JarvysTransmissionKind {
+function detectTransmissionKind(plan: MaintenancePlanJson): JarvysTransmissionKind {
   const transmissao = normalize(plan.vehicle_summary.transmissao);
   const motor = normalize(plan.vehicle_summary.motor_textual);
   const hay = `${transmissao} ${motor}`;
@@ -221,9 +209,7 @@ function detectSteeringKind(plan: MaintenancePlanJson): JarvysSteeringKind {
   return "desconhecida";
 }
 
-export function inferJarvysProfileFromPlan(
-  plan: MaintenancePlanJson,
-): JarvysVehicleProfile {
+export function inferJarvysProfileFromPlan(plan: MaintenancePlanJson): JarvysVehicleProfile {
   return {
     fuelKind: detectFuelKind(plan),
     timingSystem: plan.system_profile.timing_system,
@@ -450,8 +436,7 @@ const ITEMS = {
   oleo_direcao_unknown_service: (): JarvysItem =>
     mk({
       item_key: "oleo_direcao_hidraulica",
-      label:
-        "Direção: confirmar se é hidráulica antes de qualquer serviço (serviço/diagnóstico)",
+      label: "Direção: confirmar se é hidráulica antes de qualquer serviço (serviço/diagnóstico)",
       category: "direcao",
       action: "verificar",
       recommendation_type: "inspect_only",
@@ -473,8 +458,7 @@ const ITEMS = {
   oleo_cambio_automatico: (): JarvysItem =>
     mk({
       item_key: "oleo_cambio_automatico",
-      label:
-        "Óleo e filtro do câmbio automático — troca completa com equipamento especializado",
+      label: "Óleo e filtro do câmbio automático — troca completa com equipamento especializado",
       category: "transmissao",
       action: "troca_preventiva_recomendada",
       recommendation_type: "preventive_recommended",
@@ -486,8 +470,7 @@ const ITEMS = {
   diagnostico_e_cvt: (): JarvysItem =>
     mk({
       item_key: "diagnostico_e_cvt",
-      label:
-        "Diagnóstico do sistema híbrido/e-CVT (scanner em oficina especializada)",
+      label: "Diagnóstico do sistema híbrido/e-CVT (scanner em oficina especializada)",
       category: "transmissao",
       action: "diagnosticar",
       recommendation_type: "condition_based",
@@ -533,8 +516,7 @@ const ITEMS = {
   correia_banhada_link: (): JarvysItem =>
     mk({
       item_key: "correia_banhada",
-      label:
-        "Correia banhada a óleo — troca conforme marco, com peça específica do motor",
+      label: "Correia banhada a óleo — troca conforme marco, com peça específica do motor",
       category: "motor",
       action: "trocar",
       recommendation_type: "preventive_recommended",
@@ -565,9 +547,7 @@ const ITEMS = {
       shopping_classification: "safe_to_buy",
       group_key: "filtros_kit",
       requires_confirmation: true,
-      notes: [
-        "Confirme a aplicação correta pelo modelo, ano e versão antes da compra.",
-      ],
+      notes: ["Confirme a aplicação correta pelo modelo, ano e versão antes da compra."],
     }),
   fluido_freio_ev: (): JarvysItem =>
     mk({
@@ -586,8 +566,7 @@ const ITEMS = {
   aditivo_arrefecimento_ev: (): JarvysItem =>
     mk({
       item_key: "aditivo_arrefecimento",
-      label:
-        "Aditivo do sistema de arrefecimento (bateria/inversor) — veículo elétrico",
+      label: "Aditivo do sistema de arrefecimento (bateria/inversor) — veículo elétrico",
       category: "arrefecimento",
       action: "trocar",
       recommendation_type: "preventive_recommended",
@@ -601,8 +580,7 @@ const ITEMS = {
   limpeza_arrefecimento_ev: (): JarvysItem =>
     mk({
       item_key: "limpeza_arrefecimento",
-      label:
-        "Limpeza do sistema de arrefecimento (bateria/inversor) — serviço especializado",
+      label: "Limpeza do sistema de arrefecimento (bateria/inversor) — serviço especializado",
       category: "arrefecimento",
       action: "limpar",
       recommendation_type: "preventive_recommended",
@@ -633,6 +611,18 @@ const ITEMS = {
 // Matriz elétrica (Build 6.42D.1)
 // ─────────────────────────────────────────────────────────────
 
+const DETERMINISTIC_REVISION_ITEM_KEYS: ReadonlySet<string> = new Set(
+  Object.values(ITEMS).map((factory) => factory().item_key),
+);
+
+/**
+ * Responde se uma key canonica pertence ao catalogo do motor deterministico.
+ * Nao normaliza texto nem avalia perfil, quilometragem ou Shopping.
+ */
+export function isDeterministicRevisionItem(itemKey: string): boolean {
+  return DETERMINISTIC_REVISION_ITEM_KEYS.has(itemKey);
+}
+
 function baseFactoriesForKmEV(km: number): ItemFactory[] {
   const list: ItemFactory[] = [ITEMS.alinhamento_balanceamento];
   const isEvery20 = km > 0 && km % 20000 === 0;
@@ -650,11 +640,7 @@ function baseFactoriesForKmEV(km: number): ItemFactory[] {
   // Regra editorial: 130k NÃO recebe filtro de cabine/fluido freio/sangria,
   // apesar de não ser múltiplo de 20k já é blindado por isEvery20 (130 % 20 = 10).
   if (isEvery20) {
-    list.push(
-      ITEMS.filtro_cabine_ev,
-      ITEMS.fluido_freio_ev,
-      ITEMS.sangria_freio,
-    );
+    list.push(ITEMS.filtro_cabine_ev, ITEMS.fluido_freio_ev, ITEMS.sangria_freio);
   }
   if (isEvery30) {
     list.push(ITEMS.aditivo_arrefecimento_ev, ITEMS.limpeza_arrefecimento_ev);
@@ -681,17 +667,13 @@ function getJarvysBaseMilestoneItemsEV(baseKm: number): JarvysItem[] {
   return items;
 }
 
-
 // ─────────────────────────────────────────────────────────────
 // Matriz base (perfil aplica filtros)
 // ─────────────────────────────────────────────────────────────
 
 type ItemFactory = () => JarvysItem;
 
-function timingFactoriesFor(
-  km: number,
-  profile: JarvysVehicleProfile,
-): ItemFactory[] {
+function timingFactoriesFor(km: number, profile: JarvysVehicleProfile): ItemFactory[] {
   const list: ItemFactory[] = [];
   const isBeltMilestone = km === 60000 || km === 120000 || km === 180000;
   const isWetLinkMilestone = km === 90000 || km === 180000;
@@ -713,12 +695,7 @@ function timingFactoriesFor(
   if (profile.timingSystem === "correia_banhada") {
     if (isWetLinkMilestone) {
       list.push(ITEMS.correia_banhada_link);
-    } else if (
-      isBeltMilestone ||
-      km === 100000 ||
-      km === 150000 ||
-      km === 200000
-    ) {
+    } else if (isBeltMilestone || km === 100000 || km === 150000 || km === 200000) {
       list.push(ITEMS.inspecao_correia_banhada);
     }
   }
@@ -726,17 +703,10 @@ function timingFactoriesFor(
   return list;
 }
 
-function transmissionFactoriesFor(
-  km: number,
-  profile: JarvysVehicleProfile,
-): ItemFactory[] {
+function transmissionFactoriesFor(km: number, profile: JarvysVehicleProfile): ItemFactory[] {
   const list: ItemFactory[] = [];
   const isAutoMilestone =
-    km === 40000 ||
-    km === 80000 ||
-    km === 120000 ||
-    km === 160000 ||
-    km === 200000;
+    km === 40000 || km === 80000 || km === 120000 || km === 160000 || km === 200000;
   const isManualMilestone = km === 80000 || km === 160000;
   const isECvtMilestone = km === 100000 || km === 200000;
 
@@ -759,12 +729,8 @@ function transmissionFactoriesFor(
   return list;
 }
 
-function steeringFactoriesFor(
-  km: number,
-  profile: JarvysVehicleProfile,
-): ItemFactory[] {
-  const isSteeringMilestone =
-    km === 50000 || km === 100000 || km === 150000 || km === 200000;
+function steeringFactoriesFor(km: number, profile: JarvysVehicleProfile): ItemFactory[] {
+  const isSteeringMilestone = km === 50000 || km === 100000 || km === 150000 || km === 200000;
   if (!isSteeringMilestone) return [];
   if (profile.steeringKind === "eletrica") return [];
   if (profile.steeringKind === "hidraulica") return [ITEMS.oleo_direcao_hidraulica];
@@ -778,10 +744,7 @@ function baseFactoriesForKm(km: number): ItemFactory[] {
     ITEMS.filtro_cabine,
     ITEMS.filtro_combustivel,
   ];
-  const fluidoFreioSet = (): ItemFactory[] => [
-    ITEMS.fluido_freio,
-    ITEMS.sangria_freio,
-  ];
+  const fluidoFreioSet = (): ItemFactory[] => [ITEMS.fluido_freio, ITEMS.sangria_freio];
   const limpezaMotor = (): ItemFactory[] => [
     ITEMS.velas_ignicao,
     ITEMS.limpeza_tbi_bicos,
@@ -794,11 +757,7 @@ function baseFactoriesForKm(km: number): ItemFactory[] {
       base.push(ITEMS.alinhamento_balanceamento);
       return base;
     case 20000:
-      base.push(
-        ...filtros(),
-        ...fluidoFreioSet(),
-        ITEMS.alinhamento_balanceamento,
-      );
+      base.push(...filtros(), ...fluidoFreioSet(), ITEMS.alinhamento_balanceamento);
       return base;
     case 30000:
       base.push(ITEMS.pastilhas_freio, ITEMS.alinhamento_balanceamento);
@@ -837,11 +796,7 @@ function baseFactoriesForKm(km: number): ItemFactory[] {
       );
       return base;
     case 90000:
-      base.push(
-        ITEMS.pastilhas_freio,
-        ITEMS.inspecao_suspensao,
-        ITEMS.alinhamento_balanceamento,
-      );
+      base.push(ITEMS.pastilhas_freio, ITEMS.inspecao_suspensao, ITEMS.alinhamento_balanceamento);
       return base;
     case 100000:
       base.push(
