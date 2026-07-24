@@ -80,8 +80,8 @@ const PROFILES = {
 } as const satisfies Record<string, JarvysVehicleProfile>;
 
 const KM_MATRIX = [
-  10000, 20000, 40000, 60000, 80000, 90000, 120000, 130000, 160000, 180000,
-  200000, 220000, 260000, 410000,
+  10000, 20000, 40000, 60000, 80000, 90000, 120000, 130000, 160000, 180000, 200000, 220000, 260000,
+  410000,
 ] as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -124,11 +124,7 @@ function itemKeys(m: JarvysMilestone): string[] {
   return m.items.map((i) => i.item_key);
 }
 
-function expectHasItems(
-  m: JarvysMilestone,
-  keys: readonly string[],
-  ctx: string,
-) {
+function expectHasItems(m: JarvysMilestone, keys: readonly string[], ctx: string) {
   const present = new Set(itemKeys(m));
   const missing = keys.filter((k) => !present.has(k));
   if (missing.length > 0) {
@@ -138,11 +134,7 @@ function expectHasItems(
   }
 }
 
-function expectNotHasItems(
-  m: JarvysMilestone,
-  keys: readonly string[],
-  ctx: string,
-) {
+function expectNotHasItems(m: JarvysMilestone, keys: readonly string[], ctx: string) {
   const present = new Set(itemKeys(m));
   const leaked = keys.filter((k) => present.has(k));
   if (leaked.length > 0) {
@@ -427,19 +419,11 @@ describe("BYD Dolphin — elétrico puro", () => {
   }
   test("Dolphin — 20k contém filtro cabine + fluido freio + sangria", () => {
     const m = buildJarvysMilestone(20000, PROFILES.bydDolphinEV);
-    expectHasItems(
-      m,
-      ["filtro_cabine", "fluido_freio", "sangria_freio"],
-      "Dolphin 20k",
-    );
+    expectHasItems(m, ["filtro_cabine", "fluido_freio", "sangria_freio"], "Dolphin 20k");
   });
   test("Dolphin — 30k contém aditivo + limpeza arrefecimento", () => {
     const m = buildJarvysMilestone(30000, PROFILES.bydDolphinEV);
-    expectHasItems(
-      m,
-      ["aditivo_arrefecimento", "limpeza_arrefecimento"],
-      "Dolphin 30k",
-    );
+    expectHasItems(m, ["aditivo_arrefecimento", "limpeza_arrefecimento"], "Dolphin 30k");
     expect(itemNotesText(m, "aditivo_arrefecimento")).toContain("confirm");
     expect(itemNotesText(m, "aditivo_arrefecimento")).toContain("arrefec");
   });
@@ -458,11 +442,7 @@ describe("BYD Dolphin — elétrico puro", () => {
   test("Dolphin — 220k usa base 20k e mantém regras EV", () => {
     const m = buildJarvysMilestone(220000, PROFILES.bydDolphinEV);
     expect(m.revisionKmBase).toBe(20000);
-    expectHasItems(
-      m,
-      ["filtro_cabine", "fluido_freio", "sangria_freio"],
-      "Dolphin 220k",
-    );
+    expectHasItems(m, ["filtro_cabine", "fluido_freio", "sangria_freio"], "Dolphin 220k");
     expectNotHasItems(m, FORBIDDEN_EV_ITEMS, "Dolphin 220k");
   });
   test("Dolphin — 260k usa base 60k", () => {
