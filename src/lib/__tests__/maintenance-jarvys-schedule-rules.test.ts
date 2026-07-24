@@ -18,7 +18,9 @@ import { describe, test, expect } from "bun:test";
 import {
   HIGH_MILEAGE_NOTE,
   buildJarvysMilestone,
+  buildJarvysScheduleRange,
   getJarvysBaseMilestoneItems,
+  isDeterministicRevisionItem,
   mapRealKmToBaseKm,
   type JarvysMilestone,
   type JarvysVehicleProfile,
@@ -163,6 +165,129 @@ function itemNotesText(m: JarvysMilestone, key: string): string {
 function buildAll(profile: JarvysVehicleProfile): JarvysMilestone[] {
   return KM_MATRIX.map((km) => buildJarvysMilestone(km, profile));
 }
+
+// Perfis suficientes para materializar todas as factories do catalogo atual.
+const CATALOG_PROFILES: readonly JarvysVehicleProfile[] = [
+  ...Object.values(PROFILES),
+  {
+    fuelKind: "combustao",
+    timingSystem: "correia_dentada",
+    transmissionKind: "manual",
+    steeringKind: "desconhecida",
+  },
+];
+
+function catalogMilestones(): JarvysMilestone[] {
+  return CATALOG_PROFILES.flatMap((profile) =>
+    buildJarvysScheduleRange({ fromKm: 10000, toKm: 200000, profile }),
+  );
+}
+
+describe("isDeterministicRevisionItem", () => {
+  const revisionKeys = [
+    "oleo_motor",
+    "filtro_oleo",
+    "limpeza_arrefecimento",
+    "alinhamento_balanceamento",
+    "sangria_freio",
+    "inspecao_suspensao",
+    "diagnostico_e_cvt",
+    "limpeza_tbi_bicos",
+    "inspecao_mangueiras",
+    "oleo_cambio_automatico",
+  ] as const;
+
+  for (const itemKey of revisionKeys) {
+    test(`reconhece key canonica do motor: ${itemKey}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(true);
+    });
+  }
+
+  const externalKeys = [
+    "pneus",
+    "lavagem",
+    "ar_condicionado",
+    "botao_vidro_eletrico",
+    "item_que_nao_existe_9f72",
+  ] as const;
+
+  for (const itemKey of externalKeys) {
+    test(`rejeita key externa ao motor: ${itemKey}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(false);
+    });
+  }
+
+  const invalidInputs = [
+    "",
+    "   ",
+    " oleo_motor ",
+    "OLEO_MOTOR",
+    "limpeza de arrefecimento",
+  ] as const;
+
+  for (const itemKey of invalidInputs) {
+    test(`nao normaliza entrada: ${JSON.stringify(itemKey)}`, () => {
+      expect(isDeterministicRevisionItem(itemKey)).toBe(false);
+    });
+  }
+
+  test("catalogo materializado possui 28 keys unicas, todas nao vazias", () => {
+    const items = catalogMilestones().flatMap((milestone) => milestone.items);
+    const keys = items.map((item) => item.item_key);
+    const uniqueKeys = new Set(keys);
+
+    expect(keys.every((key) => key.length > 0)).toBe(true);
+    expect(uniqueKeys.size).toBe(28);
+    for (const key of uniqueKeys) {
+      expect(isDeterministicRevisionItem(key)).toBe(true);
+    }
+  });
+
+  test("cada milestone continua sem duplicatas de item_key", () => {
+    for (const milestone of catalogMilestones()) {
+      const keys = milestone.items.map((item) => item.item_key);
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+  });
+
+  test("pertencimento independe de shopping_classification", () => {
+    const items = catalogMilestones().flatMap((milestone) => milestone.items);
+    const classifications = new Set(items.map((item) => item.shopping_classification));
+
+    expect(classifications.size).toBe(4);
+    for (const classification of [
+      "safe_to_buy",
+      "inspect_before_buy",
+      "bundle_preferred",
+      "service_only",
+    ] as const) {
+      expect(classifications.has(classification)).toBe(true);
+    }
+    for (const item of items) {
+      expect(isDeterministicRevisionItem(item.item_key)).toBe(true);
+    }
+  });
+
+  test("service_only, inspecao e diagnostico pertencem ao catalogo", () => {
+    expect(isDeterministicRevisionItem("sangria_freio")).toBe(true);
+    expect(isDeterministicRevisionItem("inspecao_suspensao")).toBe(true);
+    expect(isDeterministicRevisionItem("diagnostico_e_cvt")).toBe(true);
+  });
+
+  test("buildJarvysScheduleRange preserva a saida dos builders existentes", () => {
+    const profile = PROFILES.bmw320iAT;
+    const range = buildJarvysScheduleRange({
+      fromKm: 10000,
+      toKm: 200000,
+      profile,
+    });
+    const individual = Array.from({ length: 20 }, (_, index) =>
+      buildJarvysMilestone((index + 1) * 10000, profile),
+    );
+
+    expect(JSON.stringify(range)).toBe(JSON.stringify(individual));
+  });
+});
 
 // ─────────────────────────────────────────────────────────────
 // mapRealKmToBaseKm — tabela oficial do brief

@@ -611,6 +611,18 @@ const ITEMS = {
 // Matriz elétrica (Build 6.42D.1)
 // ─────────────────────────────────────────────────────────────
 
+const DETERMINISTIC_REVISION_ITEM_KEYS: ReadonlySet<string> = new Set(
+  Object.values(ITEMS).map((factory) => factory().item_key),
+);
+
+/**
+ * Responde se uma key canonica pertence ao catalogo do motor deterministico.
+ * Nao normaliza texto nem avalia perfil, quilometragem ou Shopping.
+ */
+export function isDeterministicRevisionItem(itemKey: string): boolean {
+  return DETERMINISTIC_REVISION_ITEM_KEYS.has(itemKey);
+}
+
 function baseFactoriesForKmEV(km: number): ItemFactory[] {
   const list: ItemFactory[] = [ITEMS.alinhamento_balanceamento];
   const isEvery20 = km > 0 && km % 20000 === 0;
