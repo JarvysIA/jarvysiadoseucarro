@@ -64,9 +64,9 @@ describe("resolveExpenseSemantics — óleo do motor", () => {
   });
 
   it("reconhece substituição concluída do filtro isolado", () => {
-    expect(
-      expectResolved("O filtro de óleo estava vazando e foi substituído.").itemKeys,
-    ).toEqual(["filtro_oleo"]);
+    expect(expectResolved("O filtro de óleo estava vazando e foi substituído.").itemKeys).toEqual([
+      "filtro_oleo",
+    ]);
   });
 
   it("óleo sem sistema pede esclarecimento", () => {
@@ -124,7 +124,11 @@ describe("resolveExpenseSemantics — intenção", () => {
 
   for (const [text, reason] of conversationCases) {
     it(`mantém conversa não persistível: ${text}`, () => {
-      expect(resolve(text)).toMatchObject({ status: "conversation_only", persistable: false, reason });
+      expect(resolve(text)).toMatchObject({
+        status: "conversation_only",
+        persistable: false,
+        reason,
+      });
     });
   }
 
@@ -152,14 +156,28 @@ describe("resolveExpenseSemantics — intenção", () => {
 describe("resolveExpenseSemantics — fail closed e invariantes", () => {
   it("rejeita candidate item key desconhecida", () => {
     expect(
-      resolveExpenseSemantics({ originalText: "Troquei o óleo do motor.", candidateItemKeys: ["inventada"] }),
-    ).toMatchObject({ status: "unsupported", persistable: false, reason: "invalid_candidate_item_key" });
+      resolveExpenseSemantics({
+        originalText: "Troquei o óleo do motor.",
+        candidateItemKeys: ["inventada"],
+      }),
+    ).toMatchObject({
+      status: "unsupported",
+      persistable: false,
+      reason: "invalid_candidate_item_key",
+    });
   });
 
   it("rejeita candidate category inválida", () => {
     expect(
-      resolveExpenseSemantics({ originalText: "Troquei o óleo do motor.", candidateCategory: "Diversos" }),
-    ).toMatchObject({ status: "unsupported", persistable: false, reason: "invalid_candidate_category" });
+      resolveExpenseSemantics({
+        originalText: "Troquei o óleo do motor.",
+        candidateCategory: "Diversos",
+      }),
+    ).toMatchObject({
+      status: "unsupported",
+      persistable: false,
+      reason: "invalid_candidate_category",
+    });
   });
 
   it("candidatos válidos não forçam resolução", () => {

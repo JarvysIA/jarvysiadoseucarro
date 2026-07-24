@@ -1,4 +1,8 @@
-import { EXPENSE_SEMANTIC_ALIASES, isExpenseSemanticCategory, isExpenseSemanticItemKey } from "./registry.ts";
+import {
+  EXPENSE_SEMANTIC_ALIASES,
+  isExpenseSemanticCategory,
+  isExpenseSemanticItemKey,
+} from "./registry.ts";
 import { normalizeExpenseSemanticText } from "./normalization.ts";
 import type {
   ConversationOnlyExpenseSemantics,
@@ -10,11 +14,26 @@ import type {
   UnsupportedExpenseSemantics,
 } from "./types.ts";
 
-const COMPLETED_MARKERS = ["troquei", "fiz a troca", "foi substituido", "foi substituida", "consertei", "reparei"] as const;
-const AUTOMOTIVE_SERVICE_TERMS = ["escapamento", "pastilha de freio", "pastilhas de freio", "pneu", "pneus", "parafuso da roda", "parafusos da roda"] as const;
+const COMPLETED_MARKERS = [
+  "troquei",
+  "fiz a troca",
+  "foi substituido",
+  "foi substituida",
+  "consertei",
+  "reparei",
+] as const;
+const AUTOMOTIVE_SERVICE_TERMS = [
+  "escapamento",
+  "pastilha de freio",
+  "pastilhas de freio",
+  "pneu",
+  "pneus",
+  "parafuso da roda",
+  "parafusos da roda",
+] as const;
 
 function containsPhrase(text: string, phrase: string): boolean {
-  return (` ${text} `).includes(` ${phrase} `);
+  return ` ${text} `.includes(` ${phrase} `);
 }
 
 function containsAny(text: string, phrases: readonly string[]): boolean {
@@ -25,12 +44,24 @@ function unsupported(reason: UnsupportedExpenseSemantics["reason"]): Unsupported
   return { status: "unsupported", persistable: false, reason, decisionCode: "fail_closed" };
 }
 
-function conversation(reason: ConversationOnlyExpenseSemantics["reason"]): ConversationOnlyExpenseSemantics {
-  return { status: "conversation_only", persistable: false, reason, decisionCode: "non_persistable_conversation" };
+function conversation(
+  reason: ConversationOnlyExpenseSemantics["reason"],
+): ConversationOnlyExpenseSemantics {
+  return {
+    status: "conversation_only",
+    persistable: false,
+    reason,
+    decisionCode: "non_persistable_conversation",
+  };
 }
 
 function clarification(reason: NeedsSemanticClarification["reason"]): NeedsSemanticClarification {
-  return { status: "needs_clarification", persistable: false, reason, decisionCode: "clarification_required" };
+  return {
+    status: "needs_clarification",
+    persistable: false,
+    reason,
+    decisionCode: "clarification_required",
+  };
 }
 
 function resolved(
@@ -39,7 +70,9 @@ function resolved(
   recognizedSystems: ResolvedExpenseSemantics["facts"]["recognizedSystems"],
   decisionCode: ResolvedExpenseSemantics["decisionCode"],
 ): ResolvedExpenseSemantics {
-  const orderedKeys = (["oleo_motor", "filtro_oleo"] as const).filter((key) => itemKeys.includes(key));
+  const orderedKeys = (["oleo_motor", "filtro_oleo"] as const).filter((key) =>
+    itemKeys.includes(key),
+  );
   return {
     status: "resolved",
     persistable: true,
@@ -50,14 +83,28 @@ function resolved(
   };
 }
 
-function classifyConversation(text: string, input: ExpenseSemanticInput): ConversationOnlyExpenseSemantics | undefined {
-  if (input.explicitIntent === "ask_question" || containsAny(text, ["quero saber", "serve no meu carro"])) {
+function classifyConversation(
+  text: string,
+  input: ExpenseSemanticInput,
+): ConversationOnlyExpenseSemantics | undefined {
+  if (
+    input.explicitIntent === "ask_question" ||
+    containsAny(text, ["quero saber", "serve no meu carro"])
+  ) {
     return conversation("technical_question");
   }
-  if (input.explicitIntent === "request_quote" || containsAny(text, ["orcamento", "recebi um orcamento"])) {
+  if (
+    input.explicitIntent === "request_quote" ||
+    containsAny(text, ["orcamento", "recebi um orcamento"])
+  ) {
     return conversation("quote");
   }
-  if (containsAny(text, ["comprei oleo e filtro mas ainda nao troquei", "comprei mas ainda nao troquei"])) {
+  if (
+    containsAny(text, [
+      "comprei oleo e filtro mas ainda nao troquei",
+      "comprei mas ainda nao troquei",
+    ])
+  ) {
     return conversation("purchase_before_service");
   }
   if (
@@ -78,12 +125,16 @@ function hasEngineOil(text: string): boolean {
 
 export function resolveExpenseSemantics(input: ExpenseSemanticInput): ExpenseSemanticResult {
   if (!input || typeof input.originalText !== "string") return unsupported("invalid_input");
-  if (input.candidateCategory !== undefined && !isExpenseSemanticCategory(input.candidateCategory)) {
+  if (
+    input.candidateCategory !== undefined &&
+    !isExpenseSemanticCategory(input.candidateCategory)
+  ) {
     return unsupported("invalid_candidate_category");
   }
   if (
     input.candidateItemKeys !== undefined &&
-    (!Array.isArray(input.candidateItemKeys) || !input.candidateItemKeys.every(isExpenseSemanticItemKey))
+    (!Array.isArray(input.candidateItemKeys) ||
+      !input.candidateItemKeys.every(isExpenseSemanticItemKey))
   ) {
     return unsupported("invalid_candidate_item_key");
   }
@@ -103,14 +154,23 @@ export function resolveExpenseSemantics(input: ExpenseSemanticInput): ExpenseSem
   const mentionsOil = containsPhrase(text, "oleo");
   const mentionsAmount = /(?:^| )(?:r )?\d+(?: |$)/.test(text);
 
-  if (!completed && mentionsAmount && (transmissionFluid || engineOil || oilFilter || containsAny(text, AUTOMOTIVE_SERVICE_TERMS))) {
+  if (
+    !completed &&
+    mentionsAmount &&
+    (transmissionFluid || engineOil || oilFilter || containsAny(text, AUTOMOTIVE_SERVICE_TERMS))
+  ) {
     return clarification("expense_or_question_intent_ambiguous");
   }
 
   if (!completed) return unsupported("unsupported_semantics");
 
   if (transmissionFluid) {
-    return resolved("Revisão", [], ["transmission_fluid"], "completed_transmission_fluid_without_safe_item_key");
+    return resolved(
+      "Revisão",
+      [],
+      ["transmission_fluid"],
+      "completed_transmission_fluid_without_safe_item_key",
+    );
   }
 
   if (engineOil) {
@@ -123,7 +183,12 @@ export function resolveExpenseSemantics(input: ExpenseSemanticInput): ExpenseSem
   }
 
   if (oilFilter) {
-    return resolved("Revisão", ["filtro_oleo"], ["engine_oil"], "completed_deterministic_revision_item");
+    return resolved(
+      "Revisão",
+      ["filtro_oleo"],
+      ["engine_oil"],
+      "completed_deterministic_revision_item",
+    );
   }
 
   if (mentionsOil) return clarification("oil_system_ambiguous");
