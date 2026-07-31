@@ -39,12 +39,19 @@ type ValidCommonCategories = [
   AcceptCommonCategory<"Acessórios">,
 ];
 
+type NewClarificationReasons = [
+  AcceptClarificationReason<"missing_total_amount">,
+  AcceptClarificationReason<"ambiguous_expense_intent">,
+];
+
 // @ts-expect-error categoria sem acento não pertence à união canônica.
 type InvalidCategoryMissingAccent = AcceptCategory<"Combustivel">;
 // @ts-expect-error categoria com caixa incorreta não pertence à união canônica.
 type InvalidCategoryWrongCase = AcceptCategory<"manutenção">;
 // @ts-expect-error Outros não pertence à união canônica.
 type InvalidCategoryOther = AcceptCategory<"Outros">;
+// @ts-expect-error Diversos não pertence à união canônica.
+type InvalidCategoryMiscellaneous = AcceptCategory<"Diversos">;
 // @ts-expect-error string arbitrária não pertence à união canônica.
 type InvalidCategoryArbitrary = AcceptCategory<"Qualquer coisa">;
 
@@ -94,5 +101,8 @@ const clarificationWithMetadata = {
 
 void assertReadonlyContracts;
 void clarificationWithMetadata;
+
+declare const newClarificationReasons: NewClarificationReasons;
+void newClarificationReasons;
 
 export {};

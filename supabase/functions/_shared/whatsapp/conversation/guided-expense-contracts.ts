@@ -9,8 +9,10 @@ import type { ExpenseCategory } from "../actions/expense-types.ts";
 export type ClarificationReason =
   | "missing_vehicle"
   | "missing_km"
+  | "missing_total_amount"
   | "ambiguous_filter"
   | "ambiguous_oil"
+  | "ambiguous_expense_intent"
   | "ambiguous_transmission"
   | "quantity_required"
   | "ambiguous_item"
