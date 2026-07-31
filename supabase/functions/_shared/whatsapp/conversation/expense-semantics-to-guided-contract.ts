@@ -1,6 +1,8 @@
 import type {
   ConversationOnlyExpenseSemantics,
   ExpenseSemanticResult,
+  NeedsSemanticClarification,
+  ResolvedExpenseSemantics,
   UnsupportedExpenseSemantics,
 } from "../../expenses/semantics/types.ts";
 import type {
@@ -20,10 +22,28 @@ export type GuidedExpenseOperationalData = Readonly<{
   laborAmount?: number;
 }>;
 
-export type PreservedSemanticDecision = Readonly<{
-  persistable: ExpenseSemanticResult["persistable"];
-  decisionCode: ExpenseSemanticResult["decisionCode"];
-}>;
+export type PreservedSemanticDecision =
+  | Readonly<{
+      status: "resolved";
+      persistable: true;
+      decisionCode: ResolvedExpenseSemantics["decisionCode"];
+      conceptualCategory: ResolvedExpenseSemantics["conceptualCategory"];
+    }>
+  | Readonly<{
+      status: "needs_clarification";
+      persistable: false;
+      decisionCode: NeedsSemanticClarification["decisionCode"];
+    }>
+  | Readonly<{
+      status: "conversation_only";
+      persistable: false;
+      decisionCode: ConversationOnlyExpenseSemantics["decisionCode"];
+    }>
+  | Readonly<{
+      status: "unsupported";
+      persistable: false;
+      decisionCode: UnsupportedExpenseSemantics["decisionCode"];
+    }>;
 
 export type ExpenseSemanticsAdapterFailureClass =
   | "contract_violation"
@@ -67,10 +87,35 @@ type OperationalValidationResult =
 
 const preserveSemanticDecision = (
   semanticResult: ExpenseSemanticResult,
-): PreservedSemanticDecision => ({
-  persistable: semanticResult.persistable,
-  decisionCode: semanticResult.decisionCode,
-});
+): PreservedSemanticDecision => {
+  switch (semanticResult.status) {
+    case "resolved":
+      return {
+        status: semanticResult.status,
+        persistable: semanticResult.persistable,
+        decisionCode: semanticResult.decisionCode,
+        conceptualCategory: semanticResult.conceptualCategory,
+      };
+    case "needs_clarification":
+      return {
+        status: semanticResult.status,
+        persistable: semanticResult.persistable,
+        decisionCode: semanticResult.decisionCode,
+      };
+    case "conversation_only":
+      return {
+        status: semanticResult.status,
+        persistable: semanticResult.persistable,
+        decisionCode: semanticResult.decisionCode,
+      };
+    case "unsupported":
+      return {
+        status: semanticResult.status,
+        persistable: semanticResult.persistable,
+        decisionCode: semanticResult.decisionCode,
+      };
+  }
+};
 
 const isValidAmount = (value: number | undefined): boolean =>
   value === undefined || (Number.isFinite(value) && value >= 0);
@@ -152,20 +197,20 @@ export const adaptExpenseSemanticsToGuidedContract = ({
   operationalData,
 }: AdaptExpenseSemanticsToGuidedContractInput): ExpenseSemanticsAdapterResult => {
   const semanticDecision = preserveSemanticDecision(semanticResult);
-  const operationalValidation = validateOperationalData(operationalData);
-
-  if (operationalValidation.valid === false) {
-    return {
-      status: "unsupported",
-      semanticDecision,
-      reason: operationalValidation.reason,
-      failureClass: "contract_violation",
-      technicalAuthorization: "none",
-    };
-  }
 
   switch (semanticResult.status) {
     case "resolved": {
+      const operationalValidation = validateOperationalData(operationalData);
+      if (operationalValidation.valid === false) {
+        return {
+          status: "unsupported",
+          semanticDecision,
+          reason: operationalValidation.reason,
+          failureClass: "contract_violation",
+          technicalAuthorization: "none",
+        };
+      }
+
       const safeKnownData = toSafeKnownData(operationalData, semanticResult.itemKeys);
       const missingFields = [
         operationalData.vehicleId === undefined ? "vehicleId" : undefined,
@@ -246,18 +291,37 @@ export const adaptExpenseSemanticsToGuidedContract = ({
     }
 
     case "needs_clarification": {
-      const clarification =
-        semanticResult.reason === "oil_system_ambiguous"
-          ? {
-              reason: "ambiguous_oil" as const,
-              missingField: "oilSystem",
-              questionKey: "ask_oil_system",
-            }
-          : {
-              reason: "ambiguous_expense_intent" as const,
-              missingField: "expenseIntent",
-              questionKey: "ask_expense_or_question_intent",
-            };
+      if (semanticResult.reason === "expense_or_question_intent_ambiguous") {
+        return {
+          status: "guided",
+          semanticDecision,
+          guidedContract: {
+            status: "needs_clarification",
+            reason: "ambiguous_expense_intent",
+            missingField: "expenseIntent",
+            questionKey: "ask_expense_or_question_intent",
+            safeKnownData: {},
+            technicalAuthorization: "none",
+          },
+        };
+      }
+
+      const operationalValidation = validateOperationalData(operationalData);
+      if (operationalValidation.valid === false) {
+        return {
+          status: "unsupported",
+          semanticDecision,
+          reason: operationalValidation.reason,
+          failureClass: "contract_violation",
+          technicalAuthorization: "none",
+        };
+      }
+
+      const clarification = {
+        reason: "ambiguous_oil" as const,
+        missingField: "oilSystem",
+        questionKey: "ask_oil_system",
+      };
 
       return {
         status: "guided",

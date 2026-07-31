@@ -11,16 +11,23 @@ import type {
   ClarificationReason,
   GuidedExpenseContract,
   RecognizedGuidedExpense,
+  SafeKnownExpenseData,
 } from "../guided-expense-contracts.ts";
 
 type AdapterStatus = ExpenseSemanticsAdapterResult["status"];
 type GuidedStatus = GuidedExpenseContract["status"];
 type AdapterUnsupported = Extract<ExpenseSemanticsAdapterResult, { status: "unsupported" }>;
+type ResolvedDecision = Extract<PreservedSemanticDecision, { status: "resolved" }>;
+type ClarificationDecision = Extract<PreservedSemanticDecision, { status: "needs_clarification" }>;
+type ConversationDecision = Extract<PreservedSemanticDecision, { status: "conversation_only" }>;
+type UnsupportedDecision = Extract<PreservedSemanticDecision, { status: "unsupported" }>;
 type AcceptAdapterStatus<T extends AdapterStatus> = T;
 type AcceptGuidedStatus<T extends GuidedStatus> = T;
 type AcceptReason<T extends ClarificationReason> = T;
 type AcceptFailureClass<T extends ExpenseSemanticsAdapterFailureClass> = T;
 type AcceptUnsupportedReason<T extends AdapterUnsupported["reason"]> = T;
+type AcceptResolvedCategory<T extends ResolvedDecision["conceptualCategory"]> = T;
+type AcceptResolvedDecisionCode<T extends ResolvedDecision["decisionCode"]> = T;
 
 type AllAdapterStatuses = [
   AcceptAdapterStatus<"guided">,
@@ -40,6 +47,16 @@ type AdapterOnlyUnsupportedReasons = [
   AcceptUnsupportedReason<"invalid_operational_data">,
   AcceptUnsupportedReason<"conflicting_operational_data">,
 ];
+type ResolvedCategories = [
+  AcceptResolvedCategory<"Revisão">,
+  AcceptResolvedCategory<"Manutenção">,
+  AcceptResolvedCategory<"Lavagem">,
+  AcceptResolvedCategory<"Combustível">,
+  AcceptResolvedCategory<"IPVA">,
+  AcceptResolvedCategory<"Multas">,
+  AcceptResolvedCategory<"Seguro">,
+  AcceptResolvedCategory<"Acessórios">,
+];
 
 // @ts-expect-error quarto estado externo não pertence à união fechada.
 type InvalidAdapterStatus = AcceptAdapterStatus<"pending">;
@@ -51,6 +68,49 @@ type InvalidReason = AcceptReason<"arbitrary_reason">;
 type InvalidFailureClass = AcceptFailureClass<"unknown_failure">;
 // @ts-expect-error reason unsupported arbitrário é rejeitado.
 type InvalidUnsupportedReason = AcceptUnsupportedReason<"unknown_reason">;
+// @ts-expect-error Diversos nao pertence as categorias canonicas.
+type InvalidResolvedCategory = AcceptResolvedCategory<"Diversos">;
+// @ts-expect-error decisionCode resolved permanece fechado pelo Core.
+type InvalidResolvedDecisionCode = AcceptResolvedDecisionCode<"invented_decision">;
+
+const resolvedDecision = {
+  status: "resolved",
+  persistable: true,
+  decisionCode: "completed_deterministic_revision_item",
+  conceptualCategory: "Revisão",
+} as const satisfies ResolvedDecision;
+const clarificationDecision = {
+  status: "needs_clarification",
+  persistable: false,
+  decisionCode: "clarification_required",
+} as const satisfies ClarificationDecision;
+const conversationDecision = {
+  status: "conversation_only",
+  persistable: false,
+  decisionCode: "non_persistable_conversation",
+} as const satisfies ConversationDecision;
+const unsupportedDecision = {
+  status: "unsupported",
+  persistable: false,
+  decisionCode: "fail_closed",
+} as const satisfies UnsupportedDecision;
+
+const clarificationWithCategory = {
+  ...clarificationDecision,
+  // @ts-expect-error conceptualCategory existe somente quando o Core resolveu.
+  conceptualCategory: "Revisão",
+} satisfies ClarificationDecision;
+const conversationWithCategory = {
+  ...conversationDecision,
+  // @ts-expect-error conceptualCategory nao existe em conversation_only.
+  conceptualCategory: "Manutenção",
+} satisfies ConversationDecision;
+const unsupportedWithCategory = {
+  ...unsupportedDecision,
+  // @ts-expect-error conceptualCategory nao existe em unsupported do Core.
+  conceptualCategory: "Revisão",
+} satisfies UnsupportedDecision;
+const emptyAmbiguousExpenseIntentData = {} satisfies SafeKnownExpenseData;
 
 const minimalOperationalData = {
   humanDescription: "Descrição literal",
@@ -134,6 +194,8 @@ function assertReadonly(): void {
   additionalItem.label = "Alterado";
   // @ts-expect-error decisão preservada é readonly.
   decision.persistable = false;
+  // @ts-expect-error categoria conceitual resolvida e readonly.
+  resolvedDecision.conceptualCategory = "Manutenção";
   // @ts-expect-error resultado reconhecido é readonly.
   recognized.vehicleId = "outro";
   // @ts-expect-error itemKeys reconhecidas são readonly.
@@ -141,6 +203,29 @@ function assertReadonly(): void {
   // @ts-expect-error input do adapter é readonly.
   adapterInput.operationalData = minimalOperationalData;
 }
+
+const narrowSemanticDecision = (semanticDecision: PreservedSemanticDecision): string => {
+  switch (semanticDecision.status) {
+    case "resolved": {
+      const persistable: true = semanticDecision.persistable;
+      return `${semanticDecision.conceptualCategory}:${persistable}`;
+    }
+    case "needs_clarification": {
+      const persistable: false = semanticDecision.persistable;
+      return `${semanticDecision.decisionCode}:${persistable}`;
+    }
+    case "conversation_only": {
+      const persistable: false = semanticDecision.persistable;
+      return `${semanticDecision.decisionCode}:${persistable}`;
+    }
+    case "unsupported": {
+      const persistable: false = semanticDecision.persistable;
+      return `${semanticDecision.decisionCode}:${persistable}`;
+    }
+  }
+  const exhaustive: never = semanticDecision;
+  return exhaustive;
+};
 
 declare const guidedContract: GuidedExpenseContract;
 const resultWithMetadata = {
@@ -205,6 +290,7 @@ declare const allAdapterStatuses: AllAdapterStatuses;
 declare const allGuidedStatuses: AllGuidedStatuses;
 declare const approvedNewReasons: ApprovedNewReasons;
 declare const adapterOnlyUnsupportedReasons: AdapterOnlyUnsupportedReasons;
+declare const resolvedCategories: ResolvedCategories;
 
 void minimalOperationalData;
 void completeOperationalData;
@@ -228,5 +314,15 @@ void allAdapterStatuses;
 void allGuidedStatuses;
 void approvedNewReasons;
 void adapterOnlyUnsupportedReasons;
+void resolvedCategories;
+void resolvedDecision;
+void clarificationDecision;
+void conversationDecision;
+void unsupportedDecision;
+void clarificationWithCategory;
+void conversationWithCategory;
+void unsupportedWithCategory;
+void emptyAmbiguousExpenseIntentData;
+void narrowSemanticDecision;
 
 export {};

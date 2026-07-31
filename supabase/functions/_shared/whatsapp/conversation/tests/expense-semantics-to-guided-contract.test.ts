@@ -74,8 +74,10 @@ describe("expense semantics adapter — resolved", () => {
       throw new Error("expected recognized guided expense");
     }
     expect(result.semanticDecision).toEqual({
+      status: "resolved",
       persistable: true,
       decisionCode: "completed_deterministic_revision_item",
+      conceptualCategory: "Revisão",
     });
     expect(result.guidedContract).toMatchObject({
       category: "Revisão",
@@ -238,8 +240,10 @@ describe("expense semantics adapter — dados ausentes", () => {
         technicalAuthorization: "none",
       });
       expect(result.semanticDecision).toEqual({
+        status: "resolved",
         persistable: true,
         decisionCode: "completed_deterministic_revision_item",
+        conceptualCategory: "Revisão",
       });
     }
   });
@@ -313,7 +317,11 @@ describe("expense semantics adapter — needs clarification", () => {
     });
     expect(result).toMatchObject({
       status: "guided",
-      semanticDecision: { persistable: false, decisionCode: "clarification_required" },
+      semanticDecision: {
+        status: "needs_clarification",
+        persistable: false,
+        decisionCode: "clarification_required",
+      },
       guidedContract: {
         status: "needs_clarification",
         reason: "ambiguous_oil",
@@ -372,6 +380,7 @@ describe("expense semantics adapter — conversation only", () => {
       expect(result).toEqual({
         status: "conversation_only",
         semanticDecision: {
+          status: "conversation_only",
           persistable: false,
           decisionCode: "non_persistable_conversation",
         },
@@ -406,10 +415,286 @@ describe("expense semantics adapter — unsupported", () => {
       });
       expect(result).toEqual({
         status: "unsupported",
-        semanticDecision: { persistable: false, decisionCode: "fail_closed" },
+        semanticDecision: {
+          status: "unsupported",
+          persistable: false,
+          decisionCode: "fail_closed",
+        },
         reason,
         failureClass,
         technicalAuthorization: "none",
+      });
+      expect("guidedContract" in result).toBe(false);
+    });
+  }
+});
+
+describe("expense semantics adapter - correcoes da revisao formal", () => {
+  it("descarta exatamente todos os dados de intencao de despesa ambigua", () => {
+    const additionalItems = [
+      { id: "kit", label: "Kit complementar", quantity: 1 },
+    ] as const satisfies readonly AdditionalExpenseItem[];
+    const result = adapt(
+      {
+        status: "needs_clarification",
+        persistable: false,
+        reason: "expense_or_question_intent_ambiguous",
+        decisionCode: "clarification_required",
+      },
+      {
+        vehicleId: "vehicle-1",
+        km: 80_000,
+        totalAmount: 1199,
+        humanDescription: "Troca de oleo do cambio",
+        additionalItems,
+        laborMentioned: true,
+        partsAmount: 999,
+        laborAmount: 200,
+      },
+    );
+
+    expect(result.status).toBe("guided");
+    if (result.status !== "guided" || result.guidedContract.status !== "needs_clarification") {
+      throw new Error("expected ambiguous expense intent clarification");
+    }
+    expect(result.guidedContract).toMatchObject({
+      reason: "ambiguous_expense_intent",
+      missingField: "expenseIntent",
+      questionKey: "ask_expense_or_question_intent",
+      technicalAuthorization: "none",
+    });
+    expect(result.guidedContract.safeKnownData).toEqual({});
+    expect(Object.keys(result.guidedContract.safeKnownData)).toEqual([]);
+  });
+
+  it("nao valida dados descartados na intencao ambigua", () => {
+    const result = adapt(
+      {
+        status: "needs_clarification",
+        persistable: false,
+        reason: "expense_or_question_intent_ambiguous",
+        decisionCode: "clarification_required",
+      },
+      operationalData({
+        humanDescription: "   ",
+        totalAmount: Number.NaN,
+        km: 1.5,
+      }),
+    );
+
+    expect(result.status).toBe("guided");
+    if (result.status === "guided" && result.guidedContract.status === "needs_clarification") {
+      expect(result.guidedContract.reason).toBe("ambiguous_expense_intent");
+      expect(result.guidedContract.safeKnownData).toEqual({});
+    }
+  });
+
+  it("preserva somente dados operacionais validos para oleo ambiguo", () => {
+    const additionalItems = [
+      { id: "anel", label: "Anel de vedacao" },
+    ] as const satisfies readonly AdditionalExpenseItem[];
+    const data = operationalData({
+      vehicleId: "vehicle-oil",
+      km: 80_000,
+      totalAmount: 350,
+      humanDescription: "Troquei oleo por R$ 350 aos 80.000 km",
+      additionalItems,
+      laborMentioned: true,
+      partsAmount: 300,
+      laborAmount: 50,
+    });
+    const result = adapt(
+      {
+        status: "needs_clarification",
+        persistable: false,
+        reason: "oil_system_ambiguous",
+        decisionCode: "clarification_required",
+      },
+      data,
+    );
+
+    expect(result.status).toBe("guided");
+    if (result.status === "guided" && result.guidedContract.status === "needs_clarification") {
+      expect(result.guidedContract).toMatchObject({
+        reason: "ambiguous_oil",
+        missingField: "oilSystem",
+        questionKey: "ask_oil_system",
+        safeKnownData: {
+          vehicleId: "vehicle-oil",
+          km: 80_000,
+          totalAmount: 350,
+          description: data.humanDescription,
+          additionalItems,
+          laborMentioned: true,
+          partsAmount: 300,
+          laborAmount: 50,
+        },
+      });
+      expect("commonCategory" in result.guidedContract.safeKnownData).toBe(false);
+      expect("recognizedItemKeys" in result.guidedContract.safeKnownData).toBe(false);
+    }
+  });
+
+  it("rejeita dado que seria publicado para oleo ambiguo", () => {
+    const result = adapt(
+      {
+        status: "needs_clarification",
+        persistable: false,
+        reason: "oil_system_ambiguous",
+        decisionCode: "clarification_required",
+      },
+      operationalData({ totalAmount: Number.NaN }),
+    );
+    expect(result).toMatchObject({
+      status: "unsupported",
+      reason: "invalid_operational_data",
+      failureClass: "contract_violation",
+    });
+  });
+
+  it("preserva a descricao reconhecida literalmente", () => {
+    const humanDescription = "  Troca de óleo 🚗  ";
+    const result = adapt(engineOilResult, operationalData({ humanDescription }));
+    expect(result.status).toBe("guided");
+    if (result.status === "guided" && result.guidedContract.status === "recognized") {
+      expect(result.guidedContract.description).toBe(humanDescription);
+      expect(result.guidedContract.description).not.toBe(humanDescription.trim());
+    }
+  });
+
+  it("preserva categoria Revisao na pergunta de km", () => {
+    const result = adapt(transmissionResult, {
+      humanDescription: "Troca de oleo do cambio",
+      additionalItems: [],
+      laborMentioned: false,
+      vehicleId: "vehicle-1",
+      totalAmount: 1299,
+    });
+    expect(result.status).toBe("guided");
+    expect(result.semanticDecision).toEqual({
+      status: "resolved",
+      persistable: true,
+      decisionCode: "completed_transmission_fluid_without_safe_item_key",
+      conceptualCategory: "Revisão",
+    });
+  });
+
+  it("preserva categoria Manutencao na pergunta de valor", () => {
+    const result = adapt(maintenanceResult, operationalData({ totalAmount: undefined }));
+    expect(result.status).toBe("guided");
+    expect(result.semanticDecision).toMatchObject({
+      status: "resolved",
+      conceptualCategory: "Manutenção",
+    });
+    if (result.status === "guided") {
+      expect(result.guidedContract).toMatchObject({
+        status: "needs_clarification",
+        reason: "missing_total_amount",
+      });
+    }
+  });
+
+  it("preserva categoria e todos os fatos seguros no template", () => {
+    const additionalItems = [
+      { id: "adicional", label: "Item adicional" },
+    ] as const satisfies readonly AdditionalExpenseItem[];
+    const result = adapt(engineOilResult, {
+      humanDescription: "Oleo e filtro",
+      additionalItems,
+      laborMentioned: true,
+      vehicleId: "vehicle-template",
+    });
+    expect(result.status).toBe("guided");
+    expect(result.semanticDecision).toMatchObject({
+      status: "resolved",
+      conceptualCategory: "Revisão",
+    });
+    if (result.status === "guided" && result.guidedContract.status === "use_guided_template") {
+      expect(result.guidedContract.safeKnownData).toEqual({
+        vehicleId: "vehicle-template",
+        description: "Oleo e filtro",
+        recognizedItemKeys: ["oleo_motor", "filtro_oleo"],
+        additionalItems,
+        laborMentioned: true,
+      });
+      expect("km" in result.guidedContract.safeKnownData).toBe(false);
+      expect("totalAmount" in result.guidedContract.safeKnownData).toBe(false);
+    }
+  });
+
+  it("preserva categoria Manutencao quando dados resolved falham fechados", () => {
+    const result = adapt(maintenanceResult, operationalData({ totalAmount: Number.NaN }));
+    expect(result.status).toBe("unsupported");
+    expect(result.semanticDecision).toEqual({
+      status: "resolved",
+      persistable: true,
+      decisionCode: "completed_automotive_service",
+      conceptualCategory: "Manutenção",
+    });
+  });
+});
+
+describe("expense semantics adapter - precedencia semantica", () => {
+  const conversationCases = [
+    ["technical_question", operationalData({ humanDescription: "  " })],
+    ["future_service", operationalData({ totalAmount: Number.NaN })],
+    ["quote", operationalData({ km: 1.5 })],
+    ["purchase_before_service", operationalData({ vehicleId: "" })],
+  ] as const satisfies readonly (readonly [
+    ConversationOnlyExpenseSemantics["reason"],
+    GuidedExpenseOperationalData,
+  ])[];
+
+  for (const [reason, data] of conversationCases) {
+    it(`nao mascara conversation_only ${reason}`, () => {
+      const result = adapt(
+        {
+          status: "conversation_only",
+          persistable: false,
+          reason,
+          decisionCode: "non_persistable_conversation",
+        },
+        data,
+      );
+      expect(result).toEqual({
+        status: "conversation_only",
+        semanticDecision: {
+          status: "conversation_only",
+          persistable: false,
+          decisionCode: "non_persistable_conversation",
+        },
+        reason,
+        technicalAuthorization: "none",
+      });
+    });
+  }
+
+  const unsupportedCases = [
+    ["invalid_input", "invalid_semantic_input"],
+    ["invalid_candidate_category", "contract_violation"],
+    ["invalid_candidate_item_key", "contract_violation"],
+    ["unsupported_semantics", "unsupported_semantics"],
+  ] as const satisfies readonly (readonly [
+    UnsupportedExpenseSemantics["reason"],
+    "contract_violation" | "invalid_semantic_input" | "unsupported_semantics",
+  ])[];
+
+  for (const [reason, failureClass] of unsupportedCases) {
+    it(`nao mascara unsupported ${reason}`, () => {
+      const result = adapt(
+        {
+          status: "unsupported",
+          persistable: false,
+          reason,
+          decisionCode: "fail_closed",
+        },
+        operationalData({ humanDescription: " ", totalAmount: Number.NaN, km: 1.5 }),
+      );
+      expect(result).toMatchObject({
+        status: "unsupported",
+        reason,
+        failureClass,
+        semanticDecision: { status: "unsupported", decisionCode: "fail_closed" },
       });
       expect("guidedContract" in result).toBe(false);
     });
