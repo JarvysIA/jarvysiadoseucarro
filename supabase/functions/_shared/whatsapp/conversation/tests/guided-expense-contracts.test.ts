@@ -146,14 +146,16 @@ describe("guided-expense-contracts — literais das fixtures", () => {
     const reasons: readonly ClarificationReason[] = [
       "missing_vehicle",
       "missing_km",
+      "missing_total_amount",
       "ambiguous_filter",
       "ambiguous_oil",
+      "ambiguous_expense_intent",
       "ambiguous_transmission",
       "quantity_required",
       "ambiguous_item",
       "complex_input",
     ];
-    expect(reasons).toHaveLength(8);
+    expect(reasons).toHaveLength(10);
   });
 
   it("usa os reason codes aprovados de template", () => {
