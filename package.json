@@ -1,6 +1,7 @@
 {
   "name": "tanstack_start_ts",
   "private": true,
+  "packageManager": "bun@1.3.14",
   "sideEffects": false,
   "type": "module",
   "scripts": {
@@ -11,6 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "bun test",
+    "typecheck": "tsc --noEmit",
     "test:db:guard": "bun test scripts/test-db/guard.test.ts",
     "test:db:smoke": "bun run scripts/test-db/smoke.ts",
     "test:db:mj1a-v-c1": "bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts",

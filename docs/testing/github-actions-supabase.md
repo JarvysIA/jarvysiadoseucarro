@@ -17,8 +17,11 @@ sem tocar produção.
 Somente:
 
 - workflow manual (`workflow_dispatch`);
+- instalação Bun congelada pelo `bun.lock`;
+- suíte automatizada TypeScript/JavaScript completa, typecheck e build de produção antes do banco;
 - Supabase local via CLI fixada;
-- seed sintético mínimo (`jarvys_test_meta.local_marker`, `jarvys_test_meta.tx_smoke`);
+- seed sintético mínimo (`jarvys_test_meta.local_marker`, `jarvys_test_meta.tx_smoke`
+  e fixtures locais necessárias aos testes SQL);
 - guard fail-closed pré + pós-conexão;
 - harness `pg.Client` dedicado;
 - smoke multi-sessão (2 sessões físicas, PIDs distintos, COMMIT, ROLLBACK,
@@ -26,7 +29,10 @@ Somente:
 
 ## 3. O que ele cobre
 
-- Aplicação de todas as 67 migrations reais desde zero em CI.
+- Aplicação de todas as 80 migrations atuais desde zero em CI (contagem factual
+  desta baseline; o Summary recalcula o total a cada execução).
+- Execução dos três testes SQL transacionais existentes via `psql`.
+- Bloqueio dos testes de banco quando a suíte completa, o typecheck ou o build falha.
 - Isolamento transacional entre sessões físicas independentes.
 - Prova de que o pipeline pode ser executado com segurança e reprodutibilidade.
 
@@ -67,8 +73,10 @@ aumentaria a superfície de risco sem ganho técnico.
 2. Toque em **Ações**.
 3. Selecione **Jarvys Test Database**.
 4. Toque em **Executar fluxo de trabalho** (Run workflow).
-5. Confirme a branch **main** e inicie.
-6. Abra o run em curso e, ao final, leia o **Summary** (Resumo).
+5. Selecione a branch **codex/p0-3b-pre-s3-baseline-hardening** e inicie.
+6. Abra o run em curso e, ao final, leia o **Summary** (Resumo). Cada etapa mostra
+   `success`, `failure`, `cancelled` ou `skipped`; etapas puladas não são declaradas
+   como executadas.
 
 Nenhum PAT, token ou senha é solicitado.
 
