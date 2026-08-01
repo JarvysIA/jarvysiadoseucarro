@@ -38,6 +38,7 @@ DECLARE
 
   v_instance_pk uuid;
   v_instance_id text;
+  v_instance_phone text;
 
   v_idem1      text := 'test-idem-' || gen_random_uuid()::text;
   v_idem2      text := 'test-idem-' || gen_random_uuid()::text;
@@ -51,11 +52,15 @@ BEGIN
   SELECT id INTO v_user FROM public.profiles ORDER BY created_at LIMIT 1;
   IF v_user IS NULL THEN RAISE EXCEPTION 'BLOCKED_NO_PROFILE_FIXTURE'; END IF;
 
-  SELECT id, instance_id INTO v_instance_pk, v_instance_id
+  SELECT id, instance_id, phone_number_e164
+    INTO v_instance_pk, v_instance_id, v_instance_phone
     FROM public.whatsapp_provider_instances
    WHERE provider = 'zapi' AND status = 'active'
    ORDER BY created_at LIMIT 1;
   IF v_instance_id IS NULL THEN RAISE EXCEPTION 'BLOCKED_NO_INSTANCE_FIXTURE'; END IF;
+  IF v_instance_phone IS NULL OR v_instance_phone !~ '^\+[0-9]{10,15}$' THEN
+    RAISE EXCEPTION 'BLOCKED_INVALID_INSTANCE_PHONE_FIXTURE';
+  END IF;
 
   INSERT INTO public.veiculos(id, user_id, placa, status)
        VALUES (v_vehicle,   v_user, 'MJ1A01', 'ativo'),
@@ -66,7 +71,7 @@ BEGIN
                                        assigned_instance_id, assigned_whatsapp_number,
                                        verified_at, opt_in, opt_out)
        VALUES (v_contact, v_user, '+5511900000001', 'zapi', v_instance_id,
-               '+551150000000', now(), true, false);
+               v_instance_phone, now(), true, false);
 
   -- E01: created (happy path)
   v_res := public.enqueue_whatsapp_km_prompt(

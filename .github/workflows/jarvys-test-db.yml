@@ -5,10 +5,12 @@
 # NÃO faz deploy. NÃO liga orchestrator_mode em produção. NÃO conecta
 # runtime produtivo.
 #
-# Fluxo: checkout → Bun fixo → deps congeladas → testes puros do guard →
-# Supabase CLI fixa → sanitização de ambiente → supabase start local →
+# Fluxo: checkout → Bun fixo → deps congeladas → suíte completa → typecheck →
+# build de produção → testes puros do guard → Supabase CLI fixa →
+# sanitização de ambiente → supabase start local →
 # supabase db reset --local (aplica migrations + seed sintético) →
-# TEST_DATABASE_URL local sem fallback → smoke multi-sessão (2 pg.Client
+# TEST_DATABASE_URL local sem fallback → testes SQL via psql →
+# smoke multi-sessão (2 pg.Client
 # físicos independentes, PID distinto, COMMIT, ROLLBACK, zero leaked rows)
 # → ratificação MJ1A-V (C1-C7) e MJ1B-V (O1-O5), RPCs reais contra este
 # Postgres local efêmero → Step Summary sanitizado → teardown always
@@ -40,25 +42,43 @@ jobs:
 
     steps:
       - name: Checkout (read-only)
+        id: checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # release v7.0.0
 
       - name: Setup Bun (versão fixa)
+        id: setup_bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # release v2.2.0
         with:
           bun-version: 1.3.14
 
       - name: Install deps (frozen lockfile)
+        id: install
         run: bun install --frozen-lockfile
 
+      - name: Suite automatizada TypeScript/JavaScript completa
+        id: test_suite
+        run: bun test
+
+      - name: Typecheck
+        id: typecheck
+        run: bun run typecheck
+
+      - name: Build de producao
+        id: build
+        run: bun run build
+
       - name: Testes puros do guard (sem banco)
+        id: guard_tests
         run: bun test scripts/test-db/guard.test.ts
 
       - name: Setup Supabase CLI (versão fixa)
+        id: setup_supabase
         uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # release v3.0.0
         with:
           version: 2.109.1
 
       - name: Verificar versões
+        id: versions
         run: |
           set -euo pipefail
           echo "bun: $(bun --version)"
@@ -66,6 +86,7 @@ jobs:
           echo "docker: $(docker --version)"
 
       - name: Sanitização do ambiente (fail-closed)
+        id: sanitize
         run: |
           set -euo pipefail
           forbidden=(
@@ -95,6 +116,7 @@ jobs:
           echo "env sanitization OK (nenhuma variável produtiva presente)"
 
       - name: Supabase start (local, logs redigidos)
+        id: supabase_start
         run: |
           set -euo pipefail
           mkdir -p /tmp/jarvys-ci
@@ -112,6 +134,7 @@ jobs:
           echo "supabase start OK (log bruto retido apenas no runner efêmero)"
 
       - name: Supabase db reset (local — aplica migrations + seed)
+        id: migrations
         run: |
           set -euo pipefail
           log=/tmp/jarvys-ci/supabase-reset.log
@@ -129,6 +152,7 @@ jobs:
           echo "supabase db reset OK ($migrations migrations aplicadas + seed)"
 
       - name: Definir TEST_DATABASE_URL local
+        id: database_url
         run: |
           set -euo pipefail
           # Porta externa canônica do Supabase local: 54322. Senha default local: postgres.
@@ -138,156 +162,218 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "TEST_DATABASE_URL definida (valor não ecoado)"
 
+      - name: SQL — lifecycle de km-prompts
+        id: sql_km_lifecycle
+        run: psql "$TEST_DATABASE_URL" --set ON_ERROR_STOP=1 --file supabase/tests/whatsapp-km-prompts-lifecycle.sql
+
+      - name: SQL — enqueue MJ1A
+        id: sql_km_mj1a
+        run: psql "$TEST_DATABASE_URL" --set ON_ERROR_STOP=1 --file supabase/tests/whatsapp-km-prompts-mj1a.sql
+
+      - name: SQL — RPCs do orquestrador
+        id: sql_orchestrator
+        run: psql "$TEST_DATABASE_URL" --set ON_ERROR_STOP=1 --file supabase/tests/whatsapp-orchestrator-rpcs.sql
+
       - name: Smoke multi-sessão
+        id: smoke
         run: bun run scripts/test-db/smoke.ts
 
       - name: MJ1A-V C1 — enqueue concorrente (Postgres real)
+        id: c1
         run: bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts
 
       - name: MJ1A-V C2 — enqueue + rollback libera lock (Postgres real)
+        id: c2
         run: bun test supabase/tests/mj1a-v/c2-enqueue-rollback.test.ts
 
       - name: MJ1A-V C3 — contexto divergente rejeitado (Postgres real)
+        id: c3
         run: bun test supabase/tests/mj1a-v/c3-enqueue-context-mismatch.test.ts
 
       - name: MJ1A-V C4 — finalize_sent webhook duplicado (Postgres real)
+        id: c4
         run: bun test supabase/tests/mj1a-v/c4-finalize-sent-duplicate-webhook.test.ts
 
       - name: MJ1A-V C5 — sucesso vence sempre / terminal não flipa (Postgres real)
+        id: c5
         run: bun test supabase/tests/mj1a-v/c5-finalize-terminal-precedence.test.ts
 
       - name: MJ1A-V C6 — finalize_failed reparo self-heal (Postgres real)
+        id: c6
         run: bun test supabase/tests/mj1a-v/c6-finalize-failed-repair.test.ts
 
       - name: MJ1A-V C7 — auditoria final zero órfão (Postgres real)
+        id: c7
         run: bun test supabase/tests/mj1a-v/c7-orphan-audit.test.ts
 
       - name: MJ1B-V O1 — claim SKIP LOCKED não bloqueia (Postgres real)
+        id: o1
         run: bun test supabase/tests/mj1b-v/o1-claim-skip-locked.test.ts
 
       - name: MJ1B-V O2 — recuperação de lease expirado (Postgres real)
+        id: o2
         run: bun test supabase/tests/mj1b-v/o2-lease-recovery.test.ts
 
       - name: MJ1B-V O3 — replay durável do apply (Postgres real)
+        id: o3
         run: bun test supabase/tests/mj1b-v/o3-apply-replay.test.ts
 
       - name: MJ1B-V O4 — CAS state_version sob lock real (Postgres real)
+        id: o4
         run: bun test supabase/tests/mj1b-v/o4-apply-cas-lock.test.ts
 
       - name: MJ1B-V O5 — corrida 1a insercao de estado (Postgres real)
+        id: o5
         run: bun test supabase/tests/mj1b-v/o5-apply-first-insert-race.test.ts
 
       - name: MJ1B-V O6 — release nao reprocessa duplicata (Postgres real)
+        id: o6
         run: bun test supabase/tests/mj1b-v/o6-release-duplicate.test.ts
 
 
 
       - name: MJ1C-V K1 — applied caminho feliz (Postgres real)
+        id: k1
         run: bun test supabase/tests/mj1c-v/k1-applied.test.ts
 
       - name: MJ1C-V K2 — no_op (Postgres real)
+        id: k2
         run: bun test supabase/tests/mj1c-v/k2-no-op.test.ts
 
       - name: MJ1C-V K3 — replay durável (Postgres real)
+        id: k3
         run: bun test supabase/tests/mj1c-v/k3-replay.test.ts
 
       - name: MJ1C-V K4 — km_conflict (Postgres real)
+        id: k4
         run: bun test supabase/tests/mj1c-v/k4-km-conflict.test.ts
 
       - name: MJ1C-V K5 — state_version_conflict (Postgres real)
+        id: k5
         run: bun test supabase/tests/mj1c-v/k5-state-version-conflict.test.ts
 
       - name: MJ1C-V K6 — correction_not_confirmed (Postgres real)
+        id: k6
         run: bun test supabase/tests/mj1c-v/k6-correction-not-confirmed.test.ts
 
       - name: MJ1C-V K7 — vehicle_archived (Postgres real)
+        id: k7
         run: bun test supabase/tests/mj1c-v/k7-vehicle-archived.test.ts
 
       - name: MJ1C-V K8 — vehicle_not_owned (Postgres real)
+        id: k8
         run: bun test supabase/tests/mj1c-v/k8-vehicle-not-owned.test.ts
 
       - name: MJ1C-V K9 — invariant_violation (Postgres real)
+        id: k9
         run: bun test supabase/tests/mj1c-v/k9-invariant-violation.test.ts
 
       - name: MJ1C-V K10 — action_execution_conflict (Postgres real)
+        id: k10
         run: bun test supabase/tests/mj1c-v/k10-action-execution-conflict.test.ts
 
       - name: MJ1C-V K11 — concorrência real no mesmo draft_id (Postgres real)
+        id: k11
         run: bun test supabase/tests/mj1c-v/k11-concurrent-same-draft.test.ts
 
       - name: MJ1C-V K12 — crash-window replay (Postgres real)
+        id: k12
         run: bun test supabase/tests/mj1c-v/k12-crash-window-replay.test.ts
 
       - name: MJ1D-V D1 — corrente completa applied (Postgres real)
+        id: d1
         run: bun test supabase/tests/mj1d-v/d1-applied-happy-path.test.ts
 
       - name: MJ1D-V D2 — km_conflict e retry_needed (Postgres real)
+        id: d2
         run: bun test supabase/tests/mj1d-v/d2-km-conflict-retry.test.ts
 
       - name: MJ1D-V D3 — crash-window replay encadeado com apply (Postgres real)
+        id: d3
         run: bun test supabase/tests/mj1d-v/d3-crash-window-replay.test.ts
 
       - name: MJ2A-V E1 — expense_create applied happy path (Postgres real)
+        id: e1
         run: bun test supabase/tests/mj2a-v/e1-happy-path-applied.test.ts
 
       - name: MJ2A-V E2 — expense_create replay idempotente (Postgres real)
+        id: e2
         run: bun test supabase/tests/mj2a-v/e2-replay-idempotent.test.ts
 
       - name: MJ2A-V E3 — expense_create replay payload mismatch (Postgres real)
+        id: e3
         run: bun test supabase/tests/mj2a-v/e3-replay-payload-mismatch.test.ts
 
       - name: MJ2A-V E4 — expense_create state_version_conflict (Postgres real)
+        id: e4
         run: bun test supabase/tests/mj2a-v/e4-state-version-conflict.test.ts
 
       - name: MJ2A-V E5 — expense_create invalid state (Postgres real)
+        id: e5
         run: bun test supabase/tests/mj2a-v/e5-invalid-state.test.ts
 
       - name: MJ2A-V E6 — expense_create draft_type mismatch (Postgres real)
+        id: e6
         run: bun test supabase/tests/mj2a-v/e6-draft-type-mismatch.test.ts
 
       - name: MJ2A-V E7 — expense_create draft_payload mismatch (Postgres real)
+        id: e7
         run: bun test supabase/tests/mj2a-v/e7-draft-payload-mismatch.test.ts
 
       - name: MJ2A-V E8 — expense_create categoria_invalid (Postgres real)
+        id: e8
         run: bun test supabase/tests/mj2a-v/e8-categoria-invalid.test.ts
 
       - name: MJ2A-V E9 — expense_create valor_invalid (Postgres real)
+        id: e9
         run: bun test supabase/tests/mj2a-v/e9-valor-invalid.test.ts
 
       - name: MJ2A-V E10 — expense_create vehicle_not_owned (Postgres real)
+        id: e10
         run: bun test supabase/tests/mj2a-v/e10-vehicle-not-owned.test.ts
 
       - name: MJ2A-V E11 — expense_create vehicle_archived (Postgres real)
+        id: e11
         run: bun test supabase/tests/mj2a-v/e11-vehicle-archived.test.ts
 
       - name: MJ2A-V E12 — expense_create concorrência real mesmo draft_id (Postgres real)
+        id: e12
         run: bun test supabase/tests/mj2a-v/e12-concurrency-same-draft.test.ts
 
       - name: MJ2B-V F1 — corrente completa applied despesa (Postgres real)
+        id: f1
         run: bun test supabase/tests/mj2b-v/f1-chain-applied.test.ts
 
       - name: MJ2B-V F2 — despesa rejected vehicle_archived + retry_needed (Postgres real)
+        id: f2
         run: bun test supabase/tests/mj2b-v/f2-chain-rejected-retry.test.ts
 
       - name: MJ2B-V F3 — despesa crash-window replay encadeado com apply (Postgres real)
+        id: f3
         run: bun test supabase/tests/mj2b-v/f3-chain-crash-replay.test.ts
 
       - name: MJ4x-V G1 — caminho feliz, liga despesa (Postgres real)
+        id: g1
         run: bun test supabase/tests/mj4x-v/g1-happy-path-link.test.ts
 
       - name: MJ4x-V G2 — no_op ainda liga despesa (Postgres real)
+        id: g2
         run: bun test supabase/tests/mj4x-v/g2-no-op-links.test.ts
 
       - name: MJ4x-V G3 — replay não reprocessa a ligação (Postgres real)
+        id: g3
         run: bun test supabase/tests/mj4x-v/g3-replay-idempotent.test.ts
 
       - name: MJ4x-V G4 — trava impede sobrescrever despesa já ligada (Postgres real)
+        id: g4
         run: bun test supabase/tests/mj4x-v/g4-guard-prevents-overwrite.test.ts
 
       - name: MJ4x-V G5 — trava de identidade vehicle/user (Postgres real)
+        id: g5
         run: bun test supabase/tests/mj4x-v/g5-guard-identity-mismatch.test.ts
 
       - name: MJ4x-V G6 — RPC rejeitada não toca despesa (Postgres real)
+        id: g6
         run: bun test supabase/tests/mj4x-v/g6-rejected-no-link.test.ts
 
 
@@ -298,40 +384,66 @@ jobs:
 
 
 
-      - name: Step Summary sanitizado
+      - name: Teardown (sempre)
+        id: teardown
+        if: always()
+        run: |
+          set +e
+          mkdir -p /tmp/jarvys-ci
+          supabase stop >/tmp/jarvys-ci/supabase-stop.log 2>&1
+          stop_exit=$?
+          if [ "$stop_exit" -eq 0 ]; then
+            echo "supabase stop concluído (runner efêmero será descartado)"
+          else
+            echo "::warning::supabase stop não foi concluído (exit $stop_exit)"
+          fi
+          exit "$stop_exit"
+
+      - name: Step Summary factual e sanitizado
+        id: summary
         if: always()
         run: |
           {
             echo "# Jarvys Test Database"
             echo ""
-            echo "- build: MJ1A-V-ENV-CI"
-            echo "- runner: ubuntu-24.04"
-            echo "- bun: $(bun --version 2>/dev/null || echo n/a)"
-            echo "- supabase CLI: $(supabase --version 2>/dev/null || echo n/a)"
-            echo "- docker: $(docker --version 2>/dev/null || echo n/a)"
+            echo "Resultados: \`success\` = passou; \`failure\` = falhou; \`cancelled\` = cancelado; \`skipped\` = pulado/não executado."
             echo ""
-            echo "## Resultado do job"
+            echo "## Baseline TypeScript/JavaScript"
             echo ""
-            echo "- job status: ${{ job.status }}"
-            echo "- migrations detectadas: $(ls supabase/migrations/*.sql 2>/dev/null | wc -l | tr -d ' ')"
-            echo "- seed executado via \`supabase db reset --local\`"
+            echo "- checkout: ${{ steps.checkout.outcome }}"
+            echo "- setup Bun: ${{ steps.setup_bun.outcome }}"
+            echo "- instalação congelada: ${{ steps.install.outcome }}"
+            echo "- suíte automatizada completa (\`bun test\`): ${{ steps.test_suite.outcome }}"
+            echo "- typecheck (\`bun run typecheck\`): ${{ steps.typecheck.outcome }}"
+            echo "- build de produção (\`bun run build\`): ${{ steps.build.outcome }}"
+            echo "- testes puros do guard: ${{ steps.guard_tests.outcome }}"
             echo ""
-            echo "## Invariantes de segurança"
+            echo "## Supabase local e migrations"
             echo ""
-            echo "- runtime: \`orchestrator_mode = off\`"
-            echo "- MJ1A-V (C1-C7), MJ1B-V (O1-O6), MJ1C-V (K1-K12), MJ1D-V (D1-D3), MJ2A-V (E1-E12), MJ2B-V (F1-F3) e MJ4x-V (G1-G6) executados neste build — 100% contra Postgres local efêmero, zero conexão com produção"
-            echo "- nenhum secret referenciado"
-            echo "- nenhum environment declarado"
-            echo "- nenhum acesso a banco remoto"
-            echo "- teardown solicitado (supabase stop) via always()"
+            echo "- setup Supabase CLI: ${{ steps.setup_supabase.outcome }}"
+            echo "- verificação de versões: ${{ steps.versions.outcome }}"
+            echo "- sanitização fail-closed: ${{ steps.sanitize.outcome }}"
+            echo "- Supabase start local: ${{ steps.supabase_start.outcome }}"
+            echo "- replay de migrations + seed: ${{ steps.migrations.outcome }}"
+            echo "- definição da URL exclusivamente local: ${{ steps.database_url.outcome }}"
+            echo "- SQL lifecycle de km-prompts: ${{ steps.sql_km_lifecycle.outcome }}"
+            echo "- SQL enqueue MJ1A: ${{ steps.sql_km_mj1a.outcome }}"
+            echo "- SQL RPCs do orquestrador: ${{ steps.sql_orchestrator.outcome }}"
+            echo "- smoke multi-sessão: ${{ steps.smoke.outcome }}"
             echo ""
-            echo "Detalhes do smoke (PIDs, isolamento, commit, rollback, leaked_rows) foram anexados"
-            echo "pelo próprio smoke em passos anteriores. DSN, senha, JWT e keys foram redigidos."
+            echo "## Testes PostgreSQL existentes"
+            echo ""
+            echo "- MJ1A-V: C1=${{ steps.c1.outcome }}, C2=${{ steps.c2.outcome }}, C3=${{ steps.c3.outcome }}, C4=${{ steps.c4.outcome }}, C5=${{ steps.c5.outcome }}, C6=${{ steps.c6.outcome }}, C7=${{ steps.c7.outcome }}"
+            echo "- MJ1B-V: O1=${{ steps.o1.outcome }}, O2=${{ steps.o2.outcome }}, O3=${{ steps.o3.outcome }}, O4=${{ steps.o4.outcome }}, O5=${{ steps.o5.outcome }}, O6=${{ steps.o6.outcome }}"
+            echo "- MJ1C-V: K1=${{ steps.k1.outcome }}, K2=${{ steps.k2.outcome }}, K3=${{ steps.k3.outcome }}, K4=${{ steps.k4.outcome }}, K5=${{ steps.k5.outcome }}, K6=${{ steps.k6.outcome }}, K7=${{ steps.k7.outcome }}, K8=${{ steps.k8.outcome }}, K9=${{ steps.k9.outcome }}, K10=${{ steps.k10.outcome }}, K11=${{ steps.k11.outcome }}, K12=${{ steps.k12.outcome }}"
+            echo "- MJ1D-V: D1=${{ steps.d1.outcome }}, D2=${{ steps.d2.outcome }}, D3=${{ steps.d3.outcome }}"
+            echo "- MJ2A-V: E1=${{ steps.e1.outcome }}, E2=${{ steps.e2.outcome }}, E3=${{ steps.e3.outcome }}, E4=${{ steps.e4.outcome }}, E5=${{ steps.e5.outcome }}, E6=${{ steps.e6.outcome }}, E7=${{ steps.e7.outcome }}, E8=${{ steps.e8.outcome }}, E9=${{ steps.e9.outcome }}, E10=${{ steps.e10.outcome }}, E11=${{ steps.e11.outcome }}, E12=${{ steps.e12.outcome }}"
+            echo "- MJ2B-V: F1=${{ steps.f1.outcome }}, F2=${{ steps.f2.outcome }}, F3=${{ steps.f3.outcome }}"
+            echo "- MJ4x-V: G1=${{ steps.g1.outcome }}, G2=${{ steps.g2.outcome }}, G3=${{ steps.g3.outcome }}, G4=${{ steps.g4.outcome }}, G5=${{ steps.g5.outcome }}, G6=${{ steps.g6.outcome }}"
+            echo ""
+            echo "## Encerramento"
+            echo ""
+            echo "- teardown local: ${{ steps.teardown.outcome }}"
+            echo "- status final do job: ${{ job.status }}"
+            echo "- migrations detectadas no checkout: $(find supabase/migrations -maxdepth 1 -type f -name '*.sql' 2>/dev/null | wc -l | tr -d ' ')"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Teardown (sempre)
-        if: always()
-        run: |
-          set +e
-          supabase stop >/tmp/jarvys-ci/supabase-stop.log 2>&1
-          echo "supabase stop concluído (runner efêmero será descartado)"

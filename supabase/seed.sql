@@ -41,4 +41,22 @@ BEGIN
 
   EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA jarvys_test_meta
     REVOKE ALL ON TABLES FROM public, anon, authenticated';
+
+  -- Fixtures estritamente sintéticas para os testes SQL transacionais.
+  EXECUTE $sql$INSERT INTO auth.users (id, email)
+    VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-000000000001', 'mj1av+c1@example.invalid')
+    ON CONFLICT (id) DO NOTHING$sql$;
+
+  EXECUTE $sql$INSERT INTO public.profiles (id, nome, whatsapp)
+    VALUES (
+      'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
+      'MJ1A-V Synth',
+      '+5511900000101'
+    )
+    ON CONFLICT (id) DO NOTHING$sql$;
+
+  EXECUTE $sql$INSERT INTO public.whatsapp_provider_instances
+      (provider, instance_id, status, phone_number_e164, health_status)
+    VALUES ('zapi', 'mj1av-c1-instance', 'active', '+551190000000', 'ok')
+    ON CONFLICT (provider, instance_id) DO NOTHING$sql$;
 END $$;
