@@ -11,6 +11,7 @@ import type {
   QuoteEvent,
   RecognizedAutomotiveConcept,
 } from "../concept-event-contract.ts";
+import type { ExpenseSemanticItemKey } from "../types.ts";
 
 const none = { status: "none", executedItemKeys: [] } as const satisfies NoTechnicalEffect;
 const effect = {
@@ -218,15 +219,65 @@ const eventWithAllocation: PurchaseEvent = eventWithAllocationSource;
 
 type EventKind = ConceptEvent["kind"];
 type RecognitionSource = RecognizedAutomotiveConcept["recognitionSource"];
+type ConceptKey = RecognizedAutomotiveConcept["conceptKey"];
 type AcceptEventKind<T extends EventKind> = T;
 type AcceptRecognitionSource<T extends RecognitionSource> = T;
+type AcceptConceptKey<T extends ConceptKey> = T;
+type AcceptItemKey<T extends ExpenseSemanticItemKey> = T;
 // @ts-expect-error discriminante de acontecimento é fechado.
 type UnknownEventKind = AcceptEventKind<"payment">;
 // @ts-expect-error fonte de reconhecimento não concede autoridade à IA.
 type UnknownRecognitionSource = AcceptRecognitionSource<"ai_suggestion">;
 
+type EngineOilConcept = AcceptConceptKey<"engine_oil">;
+type EngineOilFilterConcept = AcceptConceptKey<"engine_oil_filter">;
+type TiresConcept = AcceptConceptKey<"tires">;
+type MultimediaConcept = AcceptConceptKey<"multimedia_system">;
+type TransmissionFluidConcept = AcceptConceptKey<"transmission_fluid">;
+type BrakePadsConcept = AcceptConceptKey<"brake_pads">;
+type EngineOilItem = AcceptItemKey<"oleo_motor">;
+type EngineOilFilterItem = AcceptItemKey<"filtro_oleo">;
+const approvedConcepts = [
+  {
+    conceptKey: "engine_oil",
+    recognitionSource: "deterministic_core",
+    relatedItemKeys: ["oleo_motor"],
+  },
+  {
+    conceptKey: "engine_oil_filter",
+    recognitionSource: "explicit_user_statement",
+    relatedItemKeys: ["filtro_oleo"],
+  },
+  { conceptKey: "tires", recognitionSource: "explicit_user_statement", relatedItemKeys: [] },
+  {
+    conceptKey: "multimedia_system",
+    recognitionSource: "explicit_user_statement",
+    relatedItemKeys: [],
+  },
+  {
+    conceptKey: "transmission_fluid",
+    recognitionSource: "deterministic_core",
+    relatedItemKeys: [],
+  },
+  { conceptKey: "brake_pads", recognitionSource: "explicit_user_statement", relatedItemKeys: [] },
+] as const satisfies readonly RecognizedAutomotiveConcept[];
+// @ts-expect-error conceito desconhecido não entra na união canônica.
+type UnknownConcept = AcceptConceptKey<"unknown_concept">;
+// @ts-expect-error revisão genérica permanece fora do contrato S3.
+type GenericRevisionConcept = AcceptConceptKey<"generic_revision_service">;
+// @ts-expect-error filtro de transmissão não foi aprovado.
+type TransmissionFilterConcept = AcceptConceptKey<"transmission_filter">;
+// @ts-expect-error alias textual não pertence à união canônica.
+type ConceptAlias = AcceptConceptKey<"oleo do motor">;
+// @ts-expect-error a união conceitual não se abre para string.
+type OpenConceptString = AcceptConceptKey<string>;
+// @ts-expect-error item key desconhecida permanece fechada.
+type UnknownItemKey = AcceptItemKey<"inventada">;
+// @ts-expect-error item do catálogo amplo não entra automaticamente no S3.
+type BroadMaintenanceItemKey = AcceptItemKey<"oleo_cambio_automatico">;
+
 const invalidConceptKeySource = {
-  conceptKey: "tires",
+  conceptKey: "unknown_concept",
   recognitionSource: "deterministic_core",
   relatedItemKeys: [],
 } as const;
@@ -280,5 +331,6 @@ void eventWithAllocation;
 void invalidConceptKey;
 void dividedAmount;
 void assertReadonly;
+void approvedConcepts;
 
 export {};

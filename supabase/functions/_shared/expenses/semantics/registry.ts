@@ -5,8 +5,46 @@ import {
   type ExpenseSemanticItemKey,
 } from "./types.ts";
 
+export { EXPENSE_SEMANTIC_ITEM_KEYS };
+export type { ExpenseSemanticItemKey };
+
 const CATEGORY_SET: ReadonlySet<unknown> = new Set(EXPENSE_SEMANTIC_CATEGORIES);
 const ITEM_KEY_SET: ReadonlySet<unknown> = new Set(EXPENSE_SEMANTIC_ITEM_KEYS);
+
+type ExpenseSemanticConceptDefinitionShape = Readonly<{
+  conceptKey: string;
+  relatedItemKeys: readonly ExpenseSemanticItemKey[];
+}>;
+
+export const EXPENSE_SEMANTIC_CONCEPT_REGISTRY = Object.freeze([
+  Object.freeze({
+    conceptKey: "engine_oil",
+    relatedItemKeys: Object.freeze(["oleo_motor"] as const),
+  }),
+  Object.freeze({
+    conceptKey: "engine_oil_filter",
+    relatedItemKeys: Object.freeze(["filtro_oleo"] as const),
+  }),
+  Object.freeze({ conceptKey: "tires", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({
+    conceptKey: "multimedia_system",
+    relatedItemKeys: Object.freeze([] as const),
+  }),
+  Object.freeze({
+    conceptKey: "transmission_fluid",
+    relatedItemKeys: Object.freeze([] as const),
+  }),
+  Object.freeze({ conceptKey: "brake_pads", relatedItemKeys: Object.freeze([] as const) }),
+] as const satisfies readonly ExpenseSemanticConceptDefinitionShape[]);
+
+export type ExpenseSemanticConceptDefinition = (typeof EXPENSE_SEMANTIC_CONCEPT_REGISTRY)[number];
+export type ExpenseSemanticConceptKey = ExpenseSemanticConceptDefinition["conceptKey"];
+
+export function findExpenseSemanticConcept(
+  value: unknown,
+): ExpenseSemanticConceptDefinition | undefined {
+  return EXPENSE_SEMANTIC_CONCEPT_REGISTRY.find(({ conceptKey }) => conceptKey === value);
+}
 
 export function isExpenseSemanticCategory(value: unknown): value is ExpenseSemanticCategory {
   return CATEGORY_SET.has(value);

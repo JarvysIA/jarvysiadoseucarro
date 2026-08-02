@@ -25,9 +25,11 @@ export type {
 export {
   EXISTING_SPECIALIZED_TRANSMISSION_ITEM_KEYS,
   EXPENSE_SEMANTIC_ALIASES,
+  EXPENSE_SEMANTIC_CONCEPT_REGISTRY,
   isExpenseSemanticCategory,
   isExpenseSemanticItemKey,
 } from "./registry.ts";
+export type { ExpenseSemanticConceptKey } from "./registry.ts";
 export type {
   ConversationOnlyExpenseSemantics,
   ExpenseSemanticCategory,

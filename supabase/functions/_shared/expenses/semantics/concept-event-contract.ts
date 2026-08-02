@@ -1,4 +1,10 @@
-import type { ExpenseSemanticItemKey } from "./types.ts";
+import {
+  findExpenseSemanticConcept,
+  isExpenseSemanticItemKey,
+  type ExpenseSemanticConceptDefinition,
+  type ExpenseSemanticConceptKey,
+  type ExpenseSemanticItemKey,
+} from "./registry.ts";
 
 /**
  * P0-3B-S3.1 — contrato puro conceito × acontecimento.
@@ -47,11 +53,12 @@ type ConceptShape<
 }> &
   ForbiddenOperationalAuthority;
 
-export type RecognizedAutomotiveConcept =
-  | ConceptShape<"engine_oil", readonly ["oleo_motor"]>
-  | ConceptShape<"engine_oil_filter", readonly ["filtro_oleo"]>
-  | ConceptShape<"brake_pads", readonly []>
-  | ConceptShape<"multimedia_system", readonly []>;
+export type RecognizedAutomotiveConcept = {
+  [Definition in ExpenseSemanticConceptDefinition as Definition["conceptKey"]]: ConceptShape<
+    Definition["conceptKey"],
+    Definition["relatedItemKeys"]
+  >;
+}[ExpenseSemanticConceptKey];
 
 export type NoTechnicalEffect = ForbiddenOperationalAuthority &
   Readonly<{
@@ -187,7 +194,6 @@ export type ConceptEventContractValidationResult =
       error: Readonly<{ code: ConceptEventContractValidationErrorCode; path: string }>;
     }>;
 
-const ITEM_KEYS: ReadonlySet<unknown> = new Set(["oleo_motor", "filtro_oleo"]);
 const RECOGNITION_SOURCES: ReadonlySet<unknown> = new Set([
   "explicit_user_statement",
   "deterministic_core",
@@ -375,13 +381,13 @@ const checkArray = (value: unknown, path: string, nonEmpty: boolean): SafeArray 
 
 const validateStringArray = (
   value: unknown,
-  allowed: ReadonlySet<unknown>,
+  isAllowed: (item: unknown) => boolean,
   path: string,
   nonEmpty: boolean,
 ): Failure | undefined => {
   const array = checkArray(value, path, nonEmpty);
   if (isFailure(array)) return array;
-  const invalidIndex = array.values.findIndex((item) => !allowed.has(item));
+  const invalidIndex = array.values.findIndex((item) => !isAllowed(item));
   return invalidIndex < 0 ? undefined : fail("invalid_value", `${path}[${invalidIndex}]`);
 };
 
@@ -397,15 +403,9 @@ const validateConcept = (value: unknown, path: string): Failure | undefined => {
   if (!RECOGNITION_SOURCES.has(object.recognitionSource)) {
     return fail("invalid_value", `${path}.recognitionSource`);
   }
-  const expected =
-    object.conceptKey === "engine_oil"
-      ? ["oleo_motor"]
-      : object.conceptKey === "engine_oil_filter"
-        ? ["filtro_oleo"]
-        : object.conceptKey === "brake_pads" || object.conceptKey === "multimedia_system"
-          ? []
-          : undefined;
-  if (expected === undefined) return fail("invalid_value", `${path}.conceptKey`);
+  const definition = findExpenseSemanticConcept(object.conceptKey);
+  if (definition === undefined) return fail("invalid_value", `${path}.conceptKey`);
+  const expected = definition.relatedItemKeys;
   const related = checkArray(object.relatedItemKeys, `${path}.relatedItemKeys`, false);
   if (isFailure(related)) return related;
   if (
@@ -456,7 +456,7 @@ const validateFutureEffect = (value: unknown, path: string): Failure | undefined
   }
   const keysFailure = validateStringArray(
     object.executedItemKeys,
-    ITEM_KEYS,
+    isExpenseSemanticItemKey,
     `${path}.executedItemKeys`,
     true,
   );

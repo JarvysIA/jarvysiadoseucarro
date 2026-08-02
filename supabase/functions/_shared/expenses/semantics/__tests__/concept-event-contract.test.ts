@@ -3,6 +3,12 @@ import {
   validateConceptEventOccurrence,
   type ConceptEventOccurrence,
 } from "../concept-event-contract.ts";
+import {
+  EXPENSE_SEMANTIC_ALIASES,
+  EXPENSE_SEMANTIC_CONCEPT_REGISTRY,
+  findExpenseSemanticConcept,
+  isExpenseSemanticItemKey,
+} from "../registry.ts";
 
 const noTechnicalEffect = { status: "none", executedItemKeys: [] } as const;
 const futureEffect = (
@@ -105,30 +111,129 @@ describe("concept-event validator — entradas e allowlists", () => {
     it(`rejeita ${name}`, () => expectInvalid(input, code, path));
   }
 
-  it("rejeita conceito inválido", () => {
-    const input = valid();
-    expectInvalid({
-      ...input,
-      concepts: [{ concept: { ...engineOil, conceptKey: "tires" }, events: [service] }],
-    });
-  });
+  const approvedConcepts = [
+    ["engine_oil", ["oleo_motor"]],
+    ["engine_oil_filter", ["filtro_oleo"]],
+    ["tires", []],
+    ["multimedia_system", []],
+    ["transmission_fluid", []],
+    ["brake_pads", []],
+  ] as const;
 
-  it("rejeita itemKey inválida", () => {
+  for (const [conceptKey, relatedItemKeys] of approvedConcepts) {
+    it(`aceita o conceito canônico ${conceptKey}`, () => {
+      const input = valid();
+      expect(
+        validate({
+          ...input,
+          concepts: [
+            {
+              concept: {
+                conceptKey,
+                recognitionSource: "explicit_user_statement",
+                relatedItemKeys,
+              },
+              events: [service],
+            },
+          ],
+        }).valid,
+      ).toBe(true);
+    });
+  }
+
+  for (const conceptKey of [
+    "unknown_concept",
+    "generic_revision_service",
+    "transmission_filter",
+  ] as const) {
+    it(`rejeita o conceito não aprovado ${conceptKey}`, () => {
+      const input = valid();
+      expectInvalid({
+        ...input,
+        concepts: [{ concept: { ...engineOil, conceptKey }, events: [service] }],
+      });
+    });
+  }
+
+  it("rejeita alias no lugar do conceito canônico", () => {
     const input = valid();
     expectInvalid({
       ...input,
       concepts: [
         {
-          ...input.concepts[0],
-          events: [
-            {
-              ...service,
-              technicalEffect: { ...service.technicalEffect, executedItemKeys: ["inventada"] },
-            },
-          ],
+          concept: { ...engineOil, conceptKey: EXPENSE_SEMANTIC_ALIASES.engineOil[0] },
+          events: [service],
         },
       ],
     });
+  });
+
+  it("mantém ordem determinística e metadados sem autoridade textual", () => {
+    expect(EXPENSE_SEMANTIC_CONCEPT_REGISTRY).toEqual(
+      approvedConcepts.map(([conceptKey, relatedItemKeys]) => ({ conceptKey, relatedItemKeys })),
+    );
+    expect(Object.isFrozen(EXPENSE_SEMANTIC_CONCEPT_REGISTRY)).toBe(true);
+    for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
+      expect(Object.keys(definition)).toEqual(["conceptKey", "relatedItemKeys"]);
+      expect(Object.isFrozen(definition)).toBe(true);
+      expect(Object.isFrozen(definition.relatedItemKeys)).toBe(true);
+    }
+    expect(findExpenseSemanticConcept(EXPENSE_SEMANTIC_ALIASES.engineOil[0])).toBeUndefined();
+  });
+
+  for (const itemKey of ["oleo_motor", "filtro_oleo"] as const) {
+    it(`aceita a item key S3 ${itemKey}`, () => {
+      expect(isExpenseSemanticItemKey(itemKey)).toBe(true);
+      const input = valid();
+      expect(
+        validate({
+          ...input,
+          concepts: [
+            {
+              ...input.concepts[0],
+              events: [
+                {
+                  ...service,
+                  technicalEffect: { ...service.technicalEffect, executedItemKeys: [itemKey] },
+                },
+              ],
+            },
+          ],
+        }).valid,
+      ).toBe(true);
+    });
+  }
+
+  for (const itemKey of ["inventada", "oleo_cambio_automatico"] as const) {
+    it(`rejeita a item key não aprovada ${itemKey}`, () => {
+      const input = valid();
+      expectInvalid({
+        ...input,
+        concepts: [
+          {
+            ...input.concepts[0],
+            events: [
+              {
+                ...service,
+                technicalEffect: { ...service.technicalEffect, executedItemKeys: [itemKey] },
+              },
+            ],
+          },
+        ],
+      });
+    });
+  }
+
+  it("mantém aiAuthority fechada em none", () => {
+    expectInvalid({ ...valid(), aiAuthority: "ai_suggestion" }, "invalid_value", "$.aiAuthority");
+  });
+
+  it("mantém runtimeIntegration fechada em disconnected", () => {
+    expectInvalid(
+      { ...valid(), runtimeIntegration: "whatsapp" },
+      "invalid_value",
+      "$.runtimeIntegration",
+    );
   });
 });
 
