@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
+    "typecheck:expense-concept-event-contract": "tsc -p tsconfig.expense-concept-event-contract.json",
     "test:db:guard": "bun test scripts/test-db/guard.test.ts",
     "test:db:smoke": "bun run scripts/test-db/smoke.ts",
     "test:db:mj1a-v-c1": "bun test supabase/tests/mj1a-v/c1-enqueue-concurrent.test.ts",
