@@ -1,336 +1,271 @@
 import type {
-  CompletedInspectionEvent,
-  ConceptEvent,
-  ConceptEventOccurrence,
-  ConfirmedCompletedServiceEvent,
-  FutureIntentEvent,
-  FutureScheduleEffectCandidate,
-  InstallationEvent,
-  NoTechnicalEffect,
-  PurchaseEvent,
-  QuoteEvent,
+  ConceptRecognitionSource,
+  ExpenseSemanticOccurrence,
   RecognizedAutomotiveConcept,
+  SemanticFinancialValue,
 } from "../concept-event-contract.ts";
-import type { ExpenseSemanticItemKey } from "../types.ts";
+import type { ExpenseSemanticConceptKey } from "../registry.ts";
+import type { ExpenseSemanticCategory, ExpenseSemanticItemKey } from "../types.ts";
 
-const none = { status: "none", executedItemKeys: [] } as const satisfies NoTechnicalEffect;
-const effect = {
-  status: "eligible_for_future_schedule_effect",
-  executedItemKeys: ["oleo_motor"],
-  authorization: "requires_deterministic_engine_validation",
-  activation: "not_applied",
-} as const satisfies FutureScheduleEffectCandidate;
-const validPurchase = {
-  kind: "purchase",
-  completion: "completed",
-  technicalEffect: none,
-} as const satisfies PurchaseEvent;
-const validService = {
-  kind: "completed_service",
-  serviceKind: "replacement",
-  completion: "explicitly_confirmed",
-  technicalEffect: effect,
-} as const satisfies ConfirmedCompletedServiceEvent;
-const validMixedContract = {
-  contractVersion: "p0_3b_s3_1",
-  concepts: [
-    {
-      concept: {
-        conceptKey: "engine_oil",
-        recognitionSource: "deterministic_core",
-        relatedItemKeys: ["oleo_motor"],
-      },
-      events: [validPurchase, validService],
-    },
-    {
-      concept: {
-        conceptKey: "multimedia_system",
-        recognitionSource: "explicit_user_statement",
-        relatedItemKeys: [],
-      },
-      events: [
-        validPurchase,
-        { kind: "installation", completion: "confirmed_completed", technicalEffect: none },
-      ],
-    },
-  ],
-  financialOccurrence: {
-    status: "present",
-    occurrenceCount: 1,
-    amount: {
-      kind: "single_user_declared_total",
-      declaredAmount: 2200,
-      allocation: "undivided",
-    },
-  },
+const declared = {
+  status: "declared_positive",
+  declaredAmount: 120,
+} as const satisfies SemanticFinancialValue;
+const zero = {
+  status: "confirmed_zero_cost",
+  declaredAmount: 0,
+} as const satisfies SemanticFinancialValue;
+const notInformed = { status: "not_informed" } as const satisfies SemanticFinancialValue;
+
+const engineOil = {
+  conceptKey: "engine_oil",
+  recognitionSource: "deterministic_core",
+  relatedItemKeys: ["oleo_motor"],
+} as const satisfies RecognizedAutomotiveConcept;
+const engineOilFilter = {
+  conceptKey: "engine_oil_filter",
+  recognitionSource: "explicit_user_statement",
+  relatedItemKeys: ["filtro_oleo"],
+} as const satisfies RecognizedAutomotiveConcept;
+
+const valid: ExpenseSemanticOccurrence = {
+  contractVersion: "p0_3b_s3_3",
+  concepts: [engineOil, engineOilFilter],
+  category: "Revisão",
+  description: "Compra de óleo e filtro",
+  financialValue: declared,
   aiAuthority: "none",
   runtimeIntegration: "disconnected",
-} as const satisfies ConceptEventOccurrence;
+};
+const emptyConcepts = { ...valid, concepts: [] } as const satisfies ExpenseSemanticOccurrence;
 
-const purchaseWithEffectSource = { ...validPurchase, technicalEffect: effect } as const;
-// @ts-expect-error compra aceita somente NoTechnicalEffect.
-const purchaseWithEffect: PurchaseEvent = purchaseWithEffectSource;
-
-const purchaseWithExecutedItemSource = {
-  ...validPurchase,
-  executedItemKeys: ["oleo_motor"],
-} as const;
-// @ts-expect-error executedItemKeys não pode existir fora de technicalEffect.
-const purchaseWithExecutedItem: PurchaseEvent = purchaseWithExecutedItemSource;
-
-const contextualPurchaseWithLegacyField = {
-  kind: "purchase",
-  completion: "completed",
-  technicalEffect: none,
-  // @ts-expect-error serviceCompleted legado é proibido no acontecimento.
-  serviceCompleted: true,
-} satisfies PurchaseEvent;
-
-const indirectPurchaseWithLegacyFieldSource = {
-  ...validPurchase,
-  serviceCompleted: true,
-} as const;
-// @ts-expect-error serviceCompleted também é bloqueado por atribuição indireta.
-const indirectPurchaseWithLegacyField: PurchaseEvent = indirectPurchaseWithLegacyFieldSource;
-
-const indirectPurchaseOperationalField = { ...validPurchase, vehicleId: "vehicle-1" } as const;
-// @ts-expect-error campos operacionais são bloqueados também por atribuição indireta.
-const purchaseWithIndirectOperationalField: PurchaseEvent = indirectPurchaseOperationalField;
-
-const contextualPurchaseOperationalField = {
-  kind: "purchase",
-  completion: "completed",
-  technicalEffect: none,
-  // @ts-expect-error campo operacional é bloqueado em literal contextualizado.
-  vehicleId: "vehicle-1",
-} satisfies PurchaseEvent;
-
-const purchaseWithUndefinedVehicleSource = { ...validPurchase, vehicleId: undefined } as const;
-// @ts-expect-error vehicleId is forbidden even when explicitly undefined.
-const purchaseWithUndefinedVehicle: PurchaseEvent = purchaseWithUndefinedVehicleSource;
-
-const purchaseWithUndefinedServiceCompletedSource = {
-  ...validPurchase,
-  serviceCompleted: undefined,
-} as const;
-// @ts-expect-error serviceCompleted is forbidden even when explicitly undefined.
-const purchaseWithUndefinedServiceCompleted: PurchaseEvent =
-  purchaseWithUndefinedServiceCompletedSource;
-
-const purchaseWithUndefinedAmountSource = { ...validPurchase, amount: undefined } as const;
-// @ts-expect-error amount cannot exist on an event, including as undefined.
-const purchaseWithUndefinedAmount: PurchaseEvent = purchaseWithUndefinedAmountSource;
-
-const purchaseWithUndefinedItemsSource = {
-  ...validPurchase,
-  executedItemKeys: undefined,
-} as const;
-// @ts-expect-error executedItemKeys outside technicalEffect is forbidden as undefined.
-const purchaseWithUndefinedItems: PurchaseEvent = purchaseWithUndefinedItemsSource;
-
-const purchaseWithUndefinedSchedule = {
-  kind: "purchase",
-  completion: "completed",
-  technicalEffect: none,
-  scheduleUpdated: undefined,
-  // @ts-expect-error scheduleUpdated is forbidden in a contextual literal as undefined.
-} satisfies PurchaseEvent;
-
-const quoteWithEffectSource = {
-  kind: "quote",
-  completion: "proposal_only",
-  technicalEffect: effect,
-} as const;
-// @ts-expect-error orçamento não produz efeito técnico.
-const quoteWithEffect: QuoteEvent = quoteWithEffectSource;
-
-const futureIntentWithEffectSource = {
-  kind: "future_intent",
-  completion: "not_started",
-  technicalEffect: effect,
-} as const;
-// @ts-expect-error intenção futura não produz efeito técnico.
-const futureIntentWithEffect: FutureIntentEvent = futureIntentWithEffectSource;
-
-const installationWithEffectSource = {
-  kind: "installation",
-  completion: "confirmed_completed",
-  technicalEffect: effect,
-} as const;
-// @ts-expect-error instalação permanece sem efeito técnico.
-const installationWithEffect: InstallationEvent = installationWithEffectSource;
-
-const inspectionAsReplacementSource = {
-  kind: "completed_inspection",
-  completion: "confirmed_completed",
-  technicalEffect: none,
-  serviceKind: "replacement",
-} as const;
-// @ts-expect-error inspeção não pode declarar substituição.
-const inspectionAsReplacement: CompletedInspectionEvent = inspectionAsReplacementSource;
-
-const serviceWithNoEffectSource = { ...validService, technicalEffect: none } as const;
-// @ts-expect-error completed_service exige FutureScheduleEffectCandidate.
-const serviceWithNoEffect: ConfirmedCompletedServiceEvent = serviceWithNoEffectSource;
-
-const serviceWithEmptyItemsSource = {
-  ...validService,
-  technicalEffect: { ...effect, executedItemKeys: [] },
-} as const;
-// @ts-expect-error completed_service exige executedItemKeys não vazio.
-const serviceWithEmptyItems: ConfirmedCompletedServiceEvent = serviceWithEmptyItemsSource;
-
-const serviceWithoutAuthorizationSource = {
-  kind: "completed_service",
-  serviceKind: "replacement",
-  completion: "explicitly_confirmed",
-  technicalEffect: {
-    status: "eligible_for_future_schedule_effect",
-    executedItemKeys: ["oleo_motor"],
-    activation: "not_applied",
-  },
-} as const;
-// @ts-expect-error autorização determinística é obrigatória.
-const serviceWithoutAuthorization: ConfirmedCompletedServiceEvent =
-  serviceWithoutAuthorizationSource;
-
-const appliedServiceSource = {
-  ...validService,
-  technicalEffect: { ...effect, activation: "applied" },
-} as const;
-// @ts-expect-error o contrato nunca representa efeito já aplicado.
-const appliedService: ConfirmedCompletedServiceEvent = appliedServiceSource;
-
-const aiAuthorizedEffectSource = { ...effect, authorization: "ai_suggestion" } as const;
-// @ts-expect-error a IA não possui autoridade para autorizar efeito técnico.
-const aiAuthorizedEffect: FutureScheduleEffectCandidate = aiAuthorizedEffectSource;
-
-const eventWithTopLevelItemsSource = { ...validService, executedItemKeys: ["oleo_motor"] } as const;
-// @ts-expect-error executedItemKeys de serviço também existe somente em technicalEffect.
-const eventWithTopLevelItems: ConceptEvent = eventWithTopLevelItemsSource;
-
-const eventWithAmountSource = { ...validPurchase, amount: 100 } as const;
-// @ts-expect-error valor pertence exclusivamente à ocorrência financeira.
-const eventWithAmount: PurchaseEvent = eventWithAmountSource;
-
-const eventWithAllocationSource = { ...validPurchase, allocation: "undivided" } as const;
-// @ts-expect-error alocação financeira não pertence ao acontecimento.
-const eventWithAllocation: PurchaseEvent = eventWithAllocationSource;
-
-type EventKind = ConceptEvent["kind"];
-type RecognitionSource = RecognizedAutomotiveConcept["recognitionSource"];
-type ConceptKey = RecognizedAutomotiveConcept["conceptKey"];
-type AcceptEventKind<T extends EventKind> = T;
-type AcceptRecognitionSource<T extends RecognitionSource> = T;
-type AcceptConceptKey<T extends ConceptKey> = T;
+type FinancialStatus = SemanticFinancialValue["status"];
+type AcceptFinancialStatus<T extends FinancialStatus> = T;
+type AcceptCategory<T extends ExpenseSemanticCategory> = T;
+type AcceptRecognitionSource<T extends ConceptRecognitionSource> = T;
+type AcceptConceptKey<T extends ExpenseSemanticConceptKey> = T;
 type AcceptItemKey<T extends ExpenseSemanticItemKey> = T;
-// @ts-expect-error discriminante de acontecimento é fechado.
-type UnknownEventKind = AcceptEventKind<"payment">;
+
+type AllStatuses = [
+  AcceptFinancialStatus<"declared_positive">,
+  AcceptFinancialStatus<"confirmed_zero_cost">,
+  AcceptFinancialStatus<"not_informed">,
+];
+type AllCategories = [
+  AcceptCategory<"Revisão">,
+  AcceptCategory<"Manutenção">,
+  AcceptCategory<"Lavagem">,
+  AcceptCategory<"Combustível">,
+  AcceptCategory<"IPVA">,
+  AcceptCategory<"Multas">,
+  AcceptCategory<"Seguro">,
+  AcceptCategory<"Acessórios">,
+];
+
+// @ts-expect-error status financeiro é uma união fechada.
+type InvalidStatus = AcceptFinancialStatus<"pending">;
+// @ts-expect-error categoria é uma união fechada com exatamente oito membros.
+type InvalidCategory = AcceptCategory<"Diversos">;
 // @ts-expect-error fonte de reconhecimento não concede autoridade à IA.
-type UnknownRecognitionSource = AcceptRecognitionSource<"ai_suggestion">;
+type InvalidRecognitionSource = AcceptRecognitionSource<"ai_suggestion">;
+// @ts-expect-error conceitos pertencem à união canônica do registry.
+type InvalidConceptKey = AcceptConceptKey<"unknown_concept">;
+// @ts-expect-error item keys também permanecem fechadas no registry.
+type InvalidItemKey = AcceptItemKey<"inventada">;
 
-type EngineOilConcept = AcceptConceptKey<"engine_oil">;
-type EngineOilFilterConcept = AcceptConceptKey<"engine_oil_filter">;
-type TiresConcept = AcceptConceptKey<"tires">;
-type MultimediaConcept = AcceptConceptKey<"multimedia_system">;
-type TransmissionFluidConcept = AcceptConceptKey<"transmission_fluid">;
-type BrakePadsConcept = AcceptConceptKey<"brake_pads">;
-type EngineOilItem = AcceptItemKey<"oleo_motor">;
-type EngineOilFilterItem = AcceptItemKey<"filtro_oleo">;
-const approvedConcepts = [
-  {
-    conceptKey: "engine_oil",
-    recognitionSource: "deterministic_core",
-    relatedItemKeys: ["oleo_motor"],
-  },
-  {
-    conceptKey: "engine_oil_filter",
-    recognitionSource: "explicit_user_statement",
-    relatedItemKeys: ["filtro_oleo"],
-  },
-  { conceptKey: "tires", recognitionSource: "explicit_user_statement", relatedItemKeys: [] },
-  {
-    conceptKey: "multimedia_system",
-    recognitionSource: "explicit_user_statement",
-    relatedItemKeys: [],
-  },
-  {
-    conceptKey: "transmission_fluid",
-    recognitionSource: "deterministic_core",
-    relatedItemKeys: [],
-  },
-  { conceptKey: "brake_pads", recognitionSource: "explicit_user_statement", relatedItemKeys: [] },
-] as const satisfies readonly RecognizedAutomotiveConcept[];
-// @ts-expect-error conceito desconhecido não entra na união canônica.
-type UnknownConcept = AcceptConceptKey<"unknown_concept">;
-// @ts-expect-error revisão genérica permanece fora do contrato S3.
-type GenericRevisionConcept = AcceptConceptKey<"generic_revision_service">;
-// @ts-expect-error filtro de transmissão não foi aprovado.
-type TransmissionFilterConcept = AcceptConceptKey<"transmission_filter">;
-// @ts-expect-error alias textual não pertence à união canônica.
-type ConceptAlias = AcceptConceptKey<"oleo do motor">;
-// @ts-expect-error a união conceitual não se abre para string.
-type OpenConceptString = AcceptConceptKey<string>;
-// @ts-expect-error item key desconhecida permanece fechada.
-type UnknownItemKey = AcceptItemKey<"inventada">;
-// @ts-expect-error item do catálogo amplo não entra automaticamente no S3.
-type BroadMaintenanceItemKey = AcceptItemKey<"oleo_cambio_automatico">;
+const zeroWithPositiveAmountSource = {
+  status: "confirmed_zero_cost",
+  declaredAmount: 1,
+} as const;
+// @ts-expect-error confirmed_zero_cost exige o literal zero.
+const zeroWithPositiveAmount: SemanticFinancialValue = zeroWithPositiveAmountSource;
 
-const invalidConceptKeySource = {
+const notInformedWithAmountSource = {
+  status: "not_informed",
+  declaredAmount: 0,
+} as const;
+// @ts-expect-error not_informed não carrega declaredAmount.
+const notInformedWithAmount: SemanticFinancialValue = notInformedWithAmountSource;
+
+const declaredWithoutAmountSource = { status: "declared_positive" } as const;
+// @ts-expect-error declared_positive exige declaredAmount.
+const declaredWithoutAmount: SemanticFinancialValue = declaredWithoutAmountSource;
+
+const unknownConceptSource = {
   conceptKey: "unknown_concept",
   recognitionSource: "deterministic_core",
   relatedItemKeys: [],
 } as const;
-// @ts-expect-error conceito desconhecido não entra na união fechada.
-const invalidConceptKey: RecognizedAutomotiveConcept = invalidConceptKeySource;
+// @ts-expect-error conceito desconhecido não entra na união canônica.
+const unknownConcept: RecognizedAutomotiveConcept = unknownConceptSource;
 
-const dividedAmountSource = {
-  status: "present",
-  occurrenceCount: 1,
-  amount: {
-    kind: "single_user_declared_total",
-    declaredAmount: 100,
-    allocation: "split_by_concept",
-  },
+const mismatchedRelatedItemsSource = {
+  ...engineOil,
+  relatedItemKeys: ["filtro_oleo"],
 } as const;
-// @ts-expect-error rateio por conceito é proibido.
-const dividedAmount: ConceptEventOccurrence["financialOccurrence"] = dividedAmountSource;
+// @ts-expect-error relatedItemKeys deve corresponder exatamente ao conceito no registry.
+const mismatchedRelatedItems: RecognizedAutomotiveConcept = mismatchedRelatedItemsSource;
 
-declare const readonlyContract: ConceptEventOccurrence;
+const invalidSourceConceptSource = {
+  ...engineOil,
+  recognitionSource: "ai_suggestion",
+} as const;
+// @ts-expect-error recognitionSource é uma união fechada.
+const invalidSourceConcept: RecognizedAutomotiveConcept = invalidSourceConceptSource;
+
+const missingRecognitionSourceSource = {
+  conceptKey: "engine_oil",
+  relatedItemKeys: ["oleo_motor"],
+} as const;
+// @ts-expect-error recognitionSource é obrigatório em cada conceito reconhecido.
+const missingRecognitionSource: RecognizedAutomotiveConcept = missingRecognitionSourceSource;
+
+const missingConceptKeySource = {
+  recognitionSource: "deterministic_core",
+  relatedItemKeys: ["oleo_motor"],
+} as const;
+// @ts-expect-error conceptKey é obrigatório em cada conceito reconhecido.
+const missingConceptKey: RecognizedAutomotiveConcept = missingConceptKeySource;
+
+const oldVersionSource = { ...valid, contractVersion: "p0_3b_s3_1" } as const;
+// @ts-expect-error S3.1 foi substituído definitivamente.
+const oldVersion: ExpenseSemanticOccurrence = oldVersionSource;
+
+const connectedRuntimeSource = { ...valid, runtimeIntegration: "connected" } as const;
+// @ts-expect-error o contrato permanece desconectado.
+const connectedRuntime: ExpenseSemanticOccurrence = connectedRuntimeSource;
+
+const aiAuthorizedSource = { ...valid, aiAuthority: "persist_expense" } as const;
+// @ts-expect-error nenhuma autoridade da IA é permitida.
+const aiAuthorized: ExpenseSemanticOccurrence = aiAuthorizedSource;
+
+const legacyAuthoritySource = { ...valid, operationalAuthority: "none" } as const;
+// @ts-expect-error operationalAuthority não pertence ao contrato aprovado.
+const legacyAuthority: ExpenseSemanticOccurrence = legacyAuthoritySource;
+
+const missingAiAuthoritySource = {
+  contractVersion: valid.contractVersion,
+  concepts: valid.concepts,
+  category: valid.category,
+  description: valid.description,
+  financialValue: valid.financialValue,
+  runtimeIntegration: valid.runtimeIntegration,
+} as const;
+// @ts-expect-error aiAuthority é obrigatório.
+const missingAiAuthority: ExpenseSemanticOccurrence = missingAiAuthoritySource;
+
+const forbiddenEventSource = { ...valid, events: [{ kind: "purchase" }] } as const;
+// @ts-expect-error eventos estruturados não pertencem ao S3.3.
+const forbiddenEvent: ExpenseSemanticOccurrence = forbiddenEventSource;
+
+const forbiddenKmSource = { ...valid, km: 89_000 } as const;
+// @ts-expect-error KM não pertence ao S3.3.
+const forbiddenKm: ExpenseSemanticOccurrence = forbiddenKmSource;
+
+const forbiddenQuantitySource = { ...valid, quantity: 4 } as const;
+// @ts-expect-error quantidade permanece somente na descrição.
+const forbiddenQuantity: ExpenseSemanticOccurrence = forbiddenQuantitySource;
+
+const forbiddenTitleSource = { ...valid, title: "Óleo" } as const;
+// @ts-expect-error title foi substituído por description obrigatória.
+const forbiddenTitle: ExpenseSemanticOccurrence = forbiddenTitleSource;
+
+const forbiddenEffectSource = { ...valid, technicalEffect: { status: "none" } } as const;
+// @ts-expect-error efeitos técnicos não pertencem ao contrato.
+const forbiddenEffect: ExpenseSemanticOccurrence = forbiddenEffectSource;
+
+const forbiddenLinkSource = { ...valid, linkedExpenseId: "expense-1" } as const;
+// @ts-expect-error ocorrências independentes não vinculam despesas.
+const forbiddenLink: ExpenseSemanticOccurrence = forbiddenLinkSource;
+
+const conceptAmountSource = { ...engineOil, amount: 120 } as const;
+// @ts-expect-error o conceito reconhecido não carrega valor financeiro.
+const conceptAmount: RecognizedAutomotiveConcept = conceptAmountSource;
+
+const conceptVehicleSource = { ...engineOil, vehicleId: "vehicle-1" } as const;
+// @ts-expect-error o conceito reconhecido não carrega autoridade operacional.
+const conceptVehicle: RecognizedAutomotiveConcept = conceptVehicleSource;
+
+const aliasConceptKeySource = {
+  conceptKey: "oleo do motor",
+  recognitionSource: "deterministic_core",
+  relatedItemKeys: ["oleo_motor"],
+} as const;
+// @ts-expect-error alias textual não substitui a chave canônica do registry.
+const aliasConceptKey: RecognizedAutomotiveConcept = aliasConceptKeySource;
+
+const missingDescriptionSource = {
+  contractVersion: valid.contractVersion,
+  concepts: valid.concepts,
+  category: valid.category,
+  financialValue: valid.financialValue,
+  aiAuthority: valid.aiAuthority,
+  runtimeIntegration: valid.runtimeIntegration,
+} as const;
+// @ts-expect-error description é obrigatória.
+const missingDescription: ExpenseSemanticOccurrence = missingDescriptionSource;
+
+const invalidDescriptionTypeSource = { ...valid, description: 123 } as const;
+// @ts-expect-error description deve ser string.
+const invalidDescriptionType: ExpenseSemanticOccurrence = invalidDescriptionTypeSource;
+
+const forbiddenPersistableSource = { ...valid, persistable: true } as const;
+// @ts-expect-error persistable não pertence ao contrato S3.3.
+const forbiddenPersistable: ExpenseSemanticOccurrence = forbiddenPersistableSource;
+
+const forbiddenServiceCompletedSource = { ...valid, serviceCompleted: true } as const;
+// @ts-expect-error serviceCompleted legado não pertence ao contrato S3.3.
+const forbiddenServiceCompleted: ExpenseSemanticOccurrence = forbiddenServiceCompletedSource;
+
+declare const readonlyOccurrence: ExpenseSemanticOccurrence;
+declare const readonlyFinancialValue: SemanticFinancialValue;
+declare const readonlyConcept: RecognizedAutomotiveConcept;
 function assertReadonly(): void {
-  // @ts-expect-error contrato é readonly.
-  readonlyContract.aiAuthority = "none";
-  // @ts-expect-error conceitos são readonly.
-  readonlyContract.concepts.push(readonlyContract.concepts[0]);
+  // @ts-expect-error ocorrência é readonly.
+  readonlyOccurrence.description = "alterada";
+  // @ts-expect-error lista de conceitos é readonly.
+  readonlyOccurrence.concepts.push(engineOil);
+  // @ts-expect-error valor financeiro é readonly.
+  readonlyFinancialValue.status = "not_informed";
+  // @ts-expect-error estrutura reconhecida é readonly.
+  readonlyConcept.conceptKey = "tires";
+  // @ts-expect-error relatedItemKeys é readonly.
+  readonlyConcept.relatedItemKeys.push("oleo_motor");
 }
 
-void validMixedContract;
-void purchaseWithEffect;
-void purchaseWithExecutedItem;
-void contextualPurchaseWithLegacyField;
-void indirectPurchaseWithLegacyField;
-void purchaseWithIndirectOperationalField;
-void contextualPurchaseOperationalField;
-void purchaseWithUndefinedVehicle;
-void purchaseWithUndefinedServiceCompleted;
-void purchaseWithUndefinedAmount;
-void purchaseWithUndefinedItems;
-void purchaseWithUndefinedSchedule;
-void quoteWithEffect;
-void futureIntentWithEffect;
-void installationWithEffect;
-void inspectionAsReplacement;
-void serviceWithNoEffect;
-void serviceWithEmptyItems;
-void serviceWithoutAuthorization;
-void appliedService;
-void aiAuthorizedEffect;
-void eventWithTopLevelItems;
-void eventWithAmount;
-void eventWithAllocation;
-void invalidConceptKey;
-void dividedAmount;
+void zero;
+void notInformed;
+void emptyConcepts;
+void zeroWithPositiveAmount;
+void notInformedWithAmount;
+void declaredWithoutAmount;
+void unknownConcept;
+void mismatchedRelatedItems;
+void invalidSourceConcept;
+void missingRecognitionSource;
+void missingConceptKey;
+void oldVersion;
+void connectedRuntime;
+void aiAuthorized;
+void legacyAuthority;
+void missingAiAuthority;
+void forbiddenEvent;
+void forbiddenKm;
+void forbiddenQuantity;
+void forbiddenTitle;
+void forbiddenEffect;
+void forbiddenLink;
+void conceptAmount;
+void conceptVehicle;
+void aliasConceptKey;
+void missingDescription;
+void invalidDescriptionType;
+void forbiddenPersistable;
+void forbiddenServiceCompleted;
 void assertReadonly;
-void approvedConcepts;
+declare const allStatuses: AllStatuses;
+declare const allCategories: AllCategories;
+void allStatuses;
+void allCategories;
 
 export {};
