@@ -1,986 +1,367 @@
 import { describe, expect, it } from "bun:test";
 import {
-  validateConceptEventOccurrence,
-  type ConceptEventOccurrence,
+  validateExpenseSemanticOccurrence,
+  type ExpenseSemanticOccurrence,
 } from "../concept-event-contract.ts";
-import {
-  EXPENSE_SEMANTIC_ALIASES,
-  EXPENSE_SEMANTIC_CONCEPT_REGISTRY,
-  findExpenseSemanticConcept,
-  isExpenseSemanticItemKey,
-} from "../registry.ts";
+import { EXPENSE_SEMANTIC_CONCEPT_REGISTRY, findExpenseSemanticConcept } from "../registry.ts";
+import { EXPENSE_SEMANTIC_CATEGORIES } from "../types.ts";
 
-const noTechnicalEffect = { status: "none", executedItemKeys: [] } as const;
-const futureEffect = (
-  executedItemKeys: readonly ["oleo_motor" | "filtro_oleo", ...("oleo_motor" | "filtro_oleo")[]],
-) => ({
-  status: "eligible_for_future_schedule_effect" as const,
-  executedItemKeys,
-  authorization: "requires_deterministic_engine_validation" as const,
-  activation: "not_applied" as const,
-});
-const purchase = {
-  kind: "purchase",
-  completion: "completed",
-  technicalEffect: noTechnicalEffect,
-} as const;
-const quote = {
-  kind: "quote",
-  completion: "proposal_only",
-  technicalEffect: noTechnicalEffect,
-} as const;
-const futureIntent = {
-  kind: "future_intent",
-  completion: "not_started",
-  technicalEffect: noTechnicalEffect,
-} as const;
-const installation = {
-  kind: "installation",
-  completion: "confirmed_completed",
-  technicalEffect: noTechnicalEffect,
-} as const;
-const inspection = {
-  kind: "completed_inspection",
-  completion: "confirmed_completed",
-  technicalEffect: noTechnicalEffect,
-} as const;
-const service = {
-  kind: "completed_service",
-  serviceKind: "replacement",
-  completion: "explicitly_confirmed",
-  technicalEffect: futureEffect(["oleo_motor"]),
-} as const;
 const engineOil = {
   conceptKey: "engine_oil",
   recognitionSource: "deterministic_core",
   relatedItemKeys: ["oleo_motor"],
 } as const;
-const multimedia = {
-  conceptKey: "multimedia_system",
+const engineOilFilter = {
+  conceptKey: "engine_oil_filter",
+  recognitionSource: "explicit_user_statement",
+  relatedItemKeys: ["filtro_oleo"],
+} as const;
+const tires = {
+  conceptKey: "tires",
   recognitionSource: "explicit_user_statement",
   relatedItemKeys: [],
 } as const;
-const present = (declaredAmount = 450) => ({
-  status: "present" as const,
-  occurrenceCount: 1 as const,
-  amount: {
-    kind: "single_user_declared_total" as const,
-    declaredAmount,
-    allocation: "undivided" as const,
-  },
-});
-const valid = (): ConceptEventOccurrence => ({
-  contractVersion: "p0_3b_s3_1",
-  concepts: [{ concept: engineOil, events: [service] }],
-  financialOccurrence: present(),
+const brakePads = {
+  conceptKey: "brake_pads",
+  recognitionSource: "explicit_user_statement",
+  relatedItemKeys: [],
+} as const;
+
+const valid = (): ExpenseSemanticOccurrence => ({
+  contractVersion: "p0_3b_s3_3",
+  concepts: [engineOil, engineOilFilter],
+  category: "Revisão",
+  description: "Compra de óleo e filtro do motor",
+  financialValue: { status: "declared_positive", declaredAmount: 120 },
   aiAuthority: "none",
   runtimeIntegration: "disconnected",
 });
-const validate = (value: unknown) => validateConceptEventOccurrence(value);
-const expectInvalid = (value: unknown, code?: string, path?: string) => {
-  const result = validate(value);
+
+const expectInvalid = (value: unknown, code?: string, path?: string): void => {
+  const result = validateExpenseSemanticOccurrence(value);
   expect(result.valid).toBe(false);
-  if (result.valid === false) {
-    if (code) expect(result.error.code).toBe(code);
-    if (path) expect(result.error.path).toBe(path);
+  if (!result.valid) {
+    if (code !== undefined) expect(result.error.code).toBe(code);
+    if (path !== undefined) expect(result.error.path).toBe(path);
   }
 };
 
-describe("concept-event validator — entradas e allowlists", () => {
-  it("aceita objeto válido sem mutação", () => {
+describe("expense semantic occurrence — contrato mínimo", () => {
+  it("aceita uma ocorrência válida sem coerção nem mutação", () => {
     const input = valid();
-    const snapshot = structuredClone(input);
-    const result = validate(input);
+    const before = structuredClone(input);
+    const result = validateExpenseSemanticOccurrence(input);
     expect(result).toEqual({ valid: true, value: input });
     expect(result.valid && result.value).toBe(input);
-    expect(input).toEqual(snapshot);
+    expect(input).toEqual(before);
   });
 
-  const invalidRoots = [
-    ["null", null, "invalid_type", "$"],
-    ["array", [], "invalid_type", "$"],
-    ["propriedade desconhecida", { ...valid(), metadata: {} }, "unknown_property", "$.metadata"],
-    [
-      "discriminante desconhecido",
-      { ...valid(), contractVersion: "p0_3b_s3_2" },
-      "invalid_value",
-      "$.contractVersion",
-    ],
-  ] as const;
-  for (const [name, input, code, path] of invalidRoots) {
-    it(`rejeita ${name}`, () => expectInvalid(input, code, path));
+  it("preserva ordem, descrição literal e conceitos diferentes", () => {
+    const description = "  Compra de 4 pneus — mão de obra amanhã  ";
+    const input = {
+      ...valid(),
+      concepts: [tires, brakePads, engineOil] as const,
+      description,
+    };
+    const result = validateExpenseSemanticOccurrence(input);
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.value.concepts).toEqual([tires, brakePads, engineOil]);
+      expect(result.value.description).toBe(description);
+    }
+  });
+
+  for (const category of EXPENSE_SEMANTIC_CATEGORIES) {
+    it(`aceita a categoria fechada ${category}`, () => {
+      expect(validateExpenseSemanticOccurrence({ ...valid(), category }).valid).toBe(true);
+    });
   }
 
-  const approvedConcepts = [
-    ["engine_oil", ["oleo_motor"]],
-    ["engine_oil_filter", ["filtro_oleo"]],
-    ["tires", []],
-    ["multimedia_system", []],
-    ["transmission_fluid", []],
-    ["brake_pads", []],
-  ] as const;
-
-  for (const [conceptKey, relatedItemKeys] of approvedConcepts) {
+  for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
+    const { conceptKey, relatedItemKeys } = definition;
     it(`aceita o conceito canônico ${conceptKey}`, () => {
-      const input = valid();
-      expect(
-        validate({
-          ...input,
-          concepts: [
-            {
-              concept: {
-                conceptKey,
-                recognitionSource: "explicit_user_statement",
-                relatedItemKeys,
-              },
-              events: [service],
-            },
-          ],
-        }).valid,
-      ).toBe(true);
+      const concept = {
+        conceptKey,
+        recognitionSource: "explicit_user_statement",
+        relatedItemKeys,
+      } as const;
+      expect(validateExpenseSemanticOccurrence({ ...valid(), concepts: [concept] }).valid).toBe(
+        true,
+      );
     });
   }
 
-  for (const conceptKey of [
-    "unknown_concept",
-    "generic_revision_service",
-    "transmission_filter",
-  ] as const) {
-    it(`rejeita o conceito não aprovado ${conceptKey}`, () => {
-      const input = valid();
-      expectInvalid({
-        ...input,
-        concepts: [{ concept: { ...engineOil, conceptKey }, events: [service] }],
-      });
-    });
-  }
-
-  it("rejeita alias no lugar do conceito canônico", () => {
-    const input = valid();
-    expectInvalid({
-      ...input,
-      concepts: [
-        {
-          concept: { ...engineOil, conceptKey: EXPENSE_SEMANTIC_ALIASES.engineOil[0] },
-          events: [service],
-        },
-      ],
-    });
-  });
-
-  it("mantém ordem determinística e metadados sem autoridade textual", () => {
-    expect(EXPENSE_SEMANTIC_CONCEPT_REGISTRY).toEqual(
-      approvedConcepts.map(([conceptKey, relatedItemKeys]) => ({ conceptKey, relatedItemKeys })),
-    );
+  it("mantém allowlist, ordem e imutabilidade do registry canônico", () => {
+    expect(EXPENSE_SEMANTIC_CONCEPT_REGISTRY).toEqual([
+      { conceptKey: "engine_oil", relatedItemKeys: ["oleo_motor"] },
+      { conceptKey: "engine_oil_filter", relatedItemKeys: ["filtro_oleo"] },
+      { conceptKey: "tires", relatedItemKeys: [] },
+      { conceptKey: "multimedia_system", relatedItemKeys: [] },
+      { conceptKey: "transmission_fluid", relatedItemKeys: [] },
+      { conceptKey: "brake_pads", relatedItemKeys: [] },
+      { conceptKey: "engine_air_filter", relatedItemKeys: [] },
+      { conceptKey: "cabin_filter", relatedItemKeys: [] },
+      { conceptKey: "fuel_filter", relatedItemKeys: [] },
+      { conceptKey: "timing_kit", relatedItemKeys: [] },
+      { conceptKey: "cooling_system", relatedItemKeys: [] },
+      { conceptKey: "spark_and_injection", relatedItemKeys: [] },
+      { conceptKey: "suspension", relatedItemKeys: [] },
+      { conceptKey: "wiper_blades", relatedItemKeys: [] },
+      { conceptKey: "wheel_alignment", relatedItemKeys: [] },
+      { conceptKey: "power_steering_fluid", relatedItemKeys: [] },
+      { conceptKey: "hybrid_ecvt_diagnostic", relatedItemKeys: [] },
+    ]);
     expect(Object.isFrozen(EXPENSE_SEMANTIC_CONCEPT_REGISTRY)).toBe(true);
     for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
       expect(Object.keys(definition)).toEqual(["conceptKey", "relatedItemKeys"]);
       expect(Object.isFrozen(definition)).toBe(true);
       expect(Object.isFrozen(definition.relatedItemKeys)).toBe(true);
     }
-    expect(findExpenseSemanticConcept(EXPENSE_SEMANTIC_ALIASES.engineOil[0])).toBeUndefined();
+    expect(findExpenseSemanticConcept("oleo do motor")).toBeUndefined();
   });
 
-  for (const itemKey of ["oleo_motor", "filtro_oleo"] as const) {
-    it(`aceita a item key S3 ${itemKey}`, () => {
-      expect(isExpenseSemanticItemKey(itemKey)).toBe(true);
-      const input = valid();
-      expect(
-        validate({
-          ...input,
-          concepts: [
-            {
-              ...input.concepts[0],
-              events: [
-                {
-                  ...service,
-                  technicalEffect: { ...service.technicalEffect, executedItemKeys: [itemKey] },
-                },
-              ],
-            },
-          ],
-        }).valid,
-      ).toBe(true);
-    });
-  }
-
-  for (const itemKey of ["inventada", "oleo_cambio_automatico"] as const) {
-    it(`rejeita a item key não aprovada ${itemKey}`, () => {
-      const input = valid();
-      expectInvalid({
-        ...input,
-        concepts: [
-          {
-            ...input.concepts[0],
-            events: [
-              {
-                ...service,
-                technicalEffect: { ...service.technicalEffect, executedItemKeys: [itemKey] },
-              },
-            ],
-          },
-        ],
-      });
-    });
-  }
-
-  it("mantém aiAuthority fechada em none", () => {
-    expectInvalid({ ...valid(), aiAuthority: "ai_suggestion" }, "invalid_value", "$.aiAuthority");
+  it("aceita lista vazia", () => {
+    expect(validateExpenseSemanticOccurrence({ ...valid(), concepts: [] }).valid).toBe(true);
   });
 
-  it("mantém runtimeIntegration fechada em disconnected", () => {
+  it("rejeita conceito desconhecido e alias textual", () => {
     expectInvalid(
-      { ...valid(), runtimeIntegration: "whatsapp" },
+      { ...valid(), concepts: [{ ...engineOil, conceptKey: "unknown_concept" }] },
+      "invalid_value",
+      "$.concepts[0].conceptKey",
+    );
+    expectInvalid(
+      { ...valid(), concepts: [{ ...engineOil, conceptKey: "oleo do motor" }] },
+      "invalid_value",
+      "$.concepts[0].conceptKey",
+    );
+  });
+
+  it("rejeita metadados divergentes do registry", () => {
+    expectInvalid(
+      { ...valid(), concepts: [{ ...engineOil, relatedItemKeys: ["filtro_oleo"] }] },
+      "invalid_value",
+      "$.concepts[0].relatedItemKeys",
+    );
+    expectInvalid(
+      { ...valid(), concepts: [{ ...engineOil, recognitionSource: "ai_suggestion" }] },
+      "invalid_value",
+      "$.concepts[0].recognitionSource",
+    );
+  });
+
+  it("rejeita duplicidade sem deduplicar silenciosamente", () => {
+    const input = { ...valid(), concepts: [tires, brakePads, tires] };
+    expectInvalid(input, "duplicate_concept", "$.concepts[2]");
+    expect(input.concepts).toEqual([tires, brakePads, tires]);
+  });
+
+  it("permite o mesmo conceito em lançamentos independentes", () => {
+    const first = { ...valid(), concepts: [tires] };
+    const second = { ...valid(), concepts: [tires], description: "Nova compra de pneus" };
+    expect(validateExpenseSemanticOccurrence(first).valid).toBe(true);
+    expect(validateExpenseSemanticOccurrence(second).valid).toBe(true);
+  });
+});
+
+describe("expense semantic occurrence — descrição e valor", () => {
+  it("aceita descrição com exatamente 500 caracteres", () => {
+    expect(
+      validateExpenseSemanticOccurrence({ ...valid(), description: "x".repeat(500) }).valid,
+    ).toBe(true);
+  });
+
+  for (const description of ["", "   ", "\n\t", "x".repeat(501), null, 123]) {
+    it(`rejeita descrição inválida ${JSON.stringify(description)}`, () => {
+      expectInvalid({ ...valid(), description }, "invalid_value", "$.description");
+    });
+  }
+
+  it("aceita exatamente os três estados financeiros", () => {
+    const values = [
+      { status: "declared_positive", declaredAmount: 0.01 },
+      { status: "confirmed_zero_cost", declaredAmount: 0 },
+      { status: "not_informed" },
+    ];
+    for (const financialValue of values) {
+      expect(validateExpenseSemanticOccurrence({ ...valid(), financialValue }).valid).toBe(true);
+    }
+  });
+
+  for (const amount of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, "10", null]) {
+    it(`rejeita declared_positive inválido ${String(amount)}`, () => {
+      expectInvalid(
+        {
+          ...valid(),
+          financialValue: { status: "declared_positive", declaredAmount: amount },
+        },
+        "invalid_value",
+        "$.financialValue.declaredAmount",
+      );
+    });
+  }
+
+  it("exige zero literal no estado confirmed_zero_cost", () => {
+    expectInvalid(
+      {
+        ...valid(),
+        financialValue: { status: "confirmed_zero_cost", declaredAmount: 1 },
+      },
+      "invalid_value",
+      "$.financialValue.declaredAmount",
+    );
+  });
+
+  it("proíbe declaredAmount no estado not_informed, inclusive undefined", () => {
+    expectInvalid(
+      {
+        ...valid(),
+        financialValue: { status: "not_informed", declaredAmount: undefined },
+      },
+      "unknown_property",
+      "$.financialValue.declaredAmount",
+    );
+  });
+
+  it("não aceita coerção financeira nem status aberto", () => {
+    expectInvalid(
+      { ...valid(), financialValue: { status: "unknown" } },
+      "invalid_value",
+      "$.financialValue.status",
+    );
+  });
+});
+
+describe("expense semantic occurrence — ausência de autoridade e runtime", () => {
+  const forbiddenFields = [
+    "title",
+    "quantity",
+    "unit",
+    "events",
+    "serviceKind",
+    "completion",
+    "occurrenceCount",
+    "km",
+    "kmAtual",
+    "kmRegistro",
+    "expectedPreviousKm",
+    "vehicleId",
+    "expenseId",
+    "linkedExpenseId",
+    "technicalEffect",
+    "scheduleEffect",
+    "scheduleUpdated",
+    "cardEffect",
+    "persistable",
+    "persisted",
+  ] as const;
+
+  for (const field of forbiddenFields) {
+    it(`rejeita o campo fora de escopo ${field}`, () => {
+      expectInvalid({ ...valid(), [field]: true }, "unknown_property", `$.${field}`);
+    });
+  }
+
+  it("mantém autoridade da IA fechada em none", () => {
+    expectInvalid({ ...valid(), aiAuthority: "persist_expense" }, "invalid_value", "$.aiAuthority");
+  });
+
+  it("rejeita completamente o campo divergente operationalAuthority", () => {
+    expectInvalid(
+      { ...valid(), operationalAuthority: "none" },
+      "unknown_property",
+      "$.operationalAuthority",
+    );
+  });
+
+  it("mantém integração fechada em disconnected", () => {
+    expectInvalid(
+      { ...valid(), runtimeIntegration: "connected" },
       "invalid_value",
       "$.runtimeIntegration",
     );
   });
-});
 
-describe("concept-event validator — acontecimentos", () => {
-  it("rejeita compra com efeito técnico", () => {
-    expectInvalid({
-      ...valid(),
-      concepts: [
-        {
-          concept: engineOil,
-          events: [{ ...purchase, technicalEffect: futureEffect(["oleo_motor"]) }],
-        },
-      ],
-    });
-  });
-
-  it("rejeita compra com campo operacional proibido", () => {
+  it("rejeita versão S3.1 e categoria fora da união", () => {
     expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [{ ...purchase, vehicleId: "v1" }] }],
-      },
-      "unknown_property",
+      { ...valid(), contractVersion: "p0_3b_s3_1" },
+      "invalid_value",
+      "$.contractVersion",
     );
-  });
-
-  const invalidServices = [
-    [
-      "sem executedItemKeys",
-      {
-        ...service,
-        technicalEffect: {
-          status: "eligible_for_future_schedule_effect",
-          authorization: "requires_deterministic_engine_validation",
-          activation: "not_applied",
-        },
-      },
-    ],
-    [
-      "com array vazio",
-      { ...service, technicalEffect: { ...service.technicalEffect, executedItemKeys: [] } },
-    ],
-    ["sem confirmação explícita", { ...service, completion: "inferred" }],
-    [
-      "sem autorização determinística",
-      { ...service, technicalEffect: { ...service.technicalEffect, authorization: undefined } },
-    ],
-    [
-      "com autorização da IA",
-      {
-        ...service,
-        technicalEffect: { ...service.technicalEffect, authorization: "ai_suggestion" },
-      },
-    ],
-    [
-      "com efeito aplicado",
-      { ...service, technicalEffect: { ...service.technicalEffect, activation: "applied" } },
-    ],
-  ] as const;
-  for (const [name, invalidService] of invalidServices) {
-    it(`rejeita completed_service ${name}`, () => {
-      expectInvalid({ ...valid(), concepts: [{ concept: engineOil, events: [invalidService] }] });
-    });
-  }
-
-  it("aceita acontecimento técnico válido sem ocorrência financeira", () => {
-    const input = { ...valid(), financialOccurrence: { status: "absent", reason: "warranty" } };
-    expect(validate(input).valid).toBe(true);
+    expectInvalid({ ...valid(), category: "Diversos" }, "invalid_value", "$.category");
   });
 });
 
-describe("concept-event validator — coerência financeira", () => {
-  const presentWithoutExpense = [
-    ["orçamento isolado", [quote]],
-    ["intenção futura isolada", [futureIntent]],
-    ["orçamento e intenção futuros exclusivos", [quote, futureIntent]],
-  ] as const;
-  for (const [name, events] of presentWithoutExpense) {
-    it(`rejeita ocorrência presente com ${name}`, () => {
-      expectInvalid(
-        { ...valid(), concepts: [{ concept: engineOil, events }], financialOccurrence: present() },
-        "invalid_financial_coherence",
-      );
-    });
-  }
-
-  it("rejeita completed_service com razão quote_only", () => {
-    expectInvalid(
-      { ...valid(), financialOccurrence: { status: "absent", reason: "quote_only" } },
-      "invalid_financial_coherence",
-    );
-  });
-
-  it("rejeita compra isolada com razão warranty", () => {
-    expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [purchase] }],
-        financialOccurrence: { status: "absent", reason: "warranty" },
-      },
-      "invalid_financial_coherence",
-    );
-  });
-
-  for (const reason of [
-    "warranty",
-    "free_service",
-    "owner_performed",
-    "previously_purchased_part",
-  ] as const) {
-    it(`rejeita completed_service + purchase ausentes por ${reason}`, () => {
-      expectInvalid(
-        {
-          ...valid(),
-          concepts: [{ concept: engineOil, events: [service, purchase] }],
-          financialOccurrence: { status: "absent", reason },
-        },
-        "invalid_financial_coherence",
-        "$.financialOccurrence.reason",
-      );
-    });
-  }
-
-  it("aceita completed_service + purchase com ocorrencia financeira presente", () => {
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [service, purchase] }],
-    };
-    expect(validate(input).valid).toBe(true);
-  });
-
-  it("usa um unico snapshot do evento na matriz financeira", () => {
-    let snapshots = 0;
-    let kindDescriptorReads = 0;
-    const event = new Proxy(
-      { ...service },
-      {
-        ownKeys(target) {
-          snapshots += 1;
-          return Reflect.ownKeys(target);
-        },
-        getOwnPropertyDescriptor(target, key) {
-          const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
-          if (key !== "kind" || descriptor === undefined) return descriptor;
-          kindDescriptorReads += 1;
-          return { ...descriptor, value: snapshots >= 3 ? "quote" : "completed_service" };
-        },
-      },
-    );
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [event] }],
-      financialOccurrence: { status: "absent", reason: "quote_only" },
-    };
-    expectInvalid(input, "invalid_financial_coherence", "$.financialOccurrence.reason");
-    expect(snapshots).toBe(1);
-    expect(kindDescriptorReads).toBe(1);
-  });
-
-  const invalidAmounts = [
-    ["negativo", -1],
-    ["NaN", Number.NaN],
-    ["Infinity", Infinity],
-    ["-Infinity", -Infinity],
-  ] as const;
-  for (const [name, declaredAmount] of invalidAmounts) {
-    it(`rejeita valor ${name}`, () =>
-      expectInvalid({ ...valid(), financialOccurrence: present(declaredAmount) }));
-  }
-
-  it("rejeita ocorrência ausente carregando valor", () => {
-    expectInvalid(
-      {
-        ...valid(),
-        financialOccurrence: { status: "absent", reason: "warranty", amount: present().amount },
-      },
-      "unknown_property",
-    );
-  });
-
-  it("rejeita ocorrência presente carregando razão de ausência", () => {
-    expectInvalid(
-      { ...valid(), financialOccurrence: { ...present(), reason: "warranty" } },
-      "unknown_property",
-    );
-  });
-
-  it("rejeita occurrenceCount diferente de 1", () =>
-    expectInvalid({ ...valid(), financialOccurrence: { ...present(), occurrenceCount: 2 } }));
-  it("rejeita allocation diferente de undivided", () =>
-    expectInvalid({
-      ...valid(),
-      financialOccurrence: {
-        ...present(),
-        amount: { ...present().amount, allocation: "split_by_concept" },
-      },
-    }));
-  it("rejeita tentativa de rateio", () =>
-    expectInvalid(
-      { ...valid(), financialOccurrence: { ...present(), conceptAllocations: [{ amount: 10 }] } },
-      "unknown_property",
-    ));
-});
-
-describe("concept-event validator — preservação semântica", () => {
-  it("aceita orçamento isolado somente com ausência quote_only", () => {
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [quote] }],
-      financialOccurrence: { status: "absent", reason: "quote_only" },
-    };
-    expect(validate(input).valid).toBe(true);
-  });
-
-  it("aceita intenção futura isolada somente com ausência future_intent_only", () => {
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [futureIntent] }],
-      financialOccurrence: { status: "absent", reason: "future_intent_only" },
-    };
-    expect(validate(input).valid).toBe(true);
-  });
-
-  it("preserva inspeção concluída sem convertê-la em substituição", () => {
-    const inspection = {
-      kind: "completed_inspection",
-      completion: "confirmed_completed",
-      technicalEffect: noTechnicalEffect,
-    } as const;
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [inspection] }],
-      financialOccurrence: { status: "absent", reason: "no_completed_expense" },
-    };
-    const result = validate(input);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.value.concepts[0].events[0]).toEqual(inspection);
-  });
-
-  it("preserva múltiplos conceitos, compra e instalação e total único", () => {
-    const input = {
-      ...valid(),
-      concepts: [
-        { concept: engineOil, events: [purchase, service] },
-        {
-          concept: multimedia,
-          events: [
-            purchase,
-            {
-              kind: "installation",
-              completion: "confirmed_completed",
-              technicalEffect: noTechnicalEffect,
-            },
-          ],
-        },
-      ],
-      financialOccurrence: present(2200),
-    };
-    const result = validate(input);
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.value.concepts).toHaveLength(2);
-      expect(result.value.financialOccurrence).toEqual(present(2200));
+describe("expense semantic occurrence — fechamento adversarial", () => {
+  it("rejeita instância de classe e propriedades herdadas", () => {
+    class Occurrence {
+      contractVersion = "p0_3b_s3_3";
     }
-  });
-
-  it("aceita relato misto com orçamento e acontecimento financeiro real", () => {
-    const input = {
-      ...valid(),
-      concepts: [{ concept: engineOil, events: [purchase, quote, futureIntent] }],
-      financialOccurrence: present(280),
-    };
-    expect(validate(input).valid).toBe(true);
-  });
-
-  it("mantém relatedItemKeys distinto de executedItemKeys", () => {
-    const input = {
-      ...valid(),
-      concepts: [
-        {
-          concept: engineOil,
-          events: [{ ...service, technicalEffect: futureEffect(["filtro_oleo"]) }],
-        },
-      ],
-    };
-    const result = validate(input);
-    expect(result.valid).toBe(true);
-    if (result.valid) {
-      expect(result.value.concepts[0].concept.relatedItemKeys).toEqual(["oleo_motor"]);
-      expect(result.value.concepts[0].events[0].technicalEffect.executedItemKeys).toEqual([
-        "filtro_oleo",
-      ]);
-    }
-  });
-});
-
-describe("concept-event validator - fechamento adversarial de objetos", () => {
-  it("rejeita raiz criada por Object.create(validContract)", () => {
+    expectInvalid(new Occurrence(), "invalid_type", "$");
     expectInvalid(Object.create(valid()), "invalid_type", "$");
   });
 
-  it("rejeita raiz com campos obrigatorios herdados", () => {
-    const input = Object.create(valid()) as object;
-    Object.defineProperty(input, "aiAuthority", { value: "none", enumerable: true });
-    expectInvalid(input, "invalid_type", "$");
+  it("aceita objeto de prototype null com propriedades próprias de dados", () => {
+    const input = Object.assign(Object.create(null), valid());
+    expect(validateExpenseSemanticOccurrence(input).valid).toBe(true);
   });
 
-  const inheritedNestedCases = [
-    [
-      "conceito",
-      () => ({
-        ...valid(),
-        concepts: [{ concept: Object.create(engineOil), events: [service] }],
-      }),
-      "$.concepts[0].concept",
-    ],
-    [
-      "acontecimento",
-      () => ({
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [Object.create(service)] }],
-      }),
-      "$.concepts[0].events[0]",
-    ],
-    [
-      "technicalEffect",
-      () => ({
-        ...valid(),
-        concepts: [
-          {
-            concept: engineOil,
-            events: [{ ...service, technicalEffect: Object.create(service.technicalEffect) }],
-          },
-        ],
-      }),
-      "$.concepts[0].events[0].technicalEffect",
-    ],
-    [
-      "financialOccurrence",
-      () => ({ ...valid(), financialOccurrence: Object.create(present()) }),
-      "$.financialOccurrence",
-    ],
-    [
-      "amount",
-      () => ({
-        ...valid(),
-        financialOccurrence: { ...present(), amount: Object.create(present().amount) },
-      }),
-      "$.financialOccurrence.amount",
-    ],
-  ] as const;
-  for (const [name, makeInput, path] of inheritedNestedCases) {
-    it(`rejeita ${name} com campos obrigatorios herdados`, () => {
-      expectInvalid(makeInput(), "invalid_type", path);
-    });
-  }
-
-  it("nao confia em valid herdado por tentativa de pollution", () => {
-    const input = Object.create({ valid: true }) as Record<string, unknown>;
-    Object.assign(input, valid());
-    expectInvalid(input, "invalid_type", "$");
-  });
-
-  it("nao confunde Object.prototype.valid com resultado de validacao", () => {
-    const previous = Object.getOwnPropertyDescriptor(Object.prototype, "valid");
-    Object.defineProperty(Object.prototype, "valid", { value: true, configurable: true });
-    try {
-      expect(validate(valid()).valid).toBe(true);
-    } finally {
-      if (previous === undefined) Reflect.deleteProperty(Object.prototype, "valid");
-      else Object.defineProperty(Object.prototype, "valid", previous);
-    }
-  });
-
-  it("rejeita instancia de classe com aparencia compativel", () => {
-    class ContractLike {
-      contractVersion = "p0_3b_s3_1";
-      concepts = valid().concepts;
-      financialOccurrence = valid().financialOccurrence;
-      aiAuthority = "none";
-      runtimeIntegration = "disconnected";
-    }
-    expectInvalid(new ContractLike(), "invalid_type", "$");
-  });
-
-  it("aceita raiz de prototype null com propriedades proprias de dados", () => {
-    const input = Object.assign(Object.create(null) as Record<string, unknown>, valid());
-    const result = validate(input);
-    expect(result.valid).toBe(true);
-    if (result.valid) expect(result.value).toBe(input);
-  });
-
-  it("rejeita propriedade desconhecida nao enumeravel", () => {
-    const input = valid();
-    Object.defineProperty(input, "secret", { value: true, enumerable: false });
-    expectInvalid(input, "unknown_property", "$.secret");
-  });
-
-  it("rejeita symbol proprio desconhecido", () => {
-    const input = valid();
-    Object.defineProperty(input, Symbol("secret"), { value: true });
-    expectInvalid(input, "unknown_property", "$");
-  });
-
-  it("rejeita getter que lanca na raiz sem executa-lo", () => {
-    const input = valid();
-    let calls = 0;
-    Object.defineProperty(input, "contractVersion", {
+  it("rejeita getter sem executá-lo", () => {
+    let executed = false;
+    const input = valid() as unknown as Record<string, unknown>;
+    Object.defineProperty(input, "description", {
       enumerable: true,
       get() {
-        calls += 1;
-        throw new Error("getter executado");
+        executed = true;
+        return "descrição";
       },
     });
-    expectInvalid(input, "invalid_type", "$.contractVersion");
-    expect(calls).toBe(0);
+    expectInvalid(input, "invalid_type", "$.description");
+    expect(executed).toBe(false);
   });
 
-  it("rejeita getter que lanca em objeto aninhado sem executa-lo", () => {
-    const technicalEffect = { ...service.technicalEffect };
-    let calls = 0;
-    Object.defineProperty(technicalEffect, "authorization", {
+  it("rejeita array esparso, propriedade extra e prototype customizado", () => {
+    const sparse = [engineOil, , tires];
+    expectInvalid({ ...valid(), concepts: sparse }, "invalid_type", "$.concepts[1]");
+
+    const extra = [engineOil] as unknown as Record<string, unknown>;
+    extra.extra = true;
+    expectInvalid({ ...valid(), concepts: extra }, "unknown_property", "$.concepts.extra");
+
+    const custom = [engineOil];
+    Object.setPrototypeOf(custom, Object.create(Array.prototype));
+    expectInvalid({ ...valid(), concepts: custom }, "invalid_type", "$.concepts");
+  });
+
+  it("rejeita conceito não plano, getter e relatedItemKeys adulterado", () => {
+    expectInvalid(
+      { ...valid(), concepts: [Object.create(engineOil)] },
+      "invalid_type",
+      "$.concepts[0]",
+    );
+
+    let executed = false;
+    const getterConcept = { ...engineOil } as Record<string, unknown>;
+    Object.defineProperty(getterConcept, "conceptKey", {
       enumerable: true,
       get() {
-        calls += 1;
-        throw new Error("getter executado");
+        executed = true;
+        return "engine_oil";
       },
     });
     expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [{ ...service, technicalEffect }] }],
-      },
+      { ...valid(), concepts: [getterConcept] },
       "invalid_type",
-      "$.concepts[0].events[0].technicalEffect.authorization",
+      "$.concepts[0].conceptKey",
     );
-    expect(calls).toBe(0);
-  });
+    expect(executed).toBe(false);
 
-  it("rejeita setter/accessor em campo permitido", () => {
-    const input = valid();
-    Object.defineProperty(input, "aiAuthority", { enumerable: true, set() {} });
-    expectInvalid(input, "invalid_type", "$.aiAuthority");
-  });
-
-  const expectContainedIntrospectionFailure = (value: unknown, path: string, token: string) => {
-    const result = validate(value);
-    expect(result).toEqual({ valid: false, error: { code: "invalid_type", path } });
-    expect(JSON.stringify(result)).not.toContain(token);
-  };
-
-  it("contem excecao de getPrototypeOf de Proxy no path correspondente", () => {
-    const token = "hostile-getPrototypeOf-message-and-stack";
-    const proxy = new Proxy(valid(), {
-      getPrototypeOf() {
-        throw new Error(token);
-      },
-    });
-    expectContainedIntrospectionFailure(proxy, "$", token);
-  });
-
-  it("contem excecao de ownKeys de Proxy no path correspondente", () => {
-    const token = "hostile-ownKeys-message-and-stack";
-    const proxy = new Proxy(valid(), {
-      ownKeys() {
-        throw new Error(token);
-      },
-    });
-    expectContainedIntrospectionFailure(proxy, "$", token);
-  });
-
-  it("contem excecao de getOwnPropertyDescriptor de Proxy no path correspondente", () => {
-    const token = "hostile-getOwnPropertyDescriptor-message-and-stack";
-    const proxy = new Proxy(valid(), {
-      getOwnPropertyDescriptor() {
-        throw new Error(token);
-      },
-    });
-    expectContainedIntrospectionFailure(proxy, "$", token);
-  });
-
-  it("usa primordial capturado e nao mascara monkeypatch global posterior", () => {
-    const original = Object.getOwnPropertyDescriptor(Object, "getPrototypeOf");
-    Object.defineProperty(Object, "getPrototypeOf", {
-      configurable: true,
-      value() {
-        throw new Error("falha artificial interna posterior a importacao");
-      },
-      writable: true,
-    });
-    try {
-      const input = valid();
-      const result = validate(input);
-      expect(result).toEqual({ valid: true, value: input });
-    } finally {
-      if (original !== undefined) Object.defineProperty(Object, "getPrototypeOf", original);
-    }
-  });
-
-  it("nao converte falha interna fora da introspeccao em invalid_type na raiz", () => {
-    const original = Object.getOwnPropertyDescriptor(Array.prototype, "includes");
-    const sentinel = new Error("falha interna sentinela");
-    let caught: unknown;
-    Object.defineProperty(Array.prototype, "includes", {
-      configurable: true,
-      value() {
-        throw sentinel;
-      },
-      writable: true,
-    });
-    try {
-      validate({ ...valid(), financialOccurrence: { status: "absent", reason: "warranty" } });
-    } catch (error) {
-      caught = error;
-    } finally {
-      if (original !== undefined) Object.defineProperty(Array.prototype, "includes", original);
-    }
-    expect(caught).toBe(sentinel);
-  });
-});
-
-describe("concept-event validator - fechamento adversarial de arrays", () => {
-  const withEvents = (events: unknown) => ({
-    ...valid(),
-    concepts: [{ concept: engineOil, events }],
-  });
-
-  it("rejeita relatedItemKeys esparso", () => {
-    const relatedItemKeys = Array(1);
+    const customRelated = ["oleo_motor"];
+    Object.setPrototypeOf(customRelated, Object.create(Array.prototype));
     expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: { ...engineOil, relatedItemKeys }, events: [service] }],
-      },
+      { ...valid(), concepts: [{ ...engineOil, relatedItemKeys: customRelated }] },
       "invalid_type",
-      "$.concepts[0].concept.relatedItemKeys[0]",
+      "$.concepts[0].relatedItemKeys",
     );
-  });
-
-  it("rejeita executedItemKeys esparso", () => {
-    const executedItemKeys = Array(1);
-    expectInvalid(
-      withEvents([
-        { ...service, technicalEffect: { ...service.technicalEffect, executedItemKeys } },
-      ]),
-      "invalid_type",
-      "$.concepts[0].events[0].technicalEffect.executedItemKeys[0]",
-    );
-  });
-
-  it("rejeita concepts esparso", () => {
-    expectInvalid({ ...valid(), concepts: Array(1) }, "invalid_type", "$.concepts[0]");
-  });
-
-  it("rejeita events esparso", () => {
-    expectInvalid(withEvents(Array(1)), "invalid_type", "$.concepts[0].events[0]");
-  });
-
-  it("rejeita array tornado esparso por delete", () => {
-    const events: Array<typeof service | undefined> = [service];
-    delete events[0];
-    expectInvalid(withEvents(events), "invalid_type", "$.concepts[0].events[0]");
-  });
-
-  it("rejeita slot ausente suprido pelo prototype do array", () => {
-    const events = Array(1);
-    Object.setPrototypeOf(events, { 0: service });
-    expectInvalid(withEvents(events), "invalid_type", "$.concepts[0].events[0]");
-  });
-
-  it("rejeita getter em indice sem executa-lo", () => {
-    const events = [service];
-    let calls = 0;
-    Object.defineProperty(events, "0", {
-      enumerable: true,
-      get() {
-        calls += 1;
-        return service;
-      },
-    });
-    expectInvalid(withEvents(events), "invalid_type", "$.concepts[0].events[0]");
-    expect(calls).toBe(0);
-  });
-
-  it("rejeita propriedade extra em array", () => {
-    const events = [service];
-    Object.defineProperty(events, "extra", { value: true });
-    expectInvalid(withEvents(events), "unknown_property", "$.concepts[0].events.extra");
-  });
-
-  it("rejeita symbol proprio em array", () => {
-    const events = [service];
-    Object.defineProperty(events, Symbol("extra"), { value: true });
-    expectInvalid(withEvents(events), "unknown_property", "$.concepts[0].events");
-  });
-
-  const prototypeCases = [
-    [
-      "concepts",
-      "$.concepts",
-      (prototype: object | null) => {
-        const concepts = [{ concept: engineOil, events: [service] }];
-        Object.setPrototypeOf(concepts, prototype);
-        return { ...valid(), concepts };
-      },
-    ],
-    [
-      "events",
-      "$.concepts[0].events",
-      (prototype: object | null) => {
-        const events = [service];
-        Object.setPrototypeOf(events, prototype);
-        return { ...valid(), concepts: [{ concept: engineOil, events }] };
-      },
-    ],
-    [
-      "relatedItemKeys",
-      "$.concepts[0].concept.relatedItemKeys",
-      (prototype: object | null) => {
-        const relatedItemKeys = ["oleo_motor"];
-        Object.setPrototypeOf(relatedItemKeys, prototype);
-        return {
-          ...valid(),
-          concepts: [{ concept: { ...engineOil, relatedItemKeys }, events: [service] }],
-        };
-      },
-    ],
-    [
-      "executedItemKeys",
-      "$.concepts[0].events[0].technicalEffect.executedItemKeys",
-      (prototype: object | null) => {
-        const executedItemKeys = ["oleo_motor"];
-        Object.setPrototypeOf(executedItemKeys, prototype);
-        return withEvents([
-          { ...service, technicalEffect: { ...service.technicalEffect, executedItemKeys } },
-        ]);
-      },
-    ],
-  ] as const;
-
-  for (const [name, path, makeInput] of prototypeCases) {
-    it(`aceita ${name} com Array.prototype exato`, () => {
-      expect(validate(makeInput(Array.prototype)).valid).toBe(true);
-    });
-
-    it(`rejeita ${name} com prototype customizado e slots proprios validos`, () => {
-      expectInvalid(makeInput(Object.create(Array.prototype)), "invalid_type", path);
-    });
-
-    it(`rejeita ${name} com prototype null e slots proprios validos`, () => {
-      expectInvalid(makeInput(null), "invalid_type", path);
-    });
-  }
-});
-
-describe("concept-event validator - hardening dos acontecimentos", () => {
-  it("rejeita installation com efeito tecnico futuro", () => {
-    expectInvalid(
-      {
-        ...valid(),
-        concepts: [
-          {
-            concept: engineOil,
-            events: [{ ...installation, technicalEffect: futureEffect(["oleo_motor"]) }],
-          },
-        ],
-      },
-      "invalid_value",
-      "$.concepts[0].events[0].technicalEffect.status",
-    );
-  });
-
-  it("rejeita completed_inspection representando replacement", () => {
-    expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [{ ...inspection, serviceKind: "replacement" }] }],
-      },
-      "unknown_property",
-      "$.concepts[0].events[0].serviceKind",
-    );
-  });
-
-  it("rejeita kind desconhecido", () => {
-    expectInvalid(
-      {
-        ...valid(),
-        concepts: [{ concept: engineOil, events: [{ ...purchase, kind: "payment" }] }],
-      },
-      "invalid_value",
-      "$.concepts[0].events[0].kind",
-    );
-  });
-});
-
-describe("concept-event validator - matriz no_completed_expense", () => {
-  const contract = (events: readonly unknown[], reason: string) => ({
-    ...valid(),
-    concepts: [{ concept: engineOil, events }],
-    financialOccurrence: { status: "absent", reason },
-  });
-  const rejected = [
-    ["purchase isolada", [purchase]],
-    ["purchase em combinacao", [purchase, quote]],
-    ["installation isolada", [installation]],
-    ["completed_service", [service]],
-    ["quote isolado", [quote]],
-    ["future_intent isolado", [futureIntent]],
-    ["outra combinacao", [inspection, quote]],
-  ] as const;
-  for (const [name, events] of rejected) {
-    it(`rejeita ${name} com no_completed_expense`, () => {
-      expectInvalid(
-        contract(events, "no_completed_expense"),
-        "invalid_financial_coherence",
-        "$.financialOccurrence.reason",
-      );
-    });
-  }
-
-  it("aceita quote isolado somente com quote_only", () => {
-    expect(validate(contract([quote], "quote_only")).valid).toBe(true);
-  });
-  it("aceita future_intent isolado somente com future_intent_only", () => {
-    expect(validate(contract([futureIntent], "future_intent_only")).valid).toBe(true);
-  });
-  it("aceita quote + future_intent exclusivos com no_completed_expense", () => {
-    expect(validate(contract([quote, futureIntent], "no_completed_expense")).valid).toBe(true);
-  });
-  it("aceita completed_inspection isolada com no_completed_expense", () => {
-    expect(validate(contract([inspection], "no_completed_expense")).valid).toBe(true);
-  });
-
-  for (const reason of [
-    "warranty",
-    "free_service",
-    "owner_performed",
-    "previously_purchased_part",
-  ] as const) {
-    it(`preserva razao especifica ${reason} para completed_service`, () => {
-      expect(validate(contract([service], reason)).valid).toBe(true);
-    });
-  }
-
-  it("mantem purchase concluida valida exigindo ocorrencia financeira presente", () => {
-    expect(
-      validate({ ...valid(), concepts: [{ concept: engineOil, events: [purchase] }] }).valid,
-    ).toBe(true);
   });
 });
