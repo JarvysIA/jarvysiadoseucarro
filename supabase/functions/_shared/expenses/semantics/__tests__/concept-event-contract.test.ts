@@ -26,6 +26,11 @@ const brakePads = {
   recognitionSource: "explicit_user_statement",
   relatedItemKeys: [],
 } as const;
+const multimediaSystem = {
+  conceptKey: "multimedia_system",
+  recognitionSource: "explicit_user_statement",
+  relatedItemKeys: [],
+} as const;
 
 const valid = (): ExpenseSemanticOccurrence => ({
   contractVersion: "p0_3b_s3_3",
@@ -72,48 +77,58 @@ describe("expense semantic occurrence — contrato mínimo", () => {
   });
 
   for (const category of EXPENSE_SEMANTIC_CATEGORIES) {
-    it(`aceita a categoria fechada ${category}`, () => {
-      expect(validateExpenseSemanticOccurrence({ ...valid(), category }).valid).toBe(true);
+    it(`aceita a categoria fechada ${category} sem conceitos`, () => {
+      expect(
+        validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid,
+      ).toBe(true);
     });
   }
 
   for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
-    const { conceptKey, relatedItemKeys } = definition;
+    const { conceptKey, relatedItemKeys, defaultCategory } = definition;
     it(`aceita o conceito canônico ${conceptKey}`, () => {
       const concept = {
         conceptKey,
         recognitionSource: "explicit_user_statement",
         relatedItemKeys,
       } as const;
-      expect(validateExpenseSemanticOccurrence({ ...valid(), concepts: [concept] }).valid).toBe(
-        true,
-      );
+      expect(
+        validateExpenseSemanticOccurrence({
+          ...valid(),
+          concepts: [concept],
+          category: defaultCategory,
+        }).valid,
+      ).toBe(true);
     });
   }
 
   it("mantém allowlist, ordem e imutabilidade do registry canônico", () => {
     expect(EXPENSE_SEMANTIC_CONCEPT_REGISTRY).toEqual([
-      { conceptKey: "engine_oil", relatedItemKeys: ["oleo_motor"] },
-      { conceptKey: "engine_oil_filter", relatedItemKeys: ["filtro_oleo"] },
-      { conceptKey: "tires", relatedItemKeys: [] },
-      { conceptKey: "multimedia_system", relatedItemKeys: [] },
-      { conceptKey: "transmission_fluid", relatedItemKeys: [] },
-      { conceptKey: "brake_pads", relatedItemKeys: [] },
-      { conceptKey: "engine_air_filter", relatedItemKeys: [] },
-      { conceptKey: "cabin_filter", relatedItemKeys: [] },
-      { conceptKey: "fuel_filter", relatedItemKeys: [] },
-      { conceptKey: "timing_kit", relatedItemKeys: [] },
-      { conceptKey: "cooling_system", relatedItemKeys: [] },
-      { conceptKey: "spark_and_injection", relatedItemKeys: [] },
-      { conceptKey: "suspension", relatedItemKeys: [] },
-      { conceptKey: "wiper_blades", relatedItemKeys: [] },
-      { conceptKey: "wheel_alignment", relatedItemKeys: [] },
-      { conceptKey: "power_steering_fluid", relatedItemKeys: [] },
-      { conceptKey: "hybrid_ecvt_diagnostic", relatedItemKeys: [] },
+      { conceptKey: "engine_oil", relatedItemKeys: ["oleo_motor"], defaultCategory: "Revisão" },
+      {
+        conceptKey: "engine_oil_filter",
+        relatedItemKeys: ["filtro_oleo"],
+        defaultCategory: "Revisão",
+      },
+      { conceptKey: "tires", relatedItemKeys: [], defaultCategory: "Manutenção" },
+      { conceptKey: "multimedia_system", relatedItemKeys: [], defaultCategory: "Acessórios" },
+      { conceptKey: "transmission_fluid", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "brake_pads", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "engine_air_filter", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "cabin_filter", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "fuel_filter", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "timing_kit", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "cooling_system", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "spark_and_injection", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "suspension", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "wiper_blades", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "wheel_alignment", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "power_steering_fluid", relatedItemKeys: [], defaultCategory: "Revisão" },
+      { conceptKey: "hybrid_ecvt_diagnostic", relatedItemKeys: [], defaultCategory: "Revisão" },
     ]);
     expect(Object.isFrozen(EXPENSE_SEMANTIC_CONCEPT_REGISTRY)).toBe(true);
     for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
-      expect(Object.keys(definition)).toEqual(["conceptKey", "relatedItemKeys"]);
+      expect(Object.keys(definition)).toEqual(["conceptKey", "relatedItemKeys", "defaultCategory"]);
       expect(Object.isFrozen(definition)).toBe(true);
       expect(Object.isFrozen(definition.relatedItemKeys)).toBe(true);
     }
@@ -157,8 +172,13 @@ describe("expense semantic occurrence — contrato mínimo", () => {
   });
 
   it("permite o mesmo conceito em lançamentos independentes", () => {
-    const first = { ...valid(), concepts: [tires] };
-    const second = { ...valid(), concepts: [tires], description: "Nova compra de pneus" };
+    const first = { ...valid(), concepts: [tires], category: "Manutenção" };
+    const second = {
+      ...valid(),
+      concepts: [tires],
+      category: "Manutenção",
+      description: "Nova compra de pneus",
+    };
     expect(validateExpenseSemanticOccurrence(first).valid).toBe(true);
     expect(validateExpenseSemanticOccurrence(second).valid).toBe(true);
   });
@@ -364,4 +384,78 @@ describe("expense semantic occurrence — fechamento adversarial", () => {
       "$.concepts[0].relatedItemKeys",
     );
   });
+});
+
+describe("expense semantic occurrence — coerência categoria-conceito (S3.4)", () => {
+  for (const definition of EXPENSE_SEMANTIC_CONCEPT_REGISTRY) {
+    const { conceptKey, relatedItemKeys, defaultCategory } = definition;
+    const concept = {
+      conceptKey,
+      recognitionSource: "explicit_user_statement",
+      relatedItemKeys,
+    } as const;
+
+    it(`aceita ${conceptKey} sozinho quando category bate com sua defaultCategory ${defaultCategory}`, () => {
+      expect(
+        validateExpenseSemanticOccurrence({
+          ...valid(),
+          concepts: [concept],
+          category: defaultCategory,
+        }).valid,
+      ).toBe(true);
+    });
+
+    const mismatchedCategory = EXPENSE_SEMANTIC_CATEGORIES.find(
+      (category) => category !== defaultCategory,
+    );
+    if (mismatchedCategory === undefined) {
+      throw new Error("EXPENSE_SEMANTIC_CATEGORIES precisa ter mais de um membro");
+    }
+
+    it(`rejeita ${conceptKey} sozinho quando category diverge (${mismatchedCategory})`, () => {
+      expectInvalid(
+        { ...valid(), concepts: [concept], category: mismatchedCategory },
+        "category_concept_mismatch",
+        "$.category",
+      );
+    });
+  }
+
+  it('exige "Revisão" quando tires e um conceito de Revisão aparecem juntos', () => {
+    expectInvalid(
+      { ...valid(), concepts: [tires, engineOil], category: "Manutenção" },
+      "category_concept_mismatch",
+      "$.category",
+    );
+    expect(
+      validateExpenseSemanticOccurrence({
+        ...valid(),
+        concepts: [tires, engineOil],
+        category: "Revisão",
+      }).valid,
+    ).toBe(true);
+  });
+
+  it('exige "Manutenção" quando tires e multimedia_system aparecem juntos sem nenhum conceito de Revisão', () => {
+    expectInvalid(
+      { ...valid(), concepts: [tires, multimediaSystem], category: "Acessórios" },
+      "category_concept_mismatch",
+      "$.category",
+    );
+    expect(
+      validateExpenseSemanticOccurrence({
+        ...valid(),
+        concepts: [tires, multimediaSystem],
+        category: "Manutenção",
+      }).valid,
+    ).toBe(true);
+  });
+
+  for (const category of EXPENSE_SEMANTIC_CATEGORIES) {
+    it(`aceita a categoria ${category} livremente quando concepts está vazio`, () => {
+      expect(
+        validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid,
+      ).toBe(true);
+    });
+  }
 });
