@@ -35,6 +35,17 @@ export const EXPENSE_SEMANTIC_CONCEPT_REGISTRY = Object.freeze([
     relatedItemKeys: Object.freeze([] as const),
   }),
   Object.freeze({ conceptKey: "brake_pads", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "engine_air_filter", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "cabin_filter", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "fuel_filter", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "timing_kit", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "cooling_system", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "spark_and_injection", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "suspension", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "wiper_blades", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "wheel_alignment", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "power_steering_fluid", relatedItemKeys: Object.freeze([] as const) }),
+  Object.freeze({ conceptKey: "hybrid_ecvt_diagnostic", relatedItemKeys: Object.freeze([] as const) }),
 ] as const satisfies readonly ExpenseSemanticConceptDefinitionShape[]);
 
 export type ExpenseSemanticConceptDefinition = (typeof EXPENSE_SEMANTIC_CONCEPT_REGISTRY)[number];
