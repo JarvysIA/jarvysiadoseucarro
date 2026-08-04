@@ -1,11 +1,7 @@
 // Build corretivo 6/6 — "revisão dos 40 mil" NÃO vira valor nem km.
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { EXPENSE_REPORTED_EVENT_KIND } from "../expense-create-protocol.ts";
 import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
@@ -84,17 +80,13 @@ describe("revisão N mil — não vira despesa nem km", () => {
 
 describe("revisão COM valor real declarado — despesa funciona", () => {
   test("revisao dos 40 mil, gastei 350 reais → Revisão R$350", () => {
-    const d = decideConversation(
-      inp({ originalText: "revisao dos 40 mil, gastei 350 reais" }),
-    );
+    const d = decideConversation(inp({ originalText: "revisao dos 40 mil, gastei 350 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(350);
     expect(d.responseParams.categoria).toBe("Revisão");
   });
   test("fiz a revisao dos 40 mil, foi 500 reais → Revisão R$500", () => {
-    const d = decideConversation(
-      inp({ originalText: "fiz a revisao dos 40 mil, foi 500 reais" }),
-    );
+    const d = decideConversation(inp({ originalText: "fiz a revisao dos 40 mil, foi 500 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(500);
     expect(d.responseParams.categoria).toBe("Revisão");
@@ -118,9 +110,7 @@ describe("km genuína com 'mil' — sem 'revisao' — não regride", () => {
 
 describe("revisão sem 'N mil' — não regride", () => {
   test("fiz a revisao, gastei 350 reais → Revisão R$350", () => {
-    const d = decideConversation(
-      inp({ originalText: "fiz a revisao, gastei 350 reais" }),
-    );
+    const d = decideConversation(inp({ originalText: "fiz a revisao, gastei 350 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(350);
     expect(d.responseParams.categoria).toBe("Revisão");
@@ -134,9 +124,7 @@ describe("revisão sem 'N mil' — não regride", () => {
 
 describe("regressão geral — builds anteriores", () => {
   test("Troca de óleo R$190,00 com 105.000km → Revisão R$190", () => {
-    const d = decideConversation(
-      inp({ originalText: "Troca de óleo R$190,00 com 105.000km" }),
-    );
+    const d = decideConversation(inp({ originalText: "Troca de óleo R$190,00 com 105.000km" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(190);
     expect(d.responseParams.categoria).toBe("Revisão");
@@ -161,17 +149,13 @@ describe("regressão geral — builds anteriores", () => {
 
 describe("revisão com valor explícito — não regride (novo formato km)", () => {
   test("revisão dos 20.000km, gastei 1.800 reais → Revisão R$1800", () => {
-    const d = decideConversation(
-      inp({ originalText: "revisão dos 20.000km, gastei 1.800 reais" }),
-    );
+    const d = decideConversation(inp({ originalText: "revisão dos 20.000km, gastei 1.800 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(1800);
     expect(d.responseParams.categoria).toBe("Revisão");
   });
   test("revisao de 60.000 km, R$900,00 → Revisão R$900", () => {
-    const d = decideConversation(
-      inp({ originalText: "revisao de 60.000 km, R$900,00" }),
-    );
+    const d = decideConversation(inp({ originalText: "revisao de 60.000 km, R$900,00" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.responseParams.valor).toBe(900);
     expect(d.responseParams.categoria).toBe("Revisão");

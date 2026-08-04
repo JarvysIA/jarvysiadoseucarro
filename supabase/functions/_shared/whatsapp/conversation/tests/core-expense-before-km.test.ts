@@ -3,11 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { EXPENSE_REPORTED_EVENT_KIND } from "../expense-create-protocol.ts";
 import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
@@ -86,11 +82,7 @@ describe("despesa + km ao mesmo tempo → reconhece despesa primeiro", () => {
 });
 
 describe("km pura não regrede", () => {
-  const cases = [
-    "rodei 105000 km hoje",
-    "km atual 105000",
-    "carro ta com 105 mil km",
-  ];
+  const cases = ["rodei 105000 km hoje", "km atual 105000", "carro ta com 105 mil km"];
   for (const text of cases) {
     test(`"${text}" → reconhece KM`, () => {
       const d = decideConversation(inp({ originalText: text }));

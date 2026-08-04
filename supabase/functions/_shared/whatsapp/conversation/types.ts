@@ -65,12 +65,7 @@ export type ConversationDecisionKind =
   | "confirm_expense_create"
   | "no_op";
 
-export type ConversationOutcome =
-  | "none"
-  | "completed"
-  | "cancelled"
-  | "expired"
-  | "failed";
+export type ConversationOutcome = "none" | "completed" | "cancelled" | "expired" | "failed";
 
 export type ConversationMessageType =
   | "text"
@@ -82,11 +77,7 @@ export type ConversationMessageType =
   | "document"
   | "system"
   | "unknown";
-export type RequestSource =
-  | "user_initiated"
-  | "proactive_maintenance"
-  | "reengagement"
-  | "system";
+export type RequestSource = "user_initiated" | "proactive_maintenance" | "reengagement" | "system";
 
 /**
  * Estado corrente da conversa, exposto ao core como dados imutáveis.
@@ -196,7 +187,6 @@ export type ConversationResponseKey =
   | "requested_km_unknown"
   | "media_unclear_during_confirmation";
 
-
 export type ConversationResponseParams = {
   vehicleLabel?: string;
   options?: string[];
@@ -208,7 +198,6 @@ export type ConversationResponseParams = {
   needsDescriptionInvite?: boolean;
   needsFilterClarification?: boolean;
 };
-
 
 export type ConversationCoreDecision = {
   eventKind: ConversationEventKind;

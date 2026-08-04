@@ -6,19 +6,13 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import {
   CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
   EXPENSE_REPORTED_EVENT_KIND,
 } from "../expense-create-protocol.ts";
 import { EXPENSE_CATEGORIES } from "../expense-create-draft.ts";
-import {
-  KM_REPORTED_EVENT_KIND,
-} from "../km-update-protocol.ts";
+import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";
 const MSG_B = "22222222-2222-4222-8222-222222222222";
@@ -79,9 +73,7 @@ function inp(overrides: Partial<ConversationCoreInput> = {}): ConversationCoreIn
 describe("T1 despesa — draft direto em idle", () => {
   test("valor + categoria + 1 veículo elegível → awaiting_expense_confirmation v0", () => {
     const v = veh(VEH_1);
-    const d = decideConversation(
-      inp({ originalText: "gasolina R$ 80", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "gasolina R$ 80", vehicles: [v] }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.decisionKind).toBe("transition");
     expect(d.nextState).toBe("awaiting_expense_confirmation");
@@ -151,7 +143,12 @@ describe("T1 despesa — resposta em awaiting_expense_category", () => {
 
   test("categoria reconhecida + 1 veículo → awaiting_expense_confirmation v1", () => {
     const d = decideConversation(
-      inp({ state: catState, originalText: "gasolina", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: catState,
+        originalText: "gasolina",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.eventKind).toBe("category_reply");
     expect(d.nextState).toBe("awaiting_expense_confirmation");
@@ -176,7 +173,12 @@ describe("T1 despesa — resposta em awaiting_expense_category", () => {
 
   test("categoria não reconhecida → mantém awaiting_expense_category, sem contar fallback", () => {
     const d = decideConversation(
-      inp({ state: catState, originalText: "qualquer coisa", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: catState,
+        originalText: "qualquer coisa",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.eventKind).toBe("category_reply");
     expect(d.nextState).toBe("awaiting_expense_category");
@@ -206,7 +208,12 @@ describe("T1 despesa — resposta em awaiting_vehicle", () => {
       },
     });
     const d = decideConversation(
-      inp({ state: s, originalText: "argo", vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")], sourceMessageId: MSG_B }),
+      inp({
+        state: s,
+        originalText: "argo",
+        vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.nextState).toBe("awaiting_expense_confirmation");
     expect(d.statePatch.draftVersion).toBe(1);
@@ -229,7 +236,12 @@ describe("T1 despesa — resposta em awaiting_vehicle", () => {
       },
     });
     const d = decideConversation(
-      inp({ state: s, originalText: "argo", vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")], sourceMessageId: MSG_B }),
+      inp({
+        state: s,
+        originalText: "argo",
+        vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.nextState).toBe("awaiting_expense_confirmation");
     expect(d.statePatch.draftVersion).toBe(2);
@@ -289,7 +301,12 @@ function confState(overrides: Partial<ConversationState> = {}): ConversationStat
 describe("T1 despesa — confirm/deny/correction", () => {
   test("awaiting_expense_confirmation + 'sim' → confirm_expense_create", () => {
     const d = decideConversation(
-      inp({ state: confState(), originalText: "sim", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: confState(),
+        originalText: "sim",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.decisionKind).toBe(CONFIRM_EXPENSE_CREATE_HANDOFF_KIND);
     expect(d.nextState).toBe("awaiting_expense_confirmation");
@@ -298,7 +315,12 @@ describe("T1 despesa — confirm/deny/correction", () => {
 
   test("awaiting_expense_confirmation + 'não' → reset_task/task_cancelled", () => {
     const d = decideConversation(
-      inp({ state: confState(), originalText: "não", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: confState(),
+        originalText: "não",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.decisionKind).toBe("reset_task");
     expect(d.responseKey).toBe("task_cancelled");
@@ -351,7 +373,12 @@ describe("T1 despesa — confirm/deny/correction", () => {
 
   test("awaiting_expense_confirmation + MESMA categoria do draft → NÃO trata como correção", () => {
     const d = decideConversation(
-      inp({ state: confState(), originalText: "gasolina", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: confState(),
+        originalText: "gasolina",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.nextState).not.toBe("awaiting_expense_correction");
     expect(d.responseKey).not.toBe("expense_create_correction_confirmation");
@@ -359,7 +386,12 @@ describe("T1 despesa — confirm/deny/correction", () => {
 
   test("awaiting_expense_confirmation + texto aleatório sem categoria → fallback, não quebra", () => {
     const d = decideConversation(
-      inp({ state: confState(), originalText: "xyzabc", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: confState(),
+        originalText: "xyzabc",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.nextState).not.toBe("awaiting_expense_correction");
     expect(["fallback", "respond"]).toContain(d.decisionKind);
@@ -388,14 +420,21 @@ describe("T1 despesa — regressões", () => {
       draftVersion: 0,
       draftPayload: { phase: "awaiting_category", valor: 80, requestMessageId: MSG_A },
     });
-    const d = decideConversation(inp({ state: s, originalText: "cancelar", sourceMessageId: MSG_B }));
+    const d = decideConversation(
+      inp({ state: s, originalText: "cancelar", sourceMessageId: MSG_B }),
+    );
     expect(d.decisionKind).toBe("reset_task");
     expect(d.nextState).toBe("idle");
   });
 
   test("cancel_task funciona em awaiting_expense_confirmation", () => {
     const d = decideConversation(
-      inp({ state: confState(), originalText: "cancelar", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+      inp({
+        state: confState(),
+        originalText: "cancelar",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
     );
     expect(d.decisionKind).toBe("reset_task");
     expect(d.nextState).toBe("idle");

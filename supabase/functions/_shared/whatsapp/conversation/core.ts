@@ -30,10 +30,7 @@ import {
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
-import {
-  CONFIRM_KM_UPDATE_HANDOFF_KIND,
-  KM_REPORTED_EVENT_KIND,
-} from "./km-update-protocol.ts";
+import { CONFIRM_KM_UPDATE_HANDOFF_KIND, KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
 import {
   parseExpenseValorText,
   parseExpenseValorBareNumber,
@@ -53,10 +50,8 @@ import {
 } from "./expense-create-protocol.ts";
 
 function isEligibleKmConfirmationState(state: ConversationState): boolean {
-  if (
-    state.state !== "awaiting_km_confirmation" &&
-    state.state !== "awaiting_km_correction"
-  ) return false;
+  if (state.state !== "awaiting_km_confirmation" && state.state !== "awaiting_km_correction")
+    return false;
   if (state.draftType !== "km_update") return false;
   const v = validateAwaitingConfirmationKmUpdateDraft(state.draftPayload);
   return v.ok;
@@ -66,7 +61,8 @@ function isEligibleExpenseConfirmationState(state: ConversationState): boolean {
   if (
     state.state !== "awaiting_expense_confirmation" &&
     state.state !== "awaiting_expense_correction"
-  ) return false;
+  )
+    return false;
   if (state.draftType !== "expense") return false;
   const v = validateAwaitingConfirmationExpenseDraft(state.draftPayload);
   return v.ok;
@@ -165,8 +161,7 @@ function computeMaintenanceItemsRaw(originalText: string): {
   const recognizedTags = parsed.items.map((i) => i.tag);
   const trimmed = originalText.trim();
   const sufficient =
-    recognizedTags.length > 0 ||
-    countLetters(trimmed) >= MAINTENANCE_DESCRIPTION_MIN_LETTERS;
+    recognizedTags.length > 0 || countLetters(trimmed) >= MAINTENANCE_DESCRIPTION_MIN_LETTERS;
   return {
     recognizedTags,
     descricaoPreliminar: sufficient ? trimmed : null,
@@ -219,11 +214,13 @@ function gateMaintenanceItemsByCategory(
  * (prioridade máxima) e se deve convidar a descrever (só quando não há
  * nem itens nem descrição suficiente, e não há pergunta de filtro pendente).
  */
-function buildMaintenanceResponseExtras(data: {
-  recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
-  descricao: string | null | undefined;
-  ambiguousFilterMention?: boolean;
-} | null): Pick<
+function buildMaintenanceResponseExtras(
+  data: {
+    recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+    descricao: string | null | undefined;
+    ambiguousFilterMention?: boolean;
+  } | null,
+): Pick<
   ConversationResponseParams,
   "recognizedTags" | "needsDescriptionInvite" | "needsFilterClarification"
 > {
@@ -236,7 +233,6 @@ function buildMaintenanceResponseExtras(data: {
     needsDescriptionInvite: !needsFilterClarification && !hasDescricao,
   };
 }
-
 
 // Build corretivo 6/6 — "revisão dos 40 mil" (ou variações) não deve ser
 // lida como um valor literal (nem km, nem dinheiro) — é uma referência a
@@ -295,8 +291,10 @@ function looksLikeRequestedKmUnclearResponse(normalizedText: string): boolean {
     if (normalizedText.includes(s)) return true;
   }
   if (/\bMAIS TARDE\b/.test(normalizedText)) return true;
-  if (/\bDEPOIS\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText)) return true;
-  if (/\bJA\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText)) return true;
+  if (/\bDEPOIS\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText))
+    return true;
+  if (/\bJA\b/.test(normalizedText) && REQUESTED_KM_DEFER_VERBS_RE.test(normalizedText))
+    return true;
   return false;
 }
 
@@ -310,8 +308,7 @@ function withLastMessage(
   return { ...patch, lastMessageId: sourceMessageId };
 }
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function isUuid(value: string | null | undefined): value is string {
   return typeof value === "string" && UUID_REGEX.test(value);
@@ -409,9 +406,7 @@ function extractPartialKmDraft(
  * Aceita draftVersion 0 (categoria reconhecida direto no idle) ou 1
  * (promovido depois de awaiting_expense_category).
  */
-function extractPartialExpenseDraft(
-  state: ConversationState,
-): {
+function extractPartialExpenseDraft(state: ConversationState): {
   categoria: ExpenseCategory;
   valor: number;
   requestMessageId: string;
@@ -439,10 +434,7 @@ function extractPartialExpenseDraft(
   };
 }
 
-
-export function decideConversation(
-  input: ConversationCoreInput,
-): ConversationCoreDecision {
+export function decideConversation(input: ConversationCoreInput): ConversationCoreDecision {
   const previousState = input.state.state;
   const fallbackCount = Math.max(0, Math.floor(input.fallbackCount ?? 0));
 
@@ -687,8 +679,7 @@ export function decideConversation(
           requestMessageId: partial.requestMessageId,
           isCorrection,
         };
-        const validated =
-          validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
+        const validated = validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
         if (validated.ok && isUuid(veh.id)) {
           const nextState: ConversationStateName = isCorrection
             ? "awaiting_km_correction"
@@ -743,8 +734,7 @@ export function decideConversation(
             ? { descricao: expensePartial.descricaoPreliminar }
             : {}),
         };
-        const validated =
-          validateAwaitingConfirmationExpenseDraft(candidate);
+        const validated = validateAwaitingConfirmationExpenseDraft(candidate);
         if (validated.ok && isUuid(veh.id)) {
           const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
           return buildDecision({
@@ -860,9 +850,7 @@ export function decideConversation(
 
   // 6.5) Resposta a state pendente (awaiting_expense_category)
   if (effectiveState.state === "awaiting_expense_category") {
-    const currentDraft = validateAwaitingCategoryExpenseDraft(
-      effectiveState.draftPayload,
-    );
+    const currentDraft = validateAwaitingCategoryExpenseDraft(effectiveState.draftPayload);
     if (
       effectiveState.draftType === "expense" &&
       isUuid(effectiveState.draftId) &&
@@ -897,8 +885,7 @@ export function decideConversation(
                 }
               : {}),
           };
-          const validated =
-            validateAwaitingConfirmationExpenseDraft(candidate);
+          const validated = validateAwaitingConfirmationExpenseDraft(candidate);
           if (validated.ok && isUuid(veh.id)) {
             return buildDecision({
               eventKind: "category_reply",
@@ -937,10 +924,7 @@ export function decideConversation(
               reasonCode: "expense_category_resolved_complete",
             });
           }
-        } else if (
-          resolvedVeh.kind === "ambiguous" ||
-          resolvedVeh.kind === "not_found"
-        ) {
+        } else if (resolvedVeh.kind === "ambiguous" || resolvedVeh.kind === "not_found") {
           const gated = gateMaintenanceItemsByCategory(
             categoriaMatch.categoria,
             currentDraft.value,
@@ -1034,11 +1018,11 @@ export function decideConversation(
     const parsed = parseKmUpdateText(input.originalText, "value_reply");
     if (parsed.ok) {
       const activeId = effectiveState.activeVehicleId;
-      const veh = activeId === null
-        ? null
-        : input.vehicles.find(
-            (v) => v.id === activeId && v.isEligible && !v.isArchived,
-          ) ?? null;
+      const veh =
+        activeId === null
+          ? null
+          : (input.vehicles.find((v) => v.id === activeId && v.isEligible && !v.isArchived) ??
+            null);
       if (veh === null) {
         return buildDecision({
           eventKind: KM_REPORTED_EVENT_KIND,
@@ -1061,9 +1045,7 @@ export function decideConversation(
       // km (se houver) foi guardado em effectiveState.draftId por
       // buildExpenseFinalization. Carrega adiante pro draft de km, pra ser
       // recuperado quando a km for confirmada (builds 6b/6c ligam a RPC).
-      const linkedExpenseId = isUuid(effectiveState.draftId)
-        ? effectiveState.draftId
-        : undefined;
+      const linkedExpenseId = isUuid(effectiveState.draftId) ? effectiveState.draftId : undefined;
       const completeCandidate = {
         phase: "awaiting_confirmation" as const,
         vehicleId: veh.id,
@@ -1073,8 +1055,7 @@ export function decideConversation(
         isCorrection,
         ...(linkedExpenseId !== undefined ? { linkedExpenseId } : {}),
       };
-      const validated =
-        validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
+      const validated = validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
       if (validated.ok && isUuid(veh.id)) {
         const nextState: ConversationStateName = isCorrection
           ? "awaiting_km_correction"
@@ -1147,9 +1128,10 @@ export function decideConversation(
       statePatch: withLastMessage(basePatch, input.sourceMessageId),
       responseKey: null,
       nextFallbackCount: 0,
-      reasonCode: effectiveState.state === "awaiting_km_correction"
-        ? "km_update_correction_confirmed_handoff"
-        : "km_update_confirmed_handoff",
+      reasonCode:
+        effectiveState.state === "awaiting_km_correction"
+          ? "km_update_correction_confirmed_handoff"
+          : "km_update_confirmed_handoff",
     });
   }
   if (command === "deny" && isEligibleKmConfirmationState(effectiveState)) {
@@ -1165,9 +1147,10 @@ export function decideConversation(
       ),
       responseKey: "task_cancelled",
       nextFallbackCount: 0,
-      reasonCode: effectiveState.state === "awaiting_km_correction"
-        ? "km_update_correction_denied"
-        : "km_update_denied",
+      reasonCode:
+        effectiveState.state === "awaiting_km_correction"
+          ? "km_update_correction_denied"
+          : "km_update_denied",
     });
   }
   if (command === "confirm" && isEligibleExpenseConfirmationState(effectiveState)) {
@@ -1180,9 +1163,10 @@ export function decideConversation(
       statePatch: withLastMessage(basePatch, input.sourceMessageId),
       responseKey: null,
       nextFallbackCount: 0,
-      reasonCode: effectiveState.state === "awaiting_expense_correction"
-        ? "expense_create_correction_confirmed_handoff"
-        : "expense_create_confirmed_handoff",
+      reasonCode:
+        effectiveState.state === "awaiting_expense_correction"
+          ? "expense_create_correction_confirmed_handoff"
+          : "expense_create_confirmed_handoff",
     });
   }
   if (command === "deny" && isEligibleExpenseConfirmationState(effectiveState)) {
@@ -1198,9 +1182,10 @@ export function decideConversation(
       ),
       responseKey: "task_cancelled",
       nextFallbackCount: 0,
-      reasonCode: effectiveState.state === "awaiting_expense_correction"
-        ? "expense_create_correction_denied"
-        : "expense_create_denied",
+      reasonCode:
+        effectiveState.state === "awaiting_expense_correction"
+          ? "expense_create_correction_denied"
+          : "expense_create_denied",
     });
   }
   // Correção de categoria em awaiting_expense_confirmation/correction.
@@ -1212,15 +1197,10 @@ export function decideConversation(
     command !== "deny" &&
     typeof input.originalText === "string"
   ) {
-    const currentDraft = validateAwaitingConfirmationExpenseDraft(
-      effectiveState.draftPayload,
-    );
+    const currentDraft = validateAwaitingConfirmationExpenseDraft(effectiveState.draftPayload);
     if (currentDraft.ok) {
       const categoriaMatch = matchExpenseCategoria(input.originalText);
-      if (
-        categoriaMatch.ok &&
-        categoriaMatch.categoria !== currentDraft.value.categoria
-      ) {
+      if (categoriaMatch.ok && categoriaMatch.categoria !== currentDraft.value.categoria) {
         const candidate = {
           phase: "awaiting_confirmation" as const,
           categoria: categoriaMatch.categoria,
@@ -1228,12 +1208,9 @@ export function decideConversation(
           vehicleId: currentDraft.value.vehicleId,
           requestMessageId: currentDraft.value.requestMessageId,
         };
-        const validated =
-          validateAwaitingConfirmationExpenseDraft(candidate);
+        const validated = validateAwaitingConfirmationExpenseDraft(candidate);
         if (validated.ok) {
-          const veh = input.vehicles.find(
-            (v) => v.id === currentDraft.value.vehicleId,
-          );
+          const veh = input.vehicles.find((v) => v.id === currentDraft.value.vehicleId);
           return buildDecision({
             eventKind: "category_reply",
             decisionKind: "transition",
@@ -1286,9 +1263,7 @@ export function decideConversation(
       statePatch: withLastMessage(basePatch, input.sourceMessageId),
       responseKey: "nothing_to_confirm",
       nextFallbackCount: 0,
-      reasonCode: expiredHandled
-        ? "expired_then_deny_without_pending"
-        : "deny_without_pending",
+      reasonCode: expiredHandled ? "expired_then_deny_without_pending" : "deny_without_pending",
     });
   }
 
@@ -1418,8 +1393,7 @@ export function decideConversation(
                 }
               : {}),
           };
-          const validated =
-            validateAwaitingConfirmationExpenseDraft(candidate);
+          const validated = validateAwaitingConfirmationExpenseDraft(candidate);
           if (validated.ok && isUuid(veh.id)) {
             return buildDecision({
               eventKind: EXPENSE_REPORTED_EVENT_KIND,
@@ -1458,7 +1432,6 @@ export function decideConversation(
               reasonCode: "expense_reported_complete",
             });
           }
-
         } else {
           const extras = computeMaintenanceDraftExtras(
             categoriaMatch.categoria,
@@ -1549,8 +1522,7 @@ export function decideConversation(
           requestMessageId: input.sourceMessageId,
           isCorrection,
         };
-        const validated =
-          validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
+        const validated = validateAwaitingConfirmationKmUpdateDraft(completeCandidate);
         if (validated.ok && isUuid(veh.id)) {
           const nextState: ConversationStateName = isCorrection
             ? "awaiting_km_correction"
@@ -1582,9 +1554,7 @@ export function decideConversation(
               previousKm: prev,
             },
             nextFallbackCount: 0,
-            reasonCode: isCorrection
-              ? "km_reported_complete_correction"
-              : "km_reported_complete",
+            reasonCode: isCorrection ? "km_reported_complete_correction" : "km_reported_complete",
           });
         }
         // Invariante violada — segue caminho de fallback.
@@ -1595,8 +1565,7 @@ export function decideConversation(
           newKm: parsed.newKm,
           requestMessageId: input.sourceMessageId,
         };
-        const validated =
-          validateAwaitingVehicleKmUpdateDraft(partialCandidate);
+        const validated = validateAwaitingVehicleKmUpdateDraft(partialCandidate);
         if (validated.ok) {
           return buildDecision({
             eventKind: KM_REPORTED_EVENT_KIND,
@@ -1625,7 +1594,6 @@ export function decideConversation(
       }
     }
   }
-
 
   // 10) Fallback (unknown)
   const nextFallback = fallbackCount + 1;

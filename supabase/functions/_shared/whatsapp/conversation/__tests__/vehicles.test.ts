@@ -30,9 +30,9 @@ describe("resolveVehicle", () => {
   const argo2 = v({ id: "3", brand: "Fiat", model: "Argo", plate: "QWE1D23" });
 
   test("no eligible vehicles", () => {
-    expect(
-      resolveVehicle({ text: "argo", vehicles: [], activeVehicleId: null }).kind,
-    ).toBe("no_eligible_vehicle");
+    expect(resolveVehicle({ text: "argo", vehicles: [], activeVehicleId: null }).kind).toBe(
+      "no_eligible_vehicle",
+    );
     expect(
       resolveVehicle({
         text: "argo",

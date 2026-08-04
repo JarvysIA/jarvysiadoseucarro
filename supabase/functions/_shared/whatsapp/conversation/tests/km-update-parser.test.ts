@@ -95,25 +95,16 @@ describe("explicit_report — formatos reconhecidos", () => {
     ok(parseKmUpdateText("50 mil km", "explicit_report"), 50000);
   });
   it("aceita 'meu carro está com 50000 km'", () => {
-    ok(
-      parseKmUpdateText("meu carro está com 50000 km", "explicit_report"),
-      50000,
-    );
+    ok(parseKmUpdateText("meu carro está com 50000 km", "explicit_report"), 50000);
   });
   it("aceita 'meu carro 2020 está com 50000 km' ignorando o ano sem marcador", () => {
-    ok(
-      parseKmUpdateText("meu carro 2020 está com 50000 km", "explicit_report"),
-      50000,
-    );
+    ok(parseKmUpdateText("meu carro 2020 está com 50000 km", "explicit_report"), 50000);
   });
   it("aceita 'quilometragem 50000'", () => {
     ok(parseKmUpdateText("quilometragem 50000", "explicit_report"), 50000);
   });
   it("aceita 'quilometragem atual: 50000'", () => {
-    ok(
-      parseKmUpdateText("quilometragem atual: 50000", "explicit_report"),
-      50000,
-    );
+    ok(parseKmUpdateText("quilometragem atual: 50000", "explicit_report"), 50000);
   });
   it("aceita 'odômetro 50000'", () => {
     ok(parseKmUpdateText("odômetro 50000", "explicit_report"), 50000);
@@ -170,11 +161,7 @@ describe("explicit_report — formatos reconhecidos", () => {
     err(parseKmUpdateText("pedido50000", "explicit_report"), "no_km_candidate");
   });
   it("não modifica o input original", () => {
-    const originals = [
-      "50000 km",
-      "  odometro:   50.000\u00A0km ",
-      "meu carro está com 50000 km",
-    ];
+    const originals = ["50000 km", "  odometro:   50.000\u00A0km ", "meu carro está com 50000 km"];
     for (const s of originals) {
       const before = s;
       parseKmUpdateText(s, "explicit_report");
@@ -229,16 +216,10 @@ describe("value_reply — respostas objetivas", () => {
   });
   it("rejeita texto adicional depois do valor", () => {
     err(parseKmUpdateText("50000 e depois vejo", "value_reply"), "invalid_km_format");
-    err(
-      parseKmUpdateText("é 50000 mas não tenho certeza", "value_reply"),
-      "invalid_km_format",
-    );
+    err(parseKmUpdateText("é 50000 mas não tenho certeza", "value_reply"), "invalid_km_format");
   });
   it("rejeita frase conversacional que embute o valor", () => {
-    err(
-      parseKmUpdateText("meu carro está com 50000 km", "value_reply"),
-      "invalid_km_format",
-    );
+    err(parseKmUpdateText("meu carro está com 50000 km", "value_reply"), "invalid_km_format");
   });
   it("rejeita dois valores", () => {
     err(parseKmUpdateText("50000 60000", "value_reply"), "invalid_km_format");
@@ -320,10 +301,7 @@ describe("range", () => {
     err(parseKmUpdateText("2147483648 km", "explicit_report"), "km_out_of_range");
   });
   it("'999999999999999999999 km' → km_out_of_range", () => {
-    err(
-      parseKmUpdateText("999999999999999999999 km", "explicit_report"),
-      "km_out_of_range",
-    );
+    err(parseKmUpdateText("999999999999999999999 km", "explicit_report"), "km_out_of_range");
   });
   it("'2147484 mil km' → km_out_of_range", () => {
     err(parseKmUpdateText("2147484 mil km", "explicit_report"), "km_out_of_range");
@@ -353,10 +331,7 @@ describe("range", () => {
 
 describe("ambiguidade em explicit_report", () => {
   it("dois KMs diferentes → ambiguous", () => {
-    err(
-      parseKmUpdateText("50000 km ou 51000 km", "explicit_report"),
-      "ambiguous_km_candidate",
-    );
+    err(parseKmUpdateText("50000 km ou 51000 km", "explicit_report"), "ambiguous_km_candidate");
   });
   it("dois KMs iguais em spans distintos → ambiguous", () => {
     err(
@@ -371,37 +346,19 @@ describe("ambiguidade em explicit_report", () => {
     );
   });
   it("um ano sem marcador e um KM válido → sucesso", () => {
-    ok(
-      parseKmUpdateText("comprado em 2020, hoje odometro 50000", "explicit_report"),
-      50000,
-    );
+    ok(parseKmUpdateText("comprado em 2020, hoje odometro 50000", "explicit_report"), 50000);
   });
   it("dois números sem marcador → no_km_candidate", () => {
     err(parseKmUpdateText("2020 e 50000", "explicit_report"), "no_km_candidate");
   });
   it("uma expressão válida e outra malformada → invalid_km_format", () => {
-    err(
-      parseKmUpdateText("50000 km e 50,5 km", "explicit_report"),
-      "invalid_km_format",
-    );
-    err(
-      parseKmUpdateText("km 50000 e odometro 1.00", "explicit_report"),
-      "invalid_km_format",
-    );
-    err(
-      parseKmUpdateText("50000 km e +20 km", "explicit_report"),
-      "invalid_km_format",
-    );
+    err(parseKmUpdateText("50000 km e 50,5 km", "explicit_report"), "invalid_km_format");
+    err(parseKmUpdateText("km 50000 e odometro 1.00", "explicit_report"), "invalid_km_format");
+    err(parseKmUpdateText("50000 km e +20 km", "explicit_report"), "invalid_km_format");
   });
   it("uma expressão válida e outra fora de range → km_out_of_range", () => {
-    err(
-      parseKmUpdateText("50000 km e -20 km", "explicit_report"),
-      "km_out_of_range",
-    );
-    err(
-      parseKmUpdateText("50000 km e 2147483648 km", "explicit_report"),
-      "km_out_of_range",
-    );
+    err(parseKmUpdateText("50000 km e -20 km", "explicit_report"), "km_out_of_range");
+    err(parseKmUpdateText("50000 km e 2147483648 km", "explicit_report"), "km_out_of_range");
   });
   it("prefixo com sufixo unido (km ... km) conta como um único candidato", () => {
     // "km 50000 km" — mesma ocorrência textual, um único candidato.

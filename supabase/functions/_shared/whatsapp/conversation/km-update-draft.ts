@@ -22,9 +22,7 @@ export type AwaitingConfirmationKmUpdateDraft = {
   readonly linkedExpenseId?: string;
 };
 
-export type KmUpdateDraft =
-  | AwaitingVehicleKmUpdateDraft
-  | AwaitingConfirmationKmUpdateDraft;
+export type KmUpdateDraft = AwaitingVehicleKmUpdateDraft | AwaitingConfirmationKmUpdateDraft;
 
 export type KmUpdateDraftValidationErrorCode =
   | "not_an_object"
@@ -60,17 +58,13 @@ function isValidKmInteger(value: unknown): value is number {
   );
 }
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function isValidUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_REGEX.test(value);
 }
 
-function hasExactOwnKeys(
-  obj: Record<string, unknown>,
-  allowed: ReadonlyArray<string>,
-): boolean {
+function hasExactOwnKeys(obj: Record<string, unknown>, allowed: ReadonlyArray<string>): boolean {
   const keys = Object.keys(obj);
   if (keys.length !== allowed.length) return false;
   const allowedSet = new Set(allowed);
@@ -184,9 +178,7 @@ export function validateAwaitingConfirmationKmUpdateDraft(
       newKm: nk,
       requestMessageId: input.requestMessageId,
       isCorrection: input.isCorrection,
-      ...(hasLinkedExpenseId
-        ? { linkedExpenseId: input.linkedExpenseId as string }
-        : {}),
+      ...(hasLinkedExpenseId ? { linkedExpenseId: input.linkedExpenseId as string } : {}),
     },
   };
 }

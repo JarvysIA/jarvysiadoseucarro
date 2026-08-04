@@ -3,11 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 
 const MSG = "22222222-2222-4222-8222-222222222222";
 const VEH = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01";
@@ -71,14 +67,12 @@ describe("core — linkedExpenseId no draft de km (build 6a/9)", () => {
     expect(d.nextState).toBe("awaiting_km_confirmation");
     const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
     expect(payload).not.toBeNull();
-    expect(Object.prototype.hasOwnProperty.call(payload!, "linkedExpenseId"))
-      .toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(payload!, "linkedExpenseId")).toBe(false);
   });
 
   test("draftId não-uuid → draft final NÃO carrega linkedExpenseId", () => {
     const d = decideConversation(inp("not-a-uuid"));
     const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
-    expect(Object.prototype.hasOwnProperty.call(payload!, "linkedExpenseId"))
-      .toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(payload!, "linkedExpenseId")).toBe(false);
   });
 });

@@ -37,16 +37,14 @@ describe("constantes de versão (persistência, não phase)", () => {
     expect(completeInitial.ok).toBe(true);
     if (completeInitial.ok) {
       // Payload não expõe draftVersion.
-      expect(Object.keys(completeInitial.value).sort()).toEqual(
-        [
-          "expectedPreviousKm",
-          "isCorrection",
-          "newKm",
-          "phase",
-          "requestMessageId",
-          "vehicleId",
-        ],
-      );
+      expect(Object.keys(completeInitial.value).sort()).toEqual([
+        "expectedPreviousKm",
+        "isCorrection",
+        "newKm",
+        "phase",
+        "requestMessageId",
+        "vehicleId",
+      ]);
     }
     const partial = validateAwaitingVehicleKmUpdateDraft({
       phase: "awaiting_vehicle",
@@ -55,9 +53,7 @@ describe("constantes de versão (persistência, não phase)", () => {
     });
     expect(partial.ok).toBe(true);
     if (partial.ok) {
-      expect(Object.keys(partial.value).sort()).toEqual(
-        ["newKm", "phase", "requestMessageId"],
-      );
+      expect(Object.keys(partial.value).sort()).toEqual(["newKm", "phase", "requestMessageId"]);
     }
   });
 });
@@ -532,16 +528,7 @@ describe("validateKmUpdateDraft (união)", () => {
   });
 
   it("não lança para input arbitrário", () => {
-    const inputs: unknown[] = [
-      null,
-      undefined,
-      0,
-      "",
-      [],
-      new Date(),
-      () => 0,
-      Symbol("x"),
-    ];
+    const inputs: unknown[] = [null, undefined, 0, "", [], new Date(), () => 0, Symbol("x")];
     for (const i of inputs) {
       expect(() => validateKmUpdateDraft(i)).not.toThrow();
     }

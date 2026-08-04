@@ -62,9 +62,7 @@ const CONFIRMATION_STATES: ConversationStateName[] = [
 describe("core — unknown (no text) during confirmation nudge", () => {
   for (const s of CONFIRMATION_STATES) {
     test(`unknown + null text during ${s} → nudge, state unchanged`, () => {
-      const d = decideConversation(
-        inp({ messageType: "unknown", state: state({ state: s }) }),
-      );
+      const d = decideConversation(inp({ messageType: "unknown", state: state({ state: s }) }));
       expect(d.decisionKind).toBe("respond");
       expect(d.eventKind).toBe("media");
       expect(d.responseKey).toBe("media_unclear_during_confirmation");
@@ -94,7 +92,12 @@ describe("core — unknown (no text) during confirmation nudge", () => {
 
   test("unknown + null text at idle → unchanged fallback behavior", () => {
     const d = decideConversation(
-      inp({ messageType: "unknown", originalText: null, state: state({ state: "idle" }), fallbackCount: 0 }),
+      inp({
+        messageType: "unknown",
+        originalText: null,
+        state: state({ state: "idle" }),
+        fallbackCount: 0,
+      }),
     );
     expect(d.decisionKind).toBe("fallback");
     expect(d.eventKind).toBe("unknown");

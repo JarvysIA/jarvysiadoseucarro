@@ -13,7 +13,9 @@ type Expected = {
 
 function toShape(r: MaintenanceItemsParseResult): Expected {
   return {
-    items: r.items.map((i) => [i.tag, i.itemKeys] as [MaintenanceTriggerTag, ReadonlyArray<MaintenanceItemKey>]),
+    items: r.items.map(
+      (i) => [i.tag, i.itemKeys] as [MaintenanceTriggerTag, ReadonlyArray<MaintenanceItemKey>],
+    ),
     ambiguousFilterMention: r.ambiguousFilterMention,
   };
 }

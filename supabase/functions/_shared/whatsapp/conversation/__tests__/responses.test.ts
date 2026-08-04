@@ -29,10 +29,25 @@ const ALL_KEYS = [
 
 // Guarda de linguagem: nunca prometer recursos, expor infra ou erros internos.
 const FORBIDDEN = [
-  "api", "endpoint", "banco", "database", "queue", "fila",
-  "provider", "z-api", "zapi", "supabase", "webhook",
-  "erro interno", "internal error", "500", "undefined",
-  "cron", "rate limit", "openai", "gpt",
+  "api",
+  "endpoint",
+  "banco",
+  "database",
+  "queue",
+  "fila",
+  "provider",
+  "z-api",
+  "zapi",
+  "supabase",
+  "webhook",
+  "erro interno",
+  "internal error",
+  "500",
+  "undefined",
+  "cron",
+  "rate limit",
+  "openai",
+  "gpt",
 ];
 
 describe("renderResponse guardrails", () => {

@@ -5,11 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { EXPENSE_REPORTED_EVENT_KIND } from "../expense-create-protocol.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";

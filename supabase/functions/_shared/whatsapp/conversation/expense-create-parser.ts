@@ -21,7 +21,7 @@ const EXPENSE_CATEGORIES = [
   "Seguro",
   "Acessórios",
 ] as const;
-type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
+type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 
 // ---------------------------------------------------------------------------
 // Contratos públicos
@@ -53,18 +53,16 @@ export type ExpenseCategoriaMatchResult =
 // Normalização interna
 // ---------------------------------------------------------------------------
 
-const UNICODE_SPACES_RE =
-  /[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g;
+const UNICODE_SPACES_RE = /[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g;
 const DIACRITICS_RE = /[\u0300-\u036f]/g;
 const ASCII_SPACE_RE = /[ \t\r\n\f\v]+/g;
 
 // Preserva dígitos, vírgula, ponto e "$" (necessário pro marcador "r$").
 // Converte pontuação inequívoca em espaço.
-const HARMLESS_PUNCT_VALOR_RE = /[()!?;:_\/=+\-]/g;
+const HARMLESS_PUNCT_VALOR_RE = /[()!?;:_/=+-]/g;
 
 function normalizeForValor(input: string): string {
-  const capped =
-    input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
+  const capped = input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
   return capped
     .normalize("NFD")
     .replace(DIACRITICS_RE, "")
@@ -79,12 +77,8 @@ function normalizeForValor(input: string): string {
 const NON_ALNUM_RE = /[^a-z0-9]+/g;
 
 function normalizeForCategoria(input: string): string {
-  const capped =
-    input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
-  const stripped = capped
-    .normalize("NFD")
-    .replace(DIACRITICS_RE, "")
-    .toLowerCase();
+  const capped = input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
+  const stripped = capped.normalize("NFD").replace(DIACRITICS_RE, "").toLowerCase();
   return " " + stripped.replace(NON_ALNUM_RE, " ").replace(ASCII_SPACE_RE, " ").trim() + " ";
 }
 
@@ -124,8 +118,7 @@ function validateBrlAmountFormat(raw: string): NumberCheck {
       return { kind: "format" };
     }
     if (intDigits.length > 12) return { kind: "range" };
-    const centavos =
-      decPart.length === 1 ? Number(decPart) * 10 : Number(decPart);
+    const centavos = decPart.length === 1 ? Number(decPart) * 10 : Number(decPart);
     const intN = Number(intDigits);
     if (!Number.isFinite(intN) || !Number.isInteger(intN)) {
       return { kind: "format" };
@@ -192,9 +185,7 @@ const VALOR_RE = new RegExp(
   "g",
 );
 
-function combineValorResults(
-  results: ReadonlyArray<NumberCheck>,
-): ExpenseValorParseResult {
+function combineValorResults(results: ReadonlyArray<NumberCheck>): ExpenseValorParseResult {
   if (results.length === 0) return { ok: false, code: "no_valor_candidate" };
   for (const r of results) {
     if (r.kind === "format") return { ok: false, code: "invalid_valor_format" };
@@ -283,9 +274,10 @@ export function parseExpenseValorBareNumber(input: unknown): ExpenseValorParseRe
 // Categorias — tabela de keywords (normalizadas, sem acento)
 // ---------------------------------------------------------------------------
 
-const CATEGORY_KEYWORDS: ReadonlyArray<
-  { readonly categoria: ExpenseCategory; readonly keywords: ReadonlyArray<string> }
-> = [
+const CATEGORY_KEYWORDS: ReadonlyArray<{
+  readonly categoria: ExpenseCategory;
+  readonly keywords: ReadonlyArray<string>;
+}> = [
   {
     categoria: "Combustível",
     keywords: [
@@ -404,9 +396,7 @@ function hasKeyword(haystack: string, keyword: string): boolean {
 // matchExpenseCategoria
 // ---------------------------------------------------------------------------
 
-export function matchExpenseCategoria(
-  input: unknown,
-): ExpenseCategoriaMatchResult {
+export function matchExpenseCategoria(input: unknown): ExpenseCategoriaMatchResult {
   if (typeof input !== "string") return { ok: false, code: "not_a_string" };
   if (input.trim() === "") return { ok: false, code: "empty_text" };
   const normalized = normalizeForCategoria(input);

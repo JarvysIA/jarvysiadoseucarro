@@ -20,10 +20,7 @@ import {
   validateAwaitingConfirmationKmUpdateDraft,
   validateAwaitingVehicleKmUpdateDraft,
 } from "../km-update-draft.ts";
-import {
-  CONFIRM_KM_UPDATE_HANDOFF_KIND,
-  KM_REPORTED_EVENT_KIND,
-} from "../km-update-protocol.ts";
+import { CONFIRM_KM_UPDATE_HANDOFF_KIND, KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
 // UUIDs determinísticos (RFC 4122 v4) — congelam identidade em todos os testes.
 const MSG_UUID_A = "11111111-1111-4111-8111-111111111111";
@@ -159,19 +156,17 @@ describe("core T1 — draft completo direto em idle", () => {
 
   test("kmAtual 0 + aumento → isCorrection=false", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 0);
-    const d = decideConversation(
-      inp({ originalText: "odometro 100 km", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "odometro 100 km", vehicles: [v] }));
     expect(d.nextState).toBe("awaiting_km_confirmation");
     expect((d.statePatch.draftPayload as { isCorrection: boolean }).isCorrection).toBe(false);
-    expect((d.statePatch.draftPayload as { expectedPreviousKm: number | null }).expectedPreviousKm).toBe(0);
+    expect(
+      (d.statePatch.draftPayload as { expectedPreviousKm: number | null }).expectedPreviousKm,
+    ).toBe(0);
   });
 
   test("igualdade newKm === kmAtual → isCorrection=false (comparação estrita <)", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 500);
-    const d = decideConversation(
-      inp({ originalText: "km 500", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 500", vehicles: [v] }));
     expect(d.nextState).toBe("awaiting_km_confirmation");
     expect(d.responseKey).toBe("km_update_confirmation");
     expect((d.statePatch.draftPayload as { isCorrection: boolean }).isCorrection).toBe(false);
@@ -179,9 +174,7 @@ describe("core T1 — draft completo direto em idle", () => {
 
   test("redução newKm < kmAtual → isCorrection=true + state de correção", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 20000);
-    const d = decideConversation(
-      inp({ originalText: "km 15000", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 15000", vehicles: [v] }));
     expect(d.nextState).toBe("awaiting_km_correction");
     expect(d.responseKey).toBe("km_update_correction_confirmation");
     expect((d.statePatch.draftPayload as { isCorrection: boolean }).isCorrection).toBe(true);
@@ -189,9 +182,7 @@ describe("core T1 — draft completo direto em idle", () => {
 
   test("kmAtual null → draft completo com expectedPreviousKm=null e isCorrection=false", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", null);
-    const d = decideConversation(
-      inp({ originalText: "km 50000", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 50000", vehicles: [v] }));
     expect(d.nextState).toBe("awaiting_km_confirmation");
     const payload = d.statePatch.draftPayload as {
       expectedPreviousKm: number | null;
@@ -203,9 +194,7 @@ describe("core T1 — draft completo direto em idle", () => {
 
   test("limite máximo (INT_MAX) aceito", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 0);
-    const d = decideConversation(
-      inp({ originalText: "km 2147483647", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 2147483647", vehicles: [v] }));
     expect(d.decisionKind).toBe("transition");
     expect((d.statePatch.draftPayload as { newKm: number }).newKm).toBe(2147483647);
   });
@@ -238,9 +227,7 @@ describe("core T1 — draft parcial em idle (sem resolução direta)", () => {
   const v2 = veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000);
 
   test("múltiplos veículos sem activeVehicleId → draft parcial v0 awaiting_vehicle", () => {
-    const d = decideConversation(
-      inp({ originalText: "km 5000", vehicles: [v1, v2] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 5000", vehicles: [v1, v2] }));
     expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
     expect(d.decisionKind).toBe("transition");
     expect(d.nextState).toBe("awaiting_vehicle");
@@ -266,9 +253,7 @@ describe("core T1 — draft parcial em idle (sem resolução direta)", () => {
   });
 
   test("zero veículos elegíveis → responde no_eligible_vehicle, não cria draft", () => {
-    const d = decideConversation(
-      inp({ originalText: "km 100", vehicles: [] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 100", vehicles: [] }));
     expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
     expect(d.decisionKind).toBe("respond");
     expect(d.responseKey).toBe("no_eligible_vehicle");
@@ -288,42 +273,32 @@ describe("core T1 — casos que NÃO iniciam KM", () => {
   const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
 
   test("número isolado sem rótulo/unidade não inicia KM (fallback)", () => {
-    const d = decideConversation(
-      inp({ originalText: "12345", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "12345", vehicles: [v1] }));
     expect(d.eventKind).toBe("unknown");
     expect(d.decisionKind).toBe("fallback");
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
   test("entrada ambígua ('100 km e 200 km') não cria draft", () => {
-    const d = decideConversation(
-      inp({ originalText: "100 km e 200 km", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "100 km e 200 km", vehicles: [v1] }));
     expect(d.decisionKind).toBe("fallback");
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
   test("formato inválido (sem dígitos após rótulo) não cria draft", () => {
-    const d = decideConversation(
-      inp({ originalText: "km abc", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "km abc", vehicles: [v1] }));
     expect(d.decisionKind).toBe("fallback");
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
   test("fora do range (> INT_MAX) não cria draft", () => {
-    const d = decideConversation(
-      inp({ originalText: "km 9999999999", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 9999999999", vehicles: [v1] }));
     expect(d.decisionKind).toBe("fallback");
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
   test("comando global 'ajuda' tem prioridade mesmo com contexto de veículo", () => {
-    const d = decideConversation(
-      inp({ originalText: "ajuda", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "ajuda", vehicles: [v1] }));
     expect(d.eventKind).toBe("help");
     expect(d.responseKey).toBe("help");
     expect(d.statePatch.draftType).toBeUndefined();
@@ -331,17 +306,13 @@ describe("core T1 — casos que NÃO iniciam KM", () => {
 
   test("comando global 'cancela' tem prioridade sobre parser KM", () => {
     // Sem pendência: apenas informa nothing_to_cancel.
-    const d = decideConversation(
-      inp({ originalText: "cancela", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "cancela", vehicles: [v1] }));
     expect(d.eventKind).toBe("cancel_task");
     expect(d.statePatch.draftType).toBeUndefined();
   });
 
   test("saudação isolada não dispara KM", () => {
-    const d = decideConversation(
-      inp({ originalText: "oi", vehicles: [v1] }),
-    );
+    const d = decideConversation(inp({ originalText: "oi", vehicles: [v1] }));
     expect(d.eventKind).toBe("greeting");
     expect(d.statePatch.draftType).toBeUndefined();
   });
@@ -734,33 +705,25 @@ describe("core T1 — MF.1 contrato de draftVersion (persistência, não phase)"
   test("constantes numéricas: INITIAL=0 e PROMOTED=1", () => {
     expect(KM_UPDATE_INITIAL_DRAFT_VERSION).toBe(0);
     expect(KM_UPDATE_PROMOTED_DRAFT_VERSION).toBe(1);
-    expect(KM_UPDATE_INITIAL_DRAFT_VERSION).not.toBe(
-      KM_UPDATE_PROMOTED_DRAFT_VERSION,
-    );
+    expect(KM_UPDATE_INITIAL_DRAFT_VERSION).not.toBe(KM_UPDATE_PROMOTED_DRAFT_VERSION);
   });
 
   test("draft parcial novo em idle → draftVersion === 0 (INITIAL)", () => {
     const v1 = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
     const v2 = veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000);
-    const d = decideConversation(
-      inp({ originalText: "km 5000", vehicles: [v1, v2] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 5000", vehicles: [v1, v2] }));
     expect(d.statePatch.draftVersion).toBe(0);
     expect(d.statePatch.draftVersion).toBe(KM_UPDATE_INITIAL_DRAFT_VERSION);
   });
 
   test("draft completo DIRETO em idle → draftVersion === 0 (INITIAL, não 1)", () => {
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
-    const d = decideConversation(
-      inp({ originalText: "km 3000", vehicles: [v] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 3000", vehicles: [v] }));
     expect(d.nextState).toBe("awaiting_km_confirmation");
     expect(d.statePatch.draftVersion).toBe(0);
     expect(d.statePatch.draftVersion).not.toBe(KM_UPDATE_PROMOTED_DRAFT_VERSION);
     // phase awaiting_confirmation NÃO implica draftVersion=1.
-    expect(
-      (d.statePatch.draftPayload as { phase: string }).phase,
-    ).toBe("awaiting_confirmation");
+    expect((d.statePatch.draftPayload as { phase: string }).phase).toBe("awaiting_confirmation");
   });
 
   test("promoção do MESMO draft parcial: 0 → 1, mesmo draftId, mesmo requestMessageId", () => {
@@ -792,10 +755,9 @@ describe("core T1 — MF.1 contrato de draftVersion (persistência, não phase)"
     // draftId preservado (mesmo draft).
     expect(d.statePatch.draftId).toBe(MSG_UUID_A);
     // requestMessageId preservado dentro do payload.
-    expect(
-      (d.statePatch.draftPayload as { requestMessageId: string })
-        .requestMessageId,
-    ).toBe(MSG_UUID_A);
+    expect((d.statePatch.draftPayload as { requestMessageId: string }).requestMessageId).toBe(
+      MSG_UUID_A,
+    );
   });
 
   test("seleção inválida: nunca reenvia draftVersion nem incrementa (patch omitido)", () => {
@@ -830,18 +792,13 @@ describe("core T1 — MF.1 contrato de draftVersion (persistência, não phase)"
   test("nenhum cenário deste build produz draftVersion === 1 sem snapshot anterior mesmo draftId", () => {
     // Todos os drafts novos (parcial ou completo direto) devem ter version 0.
     const v = veh(VEH_UUID_1, "Fiat", "Argo", "ABC1D23", 1000);
-    const dDirect = decideConversation(
-      inp({ originalText: "km 4000", vehicles: [v] }),
-    );
+    const dDirect = decideConversation(inp({ originalText: "km 4000", vehicles: [v] }));
     expect(dDirect.statePatch.draftVersion).toBe(0);
 
     const dPartial = decideConversation(
       inp({
         originalText: "km 4000",
-        vehicles: [
-          v,
-          veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000),
-        ],
+        vehicles: [v, veh(VEH_UUID_2, "Chevrolet", "Onix", "XYZ4E56", 2000)],
       }),
     );
     expect(dPartial.statePatch.draftVersion).toBe(0);
