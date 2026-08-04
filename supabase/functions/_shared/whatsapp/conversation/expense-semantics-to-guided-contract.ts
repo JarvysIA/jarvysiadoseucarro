@@ -291,48 +291,77 @@ export const adaptExpenseSemanticsToGuidedContract = ({
     }
 
     case "needs_clarification": {
-      if (semanticResult.reason === "expense_or_question_intent_ambiguous") {
-        return {
-          status: "guided",
-          semanticDecision,
-          guidedContract: {
-            status: "needs_clarification",
-            reason: "ambiguous_expense_intent",
-            missingField: "expenseIntent",
-            questionKey: "ask_expense_or_question_intent",
-            safeKnownData: {},
-            technicalAuthorization: "none",
-          },
-        };
+      switch (semanticResult.reason) {
+        case "expense_or_question_intent_ambiguous":
+          return {
+            status: "guided",
+            semanticDecision,
+            guidedContract: {
+              status: "needs_clarification",
+              reason: "ambiguous_expense_intent",
+              missingField: "expenseIntent",
+              questionKey: "ask_expense_or_question_intent",
+              safeKnownData: {},
+              technicalAuthorization: "none",
+            },
+          };
+
+        case "oil_system_ambiguous": {
+          const operationalValidation = validateOperationalData(operationalData);
+          if (operationalValidation.valid === false) {
+            return {
+              status: "unsupported",
+              semanticDecision,
+              reason: operationalValidation.reason,
+              failureClass: "contract_violation",
+              technicalAuthorization: "none",
+            };
+          }
+
+          return {
+            status: "guided",
+            semanticDecision,
+            guidedContract: {
+              status: "needs_clarification",
+              reason: "ambiguous_oil",
+              missingField: "oilSystem",
+              questionKey: "ask_oil_system",
+              safeKnownData: toSafeKnownData(operationalData),
+              technicalAuthorization: "none",
+            },
+          };
+        }
+
+        case "category_ambiguous_non_engine": {
+          const operationalValidation = validateOperationalData(operationalData);
+          if (operationalValidation.valid === false) {
+            return {
+              status: "unsupported",
+              semanticDecision,
+              reason: operationalValidation.reason,
+              failureClass: "contract_violation",
+              technicalAuthorization: "none",
+            };
+          }
+
+          return {
+            status: "guided",
+            semanticDecision,
+            guidedContract: {
+              status: "needs_clarification",
+              reason: "ambiguous_category",
+              missingField: "category",
+              questionKey: "ask_category",
+              options: semanticResult.candidateCategories,
+              safeKnownData: toSafeKnownData(operationalData),
+              technicalAuthorization: "none",
+            },
+          };
+        }
+
+        default:
+          return assertNever(semanticResult.reason);
       }
-
-      const operationalValidation = validateOperationalData(operationalData);
-      if (operationalValidation.valid === false) {
-        return {
-          status: "unsupported",
-          semanticDecision,
-          reason: operationalValidation.reason,
-          failureClass: "contract_violation",
-          technicalAuthorization: "none",
-        };
-      }
-
-      const clarification = {
-        reason: "ambiguous_oil" as const,
-        missingField: "oilSystem",
-        questionKey: "ask_oil_system",
-      };
-
-      return {
-        status: "guided",
-        semanticDecision,
-        guidedContract: {
-          status: "needs_clarification",
-          ...clarification,
-          safeKnownData: toSafeKnownData(operationalData),
-          technicalAuthorization: "none",
-        },
-      };
     }
 
     case "conversation_only":

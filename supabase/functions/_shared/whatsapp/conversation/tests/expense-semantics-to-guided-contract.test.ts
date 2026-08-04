@@ -332,6 +332,32 @@ describe("expense semantics adapter — needs clarification", () => {
     });
   });
 
+  it("mapeia categoria não-motor ambígua com as candidatas como options", () => {
+    const result = adapt({
+      status: "needs_clarification",
+      persistable: false,
+      reason: "category_ambiguous_non_engine",
+      decisionCode: "clarification_required",
+      candidateCategories: ["Manutenção", "Acessórios"],
+    });
+    expect(result).toMatchObject({
+      status: "guided",
+      semanticDecision: {
+        status: "needs_clarification",
+        persistable: false,
+        decisionCode: "clarification_required",
+      },
+      guidedContract: {
+        status: "needs_clarification",
+        reason: "ambiguous_category",
+        missingField: "category",
+        questionKey: "ask_category",
+        options: ["Manutenção", "Acessórios"],
+        technicalAuthorization: "none",
+      },
+    });
+  });
+
   it("mapeia intenção ambígua antes de pedir KM ou valor", () => {
     // Origens documentadas: “Óleo do câmbio, R$ 1.199” e “Óleo do carro”.
     const result = adapt(
