@@ -35,10 +35,9 @@ describe("engine concept recognizer — reconhecimento por conceito individual (
     expect(recognizeEngineConcepts("troquei o filtro do ar")).toEqual(["engine_air_filter"]);
   });
 
-  it("reconhece cabin_filter por 'filtro de cabine' e 'filtro do ar-condicionado' (o segundo também contém 'filtro do ar', logo engine_air_filter)", () => {
+  it("reconhece cabin_filter por 'filtro de cabine' e 'filtro do ar-condicionado' (sem falso positivo de engine_air_filter)", () => {
     expect(recognizeEngineConcepts("troquei o filtro de cabine")).toEqual(["cabin_filter"]);
     expect(recognizeEngineConcepts("troquei o filtro do ar-condicionado")).toEqual([
-      "engine_air_filter",
       "cabin_filter",
     ]);
   });
@@ -105,6 +104,15 @@ describe("engine concept recognizer — exceção da palavra solta 'oleo' (evita
     expect(recognizeEngineConcepts("troquei o oleo do motor e o oleo do cambio")).toEqual([
       "engine_oil",
       "transmission_fluid",
+    ]);
+  });
+});
+
+describe("engine concept recognizer — exceção de 'filtro do ar' (evita falso positivo com cabin_filter)", () => {
+  it("reconhece AMBOS engine_air_filter e cabin_filter quando mencionados explicitamente e separados", () => {
+    expect(recognizeEngineConcepts("troquei o filtro de ar e o filtro de cabine")).toEqual([
+      "engine_air_filter",
+      "cabin_filter",
     ]);
   });
 });

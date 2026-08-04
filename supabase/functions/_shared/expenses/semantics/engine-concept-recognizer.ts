@@ -43,7 +43,9 @@ const SYNONYM_KEYWORDS: Readonly<Partial<Record<ExpenseSemanticConceptKey, reado
     "freio",
     "freios",
   ],
-  engine_air_filter: ["filtro de ar", "filtro do ar"],
+  // "filtro do ar" (ambíguo com cabin_filter) é tratado à parte por
+  // matchesEngineAirFilter (regra especial abaixo), não faz parte desta lista simples.
+  engine_air_filter: ["filtro de ar"],
   cabin_filter: ["filtro de cabine", "filtro do ar condicionado", "filtro do ar-condicionado"],
   fuel_filter: [
     "filtro de combustivel",
@@ -125,9 +127,30 @@ function matchesEngineOil(haystack: string): boolean {
   return true;
 }
 
+const ENGINE_AIR_FILTER_AMBIGUOUS_KEYWORD = "filtro do ar";
+
+/**
+ * REGRA ESPECIAL — engine_air_filter:
+ * "filtro do ar" é ambíguo porque também aparece dentro de "filtro do ar condicionado" /
+ * "filtro do ar-condicionado" (termos de cabin_filter). Quando a mesma mensagem já
+ * contém um termo de cabin_filter, "filtro do ar" sozinho NÃO dispara engine_air_filter
+ * adicionalmente — evita reconhecer os dois pela mesma menção de filtro de cabine.
+ * "filtro de ar" (SYNONYM_KEYWORDS.engine_air_filter) é inequívoco e sempre dispara,
+ * mesmo ao lado de uma menção explícita e separada de cabin_filter.
+ */
+function matchesEngineAirFilter(haystack: string): boolean {
+  const unambiguousKeywords = SYNONYM_KEYWORDS.engine_air_filter;
+  if (unambiguousKeywords !== undefined && matchesAny(haystack, unambiguousKeywords)) return true;
+  if (!hasKeyword(haystack, ENGINE_AIR_FILTER_AMBIGUOUS_KEYWORD)) return false;
+  const cabinFilterKeywords = SYNONYM_KEYWORDS.cabin_filter ?? [];
+  if (matchesAny(haystack, cabinFilterKeywords)) return false;
+  return true;
+}
+
 function isConceptRecognized(conceptKey: ExpenseSemanticConceptKey, haystack: string): boolean {
   if (conceptKey === "cooling_system") return matchesCoolingSystem(haystack);
   if (conceptKey === "engine_oil") return matchesEngineOil(haystack);
+  if (conceptKey === "engine_air_filter") return matchesEngineAirFilter(haystack);
   const keywords = SYNONYM_KEYWORDS[conceptKey];
   return keywords !== undefined && matchesAny(haystack, keywords);
 }
