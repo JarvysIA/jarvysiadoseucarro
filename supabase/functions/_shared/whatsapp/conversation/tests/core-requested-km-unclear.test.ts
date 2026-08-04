@@ -3,11 +3,7 @@
 // novos padrões, número puro (caminho feliz) e fallback genérico.
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
 const MSG = "22222222-2222-4222-8222-222222222222";
@@ -117,8 +113,6 @@ describe("awaiting_requested_km — fallback genérico permanece", () => {
   test('"oi, tudo bem?" → fallback, não requested_km_unknown', () => {
     const d = decideConversation(inp("oi, tudo bem?"));
     expect(d.responseKey).not.toBe("requested_km_unknown");
-    expect(["fallback_first", "fallback_second", "fallback_reset"]).toContain(
-      d.responseKey,
-    );
+    expect(["fallback_first", "fallback_second", "fallback_reset"]).toContain(d.responseKey);
   });
 });

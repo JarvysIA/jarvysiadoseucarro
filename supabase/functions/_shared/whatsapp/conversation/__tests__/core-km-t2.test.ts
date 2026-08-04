@@ -4,11 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { KM_UPDATE_INITIAL_DRAFT_VERSION } from "../km-update-draft.ts";
 import { CONFIRM_KM_UPDATE_HANDOFF_KIND } from "../km-update-protocol.ts";
 

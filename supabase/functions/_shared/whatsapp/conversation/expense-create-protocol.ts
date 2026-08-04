@@ -21,11 +21,9 @@ export type ExpenseReportedEvent = Readonly<{
 // Handoff T2 — confirm_expense_create
 // ---------------------------------------------------------------------------
 
-export const CONFIRM_EXPENSE_CREATE_HANDOFF_KIND =
-  "confirm_expense_create" as const;
+export const CONFIRM_EXPENSE_CREATE_HANDOFF_KIND = "confirm_expense_create" as const;
 
-export type ConfirmExpenseCreateHandoffKind =
-  typeof CONFIRM_EXPENSE_CREATE_HANDOFF_KIND;
+export type ConfirmExpenseCreateHandoffKind = typeof CONFIRM_EXPENSE_CREATE_HANDOFF_KIND;
 
 export type ConfirmExpenseCreateHandoff = Readonly<{
   readonly kind: typeof CONFIRM_EXPENSE_CREATE_HANDOFF_KIND;

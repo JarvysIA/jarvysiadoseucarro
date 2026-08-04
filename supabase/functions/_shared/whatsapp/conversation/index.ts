@@ -4,11 +4,7 @@ export { normalizeCommandText } from "./normalize.ts";
 export type { NormalizedText } from "./normalize.ts";
 export { classifyCommand, looksLikeCorrectionHint } from "./commands.ts";
 export type { CommandKind } from "./commands.ts";
-export {
-  resolveVehicle,
-  vehicleLabel,
-  normalizePlate,
-} from "./vehicles.ts";
+export { resolveVehicle, vehicleLabel, normalizePlate } from "./vehicles.ts";
 export type { VehicleResolveInput, VehicleResolveResult } from "./vehicles.ts";
 export { renderResponse } from "./responses.ts";
 export { decideConversation } from "./core.ts";
@@ -32,10 +28,7 @@ export type {
   KmUpdateParseMode,
   KmUpdateParseResult,
 } from "./km-update-parser.ts";
-export {
-  CONFIRM_KM_UPDATE_HANDOFF_KIND,
-  KM_REPORTED_EVENT_KIND,
-} from "./km-update-protocol.ts";
+export { CONFIRM_KM_UPDATE_HANDOFF_KIND, KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
 export type {
   ConfirmKmUpdateHandoff,
   ConfirmKmUpdateHandoffKind,

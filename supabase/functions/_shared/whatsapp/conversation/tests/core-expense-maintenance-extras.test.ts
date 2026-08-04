@@ -4,11 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";
 const MSG_B = "22222222-2222-4222-8222-222222222222";
@@ -34,12 +30,7 @@ function state(overrides: Partial<ConversationState> = {}): ConversationState {
   };
 }
 
-function veh(
-  id: string,
-  brand = "Fiat",
-  model = "Argo",
-  plate = "ABC1D23",
-): ConversationVehicle {
+function veh(id: string, brand = "Fiat", model = "Argo", plate = "ABC1D23"): ConversationVehicle {
   return {
     id,
     brand,
@@ -79,9 +70,7 @@ describe("Build 4a — extras de manutenção no draftPayload de despesa", () =>
   });
 
   test("(2) Manutenção sem item + texto curto → recognizedTags=[], descricao=null", () => {
-    const d = decideConversation(
-      inp({ originalText: "oficina 300", vehicles: [veh(VEH_1)] }),
-    );
+    const d = decideConversation(inp({ originalText: "oficina 300", vehicles: [veh(VEH_1)] }));
     expect(d.nextState).toBe("awaiting_expense_confirmation");
     const p = d.statePatch.draftPayload as Record<string, unknown>;
     expect(p.categoria).toBe("Manutenção");
@@ -169,11 +158,8 @@ describe("Build 4a — extras de manutenção no draftPayload de despesa", () =>
     expect("descricaoPreliminar" in params).toBe(false);
   });
 
-
   test("(7) Regressão: fluxo de KM não recebe extras", () => {
-    const d = decideConversation(
-      inp({ originalText: "km 45000", vehicles: [veh(VEH_1)] }),
-    );
+    const d = decideConversation(inp({ originalText: "km 45000", vehicles: [veh(VEH_1)] }));
     // T1 de KM produz draftType="km_update"
     expect(d.statePatch.draftType).toBe("km_update");
     const p = d.statePatch.draftPayload as Record<string, unknown>;

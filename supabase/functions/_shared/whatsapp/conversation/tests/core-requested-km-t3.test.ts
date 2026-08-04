@@ -4,11 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 import { KM_UPDATE_INITIAL_DRAFT_VERSION } from "../km-update-draft.ts";
 
@@ -275,9 +271,7 @@ describe("core — awaiting_requested_km + 'não sei' (HARD4)", () => {
     );
     expect(d.responseKey).not.toBe("requested_km_unknown");
     // fallback genérico da seção 10
-    expect(["fallback_first", "fallback_second", "fallback_reset"]).toContain(
-      d.responseKey,
-    );
+    expect(["fallback_first", "fallback_second", "fallback_reset"]).toContain(d.responseKey);
   });
 
   test("'cancelar' continua caindo em cancel_task (seção 5)", () => {
@@ -292,4 +286,3 @@ describe("core — awaiting_requested_km + 'não sei' (HARD4)", () => {
     expect(d.responseKey).toBe("task_cancelled");
   });
 });
-

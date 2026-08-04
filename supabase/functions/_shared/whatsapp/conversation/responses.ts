@@ -2,10 +2,7 @@
 // Puro. Nenhuma referência a API/banco/fila/provider/Z-API/erro interno/promessas
 // de recursos ainda não ativos. No máximo um emoji por mensagem.
 
-import type {
-  ConversationResponseKey,
-  ConversationResponseParams,
-} from "./types.ts";
+import type { ConversationResponseKey, ConversationResponseParams } from "./types.ts";
 
 const MAINTENANCE_TAG_LABELS: Record<string, string> = {
   oleo: "óleo",
@@ -21,7 +18,6 @@ function joinRecognizedTags(tags: ReadonlyArray<string> | undefined): string | n
   if (labels.length === 2) return `${labels[0]} e ${labels[1]}`;
   return `${labels.slice(0, -1).join(", ")} e ${labels[labels.length - 1]}`;
 }
-
 
 export function renderResponse(
   key: ConversationResponseKey,
@@ -45,9 +41,8 @@ export function renderResponse(
       return `Combinado, vamos falar do ${label}.`;
     }
     case "vehicle_ambiguous": {
-      const opts = params.options && params.options.length > 0
-        ? params.options.join(" ou ")
-        : "qual carro";
+      const opts =
+        params.options && params.options.length > 0 ? params.options.join(" ou ") : "qual carro";
       return `Você quer o ${opts}?`;
     }
     case "vehicle_not_found":
@@ -91,9 +86,10 @@ export function renderResponse(
       return "Não consegui concluir agora. Pode me dizer a quilometragem de novo?";
     case "expense_category_prompt": {
       const v = formatValor(params.valor);
-      const opts = params.options && params.options.length > 0
-        ? params.options.join(" ou ")
-        : "qual categoria";
+      const opts =
+        params.options && params.options.length > 0
+          ? params.options.join(" ou ")
+          : "qual categoria";
       return `Registrei ${v}, mas não identifiquei a categoria. É ${opts}?`;
     }
     case "expense_create_confirmation": {

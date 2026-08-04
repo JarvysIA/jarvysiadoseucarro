@@ -63,9 +63,7 @@ const CONFIRMATION_STATES: ConversationStateName[] = [
 describe("core — media during confirmation nudge", () => {
   for (const s of CONFIRMATION_STATES) {
     test(`image during ${s} → nudge, state unchanged`, () => {
-      const d = decideConversation(
-        inp({ messageType: "image", state: state({ state: s }) }),
-      );
+      const d = decideConversation(inp({ messageType: "image", state: state({ state: s }) }));
       expect(d.decisionKind).toBe("respond");
       expect(d.eventKind).toBe("media");
       expect(d.responseKey).toBe("media_unclear_during_confirmation");

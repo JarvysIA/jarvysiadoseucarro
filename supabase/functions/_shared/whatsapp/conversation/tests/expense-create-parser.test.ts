@@ -5,7 +5,6 @@ import {
   parseExpenseValorText,
 } from "../expense-create-parser.ts";
 
-
 // ===========================================================================
 // parseExpenseValorText
 // ===========================================================================
@@ -237,9 +236,7 @@ describe("parseExpenseValorBareNumber — número pelado com ponto de milhar", (
   });
 });
 
-
 describe("parseExpenseValorText — formato inválido", () => {
-
   test("vírgula com 3+ dígitos depois (ancorado por R$)", () => {
     expect(parseExpenseValorText("R$ 30,000")).toEqual({
       ok: false,

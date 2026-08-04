@@ -15,7 +15,9 @@ export type VehicleResolveResult =
 /** Sanitiza placa: uppercase, mantém apenas A-Z0-9. */
 export function normalizePlate(value: string | null | undefined): string {
   if (!value) return "";
-  return String(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return String(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 function eligible(vehicles: ConversationVehicle[]): ConversationVehicle[] {

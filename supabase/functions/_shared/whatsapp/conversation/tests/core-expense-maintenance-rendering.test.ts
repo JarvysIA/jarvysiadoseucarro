@@ -4,11 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
 import { renderResponse } from "../responses.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";
 const MSG_B = "22222222-2222-4222-8222-222222222222";
@@ -35,12 +31,7 @@ function state(overrides: Partial<ConversationState> = {}): ConversationState {
   };
 }
 
-function veh(
-  id: string,
-  brand = "Fiat",
-  model = "Argo",
-  plate = "ABC1D23",
-): ConversationVehicle {
+function veh(id: string, brand = "Fiat", model = "Argo", plate = "ABC1D23"): ConversationVehicle {
   return {
     id,
     brand,
@@ -68,7 +59,10 @@ function inp(overrides: Partial<ConversationCoreInput> = {}): ConversationCoreIn
   };
 }
 
-function renderFrom(input: ConversationCoreInput): { text: string; decision: ReturnType<typeof decideConversation> } {
+function renderFrom(input: ConversationCoreInput): {
+  text: string;
+  decision: ReturnType<typeof decideConversation>;
+} {
   const d = decideConversation(input);
   const text = renderResponse(d.responseKey, d.responseParams);
   return { text, decision: d };
@@ -79,61 +73,75 @@ const DESCRIPTION_INVITE = "Se quiser contar mais sobre o que foi feito, pode fa
 
 describe("Build 4b — texto renderizado final para despesa de manutenção/revisão", () => {
   test("(1) pastilha reconhecida → texto contém (pastilha)", () => {
-    const { text } = renderFrom(inp({
-      originalText: "Troquei a pastilha de freio, 220 reais",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "Troquei a pastilha de freio, 220 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text).toContain("(pastilha)");
     expect(text).not.toContain(FILTER_QUESTION);
     expect(text).not.toContain(DESCRIPTION_INVITE);
   });
 
   test("(2) óleo + filtro → texto contém (óleo)", () => {
-    const { text } = renderFrom(inp({
-      originalText: "Troquei o óleo e o filtro, 220 reais",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "Troquei o óleo e o filtro, 220 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text).toContain("(óleo)");
   });
 
   test("(3) sem item + texto curto → convite de descrição no final", () => {
-    const { text } = renderFrom(inp({
-      originalText: "oficina 300",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "oficina 300",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text.endsWith(DESCRIPTION_INVITE)).toBe(true);
   });
 
   test("(4) sem item + texto longo → sem convite de descrição", () => {
-    const { text } = renderFrom(inp({
-      originalText: "Manutenção geral no carro todo, revisei tudo mesmo, 500 reais",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "Manutenção geral no carro todo, revisei tudo mesmo, 500 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text).not.toContain(DESCRIPTION_INVITE);
   });
 
   test("(5) filtro ambíguo → pergunta qual filtro", () => {
-    const { text } = renderFrom(inp({
-      originalText: "Manutenção, troquei o filtro, 30 reais",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "Manutenção, troquei o filtro, 30 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text.endsWith(FILTER_QUESTION)).toBe(true);
   });
 
   test("(6) pastilha + filtro ambíguo → contém (pastilha) E pergunta do filtro", () => {
-    const { text } = renderFrom(inp({
-      originalText: "troquei a pastilha e o filtro, 220 reais",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "troquei a pastilha e o filtro, 220 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text).toContain("(pastilha)");
     expect(text.endsWith(FILTER_QUESTION)).toBe(true);
   });
 
   test("(7) Combustível → formato antigo, sem parênteses/convite/pergunta", () => {
-    const { text } = renderFrom(inp({
-      originalText: "Abasteci 100 de gasolina",
-      vehicles: [veh(VEH_1)],
-    }));
+    const { text } = renderFrom(
+      inp({
+        originalText: "Abasteci 100 de gasolina",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
     expect(text).not.toContain("(");
     expect(text).not.toContain(DESCRIPTION_INVITE);
     expect(text).not.toContain(FILTER_QUESTION);
@@ -145,10 +153,12 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
     const v1 = veh(VEH_1, "Fiat", "Argo", "ABC1D23");
     const v2 = veh(VEH_2, "VW", "Gol", "XYZ2E34");
     const text0 = "Troquei o óleo e o filtro, 220 reais";
-    const d1 = decideConversation(inp({
-      originalText: text0,
-      vehicles: [v1, v2],
-    }));
+    const d1 = decideConversation(
+      inp({
+        originalText: text0,
+        vehicles: [v1, v2],
+      }),
+    );
     expect(d1.nextState).toBe("awaiting_vehicle");
 
     const pendingState = state({
@@ -160,21 +170,25 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
       draftVersion: 0,
       draftPayload: d1.statePatch.draftPayload as ConversationState["draftPayload"],
     });
-    const { text } = renderFrom(inp({
-      state: pendingState,
-      originalText: "argo",
-      vehicles: [v1, v2],
-      sourceMessageId: MSG_B,
-    }));
+    const { text } = renderFrom(
+      inp({
+        state: pendingState,
+        originalText: "argo",
+        vehicles: [v1, v2],
+        sourceMessageId: MSG_B,
+      }),
+    );
     expect(text).toContain("(óleo)");
   });
 
   test("(9) fluxo completo: 'Filtro 26,90' → responde 'Manutenção' → texto final tem pergunta do filtro", () => {
     const v1 = veh(VEH_1);
-    const d1 = decideConversation(inp({
-      originalText: "Filtro 26,90",
-      vehicles: [v1],
-    }));
+    const d1 = decideConversation(
+      inp({
+        originalText: "Filtro 26,90",
+        vehicles: [v1],
+      }),
+    );
     // categoria desconhecida → pergunta de categoria
     expect(d1.nextState).toBe("awaiting_expense_category");
 
@@ -189,12 +203,14 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
       activeVehicleId: VEH_1,
     });
 
-    const { text, decision } = renderFrom(inp({
-      state: pendingState,
-      originalText: "Manutenção",
-      vehicles: [v1],
-      sourceMessageId: MSG_C,
-    }));
+    const { text, decision } = renderFrom(
+      inp({
+        state: pendingState,
+        originalText: "Manutenção",
+        vehicles: [v1],
+        sourceMessageId: MSG_C,
+      }),
+    );
     expect(decision.nextState).toBe("awaiting_expense_confirmation");
     expect(text.endsWith(FILTER_QUESTION)).toBe(true);
   });

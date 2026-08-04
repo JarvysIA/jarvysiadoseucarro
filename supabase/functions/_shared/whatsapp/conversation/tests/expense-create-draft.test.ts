@@ -41,9 +41,13 @@ describe("constantes de versão (persistência, não phase)", () => {
     });
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(Object.keys(r.value).sort()).toEqual(
-        ["categoria", "phase", "requestMessageId", "valor", "vehicleId"],
-      );
+      expect(Object.keys(r.value).sort()).toEqual([
+        "categoria",
+        "phase",
+        "requestMessageId",
+        "valor",
+        "vehicleId",
+      ]);
     }
   });
 
@@ -225,16 +229,13 @@ describe("validateAwaitingVehicleExpenseDraft", () => {
     expect(r.ok).toBe(true);
   });
 
-  it.each(EXPENSE_CATEGORIES.map((c) => [c]))(
-    "aceita categoria %s",
-    (c: string) => {
-      const r = validateAwaitingVehicleExpenseDraft({
-        ...vehicleBase(),
-        categoria: c,
-      });
-      expect(r.ok).toBe(true);
-    },
-  );
+  it.each(EXPENSE_CATEGORIES.map((c) => [c]))("aceita categoria %s", (c: string) => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      categoria: c,
+    });
+    expect(r.ok).toBe(true);
+  });
 
   it.each([
     ["vazia", ""],
@@ -347,13 +348,7 @@ describe("validateAwaitingConfirmationExpenseDraft", () => {
     }
   });
 
-  const REQUIRED = [
-    "phase",
-    "categoria",
-    "valor",
-    "vehicleId",
-    "requestMessageId",
-  ] as const;
+  const REQUIRED = ["phase", "categoria", "valor", "vehicleId", "requestMessageId"] as const;
 
   it.each(REQUIRED)("rejeita campo obrigatório ausente: %s", (field: string) => {
     const input = { ...confirmationBase() } as Record<string, unknown>;
@@ -479,16 +474,7 @@ describe("validateExpenseCreateDraft (união)", () => {
   });
 
   it("não lança para input arbitrário", () => {
-    const inputs: unknown[] = [
-      null,
-      undefined,
-      0,
-      "",
-      [],
-      new Date(),
-      () => 0,
-      Symbol("x"),
-    ];
+    const inputs: unknown[] = [null, undefined, 0, "", [], new Date(), () => 0, Symbol("x")];
     for (const i of inputs) {
       expect(() => validateExpenseCreateDraft(i)).not.toThrow();
     }
@@ -832,4 +818,3 @@ describe("awaiting_confirmation — campos aditivos (build 3/9 do item 6)", () =
     if (!r.ok) expect(r.code).toBe("unexpected_field");
   });
 });
-

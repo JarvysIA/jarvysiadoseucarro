@@ -32,14 +32,7 @@ const GREETING = new Set<string>([
   "BOA NOITE",
 ]);
 
-const HELP = new Set<string>([
-  "AJUDA",
-  "MENU",
-  "HELP",
-  "COMO FUNCIONA",
-  "O QUE VOCE FAZ",
-  "?",
-]);
+const HELP = new Set<string>(["AJUDA", "MENU", "HELP", "COMO FUNCIONA", "O QUE VOCE FAZ", "?"]);
 
 const CONFIRM = new Set<string>([
   "SIM",
@@ -100,11 +93,7 @@ const CANCEL_TASK = new Set<string>([
 const THUMBS_UP = new Set<string>(["👍", "👍🏻", "👍🏼", "👍🏽", "👍🏾", "👍🏿"]);
 const THUMBS_DOWN = new Set<string>(["👎", "👎🏻", "👎🏼", "👎🏽", "👎🏾", "👎🏿"]);
 
-const RESET_CONVERSATION = new Set<string>([
-  "RECOMECAR",
-  "COMECAR DE NOVO",
-  "REINICIAR CONVERSA",
-]);
+const RESET_CONVERSATION = new Set<string>(["RECOMECAR", "COMECAR DE NOVO", "REINICIAR CONVERSA"]);
 
 // Opt-out EXPLÍCITO. Match exato no texto normalizado inteiro.
 const EXPLICIT_OPT_OUT = new Set<string>([

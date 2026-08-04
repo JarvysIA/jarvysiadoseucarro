@@ -32,8 +32,7 @@ export type KmReportedEvent = Readonly<{
 
 export const CONFIRM_KM_UPDATE_HANDOFF_KIND = "confirm_km_update" as const;
 
-export type ConfirmKmUpdateHandoffKind =
-  typeof CONFIRM_KM_UPDATE_HANDOFF_KIND;
+export type ConfirmKmUpdateHandoffKind = typeof CONFIRM_KM_UPDATE_HANDOFF_KIND;
 
 export type ConfirmKmUpdateHandoff = Readonly<{
   readonly kind: typeof CONFIRM_KM_UPDATE_HANDOFF_KIND;

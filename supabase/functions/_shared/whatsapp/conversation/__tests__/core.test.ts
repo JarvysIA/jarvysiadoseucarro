@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
-import type {
-  ConversationCoreInput,
-  ConversationState,
-  ConversationVehicle,
-} from "../types.ts";
+import type { ConversationCoreInput, ConversationState, ConversationVehicle } from "../types.ts";
 
 function state(overrides: Partial<ConversationState> = {}): ConversationState {
   return {
@@ -26,7 +22,17 @@ function state(overrides: Partial<ConversationState> = {}): ConversationState {
 }
 
 function veh(id: string, brand: string, model: string, plate: string): ConversationVehicle {
-  return { id, brand, model, plate, isArchived: false, isEligible: true, kmAtual: null, whatsappAccessMode: "full", optionalLabel: null };
+  return {
+    id,
+    brand,
+    model,
+    plate,
+    isArchived: false,
+    isEligible: true,
+    kmAtual: null,
+    whatsappAccessMode: "full",
+    optionalLabel: null,
+  };
 }
 
 function inp(overrides: Partial<ConversationCoreInput> = {}): ConversationCoreInput {
@@ -153,7 +159,10 @@ describe("core — help / greeting", () => {
 });
 
 describe("core — awaiting_vehicle", () => {
-  const veiculos = [veh("v1", "Fiat", "Argo", "ABC1D23"), veh("v2", "Chevrolet", "Onix", "XYZ4E56")];
+  const veiculos = [
+    veh("v1", "Fiat", "Argo", "ABC1D23"),
+    veh("v2", "Chevrolet", "Onix", "XYZ4E56"),
+  ];
 
   test("match único", () => {
     const d = decideConversation(

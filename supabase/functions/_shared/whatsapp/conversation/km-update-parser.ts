@@ -106,8 +106,7 @@ function validateNumberSpec(rawNum: string, hasMil: boolean): NumberCheck {
 // Normalização lexical interna (não mexe no input original)
 // ---------------------------------------------------------------------------
 
-const UNICODE_SPACES_RE =
-  /[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g;
+const UNICODE_SPACES_RE = /[\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g;
 // Somente pontuação inequívoca é convertida em espaço.
 // Preservados: . , : = + - / _ dígitos, letras.
 const HARMLESS_PUNCT_RE = /[()!?;]/g;
@@ -115,8 +114,7 @@ const DIACRITICS_RE = /[\u0300-\u036f]/g;
 const ASCII_SPACE_RE = /[ \t\r\n\f\v]+/g;
 
 function normalizeInternal(input: string): string {
-  const capped =
-    input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
+  const capped = input.length > MAX_INPUT_CHARS ? input.slice(0, MAX_INPUT_CHARS) : input;
   return capped
     .normalize("NFD")
     .replace(DIACRITICS_RE, "")
@@ -217,10 +215,7 @@ function parseValueReply(normalized: string): KmUpdateParseResult {
 // Entrada pública
 // ---------------------------------------------------------------------------
 
-export function parseKmUpdateText(
-  input: unknown,
-  mode: KmUpdateParseMode,
-): KmUpdateParseResult {
+export function parseKmUpdateText(input: unknown, mode: KmUpdateParseMode): KmUpdateParseResult {
   if (typeof input !== "string") return { ok: false, code: "not_a_string" };
   if (input.trim() === "") return { ok: false, code: "empty_text" };
   const normalized = normalizeInternal(input);
