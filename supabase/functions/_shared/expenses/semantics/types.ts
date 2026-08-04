@@ -48,8 +48,25 @@ export type ResolvedExpenseSemantics = Readonly<{
 export type NeedsSemanticClarification = Readonly<{
   status: "needs_clarification";
   persistable: false;
-  reason: "oil_system_ambiguous" | "expense_or_question_intent_ambiguous";
+  reason:
+    | "oil_system_ambiguous"
+    | "expense_or_question_intent_ambiguous"
+    | "category_ambiguous_non_engine";
   decisionCode: "clarification_required";
+  /**
+   * Só preenchido quando reason === "category_ambiguous_non_engine".
+   *
+   * PENDÊNCIA BLOQUEANTE (P0-3B-R): expense-semantics-to-guided-contract.ts (o
+   * adapter em supabase/functions/_shared/whatsapp/conversation/) ainda NÃO sabe
+   * interpretar o reason "category_ambiguous_non_engine" — o branch else do seu
+   * case "needs_clarification" assume incondicionalmente "oil_system_ambiguous" e
+   * mapearia isso incorretamente (ex.: perguntaria sobre sistema de óleo para uma
+   * mensagem sobre "farol"). Este reason NÃO deve ser considerado seguro para uso
+   * em produção até o adapter ser atualizado para tratá-lo explicitamente. Isso é
+   * escopo obrigatório do início do Build 4 (P0-3B-R), antes de qualquer conexão
+   * com core.ts.
+   */
+  candidateCategories?: readonly ExpenseSemanticCategory[];
 }>;
 
 export type ConversationOnlyExpenseSemantics = Readonly<{
