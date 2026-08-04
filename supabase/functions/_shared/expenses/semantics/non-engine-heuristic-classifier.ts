@@ -130,19 +130,24 @@ function matchesAny(haystack: string, keywords: readonly string[]): boolean {
 }
 
 const GERAL_KEYWORD = "geral";
+const GERAL_CANDIDATE_CATEGORIES: readonly NonEngineCategory[] = ["Lavagem"];
 
 /**
  * REGRA ESPECIAL — "geral" sozinho:
  * é vago demais para decidir categoria sozinho ("lavagem geral", "revisão geral",
  * "manutenção geral" são todos plausíveis). Lavagem é o palpite mais provável no
- * dia a dia, mas nunca deve ser afirmado sem confirmação explícita — por isso
- * sempre retorna "ambiguous", nunca "resolved", mesmo sem nenhum outro termo no texto.
+ * dia a dia, mas nunca deve ser afirmado sem confirmação explícita. Suas categorias
+ * candidatas são SOMADAS às demais categorias já reconhecidas no mesmo texto pelo
+ * dicionário normal (nunca as substituem) — a presença de "geral" sempre introduz
+ * incerteza, então o resultado final nunca é "resolved" quando esta regra se aplica,
+ * mesmo que a união acabe tendo só uma categoria.
  */
 function isGeralAmbiguous(haystack: string): boolean {
   return hasKeyword(haystack, GERAL_KEYWORD);
 }
 
 const FAROL_BARE_KEYWORD = "farol";
+const FAROL_CANDIDATE_CATEGORIES: readonly NonEngineCategory[] = ["Manutenção", "Acessórios"];
 
 /**
  * REGRA ESPECIAL — "farol" sozinho:
@@ -150,6 +155,9 @@ const FAROL_BARE_KEYWORD = "farol";
  * Manutenção) e uma peça decorativa/acessório (farol decorativo — Acessórios).
  * Quando a mesma mensagem já contém um dos termos qualificados abaixo, a ambiguidade
  * é resolvida por eles via CATEGORY_KEYWORDS normalmente, e esta regra não se aplica.
+ * Quando se aplica, suas categorias candidatas são SOMADAS às demais categorias já
+ * reconhecidas no mesmo texto (nunca as substituem) — assim como em "geral", o
+ * resultado final nunca é "resolved" quando esta regra se aplica.
  */
 const FAROL_QUALIFIED_KEYWORDS: readonly string[] = [
   "farol decorativo",
@@ -169,19 +177,25 @@ export function classifyNonEngineExpense(originalText: string): NonEngineHeurist
   if (normalized === "") return { status: "unrecognized" };
   const haystack = " " + normalized + " ";
 
-  if (isGeralAmbiguous(haystack)) {
-    return { status: "ambiguous", candidateCategories: ["Lavagem"] };
-  }
-  if (isFarolAmbiguous(haystack)) {
-    return { status: "ambiguous", candidateCategories: ["Manutenção", "Acessórios"] };
-  }
-
   const matched: NonEngineCategory[] = [];
   for (const category of NON_ENGINE_CATEGORIES) {
     if (matchesAny(haystack, CATEGORY_KEYWORDS[category])) matched.push(category);
   }
 
-  if (matched.length === 0) return { status: "unrecognized" };
-  if (matched.length === 1) return { status: "resolved", category: matched[0] };
-  return { status: "ambiguous", candidateCategories: matched };
+  const specialCategories: NonEngineCategory[] = [];
+  if (isGeralAmbiguous(haystack)) specialCategories.push(...GERAL_CANDIDATE_CATEGORIES);
+  if (isFarolAmbiguous(haystack)) specialCategories.push(...FAROL_CANDIDATE_CATEGORIES);
+
+  const union: NonEngineCategory[] = [];
+  for (const category of [...matched, ...specialCategories]) {
+    if (!union.includes(category)) union.push(category);
+  }
+
+  if (union.length === 0) return { status: "unrecognized" };
+  // Regras especiais nunca resolvem sozinhas: se alguma se aplicou, o resultado
+  // fica sempre "ambiguous", mesmo que a união tenha apenas uma categoria.
+  if (specialCategories.length === 0 && union.length === 1) {
+    return { status: "resolved", category: union[0] };
+  }
+  return { status: "ambiguous", candidateCategories: union };
 }

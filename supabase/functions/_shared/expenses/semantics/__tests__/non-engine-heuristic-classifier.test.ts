@@ -124,6 +124,39 @@ describe("non-engine heuristic classifier — ambiguidade por conflito entre cat
   });
 });
 
+describe("non-engine heuristic classifier — 'geral'/'farol' somam categorias em vez de substituir", () => {
+  it("une Multas com a lista fixa de 'geral' em 'paguei a multa e fiz uma geral'", () => {
+    const result = classifyNonEngineExpense("paguei a multa e fiz uma geral");
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.candidateCategories).toContain("Multas");
+      expect(result.candidateCategories).toContain("Lavagem");
+      expect(result.candidateCategories).toHaveLength(2);
+    }
+  });
+
+  it("une IPVA com a lista fixa de 'farol' em 'paguei o ipva e vou trocar o farol'", () => {
+    const result = classifyNonEngineExpense("paguei o ipva e vou trocar o farol");
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.candidateCategories).toContain("IPVA");
+      expect(result.candidateCategories).toContain("Manutenção");
+      expect(result.candidateCategories).toContain("Acessórios");
+      expect(result.candidateCategories).toHaveLength(3);
+    }
+  });
+
+  it("retorna ambiguous para 'farol queimado e som automotivo' (Manutenção + Acessórios via dicionário normal, sem a regra especial de farol)", () => {
+    const result = classifyNonEngineExpense("farol queimado e som automotivo");
+    expect(result.status).toBe("ambiguous");
+    if (result.status === "ambiguous") {
+      expect(result.candidateCategories).toContain("Manutenção");
+      expect(result.candidateCategories).toContain("Acessórios");
+      expect(result.candidateCategories).toHaveLength(2);
+    }
+  });
+});
+
 describe("non-engine heuristic classifier — não reconhecido e entradas vazias", () => {
   it("retorna unrecognized para texto sem nenhum termo reconhecido", () => {
     expect(classifyNonEngineExpense("aluguel do box da garagem")).toEqual({
