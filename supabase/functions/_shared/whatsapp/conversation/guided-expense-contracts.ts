@@ -16,6 +16,7 @@ export type ClarificationReason =
   | "ambiguous_transmission"
   | "quantity_required"
   | "ambiguous_item"
+  | "ambiguous_category"
   | "complex_input";
 
 export type TemplateReason =
@@ -82,6 +83,12 @@ export type NeedsGuidedExpenseClarification = Readonly<{
   missingField: string;
   questionKey: string;
   technicalAuthorization: "none";
+  /**
+   * Só preenchido quando reason === "ambiguous_category": categorias
+   * candidatas para o usuário escolher. Espelha o padrão já usado em
+   * ConversationResponseParams.options (whatsapp/conversation/types.ts).
+   */
+  options?: readonly string[];
 }>;
 
 /** Caso complexo que deve ser conduzido pelo template, sem inferências. */
