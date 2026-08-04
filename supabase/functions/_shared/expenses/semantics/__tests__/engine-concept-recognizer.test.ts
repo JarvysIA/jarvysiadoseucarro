@@ -160,6 +160,18 @@ describe("engine concept recognizer — exclusões explícitas", () => {
   });
 });
 
+describe("engine concept recognizer — sinônimos adicionais (calibração round 2)", () => {
+  it("reconhece suspension por 'bucha', 'buchas' e 'batente' sozinhos", () => {
+    expect(recognizeEngineConcepts("troquei a bucha")).toEqual(["suspension"]);
+    expect(recognizeEngineConcepts("troquei as buchas")).toEqual(["suspension"]);
+    expect(recognizeEngineConcepts("troquei o batente")).toEqual(["suspension"]);
+  });
+
+  it("reconhece timing_kit por 'correia' sozinha", () => {
+    expect(recognizeEngineConcepts("troquei a correia")).toEqual(["timing_kit"]);
+  });
+});
+
 describe("engine concept recognizer — entradas vazias e sem conceito", () => {
   it("retorna lista vazia para texto sem nenhum conceito de motor", () => {
     expect(recognizeEngineConcepts("capa de banco 140 reais")).toEqual([]);

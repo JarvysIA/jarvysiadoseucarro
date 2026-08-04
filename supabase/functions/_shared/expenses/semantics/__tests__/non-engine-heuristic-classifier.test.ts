@@ -157,6 +157,29 @@ describe("non-engine heuristic classifier — 'geral'/'farol' somam categorias e
   });
 });
 
+describe("non-engine heuristic classifier — sinônimos adicionais (calibração round 2)", () => {
+  it("resolve Manutenção para 'carga de gas' sozinho", () => {
+    expect(classifyNonEngineExpense("fiz a carga de gas")).toEqual({
+      status: "resolved",
+      category: "Manutenção",
+    });
+  });
+
+  it("resolve Manutenção para 'consertei o ar condicionado'", () => {
+    expect(classifyNonEngineExpense("consertei o ar condicionado")).toEqual({
+      status: "resolved",
+      category: "Manutenção",
+    });
+  });
+
+  it("resolve Combustível para 'enchi o tanque'", () => {
+    expect(classifyNonEngineExpense("enchi o tanque")).toEqual({
+      status: "resolved",
+      category: "Combustível",
+    });
+  });
+});
+
 describe("non-engine heuristic classifier — não reconhecido e entradas vazias", () => {
   it("retorna unrecognized para texto sem nenhum termo reconhecido", () => {
     expect(classifyNonEngineExpense("aluguel do box da garagem")).toEqual({
