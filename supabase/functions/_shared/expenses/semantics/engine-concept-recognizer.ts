@@ -21,7 +21,9 @@ import { normalizeExpenseSemanticText } from "./normalization.ts";
  */
 
 const SYNONYM_KEYWORDS: Readonly<Partial<Record<ExpenseSemanticConceptKey, readonly string[]>>> = {
-  engine_oil: ["oleo", "troca de oleo", "oleo do motor", "lubrificante"],
+  // "oleo" solto é tratado à parte por matchesEngineOil (regra especial abaixo),
+  // não faz parte desta lista simples.
+  engine_oil: ["troca de oleo", "oleo do motor", "lubrificante"],
   engine_oil_filter: ["filtro de oleo", "filtro do oleo", "filtro do oleo do motor"],
   transmission_fluid: [
     "cambio",
@@ -99,8 +101,33 @@ function matchesCoolingSystem(haystack: string): boolean {
   return matchesAny(haystack, COOLING_SYSTEM_ALWAYS_ON_KEYWORDS);
 }
 
+const ENGINE_OIL_BARE_KEYWORD = "oleo";
+
+/**
+ * REGRA ESPECIAL — engine_oil:
+ * a palavra solta "oleo" é o caso mais comum (troca de óleo do motor) e por padrão
+ * já basta para reconhecer engine_oil. Mas "oleo" também aparece dentro de frases de
+ * câmbio ("oleo do cambio") e de direção hidráulica ("oleo da direcao"), então quando
+ * a mesma mensagem já contém um termo de transmission_fluid ou power_steering_fluid,
+ * a palavra solta "oleo" NÃO dispara engine_oil adicionalmente — evita falso positivo.
+ * Termos mais específicos de engine_oil (SYNONYM_KEYWORDS.engine_oil) não têm essa
+ * exceção: continuam sempre reconhecendo engine_oil, mesmo ao lado de câmbio/direção.
+ */
+function matchesEngineOil(haystack: string): boolean {
+  const specificKeywords = SYNONYM_KEYWORDS.engine_oil;
+  if (specificKeywords !== undefined && matchesAny(haystack, specificKeywords)) return true;
+  if (!hasKeyword(haystack, ENGINE_OIL_BARE_KEYWORD)) return false;
+  const transmissionKeywords = SYNONYM_KEYWORDS.transmission_fluid ?? [];
+  const steeringKeywords = SYNONYM_KEYWORDS.power_steering_fluid ?? [];
+  if (matchesAny(haystack, transmissionKeywords) || matchesAny(haystack, steeringKeywords)) {
+    return false;
+  }
+  return true;
+}
+
 function isConceptRecognized(conceptKey: ExpenseSemanticConceptKey, haystack: string): boolean {
   if (conceptKey === "cooling_system") return matchesCoolingSystem(haystack);
+  if (conceptKey === "engine_oil") return matchesEngineOil(haystack);
   const keywords = SYNONYM_KEYWORDS[conceptKey];
   return keywords !== undefined && matchesAny(haystack, keywords);
 }
