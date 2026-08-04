@@ -78,9 +78,9 @@ describe("expense semantic occurrence — contrato mínimo", () => {
 
   for (const category of EXPENSE_SEMANTIC_CATEGORIES) {
     it(`aceita a categoria fechada ${category} sem conceitos`, () => {
-      expect(
-        validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid,
-      ).toBe(true);
+      expect(validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid).toBe(
+        true,
+      );
     });
   }
 
@@ -341,6 +341,7 @@ describe("expense semantic occurrence — fechamento adversarial", () => {
   });
 
   it("rejeita array esparso, propriedade extra e prototype customizado", () => {
+    // eslint-disable-next-line no-sparse-arrays -- array esparso intencional: testa rejeição de buraco no meio pelo validador
     const sparse = [engineOil, , tires];
     expectInvalid({ ...valid(), concepts: sparse }, "invalid_type", "$.concepts[1]");
 
@@ -453,9 +454,9 @@ describe("expense semantic occurrence — coerência categoria-conceito (S3.4)",
 
   for (const category of EXPENSE_SEMANTIC_CATEGORIES) {
     it(`aceita a categoria ${category} livremente quando concepts está vazio`, () => {
-      expect(
-        validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid,
-      ).toBe(true);
+      expect(validateExpenseSemanticOccurrence({ ...valid(), concepts: [], category }).valid).toBe(
+        true,
+      );
     });
   }
 });
