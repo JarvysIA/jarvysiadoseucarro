@@ -90,8 +90,17 @@ describe("Build 4a — extras de manutenção no draftPayload de despesa", () =>
     expect("descricaoPreliminar" in p).toBe(false);
   });
 
+  // Atualizado no P0-3B-R (Passo D-2): "Manutenção geral..." deixou de servir
+  // como exemplo para este teste — "geral" agora cede para o gatilho de
+  // especificação de item (needs_item_specification), então esse texto nem
+  // chega mais a montar o draftPayload de awaiting_expense_confirmation
+  // testado aqui. Trocado por outro texto longo que resolve Manutenção
+  // diretamente (via "oficina", sem "geral" e sem item de motor
+  // reconhecido), preservando o propósito original do teste (checar
+  // recognizedTags=[]/descricao=texto quando a categoria já resolveu mas
+  // nenhum item específico foi reconhecido).
   test("(4) Manutenção sem item mas texto longo → recognizedTags=[], descricao=texto", () => {
-    const text = "Manutenção geral no carro todo, revisei tudo mesmo, 500 reais";
+    const text = "Fui na oficina consertar um barulho estranho no carro, 500 reais";
     const d = decideConversation(inp({ originalText: text, vehicles: [veh(VEH_1)] }));
     expect(d.nextState).toBe("awaiting_expense_confirmation");
     const p = d.statePatch.draftPayload as Record<string, unknown>;

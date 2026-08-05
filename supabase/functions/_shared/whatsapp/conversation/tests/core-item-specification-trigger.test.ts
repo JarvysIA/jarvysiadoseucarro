@@ -131,24 +131,23 @@ describe("T1 despesa — gatilho de especificação de item (Passo B)", () => {
     expect(d.responseParams.valor).toBe(300);
   });
 
-  // NOTA: o PASSO 2.3.b pedia "deve continuar indo direto para
-  // awaiting_expense_confirmation com categoria Manutenção" para este texto.
-  // Verificado empiricamente (matchExpenseCategoria roda normalmente aqui,
-  // já que recognizeExpenseSemantics devolve "resolved", não
-  // "needs_item_specification" — o gatilho novo não intercepta) que o
-  // parser LEGADO já considerava esse texto ambíguo ANTES desta mudança:
-  // "revisao" bate em Revisão e "bateria" bate em Manutenção ao mesmo tempo,
-  // então matchExpenseCategoria retorna { ok: false, code:
-  // "ambiguous_categoria_candidate" } — comportamento pré-existente,
-  // inalterado por este build (a chamada a matchExpenseCategoria e sua
-  // lógica de branching não foram tocadas, só reordenadas para depois do
-  // novo check). O teste abaixo reflete o resultado real, não o presumido.
-  test("adjacência: 'revisão, troquei a bateria 300 reais' → motor não reconhece 'bateria' isoladamente, recognizeExpenseSemantics resolve Manutenção (resolved, não needs_item_specification), mas o parser LEGADO já achava esse texto ambíguo antes desta mudança → awaiting_expense_category (comportamento pré-existente, não uma regressão deste build)", () => {
+  // Atualizado no P0-3B-R (Passo D-2): antes desta troca, este texto ia para
+  // awaiting_expense_category, porque a CHAMADA 4 ainda usava o parser
+  // LEGADO, que achava "revisão, troquei a bateria" ambíguo (batia "revisao"
+  // em Revisão E "bateria" em Manutenção ao mesmo tempo — uma falsa
+  // ambiguidade exclusiva do vocabulário mais simples do legado). Com a
+  // CHAMADA 4 usando recognizeExpenseSemantics (que já resolvia isso
+  // corretamente como "resolved", Manutenção — motor não reconhece "bateria"
+  // isoladamente, só o classificador não-motor reconhece, sem ambiguidade),
+  // a falsa ambiguidade herdada do legado desaparece: vai direto para
+  // awaiting_expense_confirmation.
+  test("adjacência: 'revisão, troquei a bateria 300 reais' → motor não reconhece 'bateria' isoladamente, recognizeExpenseSemantics resolve Manutenção (resolved, não needs_item_specification) → awaiting_expense_confirmation direto (falsa ambiguidade do legado resolvida no Passo D-2)", () => {
     const d = decideConversation(
       inp({ originalText: "revisão, troquei a bateria 300 reais", vehicles: [veh(VEH_1)] }),
     );
-    expect(d.nextState).toBe("awaiting_expense_category");
-    expect(d.responseKey).toBe("expense_category_prompt");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
     expect(d.responseParams.valor).toBe(300);
   });
 });

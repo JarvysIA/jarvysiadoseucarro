@@ -147,6 +147,54 @@ describe("expense category recognizer — especificação de item necessária", 
   });
 });
 
+describe("expense category recognizer — 'geral' cede para gatilhos de especificação de item", () => {
+  it("'lavagem geral' → resolved, Lavagem (não é mais needs_clarification)", () => {
+    const result = recognizeExpenseSemantics("lavagem geral");
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.conceptualCategory).toBe("Lavagem");
+    }
+  });
+
+  it("'conserto geral' → needs_item_specification, trigger maintenance_unspecified (via o novo gatilho 'geral', não 'manutencao')", () => {
+    const result = recognizeExpenseSemantics("conserto geral");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("maintenance_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+    }
+  });
+
+  it("'revisão geral' → needs_item_specification, trigger revision_item_unspecified (gatilho de revisão vence, não o de 'geral')", () => {
+    const result = recognizeExpenseSemantics("revisão geral");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("revision_item_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+    }
+  });
+
+  it("'ar condicionado geral' → needs_item_specification, trigger ac_service_unspecified (gatilho de ar condicionado vence, não o de 'geral')", () => {
+    const result = recognizeExpenseSemantics("ar condicionado geral");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("ac_service_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+    }
+  });
+
+  it("'manutenção geral no carro todo, revisei tudo mesmo, 500 reais' → needs_item_specification, trigger maintenance_unspecified (caso original)", () => {
+    const result = recognizeExpenseSemantics(
+      "manutenção geral no carro todo, revisei tudo mesmo, 500 reais",
+    );
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("maintenance_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+    }
+  });
+});
+
 describe("expense category recognizer — entradas vazias", () => {
   it("retorna unsupported para texto vazio, sem lançar erro", () => {
     expect(() => recognizeExpenseSemantics("")).not.toThrow();

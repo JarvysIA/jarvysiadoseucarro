@@ -113,6 +113,40 @@ describe("non-engine heuristic classifier — regras especiais 'geral' e 'farol'
   });
 });
 
+describe("non-engine heuristic classifier — 'geral' cede para gatilhos de especificação de item", () => {
+  it("resolve Lavagem direto para 'lavagem geral' (matched não é exclusivamente Manutenção)", () => {
+    expect(classifyNonEngineExpense("lavagem geral")).toEqual({
+      status: "resolved",
+      category: "Lavagem",
+    });
+  });
+
+  it("retorna unrecognized para 'conserto geral' (matched é só Manutenção — cede pro gatilho)", () => {
+    expect(classifyNonEngineExpense("conserto geral")).toEqual({ status: "unrecognized" });
+  });
+
+  it("retorna unrecognized para 'revisão geral' (matched vazio + termo-gatilho 'revisao' presente)", () => {
+    expect(classifyNonEngineExpense("revisão geral")).toEqual({ status: "unrecognized" });
+  });
+
+  it("retorna unrecognized para 'ar condicionado geral' (matched vazio + termo-gatilho presente)", () => {
+    expect(classifyNonEngineExpense("ar condicionado geral")).toEqual({ status: "unrecognized" });
+  });
+
+  it("retorna unrecognized para 'manutenção geral no carro todo, revisei tudo mesmo, 500 reais' (caso original)", () => {
+    expect(
+      classifyNonEngineExpense("manutenção geral no carro todo, revisei tudo mesmo, 500 reais"),
+    ).toEqual({ status: "unrecognized" });
+  });
+
+  it("mantém 'fiz uma geral no carro' inalterado (matched vazio, nenhum termo-gatilho — comportamento original)", () => {
+    expect(classifyNonEngineExpense("fiz uma geral no carro")).toEqual({
+      status: "ambiguous",
+      candidateCategories: ["Lavagem"],
+    });
+  });
+});
+
 describe("non-engine heuristic classifier — ambiguidade por conflito entre categorias", () => {
   it("retorna ambiguous para 'pneu e som automotivo' (Manutenção + Acessórios)", () => {
     const result = classifyNonEngineExpense("pneu e som automotivo");
@@ -125,14 +159,16 @@ describe("non-engine heuristic classifier — ambiguidade por conflito entre cat
 });
 
 describe("non-engine heuristic classifier — 'geral'/'farol' somam categorias em vez de substituir", () => {
-  it("une Multas com a lista fixa de 'geral' em 'paguei a multa e fiz uma geral'", () => {
-    const result = classifyNonEngineExpense("paguei a multa e fiz uma geral");
-    expect(result.status).toBe("ambiguous");
-    if (result.status === "ambiguous") {
-      expect(result.candidateCategories).toContain("Multas");
-      expect(result.candidateCategories).toContain("Lavagem");
-      expect(result.candidateCategories).toHaveLength(2);
-    }
+  // Atualizado no P0-3B-R: "geral" agora cede para os gatilhos de
+  // especificação de item / para de forçar ambiguidade quando `matched` já
+  // contém uma categoria que NÃO é exclusivamente "Manutenção" (mesma regra
+  // que faz "lavagem geral" resolver direto para Lavagem). "Multas" se
+  // encaixa nessa mesma regra — resolve direto, sem mais somar Lavagem.
+  it("resolve Multas direto em 'paguei a multa e fiz uma geral' ('geral' para de forçar ambiguidade fora do caso 'exclusivamente Manutenção')", () => {
+    expect(classifyNonEngineExpense("paguei a multa e fiz uma geral")).toEqual({
+      status: "resolved",
+      category: "Multas",
+    });
   });
 
   it("une IPVA com a lista fixa de 'farol' em 'paguei o ipva e vou trocar o farol'", () => {

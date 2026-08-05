@@ -121,6 +121,13 @@ function hasBareKeyword(haystack: string, keyword: string): boolean {
   return haystack.indexOf(" " + normalizedKeyword + " ") >= 0;
 }
 
+// SINCRONIZAÇÃO OBRIGATÓRIA COM non-engine-heuristic-classifier.ts —
+// ITEM_SPECIFICATION_TRIGGER_KEYWORDS (naquele arquivo) precisa conter os
+// mesmos termos-gatilho listados abaixo (exceto "geral", que é tratado
+// diretamente por este array, não por aquela lista). Se um novo gatilho for
+// adicionado aqui (5º, 6º...), adicione o mesmo termo naquela lista também
+// — caso contrário, a regra de cessão de "geral" daquele arquivo continuaria
+// tratando o termo novo como ambiguidade de categoria em vez de ceder.
 const ITEM_SPECIFICATION_TRIGGERS: ReadonlyArray<{
   keywords: readonly string[];
   trigger: "revision_item_unspecified" | "ac_service_unspecified" | "maintenance_unspecified";
@@ -128,6 +135,14 @@ const ITEM_SPECIFICATION_TRIGGERS: ReadonlyArray<{
   { keywords: ["revisao", "revisao preventiva"], trigger: "revision_item_unspecified" },
   { keywords: ["ar condicionado"], trigger: "ac_service_unspecified" },
   { keywords: ["manutencao"], trigger: "maintenance_unspecified" },
+  // "geral" precisa ser a ÚLTIMA entrada: é um fallback genérico (qualquer
+  // categoria reconhecida sozinha ao lado de "geral", ex.: "conserto geral",
+  // já cede pra cá via non-engine-heuristic-classifier.ts). Se viesse antes
+  // dos gatilhos mais específicos, competiria e potencialmente venceria em
+  // frases que também contêm "revisão"/"ar condicionado"/"manutenção" ao
+  // lado de "geral" (ex.: "revisão geral") — nesses casos o gatilho mais
+  // específico (revision_item_unspecified) deve vencer, não o genérico.
+  { keywords: ["geral"], trigger: "maintenance_unspecified" },
 ];
 
 /**
@@ -136,16 +151,11 @@ const ITEM_SPECIFICATION_TRIGGERS: ReadonlyArray<{
  * sempre vence, e um item não-motor já reconhecido (ex.: "revisão, troquei a
  * bateria") também sempre vence, e nenhum deles chega a chamar esta função.
  * Só quando AMBOS os reconhecedores normais vierem vazios é que verificamos se
- * o texto é um dos 3 casos especiais conhecidos ("ar condicionado" sozinho,
- * "revisão"/"revisão preventiva" sozinha, "manutenção" sozinha), que precisam
- * de uma pergunta de especificação de item antes de prosseguir.
- *
- * Caso-limite conhecido e não tratado especialmente: "manutenção geral" NÃO
- * cai neste gatilho — a palavra "geral" já faz classifyNonEngineExpense
- * devolver "ambiguous" (regra especial de non-engine-heuristic-classifier.ts),
- * não "unrecognized", então o fluxo nunca chega até esta função para esse
- * texto; o resultado final é needs_clarification, não needs_item_specification.
- * Comportamento aceito, fora de escopo deste build.
+ * o texto é um dos 4 casos especiais conhecidos ("ar condicionado" sozinho,
+ * "revisão"/"revisão preventiva" sozinha, "manutenção" sozinha, ou "geral"
+ * cedido por non-engine-heuristic-classifier.ts quando nenhuma categoria
+ * específica — ou só "Manutenção" — foi reconhecida ao lado dele), que
+ * precisam de uma pergunta de especificação de item antes de prosseguir.
  *
  * A ação de turno 2 (reabrir recognizeEngineConcepts na resposta do usuário,
  * com fallback para fallbackCategory se nada for reconhecido) é
