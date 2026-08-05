@@ -126,6 +126,25 @@ describe("expense category recognizer — especificação de item necessária", 
       expect(result.itemKeys).toEqual([]);
     }
   });
+
+  it("reconhece 'manutenção, gastei 800 reais' como needs_item_specification, trigger maintenance_unspecified, fallbackCategory Manutenção", () => {
+    const result = recognizeExpenseSemantics("manutenção, gastei 800 reais");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("maintenance_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+      expect(result.persistable).toBe(false);
+    }
+  });
+
+  it("reconhece 'manutenção, troquei o oleo' como resolved, Revisão (motor sempre vence, gatilho novo não dispara)", () => {
+    const result = recognizeExpenseSemantics("manutenção, troquei o oleo");
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.conceptualCategory).toBe("Revisão");
+      expect(result.itemKeys).toEqual(["oleo_motor"]);
+    }
+  });
 });
 
 describe("expense category recognizer — entradas vazias", () => {

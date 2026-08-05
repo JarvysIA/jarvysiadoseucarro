@@ -71,7 +71,10 @@ export type AwaitingItemSpecificationDraft = {
   readonly phase: "awaiting_item_specification";
   readonly valor: number;
   readonly requestMessageId: string;
-  readonly trigger: "revision_item_unspecified" | "ac_service_unspecified";
+  readonly trigger:
+    | "revision_item_unspecified"
+    | "ac_service_unspecified"
+    | "maintenance_unspecified";
   readonly fallbackCategory: ExpenseCategory;
 };
 
@@ -227,11 +230,12 @@ const ITEM_SPECIFICATION_ALL_KEYS: ReadonlyArray<string> = [...ITEM_SPECIFICATIO
 const ITEM_SPECIFICATION_TRIGGERS_SET: ReadonlySet<string> = new Set([
   "revision_item_unspecified",
   "ac_service_unspecified",
+  "maintenance_unspecified",
 ]);
 
 function isValidItemSpecificationTrigger(
   value: unknown,
-): value is "revision_item_unspecified" | "ac_service_unspecified" {
+): value is "revision_item_unspecified" | "ac_service_unspecified" | "maintenance_unspecified" {
   return typeof value === "string" && ITEM_SPECIFICATION_TRIGGERS_SET.has(value);
 }
 
