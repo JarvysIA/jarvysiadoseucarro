@@ -79,6 +79,55 @@ describe("expense category recognizer — motor sempre vence sobre não-motor", 
   });
 });
 
+describe("expense category recognizer — especificação de item necessária", () => {
+  it("reconhece 'ar condicionado' sozinho como needs_item_specification, trigger ac_service_unspecified, fallbackCategory Manutenção", () => {
+    const result = recognizeExpenseSemantics("ar condicionado");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("ac_service_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+      expect(result.persistable).toBe(false);
+    }
+  });
+
+  it("reconhece 'revisão' sozinha como needs_item_specification, trigger revision_item_unspecified, fallbackCategory Manutenção", () => {
+    const result = recognizeExpenseSemantics("revisão");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("revision_item_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+      expect(result.persistable).toBe(false);
+    }
+  });
+
+  it("reconhece 'revisão preventiva' como needs_item_specification, trigger revision_item_unspecified", () => {
+    const result = recognizeExpenseSemantics("revisão preventiva");
+    expect(result.status).toBe("needs_item_specification");
+    if (result.status === "needs_item_specification") {
+      expect(result.trigger).toBe("revision_item_unspecified");
+      expect(result.fallbackCategory).toBe("Manutenção");
+    }
+  });
+
+  it("reconhece 'revisão, troquei o oleo' como resolved, Revisão (motor sempre vence, gatilho novo não dispara)", () => {
+    const result = recognizeExpenseSemantics("revisão, troquei o oleo");
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.conceptualCategory).toBe("Revisão");
+      expect(result.itemKeys).toEqual(["oleo_motor"]);
+    }
+  });
+
+  it("reconhece 'revisão, troquei a bateria' como resolved, Manutenção (não-motor já reconhecido vence, gatilho novo não dispara)", () => {
+    const result = recognizeExpenseSemantics("revisão, troquei a bateria");
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.conceptualCategory).toBe("Manutenção");
+      expect(result.itemKeys).toEqual([]);
+    }
+  });
+});
+
 describe("expense category recognizer — entradas vazias", () => {
   it("retorna unsupported para texto vazio, sem lançar erro", () => {
     expect(() => recognizeExpenseSemantics("")).not.toThrow();
