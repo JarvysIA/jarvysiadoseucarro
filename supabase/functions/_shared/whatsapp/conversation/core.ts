@@ -43,11 +43,13 @@ import {
   validateAwaitingCategoryExpenseDraft,
   validateAwaitingVehicleExpenseDraft,
   validateAwaitingConfirmationExpenseDraft,
+  validateAwaitingItemSpecificationDraft,
 } from "./expense-create-draft.ts";
 import {
   CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
   EXPENSE_REPORTED_EVENT_KIND,
 } from "./expense-create-protocol.ts";
+import { recognizeExpenseSemantics } from "../../expenses/semantics/expense-category-recognizer.ts";
 
 function isEligibleKmConfirmationState(state: ConversationState): boolean {
   if (state.state !== "awaiting_km_confirmation" && state.state !== "awaiting_km_correction")
@@ -1327,6 +1329,54 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
           nextFallbackCount: 0,
           reasonCode: "expense_reported_no_eligible_vehicle",
         });
+      }
+      // Correção escopada de comportamento desatualizado do parser legado:
+      // "revisão"/"revisão preventiva" e "ar condicionado" bare já eram
+      // reconhecidos por matchExpenseCategoria (resolvendo direto para uma
+      // categoria, sem perguntar qual item), então checar
+      // needs_item_specification só DEPOIS de matchExpenseCategoria falhar
+      // nunca disparava — matchExpenseCategoria sempre vencia primeiro. Por
+      // isso recognizeExpenseSemantics roda ANTES, com prioridade explícita.
+      // Para qualquer outro status (resolved, needs_clarification,
+      // conversation_only, unsupported) o fluxo abaixo é idêntico ao de
+      // antes desta mudança — matchExpenseCategoria decide normalmente.
+      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      if (semanticResult.status === "needs_item_specification") {
+        const candidate = {
+          phase: "awaiting_item_specification" as const,
+          valor: parsedValor.valor,
+          requestMessageId: input.sourceMessageId,
+          trigger: semanticResult.trigger,
+          fallbackCategory: semanticResult.fallbackCategory,
+        };
+        const validated = validateAwaitingItemSpecificationDraft(candidate);
+        if (validated.ok) {
+          return buildDecision({
+            eventKind: EXPENSE_REPORTED_EVENT_KIND,
+            decisionKind: "transition",
+            previousState,
+            nextState: "awaiting_item_specification",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: "awaiting_item_specification",
+                currentIntent: "expense",
+                awaitingField: "item_specification",
+                draftType: "expense",
+                draftId: input.sourceMessageId,
+                draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                draftPayload: validated.value as unknown as Record<string, unknown>,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: "expense_item_specification_prompt",
+            responseParams: {
+              valor: parsedValor.valor,
+              itemSpecificationTrigger: semanticResult.trigger,
+            },
+            nextFallbackCount: 0,
+            reasonCode: "expense_reported_awaiting_item_specification",
+          });
+        }
       }
       const categoriaMatch = matchExpenseCategoria(input.originalText);
       if (!categoriaMatch.ok) {

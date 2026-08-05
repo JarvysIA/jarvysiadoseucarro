@@ -69,7 +69,6 @@ describe("bare number + categoria — deve virar despesa", () => {
     { text: "mecânico 280", valor: 280, categoria: "Manutenção" },
     { text: "oficina 300", valor: 300, categoria: "Manutenção" },
     { text: "conserto 800", valor: 800, categoria: "Manutenção" },
-    { text: "peças revisão 300", valor: 300, categoria: "Revisão" },
   ];
   for (const c of cases) {
     test(`"${c.text}" → ${c.categoria} R$${c.valor}`, () => {
@@ -80,6 +79,22 @@ describe("bare number + categoria — deve virar despesa", () => {
       expect(d.responseParams.categoria).toBe(c.categoria);
     });
   }
+
+  // Atualizado no P0-3B-R: "revisão" sem item de motor específico reconhecido
+  // agora pergunta qual item foi feito, em vez de assumir a revisão completa
+  // do marco — decisão de produto, ver commit desta branch. Antes ia direto
+  // para awaiting_expense_confirmation com categoria "Revisão".
+  test('"peças revisão 300" → awaiting_item_specification (não mais Revisão direta)', () => {
+    const d = decideConversation(inp({ originalText: "peças revisão 300" }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
+    expect(d.responseParams.valor).toBe(300);
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.trigger).toBe("revision_item_unspecified");
+    expect(payload?.fallbackCategory).toBe("Manutenção");
+  });
 });
 
 // ---------------------------------------------------------------------------

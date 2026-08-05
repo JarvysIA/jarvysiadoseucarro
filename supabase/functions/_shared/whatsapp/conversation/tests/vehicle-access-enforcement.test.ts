@@ -272,11 +272,19 @@ describe("enforcement no core", () => {
     expect(km.nextState).toBe("awaiting_km_confirmation");
     expect(km.responseKey).toBe("km_update_confirmation");
 
-    for (const text of ["gasolina R$ 80", "revisão R$ 300"]) {
-      const expense = decideConversation(input({ originalText: text, vehicles: [full] }));
-      expect(expense.nextState).toBe("awaiting_expense_confirmation");
-      expect(expense.responseKey).toBe("expense_create_confirmation");
-    }
+    const gasolina = decideConversation(
+      input({ originalText: "gasolina R$ 80", vehicles: [full] }),
+    );
+    expect(gasolina.nextState).toBe("awaiting_expense_confirmation");
+    expect(gasolina.responseKey).toBe("expense_create_confirmation");
+
+    // Atualizado no P0-3B-R: "revisão" sem item de motor específico
+    // reconhecido agora pergunta qual item foi feito, em vez de assumir a
+    // revisão completa — decisão de produto, ver commit desta branch. Antes
+    // ia direto para awaiting_expense_confirmation com categoria "Revisão".
+    const revisao = decideConversation(input({ originalText: "revisão R$ 300", vehicles: [full] }));
+    expect(revisao.nextState).toBe("awaiting_item_specification");
+    expect(revisao.responseKey).toBe("expense_item_specification_prompt");
   });
 
   test.each(["passive_with_km", "denied"] as const)(

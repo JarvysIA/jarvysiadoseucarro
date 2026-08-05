@@ -79,17 +79,29 @@ describe("revisão N mil — não vira despesa nem km", () => {
 });
 
 describe("revisão COM valor real declarado — despesa funciona", () => {
-  test("revisao dos 40 mil, gastei 350 reais → Revisão R$350", () => {
+  // Atualizado no P0-3B-R: "revisão" sem item de motor específico reconhecido
+  // agora pergunta qual item foi feito, em vez de assumir a revisão completa
+  // do marco — decisão de produto (revisões parciais são comuns na prática,
+  // não dá pra assumir o marco completo só pelo valor). Antes ia direto
+  // para awaiting_expense_confirmation com categoria "Revisão".
+  test("revisao dos 40 mil, gastei 350 reais → awaiting_item_specification (não mais Revisão direta)", () => {
     const d = decideConversation(inp({ originalText: "revisao dos 40 mil, gastei 350 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
     expect(d.responseParams.valor).toBe(350);
-    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.trigger).toBe("revision_item_unspecified");
+    expect(payload?.fallbackCategory).toBe("Manutenção");
   });
-  test("fiz a revisao dos 40 mil, foi 500 reais → Revisão R$500", () => {
+  test("fiz a revisao dos 40 mil, foi 500 reais → awaiting_item_specification (não mais Revisão direta)", () => {
     const d = decideConversation(inp({ originalText: "fiz a revisao dos 40 mil, foi 500 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
     expect(d.responseParams.valor).toBe(500);
-    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
   });
 });
 
@@ -109,11 +121,16 @@ describe("km genuína com 'mil' — sem 'revisao' — não regride", () => {
 });
 
 describe("revisão sem 'N mil' — não regride", () => {
-  test("fiz a revisao, gastei 350 reais → Revisão R$350", () => {
+  // Atualizado no P0-3B-R: mesma decisão de produto do describe acima — sem
+  // "N mil" o texto ainda é só "revisão" + valor, sem item de motor
+  // reconhecido, então também pergunta qual item em vez de assumir Revisão.
+  test("fiz a revisao, gastei 350 reais → awaiting_item_specification (não mais Revisão direta)", () => {
     const d = decideConversation(inp({ originalText: "fiz a revisao, gastei 350 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
     expect(d.responseParams.valor).toBe(350);
-    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
   });
   test("revisao completa → fallback", () => {
     const d = decideConversation(inp({ originalText: "revisao completa" }));
@@ -148,17 +165,25 @@ describe("regressão geral — builds anteriores", () => {
 });
 
 describe("revisão com valor explícito — não regride (novo formato km)", () => {
-  test("revisão dos 20.000km, gastei 1.800 reais → Revisão R$1800", () => {
+  // Atualizado no P0-3B-R: mesma decisão de produto dos describes acima —
+  // "dos 20.000km"/"de 60.000 km" não mapeiam a nenhum item de motor
+  // reconhecido, então o texto ainda conta como "revisão sem item
+  // específico" e pergunta qual item em vez de assumir Revisão direta.
+  test("revisão dos 20.000km, gastei 1.800 reais → awaiting_item_specification (não mais Revisão direta)", () => {
     const d = decideConversation(inp({ originalText: "revisão dos 20.000km, gastei 1.800 reais" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
     expect(d.responseParams.valor).toBe(1800);
-    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
   });
-  test("revisao de 60.000 km, R$900,00 → Revisão R$900", () => {
+  test("revisao de 60.000 km, R$900,00 → awaiting_item_specification (não mais Revisão direta)", () => {
     const d = decideConversation(inp({ originalText: "revisao de 60.000 km, R$900,00" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
     expect(d.responseParams.valor).toBe(900);
-    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
   });
   test("rodei 60000km hoje → km 60000 (sem revisão, correção genuína)", () => {
     const d = decideConversation(inp({ originalText: "rodei 60000km hoje" }));
