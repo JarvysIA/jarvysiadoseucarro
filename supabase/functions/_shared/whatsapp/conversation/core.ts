@@ -865,133 +865,193 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       currentDraft.ok &&
       typeof input.originalText === "string"
     ) {
-      const categoriaMatch = matchExpenseCategoria(input.originalText);
-      if (categoriaMatch.ok) {
-        const resolvedVeh = resolveVehicle({
-          text: null,
-          vehicles: input.vehicles,
-          activeVehicleId: effectiveState.activeVehicleId,
-        });
-        const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
-        if (resolvedVeh.kind === "matched") {
-          const veh = resolvedVeh.vehicle;
-          const gated = gateMaintenanceItemsByCategory(
-            categoriaMatch.categoria,
-            currentDraft.value,
-          );
+      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      switch (semanticResult.status) {
+        case "resolved": {
+          const conceptualCategory = semanticResult.conceptualCategory;
+          const resolvedVeh = resolveVehicle({
+            text: null,
+            vehicles: input.vehicles,
+            activeVehicleId: effectiveState.activeVehicleId,
+          });
+          const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+          if (resolvedVeh.kind === "matched") {
+            const veh = resolvedVeh.vehicle;
+            const gated = gateMaintenanceItemsByCategory(conceptualCategory, currentDraft.value);
+            const candidate = {
+              phase: "awaiting_confirmation" as const,
+              categoria: conceptualCategory,
+              valor: currentDraft.value.valor,
+              vehicleId: veh.id,
+              requestMessageId: effectiveState.draftId,
+              ...(gated
+                ? {
+                    recognizedTags: gated.recognizedTags,
+                    descricao: gated.descricaoPreliminar,
+                    ambiguousFilterMention: gated.ambiguousFilterMention,
+                  }
+                : {}),
+            };
+            const validated = validateAwaitingConfirmationExpenseDraft(candidate);
+            if (validated.ok && isUuid(veh.id)) {
+              return buildDecision({
+                eventKind: "category_reply",
+                decisionKind: "transition",
+                previousState,
+                nextState: "awaiting_expense_confirmation",
+                statePatch: withLastMessage(
+                  mergePatch(basePatch, {
+                    state: "awaiting_expense_confirmation",
+                    currentIntent: "expense",
+                    awaitingField: "confirmation",
+                    draftType: "expense",
+                    draftId: effectiveState.draftId,
+                    draftVersion: nextVersion,
+                    draftPayload: validated.value as unknown as Record<string, unknown>,
+                    activeVehicleId: veh.id,
+                  }),
+                  input.sourceMessageId,
+                ),
+                responseKey: "expense_create_confirmation",
+                responseParams: {
+                  vehicleLabel: labelFor(veh),
+                  valor: currentDraft.value.valor,
+                  categoria: conceptualCategory,
+                  ...buildMaintenanceResponseExtras(
+                    gated
+                      ? {
+                          recognizedTags: gated.recognizedTags,
+                          descricao: gated.descricaoPreliminar,
+                          ambiguousFilterMention: gated.ambiguousFilterMention,
+                        }
+                      : null,
+                  ),
+                },
+                nextFallbackCount: 0,
+                reasonCode: "expense_category_resolved_complete",
+              });
+            }
+          } else if (resolvedVeh.kind === "ambiguous" || resolvedVeh.kind === "not_found") {
+            const gated = gateMaintenanceItemsByCategory(conceptualCategory, currentDraft.value);
+            const candidate = {
+              phase: "awaiting_vehicle" as const,
+              categoria: conceptualCategory,
+              valor: currentDraft.value.valor,
+              requestMessageId: effectiveState.draftId,
+              ...(gated
+                ? {
+                    recognizedTags: gated.recognizedTags,
+                    descricaoPreliminar: gated.descricaoPreliminar,
+                    ambiguousFilterMention: gated.ambiguousFilterMention,
+                  }
+                : {}),
+            };
+            const validated = validateAwaitingVehicleExpenseDraft(candidate);
+            if (validated.ok) {
+              const pool = firstEligible(input.vehicles);
+              return buildDecision({
+                eventKind: "category_reply",
+                decisionKind: "transition",
+                previousState,
+                nextState: "awaiting_vehicle",
+                statePatch: withLastMessage(
+                  mergePatch(basePatch, {
+                    state: "awaiting_vehicle",
+                    currentIntent: "expense",
+                    awaitingField: "vehicle",
+                    draftType: "expense",
+                    draftId: effectiveState.draftId,
+                    draftVersion: nextVersion,
+                    draftPayload: validated.value as unknown as Record<string, unknown>,
+                  }),
+                  input.sourceMessageId,
+                ),
+                responseKey: "vehicle_ambiguous",
+                responseParams: { options: pool.map(labelFor) },
+                nextFallbackCount: 0,
+                reasonCode: "expense_category_resolved_awaiting_vehicle",
+              });
+            }
+          } else {
+            return buildDecision({
+              eventKind: "category_reply",
+              decisionKind: "respond",
+              previousState,
+              nextState: "idle",
+              outcome: "completed",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+                input.sourceMessageId,
+              ),
+              responseKey: "no_eligible_vehicle",
+              nextFallbackCount: 0,
+              reasonCode: "expense_category_no_eligible_vehicle",
+            });
+          }
+          break;
+        }
+
+        case "needs_item_specification": {
+          const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
           const candidate = {
-            phase: "awaiting_confirmation" as const,
-            categoria: categoriaMatch.categoria,
+            phase: "awaiting_item_specification" as const,
             valor: currentDraft.value.valor,
-            vehicleId: veh.id,
             requestMessageId: effectiveState.draftId,
-            ...(gated
-              ? {
-                  recognizedTags: gated.recognizedTags,
-                  descricao: gated.descricaoPreliminar,
-                  ambiguousFilterMention: gated.ambiguousFilterMention,
-                }
-              : {}),
+            trigger: semanticResult.trigger,
+            fallbackCategory: semanticResult.fallbackCategory,
           };
-          const validated = validateAwaitingConfirmationExpenseDraft(candidate);
-          if (validated.ok && isUuid(veh.id)) {
+          const validated = validateAwaitingItemSpecificationDraft(candidate);
+          if (validated.ok) {
             return buildDecision({
               eventKind: "category_reply",
               decisionKind: "transition",
               previousState,
-              nextState: "awaiting_expense_confirmation",
+              nextState: "awaiting_item_specification",
               statePatch: withLastMessage(
                 mergePatch(basePatch, {
-                  state: "awaiting_expense_confirmation",
+                  state: "awaiting_item_specification",
                   currentIntent: "expense",
-                  awaitingField: "confirmation",
+                  awaitingField: "item_specification",
                   draftType: "expense",
                   draftId: effectiveState.draftId,
                   draftVersion: nextVersion,
                   draftPayload: validated.value as unknown as Record<string, unknown>,
-                  activeVehicleId: veh.id,
                 }),
                 input.sourceMessageId,
               ),
-              responseKey: "expense_create_confirmation",
+              responseKey: "expense_item_specification_prompt",
               responseParams: {
-                vehicleLabel: labelFor(veh),
                 valor: currentDraft.value.valor,
-                categoria: categoriaMatch.categoria,
-                ...buildMaintenanceResponseExtras(
-                  gated
-                    ? {
-                        recognizedTags: gated.recognizedTags,
-                        descricao: gated.descricaoPreliminar,
-                        ambiguousFilterMention: gated.ambiguousFilterMention,
-                      }
-                    : null,
-                ),
+                itemSpecificationTrigger: semanticResult.trigger,
               },
               nextFallbackCount: 0,
-              reasonCode: "expense_category_resolved_complete",
+              reasonCode: "expense_category_resolved_awaiting_item_specification",
             });
           }
-        } else if (resolvedVeh.kind === "ambiguous" || resolvedVeh.kind === "not_found") {
-          const gated = gateMaintenanceItemsByCategory(
-            categoriaMatch.categoria,
-            currentDraft.value,
-          );
-          const candidate = {
-            phase: "awaiting_vehicle" as const,
-            categoria: categoriaMatch.categoria,
-            valor: currentDraft.value.valor,
-            requestMessageId: effectiveState.draftId,
-            ...(gated
-              ? {
-                  recognizedTags: gated.recognizedTags,
-                  descricaoPreliminar: gated.descricaoPreliminar,
-                  ambiguousFilterMention: gated.ambiguousFilterMention,
-                }
-              : {}),
-          };
-          const validated = validateAwaitingVehicleExpenseDraft(candidate);
-          if (validated.ok) {
-            const pool = firstEligible(input.vehicles);
-            return buildDecision({
-              eventKind: "category_reply",
-              decisionKind: "transition",
-              previousState,
-              nextState: "awaiting_vehicle",
-              statePatch: withLastMessage(
-                mergePatch(basePatch, {
-                  state: "awaiting_vehicle",
-                  currentIntent: "expense",
-                  awaitingField: "vehicle",
-                  draftType: "expense",
-                  draftId: effectiveState.draftId,
-                  draftVersion: nextVersion,
-                  draftPayload: validated.value as unknown as Record<string, unknown>,
-                }),
-                input.sourceMessageId,
-              ),
-              responseKey: "vehicle_ambiguous",
-              responseParams: { options: pool.map(labelFor) },
-              nextFallbackCount: 0,
-              reasonCode: "expense_category_resolved_awaiting_vehicle",
-            });
-          }
-        } else {
-          return buildDecision({
-            eventKind: "category_reply",
-            decisionKind: "respond",
-            previousState,
-            nextState: "idle",
-            outcome: "completed",
-            statePatch: withLastMessage(
-              mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
-              input.sourceMessageId,
-            ),
-            responseKey: "no_eligible_vehicle",
-            nextFallbackCount: 0,
-            reasonCode: "expense_category_no_eligible_vehicle",
-          });
+          break;
         }
+
+        // needs_clarification (categoria não-motor ambígua) e unsupported
+        // (nenhuma categoria reconhecida) caem no MESMO branch hoje — repete
+        // a pergunta de categoria genericamente, sem contar fallback.
+        // Diferenciar usando candidateCategories de needs_clarification fica
+        // para um sub-passo futuro de melhoria de UX (fora de escopo aqui) —
+        // mesma decisão já replicada no Passo D-2.
+        case "needs_clarification":
+        case "unsupported":
+          break;
+
+        // Defensivo — nunca deveria ocorrer na prática. conversation_only é
+        // uma garantia estrutural de recognizeExpenseSemantics (o cabeçalho
+        // do próprio arquivo confirma que essa função nunca produz esse
+        // status) — mas precisa de um case explícito para o switch ser
+        // exaustivo (ver assertNever no default). Fail-closed: mesmo
+        // comportamento de needs_clarification/unsupported acima.
+        case "conversation_only":
+          break;
+
+        default:
+          return assertNever(semanticResult);
       }
       // categoria não reconhecida — repete a pergunta, sem contar fallback.
       return buildDecision({

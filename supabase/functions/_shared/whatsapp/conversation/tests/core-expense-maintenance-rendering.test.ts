@@ -221,7 +221,13 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
     expect(text).toContain("(óleo)");
   });
 
-  test("(9) fluxo completo: 'Filtro 26,90' → responde 'Manutenção' → texto final tem pergunta do filtro", () => {
+  // Atualizado no Passo D-3 (P0-3B-R): responder "Manutenção" ao
+  // awaiting_expense_category agora intercepta como needs_item_specification
+  // (decisão de produto aprovada — a mesma lacuna de precisão que motiva o
+  // gatilho em T1 se aplica igualmente aqui). Não resolve mais direto para
+  // awaiting_expense_confirmation com a pergunta do filtro; transiciona para
+  // awaiting_item_specification.
+  test("(9) fluxo completo: 'Filtro 26,90' → responde 'Manutenção' → agora intercepta como needs_item_specification", () => {
     const v1 = veh(VEH_1);
     const d1 = decideConversation(
       inp({
@@ -251,8 +257,10 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
         sourceMessageId: MSG_C,
       }),
     );
-    expect(decision.nextState).toBe("awaiting_expense_confirmation");
-    expect(text.endsWith(FILTER_QUESTION)).toBe(true);
+    expect(decision.nextState).toBe("awaiting_item_specification");
+    expect(decision.responseKey).toBe("expense_item_specification_prompt");
+    expect(decision.responseParams.itemSpecificationTrigger).toBe("maintenance_unspecified");
+    expect(text).not.toContain(FILTER_QUESTION);
   });
 });
 
