@@ -96,25 +96,21 @@ describe("bare number + categoria — deve virar despesa", () => {
     expect(payload?.fallbackCategory).toBe("Manutenção");
   });
 
-  // Atualizado no P0-3B-R, Passo D-1: "escapamento" já está no dicionário do
+  // Atualizado no P0-3B-R: "escapamento" já está no dicionário do
   // reconhecedor novo (non-engine-heuristic-classifier.ts) desde builds
-  // anteriores; a hint agora permite reinterpretar o número pelado (valor
-  // reconhecido = 200). MAS a CHAMADA 4 (categoriaMatch, mais abaixo no mesmo
-  // bloco T1) continua usando o parser LEGADO, intocado neste sub-passo —
-  // "escapamento" NÃO está no dicionário do legado, então categoriaMatch
-  // falha e o fluxo vai para awaiting_expense_category (pergunta a
-  // categoria), não direto para awaiting_expense_confirmation com
-  // Manutenção. Isso é uma melhoria real (antes: nem virava despesa) mas
-  // parcial (só a substituição da CHAMADA 4, num sub-passo futuro, resolve
-  // por completo) — exatamente o "pode não mudar o desfecho final" descrito
-  // no escopo deste Passo D-1. Removido da lista "ainda não funcionam"
-  // abaixo, já que agora reconhece o valor; não colocado na lista simples
-  // acima, já que o desfecho final ainda não é a confirmação direta.
-  test('"escapamento 200" → valor 200 reconhecido (hint), mas categoria ainda pendente (CHAMADA 4 no legado não conhece "escapamento")', () => {
+  // anteriores. No Passo D-1, só a hint tinha sido trocada — a CHAMADA 4
+  // (decisão real) ainda usava o parser LEGADO, que não conhece
+  // "escapamento", então a melhoria ficava parcial (valor reconhecido, mas
+  // categoria ainda pendente em awaiting_expense_category). Com o Passo D-2
+  // (CHAMADA 4 agora também usando recognizeExpenseSemantics), a melhoria
+  // fica COMPLETA: vai direto para awaiting_expense_confirmation com
+  // categoria Manutenção, como os demais casos da lista simples acima.
+  test('"escapamento 200" → Manutenção R$200 (resolução completa desde o Passo D-2)', () => {
     const d = decideConversation(inp({ originalText: "escapamento 200" }));
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
-    expect(d.nextState).toBe("awaiting_expense_category");
-    expect(d.responseKey).toBe("expense_category_prompt");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
     expect(d.responseParams.valor).toBe(200);
   });
 });

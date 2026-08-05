@@ -162,15 +162,51 @@ function isCategoryRecognized(category: NonEngineCategory, haystack: string): bo
 const GERAL_KEYWORD = "geral";
 const GERAL_CANDIDATE_CATEGORIES: readonly NonEngineCategory[] = ["Lavagem"];
 
+// SINCRONIZAÇÃO OBRIGATÓRIA COM expense-category-recognizer.ts —
+// ITEM_SPECIFICATION_TRIGGERS (naquele arquivo) lista os termos-gatilho de
+// especificação de item ("revisao"/"revisao preventiva", "ar condicionado",
+// "manutencao", "geral"). A lista abaixo PRECISA conter os mesmos termos
+// (exceto "geral", tratado por este próprio mecanismo, não por ela) — é
+// usada no passo 3 da regra de cessão de "geral" logo abaixo, para saber se
+// o texto já contém um termo que vai virar gatilho de qualquer forma. Se um
+// novo gatilho (4º, 5º...) for adicionado em ITEM_SPECIFICATION_TRIGGERS,
+// ADICIONE o mesmo termo aqui também — caso contrário, "geral" ao lado desse
+// novo termo continuaria sendo tratado como ambiguidade de categoria em vez
+// de ceder para o gatilho novo.
+const ITEM_SPECIFICATION_TRIGGER_KEYWORDS: readonly string[] = [
+  "revisao",
+  "revisao preventiva",
+  "ar condicionado",
+  "manutencao",
+];
+
 /**
  * REGRA ESPECIAL — "geral" sozinho:
  * é vago demais para decidir categoria sozinho ("lavagem geral", "revisão geral",
- * "manutenção geral" são todos plausíveis). Lavagem é o palpite mais provável no
- * dia a dia, mas nunca deve ser afirmado sem confirmação explícita. Suas categorias
- * candidatas são SOMADAS às demais categorias já reconhecidas no mesmo texto pelo
- * dicionário normal (nunca as substituem) — a presença de "geral" sempre introduz
- * incerteza, então o resultado final nunca é "resolved" quando esta regra se aplica,
- * mesmo que a união acabe tendo só uma categoria.
+ * "manutenção geral" são todos plausíveis). Historicamente, "geral" sempre somava
+ * Lavagem como candidata extra e forçava o resultado a "ambiguous", nunca
+ * "resolved", mesmo quando `matched` já tinha uma categoria confiável.
+ *
+ * Comportamento atual (P0-3B-R): "geral" agora CEDE espaço para os gatilhos de
+ * especificação de item quando faz mais sentido perguntar "o que foi feito?"
+ * em vez de "qual categoria?":
+ *   1. `matched` contém SÓ "Manutenção" → cede: devolve "unrecognized", deixando
+ *      o orquestrador tratar via o gatilho "maintenance_unspecified" já existente.
+ *   2. `matched` vazio E o texto já contém um termo-gatilho conhecido
+ *      (ITEM_SPECIFICATION_TRIGGER_KEYWORDS) → cede da mesma forma, deixando o
+ *      gatilho correspondente (revisão/ar condicionado/manutenção) decidir.
+ *   3. `matched` tem ao menos 1 categoria que NÃO é exclusivamente "Manutenção"
+ *      (ex.: Lavagem, Combustível) → "geral" para de forçar ambiguidade; o
+ *      resultado usa SOMENTE `matched` (resolved se 1 categoria, ambiguous se
+ *      mais de 1) — ex.: "lavagem geral" agora resolve direto para Lavagem.
+ *   4. Nenhum dos casos acima (matched vazio E nenhum termo-gatilho presente)
+ *      → comportamento ORIGINAL, inalterado: "geral" verdadeiramente sozinho
+ *      força "ambiguous" com Lavagem como candidata (ex.: "fiz uma geral no
+ *      carro").
+ *
+ * A lógica de "farol" (isFarolAmbiguous/FAROL_CANDIDATE_CATEGORIES) é
+ * INDEPENDENTE desta regra e não é tocada — ela só entra na união final no
+ * caso 4 acima (o único caso que preserva o comportamento de união original).
  */
 function isGeralAmbiguous(haystack: string): boolean {
   return hasKeyword(haystack, GERAL_KEYWORD);
@@ -212,8 +248,40 @@ export function classifyNonEngineExpense(originalText: string): NonEngineHeurist
     if (isCategoryRecognized(category, haystack)) matched.push(category);
   }
 
+  if (isGeralAmbiguous(haystack)) {
+    // Caso 1 — matched contém SÓ "Manutenção": cede para o gatilho
+    // maintenance_unspecified (ver comentário de isGeralAmbiguous acima).
+    if (matched.length === 1 && matched[0] === "Manutenção") {
+      return { status: "unrecognized" };
+    }
+    // Caso 2 — matched vazio e já contém um termo-gatilho conhecido: cede
+    // para o gatilho correspondente (revisão/ar condicionado/manutenção).
+    if (matched.length === 0 && matchesAny(haystack, ITEM_SPECIFICATION_TRIGGER_KEYWORDS)) {
+      return { status: "unrecognized" };
+    }
+    // Caso 3 — matched tem ao menos 1 categoria que não é exclusivamente
+    // "Manutenção": "geral" para de forçar ambiguidade; resolve só com matched.
+    if (matched.length > 0) {
+      if (matched.length === 1) {
+        return { status: "resolved", category: matched[0] };
+      }
+      return { status: "ambiguous", candidateCategories: matched };
+    }
+    // Caso 4 — matched vazio e nenhum termo-gatilho presente: comportamento
+    // ORIGINAL, inalterado — "geral" verdadeiramente sozinho força
+    // "ambiguous" com Lavagem, somando farol se também se aplicar.
+    const originalUnion: NonEngineCategory[] = [...GERAL_CANDIDATE_CATEGORIES];
+    if (isFarolAmbiguous(haystack)) {
+      for (const category of FAROL_CANDIDATE_CATEGORIES) {
+        if (!originalUnion.includes(category)) originalUnion.push(category);
+      }
+    }
+    return { status: "ambiguous", candidateCategories: originalUnion };
+  }
+
+  // "geral" ausente — farol continua exatamente como antes, sem nenhuma
+  // interferência da lógica acima.
   const specialCategories: NonEngineCategory[] = [];
-  if (isGeralAmbiguous(haystack)) specialCategories.push(...GERAL_CANDIDATE_CATEGORIES);
   if (isFarolAmbiguous(haystack)) specialCategories.push(...FAROL_CANDIDATE_CATEGORIES);
 
   const union: NonEngineCategory[] = [];

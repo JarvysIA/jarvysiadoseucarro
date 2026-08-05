@@ -148,6 +148,10 @@ function countLetters(text: string): number {
   return matches ? matches.length : 0;
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unexpected semantic result status: ${String(value)}`);
+}
+
 /**
  * Build 4c/9 do item 6 — cálculo puro dos itens de manutenção, independente
  * de categoria (o parser não precisa saber a categoria pra funcionar).
@@ -1533,141 +1537,148 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
           });
         }
       }
-      const categoriaMatch = matchExpenseCategoria(input.originalText);
-      if (!categoriaMatch.ok) {
-        const rawItems = computeMaintenanceItemsRaw(input.originalText);
-        const candidate = {
-          phase: "awaiting_category" as const,
-          valor: parsedValor.valor,
-          requestMessageId: input.sourceMessageId,
-          recognizedTags: rawItems.recognizedTags,
-          descricaoPreliminar: rawItems.descricaoPreliminar,
-          ambiguousFilterMention: rawItems.ambiguousFilterMention,
-        };
-        const validated = validateAwaitingCategoryExpenseDraft(candidate);
-        if (validated.ok) {
-          return buildDecision({
-            eventKind: EXPENSE_REPORTED_EVENT_KIND,
-            decisionKind: "transition",
-            previousState,
-            nextState: "awaiting_expense_category",
-            statePatch: withLastMessage(
-              mergePatch(basePatch, {
-                state: "awaiting_expense_category",
-                currentIntent: "expense",
-                awaitingField: "categoria",
-                draftType: "expense",
-                draftId: input.sourceMessageId,
-                draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
-                draftPayload: validated.value as unknown as Record<string, unknown>,
-              }),
-              input.sourceMessageId,
-            ),
-            responseKey: "expense_category_prompt",
-            responseParams: {
-              valor: parsedValor.valor,
-              options: [...EXPENSE_CATEGORIES],
-            },
-            nextFallbackCount: 0,
-            reasonCode: "expense_reported_awaiting_category",
+      // Passo D-2 (P0-3B-R): reaproveita semanticResult (já calculado acima
+      // para o check de needs_item_specification) em vez de chamar
+      // matchExpenseCategoria de novo. switch + assertNever no default, mesmo
+      // padrão do adapter (PR #16) — qualquer status futuro não tratado
+      // explicitamente aqui quebra a build em vez de cair num branch errado.
+      switch (semanticResult.status) {
+        case "resolved": {
+          const conceptualCategory = semanticResult.conceptualCategory;
+          const resolvedVeh = resolveVehicle({
+            text: null,
+            vehicles: input.vehicles,
+            activeVehicleId: effectiveState.activeVehicleId,
           });
-        }
-      } else {
-        const resolvedVeh = resolveVehicle({
-          text: null,
-          vehicles: input.vehicles,
-          activeVehicleId: effectiveState.activeVehicleId,
-        });
-        if (resolvedVeh.kind === "matched") {
-          const veh = resolvedVeh.vehicle;
-          const extras = computeMaintenanceDraftExtras(
-            categoriaMatch.categoria,
-            input.originalText,
-          );
-          const candidate = {
-            phase: "awaiting_confirmation" as const,
-            categoria: categoriaMatch.categoria,
-            valor: parsedValor.valor,
-            vehicleId: veh.id,
-            requestMessageId: input.sourceMessageId,
-            ...(extras
-              ? {
-                  recognizedTags: extras.recognizedTags,
-                  descricao: extras.descricaoPreliminar,
-                  ambiguousFilterMention: extras.ambiguousFilterMention,
-                }
-              : {}),
-          };
-          const validated = validateAwaitingConfirmationExpenseDraft(candidate);
-          if (validated.ok && isUuid(veh.id)) {
-            return buildDecision({
-              eventKind: EXPENSE_REPORTED_EVENT_KIND,
-              decisionKind: "transition",
-              previousState,
-              nextState: "awaiting_expense_confirmation",
-              statePatch: withLastMessage(
-                mergePatch(basePatch, {
-                  state: "awaiting_expense_confirmation",
-                  currentIntent: "expense",
-                  awaitingField: "confirmation",
-                  draftType: "expense",
-                  draftId: input.sourceMessageId,
-                  draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
-                  draftPayload: validated.value as unknown as Record<string, unknown>,
-                  activeVehicleId: veh.id,
-                }),
-                input.sourceMessageId,
-              ),
-              responseKey: "expense_create_confirmation",
-              responseParams: {
-                vehicleLabel: labelFor(veh),
-                valor: parsedValor.valor,
-                categoria: categoriaMatch.categoria,
-                ...buildMaintenanceResponseExtras(
-                  extras
-                    ? {
-                        recognizedTags: extras.recognizedTags,
-                        descricao: extras.descricaoPreliminar,
-                        ambiguousFilterMention: extras.ambiguousFilterMention,
-                      }
-                    : null,
+          if (resolvedVeh.kind === "matched") {
+            const veh = resolvedVeh.vehicle;
+            const extras = computeMaintenanceDraftExtras(conceptualCategory, input.originalText);
+            const candidate = {
+              phase: "awaiting_confirmation" as const,
+              categoria: conceptualCategory,
+              valor: parsedValor.valor,
+              vehicleId: veh.id,
+              requestMessageId: input.sourceMessageId,
+              ...(extras
+                ? {
+                    recognizedTags: extras.recognizedTags,
+                    descricao: extras.descricaoPreliminar,
+                    ambiguousFilterMention: extras.ambiguousFilterMention,
+                  }
+                : {}),
+            };
+            const validated = validateAwaitingConfirmationExpenseDraft(candidate);
+            if (validated.ok && isUuid(veh.id)) {
+              return buildDecision({
+                eventKind: EXPENSE_REPORTED_EVENT_KIND,
+                decisionKind: "transition",
+                previousState,
+                nextState: "awaiting_expense_confirmation",
+                statePatch: withLastMessage(
+                  mergePatch(basePatch, {
+                    state: "awaiting_expense_confirmation",
+                    currentIntent: "expense",
+                    awaitingField: "confirmation",
+                    draftType: "expense",
+                    draftId: input.sourceMessageId,
+                    draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                    draftPayload: validated.value as unknown as Record<string, unknown>,
+                    activeVehicleId: veh.id,
+                  }),
+                  input.sourceMessageId,
                 ),
-              },
-              nextFallbackCount: 0,
-              reasonCode: "expense_reported_complete",
-            });
+                responseKey: "expense_create_confirmation",
+                responseParams: {
+                  vehicleLabel: labelFor(veh),
+                  valor: parsedValor.valor,
+                  categoria: conceptualCategory,
+                  ...buildMaintenanceResponseExtras(
+                    extras
+                      ? {
+                          recognizedTags: extras.recognizedTags,
+                          descricao: extras.descricaoPreliminar,
+                          ambiguousFilterMention: extras.ambiguousFilterMention,
+                        }
+                      : null,
+                  ),
+                },
+                nextFallbackCount: 0,
+                reasonCode: "expense_reported_complete",
+              });
+            }
+          } else {
+            const extras = computeMaintenanceDraftExtras(conceptualCategory, input.originalText);
+            const candidate = {
+              phase: "awaiting_vehicle" as const,
+              categoria: conceptualCategory,
+              valor: parsedValor.valor,
+              requestMessageId: input.sourceMessageId,
+              ...(extras
+                ? {
+                    recognizedTags: extras.recognizedTags,
+                    descricaoPreliminar: extras.descricaoPreliminar,
+                    ambiguousFilterMention: extras.ambiguousFilterMention,
+                  }
+                : {}),
+            };
+
+            const validated = validateAwaitingVehicleExpenseDraft(candidate);
+            if (validated.ok) {
+              return buildDecision({
+                eventKind: EXPENSE_REPORTED_EVENT_KIND,
+                decisionKind: "transition",
+                previousState,
+                nextState: "awaiting_vehicle",
+                statePatch: withLastMessage(
+                  mergePatch(basePatch, {
+                    state: "awaiting_vehicle",
+                    currentIntent: "expense",
+                    awaitingField: "vehicle",
+                    draftType: "expense",
+                    draftId: input.sourceMessageId,
+                    draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                    draftPayload: validated.value as unknown as Record<string, unknown>,
+                  }),
+                  input.sourceMessageId,
+                ),
+                responseKey: "vehicle_ambiguous",
+                responseParams: { options: pool.map(labelFor) },
+                nextFallbackCount: 0,
+                reasonCode: "expense_reported_partial_awaiting_vehicle",
+              });
+            }
           }
-        } else {
-          const extras = computeMaintenanceDraftExtras(
-            categoriaMatch.categoria,
-            input.originalText,
-          );
+          break;
+        }
+
+        // needs_clarification (categoria não-motor ambígua) e unsupported
+        // (nenhuma categoria reconhecida) caem no MESMO branch hoje — pede a
+        // categoria genericamente com as 8 opções fixas. Diferenciar usando
+        // candidateCategories de needs_clarification fica para um sub-passo
+        // futuro de melhoria de UX (fora de escopo aqui).
+        case "needs_clarification":
+        case "unsupported": {
+          const rawItems = computeMaintenanceItemsRaw(input.originalText);
           const candidate = {
-            phase: "awaiting_vehicle" as const,
-            categoria: categoriaMatch.categoria,
+            phase: "awaiting_category" as const,
             valor: parsedValor.valor,
             requestMessageId: input.sourceMessageId,
-            ...(extras
-              ? {
-                  recognizedTags: extras.recognizedTags,
-                  descricaoPreliminar: extras.descricaoPreliminar,
-                  ambiguousFilterMention: extras.ambiguousFilterMention,
-                }
-              : {}),
+            recognizedTags: rawItems.recognizedTags,
+            descricaoPreliminar: rawItems.descricaoPreliminar,
+            ambiguousFilterMention: rawItems.ambiguousFilterMention,
           };
-
-          const validated = validateAwaitingVehicleExpenseDraft(candidate);
+          const validated = validateAwaitingCategoryExpenseDraft(candidate);
           if (validated.ok) {
             return buildDecision({
               eventKind: EXPENSE_REPORTED_EVENT_KIND,
               decisionKind: "transition",
               previousState,
-              nextState: "awaiting_vehicle",
+              nextState: "awaiting_expense_category",
               statePatch: withLastMessage(
                 mergePatch(basePatch, {
-                  state: "awaiting_vehicle",
+                  state: "awaiting_expense_category",
                   currentIntent: "expense",
-                  awaitingField: "vehicle",
+                  awaitingField: "categoria",
                   draftType: "expense",
                   draftId: input.sourceMessageId,
                   draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
@@ -1675,13 +1686,70 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
                 }),
                 input.sourceMessageId,
               ),
-              responseKey: "vehicle_ambiguous",
-              responseParams: { options: pool.map(labelFor) },
+              responseKey: "expense_category_prompt",
+              responseParams: {
+                valor: parsedValor.valor,
+                options: [...EXPENSE_CATEGORIES],
+              },
               nextFallbackCount: 0,
-              reasonCode: "expense_reported_partial_awaiting_vehicle",
+              reasonCode: "expense_reported_awaiting_category",
             });
           }
+          break;
         }
+
+        // Defensivo — nunca deveria ocorrer neste ponto. needs_item_specification
+        // já foi interceptado no bloco logo acima (sempre retorna cedo quando
+        // esse status ocorre, então o switch nunca deveria vê-lo aqui).
+        // conversation_only é uma garantia estrutural de recognizeExpenseSemantics
+        // (o cabeçalho do próprio arquivo confirma que essa função nunca produz
+        // esse status) — mas precisa de um case explícito para o switch ser
+        // exaustivo (ver assertNever no default). Fail-closed: mesmo
+        // comportamento de needs_clarification/unsupported acima.
+        case "needs_item_specification":
+        case "conversation_only": {
+          const rawItems = computeMaintenanceItemsRaw(input.originalText);
+          const candidate = {
+            phase: "awaiting_category" as const,
+            valor: parsedValor.valor,
+            requestMessageId: input.sourceMessageId,
+            recognizedTags: rawItems.recognizedTags,
+            descricaoPreliminar: rawItems.descricaoPreliminar,
+            ambiguousFilterMention: rawItems.ambiguousFilterMention,
+          };
+          const validated = validateAwaitingCategoryExpenseDraft(candidate);
+          if (validated.ok) {
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_expense_category",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_expense_category",
+                  currentIntent: "expense",
+                  awaitingField: "categoria",
+                  draftType: "expense",
+                  draftId: input.sourceMessageId,
+                  draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_category_prompt",
+              responseParams: {
+                valor: parsedValor.valor,
+                options: [...EXPENSE_CATEGORIES],
+              },
+              nextFallbackCount: 0,
+              reasonCode: "expense_reported_awaiting_category",
+            });
+          }
+          break;
+        }
+
+        default:
+          return assertNever(semanticResult);
       }
     }
   }

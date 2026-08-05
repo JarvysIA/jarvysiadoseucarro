@@ -101,9 +101,19 @@ describe("T1 despesa — draft direto em idle", () => {
     expect(d.statePatch.draftVersion).toBe(0);
   });
 
+  // Atualizado no P0-3B-R (Passo D-2): "botão de vidro" deixou de servir como
+  // exemplo de "categoria não reconhecida" — está no dicionário do
+  // reconhecedor novo (CATEGORY_KEYWORDS.Manutenção) desde um build anterior,
+  // então com a CHAMADA 4 usando o sistema novo ele passa a resolver direto.
+  // Trocado por "coxim do motor" (peça automotiva real e plausível — coxim
+  // do motor é o suporte de borracha/metal que fixa o motor ao chassi) —
+  // confirmado empiricamente que NEM o parser legado NEM o reconhecedor novo
+  // têm esse termo em nenhum dicionário, preservando o propósito original do
+  // teste (provar que "categoria genuinamente desconhecida" ainda cai em
+  // awaiting_expense_category com a pergunta genérica).
   test("valor sem categoria reconhecida → awaiting_expense_category v0", () => {
     const d = decideConversation(
-      inp({ originalText: "botão de vidro 30,00", vehicles: [veh(VEH_1)] }),
+      inp({ originalText: "coxim do motor 30,00", vehicles: [veh(VEH_1)] }),
     );
     expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
     expect(d.nextState).toBe("awaiting_expense_category");
