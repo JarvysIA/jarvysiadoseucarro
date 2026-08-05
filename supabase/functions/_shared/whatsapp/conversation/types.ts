@@ -181,6 +181,7 @@ export type ConversationResponseKey =
   | "km_update_no_change"
   | "km_update_retry_needed"
   | "expense_category_prompt"
+  | "expense_item_specification_prompt"
   | "expense_create_confirmation"
   | "expense_create_correction_confirmation"
   | "expense_create_completed"
@@ -199,6 +200,7 @@ export type ConversationResponseParams = {
   recognizedTags?: ReadonlyArray<string>;
   needsDescriptionInvite?: boolean;
   needsFilterClarification?: boolean;
+  itemSpecificationTrigger?: "revision_item_unspecified" | "ac_service_unspecified";
 };
 
 export type ConversationCoreDecision = {

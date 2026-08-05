@@ -92,6 +92,13 @@ export function renderResponse(
           : "qual categoria";
       return `Registrei ${v}, mas não identifiquei a categoria. É ${opts}?`;
     }
+    case "expense_item_specification_prompt": {
+      const v = formatValor(params.valor);
+      if (params.itemSpecificationTrigger === "revision_item_unspecified") {
+        return `Registrei ${v} em revisão. Qual item você trocou? (óleo, filtro, pastilha, correia...)`;
+      }
+      return `Registrei ${v}. Foi o filtro do ar-condicionado, ou foi conserto/carga de gás?`;
+    }
     case "expense_create_confirmation": {
       const label = params.vehicleLabel ?? "seu carro";
       const v = formatValor(params.valor);
