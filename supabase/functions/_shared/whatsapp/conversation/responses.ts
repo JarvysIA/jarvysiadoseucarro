@@ -86,11 +86,7 @@ export function renderResponse(
       return "Não consegui concluir agora. Pode me dizer a quilometragem de novo?";
     case "expense_category_prompt": {
       const v = formatValor(params.valor);
-      const opts =
-        params.options && params.options.length > 0
-          ? params.options.join(" ou ")
-          : "qual categoria";
-      return `Registrei ${v}, mas não identifiquei a categoria. É ${opts}?`;
+      return `Registrei o valor de ${v}. Pro lançamento ficar mais claro, essa despesa foi o quê?`;
     }
     case "expense_item_specification_prompt": {
       const v = formatValor(params.valor);
