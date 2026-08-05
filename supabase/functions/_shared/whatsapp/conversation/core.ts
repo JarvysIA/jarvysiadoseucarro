@@ -1452,8 +1452,18 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
   ) {
     let parsedValor = parseExpenseValorText(input.originalText);
     if (!parsedValor.ok) {
-      const categoriaHint = matchExpenseCategoria(input.originalText);
-      if (categoriaHint.ok && !looksLikeMaintenanceMilestoneReference(input.originalText)) {
+      // Passo D-1 (P0-3B-R): categoriaHint é só um sinal auxiliar — decide se
+      // vale tentar reinterpretar um número solto como valor de despesa, não
+      // decide a categoria final (isso é categoriaMatch, mais abaixo, ainda
+      // no legado). Por isso "status !== unsupported" é a condição certa
+      // aqui: qualquer sinal de categoria, incluindo needs_clarification e
+      // needs_item_specification, já justifica tentar a reinterpretação —
+      // não precisa ser uma resolução completa (status "resolved").
+      const categoriaHint = recognizeExpenseSemantics(input.originalText);
+      if (
+        categoriaHint.status !== "unsupported" &&
+        !looksLikeMaintenanceMilestoneReference(input.originalText)
+      ) {
         const bareValor = parseExpenseValorBareNumber(input.originalText);
         if (bareValor.ok) {
           parsedValor = bareValor;

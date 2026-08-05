@@ -95,6 +95,28 @@ describe("bare number + categoria — deve virar despesa", () => {
     expect(payload?.trigger).toBe("revision_item_unspecified");
     expect(payload?.fallbackCategory).toBe("Manutenção");
   });
+
+  // Atualizado no P0-3B-R, Passo D-1: "escapamento" já está no dicionário do
+  // reconhecedor novo (non-engine-heuristic-classifier.ts) desde builds
+  // anteriores; a hint agora permite reinterpretar o número pelado (valor
+  // reconhecido = 200). MAS a CHAMADA 4 (categoriaMatch, mais abaixo no mesmo
+  // bloco T1) continua usando o parser LEGADO, intocado neste sub-passo —
+  // "escapamento" NÃO está no dicionário do legado, então categoriaMatch
+  // falha e o fluxo vai para awaiting_expense_category (pergunta a
+  // categoria), não direto para awaiting_expense_confirmation com
+  // Manutenção. Isso é uma melhoria real (antes: nem virava despesa) mas
+  // parcial (só a substituição da CHAMADA 4, num sub-passo futuro, resolve
+  // por completo) — exatamente o "pode não mudar o desfecho final" descrito
+  // no escopo deste Passo D-1. Removido da lista "ainda não funcionam"
+  // abaixo, já que agora reconhece o valor; não colocado na lista simples
+  // acima, já que o desfecho final ainda não é a confirmação direta.
+  test('"escapamento 200" → valor 200 reconhecido (hint), mas categoria ainda pendente (CHAMADA 4 no legado não conhece "escapamento")', () => {
+    const d = decideConversation(inp({ originalText: "escapamento 200" }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_expense_category");
+    expect(d.responseKey).toBe("expense_category_prompt");
+    expect(d.responseParams.valor).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -163,12 +185,68 @@ describe("segurança — número pelado acima do teto não vira despesa", () => 
 
 describe("build 4 — ainda não funcionam (documentação)", () => {
   // "completei", "óleo" e "som" agora têm categoria (Build 4/6) e passam
-  // a funcionar com número pelado. Mantemos aqui apenas palavras sem categoria.
-  const cases = ["ar 800", "guincho 100", "lâmpada 45", "escapamento 200"];
+  // a funcionar com número pelado. "escapamento" também passou a reconhecer
+  // valor (P0-3B-R, Passo D-1), mas com desfecho parcial (vai para
+  // awaiting_expense_category, não confirmação direta) — tem teste dedicado
+  // na seção A, não se encaixa nem aqui nem no array simples. Mantemos aqui
+  // apenas palavras sem categoria em nenhum dos dois sistemas.
+  const cases = ["ar 800", "guincho 100", "lâmpada 45"];
   for (const text of cases) {
     test(`"${text}" → ainda cai no fallback (esperado)`, () => {
       const d = decideConversation(inp({ originalText: text }));
       expect(d.eventKind).not.toBe(EXPENSE_REPORTED_EVENT_KIND);
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// F) Passo D-1 (P0-3B-R) — categoriaHint trocado de matchExpenseCategoria para
+// recognizeExpenseSemantics, condição "ok" trocada para "status !== unsupported".
+// ---------------------------------------------------------------------------
+
+describe("categoriaHint agora usa recognizeExpenseSemantics (Passo D-1)", () => {
+  // "ar condicionado 200" não tem R$/reais/vírgula, então só vira despesa se a
+  // hint permitir a reinterpretação do número pelado. Resultado observado:
+  // vira valor=200 e é interceptado pelo bloco de needs_item_specification
+  // (Passo B, que roda ANTES de categoriaMatch/CHAMADA 4 no mesmo bloco T1) —
+  // vai para awaiting_item_specification, não para awaiting_expense_confirmation
+  // direto. NOTA: para este texto específico, o hint LEGADO também já
+  // permitiria a reinterpretação (matchExpenseCategoria já reconhecia "ar
+  // condicionado" bare como Manutenção antes desta troca) — então este caso
+  // não isola sozinho o efeito da condição "status !== unsupported" vs "ok".
+  // Documentando o resultado observado, como pedido, mesmo assim.
+  test('"ar condicionado 200" → hint permite reinterpretação, needs_item_specification intercepta antes da CHAMADA 4', () => {
+    const d = decideConversation(inp({ originalText: "ar condicionado 200" }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
+    expect(d.responseParams.valor).toBe(200);
+    expect(d.responseParams.itemSpecificationTrigger).toBe("ac_service_unspecified");
+  });
+
+  // "gasolina 80" não muda: recognizeExpenseSemantics resolve Combustível
+  // (status "resolved" !== "unsupported"), igual ao hint legado permitia
+  // (matchExpenseCategoria também já reconhecia "gasolina"). Prova de
+  // não-regressão do caso comum, com CHAMADA 4 (legado, intocada) decidindo
+  // a categoria final normalmente.
+  test('"gasolina 80" → idêntico a antes (não-regressão do caso comum)', () => {
+    const d = decideConversation(inp({ originalText: "gasolina 80" }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Combustível");
+    expect(d.responseParams.valor).toBe(80);
+  });
+
+  // "GNV 30" — o próprio caso da regressão descoberta na tentativa original
+  // deste Passo D-1: dependia do gap de escopo do GNV (PR #21) estar fechado
+  // primeiro. Teste formal confirmando que voltou a funcionar.
+  test('"GNV 30" → volta a funcionar (dependia do fechamento do gap de GNV, PR #21)', () => {
+    const d = decideConversation(inp({ originalText: "GNV 30" }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Combustível");
+    expect(d.responseParams.valor).toBe(30);
+  });
 });
