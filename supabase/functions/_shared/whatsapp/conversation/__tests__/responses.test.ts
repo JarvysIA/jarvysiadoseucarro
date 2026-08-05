@@ -104,14 +104,19 @@ describe("renderResponse guardrails", () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test("expense_category_prompt uses valor and options", () => {
+  // Atualizado no P0-3B-R: expense_category_prompt virou uma pergunta aberta
+  // ("essa despesa foi o quê?"), sem lista fechada de categorias — options
+  // não é mais lido por este case, mesmo se presente em responseParams.
+  test("expense_category_prompt uses valor only (pergunta aberta, sem lista fechada de categorias)", () => {
     const msg = renderResponse("expense_category_prompt", {
       valor: 30,
       options: ["Manutenção", "Lavagem"],
     });
-    expect(msg).toContain("R$ 30,00");
-    expect(msg).toContain("Manutenção");
-    expect(msg).toContain("Lavagem");
+    expect(msg).toBe(
+      "Registrei o valor de R$ 30,00. Pro lançamento ficar mais claro, essa despesa foi o quê?",
+    );
+    expect(msg).not.toContain("Manutenção");
+    expect(msg).not.toContain("Lavagem");
   });
 
   test("expense_create_confirmation uses valor/categoria/label", () => {

@@ -255,3 +255,20 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
     expect(text.endsWith(FILTER_QUESTION)).toBe(true);
   });
 });
+
+// Atualizado no P0-3B-R: expense_category_prompt trocou a lista fechada de 8
+// categorias ("É Revisão, Manutenção, Lavagem...?") por uma pergunta aberta
+// ("essa despesa foi o quê?") — mudança de UX pura em responses.ts, aplicada
+// automaticamente aos 3 pontos que usam essa responseKey (T1, CHAMADA 1 em
+// awaiting_expense_category, CHAMADA 4 já trocada no Passo D-2).
+describe("expense_category_prompt — pergunta aberta (sem lista fechada)", () => {
+  test("texto exato renderizado para categoria não reconhecida", () => {
+    const { text, decision } = renderFrom(
+      inp({ originalText: "coxim do motor 30,00", vehicles: [veh(VEH_1)] }),
+    );
+    expect(decision.responseKey).toBe("expense_category_prompt");
+    expect(text).toBe(
+      "Registrei o valor de R$ 30,00. Pro lançamento ficar mais claro, essa despesa foi o quê?",
+    );
+  });
+});

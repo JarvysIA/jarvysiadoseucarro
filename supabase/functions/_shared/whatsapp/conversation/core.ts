@@ -37,7 +37,6 @@ import {
   matchExpenseCategoria,
 } from "./expense-create-parser.ts";
 import {
-  EXPENSE_CATEGORIES,
   type ExpenseCategory,
   EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
   validateAwaitingCategoryExpenseDraft,
@@ -1004,7 +1003,6 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
         responseKey: "expense_category_prompt",
         responseParams: {
           valor: currentDraft.value.valor,
-          options: [...EXPENSE_CATEGORIES],
         },
         nextFallbackCount: 0,
         reasonCode: "expense_category_unrecognized_retry",
@@ -1689,7 +1687,6 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
               responseKey: "expense_category_prompt",
               responseParams: {
                 valor: parsedValor.valor,
-                options: [...EXPENSE_CATEGORIES],
               },
               nextFallbackCount: 0,
               reasonCode: "expense_reported_awaiting_category",
@@ -1739,7 +1736,6 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
               responseKey: "expense_category_prompt",
               responseParams: {
                 valor: parsedValor.valor,
-                options: [...EXPENSE_CATEGORIES],
               },
               nextFallbackCount: 0,
               reasonCode: "expense_reported_awaiting_category",

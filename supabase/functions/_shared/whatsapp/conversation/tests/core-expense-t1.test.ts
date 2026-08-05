@@ -11,7 +11,6 @@ import {
   CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
   EXPENSE_REPORTED_EVENT_KIND,
 } from "../expense-create-protocol.ts";
-import { EXPENSE_CATEGORIES } from "../expense-create-draft.ts";
 import { KM_REPORTED_EVENT_KIND } from "../km-update-protocol.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";
@@ -121,7 +120,11 @@ describe("T1 despesa — draft direto em idle", () => {
     expect(d.statePatch.draftType).toBe("expense");
     expect(d.statePatch.draftVersion).toBe(0);
     expect(d.responseParams.valor).toBe(30);
-    expect(d.responseParams.options).toEqual([...EXPENSE_CATEGORIES]);
+    // Atualizado: expense_category_prompt virou uma pergunta aberta ("essa
+    // despesa foi o quê?"), sem lista fechada de 8 categorias — options não
+    // é mais lido pelo texto renderizado (ver responses.ts), e core.ts não
+    // passa mais esse campo em responseParams para este responseKey.
+    expect(d.responseParams.options).toBeUndefined();
   });
 
   test("valor reconhecido + 0 veículos → no_eligible_vehicle, sem draft", () => {
