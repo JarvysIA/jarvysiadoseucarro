@@ -114,14 +114,54 @@ describe("Build 4b — texto renderizado final para despesa de manutenção/revi
     expect(text).not.toContain(DESCRIPTION_INVITE);
   });
 
-  test("(5) filtro ambíguo → pergunta qual filtro", () => {
-    const { text } = renderFrom(
+  // Atualizado no P0-3B-R: "manutenção" bare agora é um gatilho de
+  // especificação de item — corrige um bug real do sistema legado, que
+  // perguntava "qual filtro" mas NUNCA usava a resposta para reclassificar a
+  // categoria (ficava Manutenção mesmo se o item fosse do motor
+  // determinístico, ex.: filtro de ar/cabine). Com o fluxo novo, se o turno 2
+  // reconhecer um item de motor, a despesa é corretamente promovida a
+  // Revisão.
+  test("(5) 'manutenção, troquei o filtro' → needs_item_specification (não mais pergunta de filtro do legado)", () => {
+    const { text, decision } = renderFrom(
       inp({
         originalText: "Manutenção, troquei o filtro, 30 reais",
         vehicles: [veh(VEH_1)],
       }),
     );
-    expect(text.endsWith(FILTER_QUESTION)).toBe(true);
+    expect(decision.nextState).toBe("awaiting_item_specification");
+    expect(decision.responseKey).toBe("expense_item_specification_prompt");
+    expect(decision.responseParams.itemSpecificationTrigger).toBe("maintenance_unspecified");
+    expect(text).not.toContain(FILTER_QUESTION);
+  });
+
+  // Fluxo completo de 2 turnos para este mesmo texto, provando a correção:
+  // turno 2 reconhecendo "filtro de ar" (engine_air_filter) promove a
+  // categoria para Revisão, em vez de ficar presa em Manutenção como o
+  // legado fazia.
+  test("(5b) turno 2 de 'manutenção, troquei o filtro' — responde 'filtro de ar' → promovido a Revisão", () => {
+    const t1 = decideConversation(
+      inp({ originalText: "Manutenção, troquei o filtro, 30 reais", vehicles: [veh(VEH_1)] }),
+    );
+    const t2 = decideConversation(
+      inp({
+        state: state({
+          state: "awaiting_item_specification",
+          currentIntent: "expense",
+          awaitingField: "item_specification",
+          draftType: "expense",
+          draftId: t1.statePatch.draftId as string,
+          draftVersion: t1.statePatch.draftVersion as number,
+          draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+        }),
+        originalText: "filtro de ar",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_confirmation");
+    expect(t2.responseKey).toBe("expense_create_confirmation");
+    expect(t2.responseParams.categoria).toBe("Revisão");
+    expect(t2.responseParams.valor).toBe(30);
   });
 
   test("(6) pastilha + filtro ambíguo → contém (pastilha) E pergunta do filtro", () => {

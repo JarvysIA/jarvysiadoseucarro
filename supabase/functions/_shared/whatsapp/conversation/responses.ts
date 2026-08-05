@@ -97,6 +97,9 @@ export function renderResponse(
       if (params.itemSpecificationTrigger === "revision_item_unspecified") {
         return `Registrei ${v} em revisão. Qual item você trocou? (óleo, filtro, pastilha, correia...)`;
       }
+      if (params.itemSpecificationTrigger === "maintenance_unspecified") {
+        return `Pra um melhor lançamento nas despesas, o que foi feito nessa manutenção de ${v}?`;
+      }
       return `Registrei ${v}. Foi o filtro do ar-condicionado, ou foi conserto/carga de gás?`;
     }
     case "expense_create_confirmation": {

@@ -76,7 +76,7 @@ export type NeedsSemanticClarification = Readonly<{
 export type NeedsItemSpecification = Readonly<{
   status: "needs_item_specification";
   persistable: false;
-  trigger: "revision_item_unspecified" | "ac_service_unspecified";
+  trigger: "revision_item_unspecified" | "ac_service_unspecified" | "maintenance_unspecified";
   fallbackCategory: ExpenseSemanticCategory;
   decisionCode: "item_specification_required";
 }>;

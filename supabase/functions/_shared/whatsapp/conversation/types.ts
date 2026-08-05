@@ -200,7 +200,10 @@ export type ConversationResponseParams = {
   recognizedTags?: ReadonlyArray<string>;
   needsDescriptionInvite?: boolean;
   needsFilterClarification?: boolean;
-  itemSpecificationTrigger?: "revision_item_unspecified" | "ac_service_unspecified";
+  itemSpecificationTrigger?:
+    | "revision_item_unspecified"
+    | "ac_service_unspecified"
+    | "maintenance_unspecified";
 };
 
 export type ConversationCoreDecision = {

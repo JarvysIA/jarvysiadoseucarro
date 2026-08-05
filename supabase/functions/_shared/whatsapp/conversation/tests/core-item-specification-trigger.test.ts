@@ -1,10 +1,10 @@
-// Build P0-3B-R (Passo B) — Cobertura da interceptação dos 2 gatilhos de
+// Build P0-3B-R (Passo B) — Cobertura da interceptação dos gatilhos de
 // especificação de item ("revisão"/"revisão preventiva" sozinha, "ar
-// condicionado" sozinho) na detecção T1 de despesa (core.ts, chamada 4 de
-// matchExpenseCategoria). Arquivo dedicado (em vez de estender
-// core-expense-t1.test.ts) para isolar o risco desta mudança específica —
-// a primeira vez que core.ts importa de expenses/semantics — sem misturar
-// diffs com a cobertura já existente do fluxo T1 padrão.
+// condicionado" sozinho, "manutenção" sozinha) na detecção T1 de despesa
+// (core.ts, chamada 4 de matchExpenseCategoria). Arquivo dedicado (em vez de
+// estender core-expense-t1.test.ts) para isolar o risco desta mudança
+// específica — a primeira vez que core.ts importa de expenses/semantics —
+// sem misturar diffs com a cobertura já existente do fluxo T1 padrão.
 
 import { describe, expect, test } from "bun:test";
 import { decideConversation } from "../core.ts";
@@ -297,5 +297,70 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
     const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
     expect(payload?.phase).toBe("awaiting_vehicle");
     expect(payload?.categoria).toBe("Revisão");
+  });
+});
+
+describe("T1 despesa — gatilho maintenance_unspecified (3º gatilho)", () => {
+  test("a) turno 1: 'manutenção 800 reais' → awaiting_item_specification, trigger maintenance_unspecified", () => {
+    const d = decideConversation(
+      inp({ originalText: "manutenção 800 reais", vehicles: [veh(VEH_1)] }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
+    expect(d.responseParams.valor).toBe(800);
+    expect(d.responseParams.itemSpecificationTrigger).toBe("maintenance_unspecified");
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.trigger).toBe("maintenance_unspecified");
+    expect(payload?.fallbackCategory).toBe("Manutenção");
+  });
+
+  function maintenanceItemSpecState(overrides: Partial<ConversationState> = {}): ConversationState {
+    return state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: MSG_A,
+      draftVersion: 0,
+      draftPayload: {
+        phase: "awaiting_item_specification",
+        valor: 800,
+        requestMessageId: MSG_A,
+        trigger: "maintenance_unspecified",
+        fallbackCategory: "Manutenção",
+      },
+      ...overrides,
+    });
+  }
+
+  test("b) turno 2: responde 'óleo' → awaiting_expense_confirmation, categoria Revisão", () => {
+    const d = decideConversation(
+      inp({
+        state: maintenanceItemSpecState(),
+        originalText: "óleo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.valor).toBe(800);
+  });
+
+  test("c) turno 2: responde 'só um reparo mesmo' (sem termo de motor) → awaiting_expense_confirmation, categoria Manutenção (fallback)", () => {
+    const d = decideConversation(
+      inp({
+        state: maintenanceItemSpecState(),
+        originalText: "só um reparo mesmo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
+    expect(d.responseParams.valor).toBe(800);
   });
 });
