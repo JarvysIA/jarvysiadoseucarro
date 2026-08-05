@@ -363,3 +363,122 @@ describe("T1 despesa — gatilho maintenance_unspecified (3º gatilho)", () => {
     expect(d.responseParams.valor).toBe(800);
   });
 });
+
+// Passo D-3 (P0-3B-R): CHAMADA 1 (awaiting_expense_category) agora também
+// intercepta needs_item_specification, transicionando para
+// awaiting_item_specification — mesma lacuna de precisão que motiva o
+// gatilho em T1 (chamada 4) se aplica igualmente quando o usuário responde
+// "revisão"/"ar condicionado"/"manutenção" à pergunta de categoria. Fricção
+// extra (3 perguntas em vez de 2 neste caminho específico) é uma escolha de
+// produto consciente.
+describe("awaiting_expense_category — gatilho de especificação de item (Passo D-3)", () => {
+  const MSG_C = "33333333-3333-4333-8333-333333333333";
+
+  test("a) fluxo completo de 3 turnos: '800 reais' → awaiting_expense_category → 'revisão' → awaiting_item_specification → 'óleo' → awaiting_expense_confirmation (Revisão)", () => {
+    const t1 = decideConversation(inp({ originalText: "800 reais", vehicles: [veh(VEH_1)] }));
+    expect(t1.nextState).toBe("awaiting_expense_category");
+    expect(t1.responseKey).toBe("expense_category_prompt");
+
+    const categoryState = state({
+      state: "awaiting_expense_category",
+      currentIntent: "expense",
+      awaitingField: "categoria",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: categoryState,
+        originalText: "revisão",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_item_specification");
+    expect(t2.responseKey).toBe("expense_item_specification_prompt");
+    expect(t2.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
+    expect(t2.responseParams.valor).toBe(800);
+
+    const itemSpecState = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t2.statePatch.draftId as string,
+      draftVersion: t2.statePatch.draftVersion as number,
+      draftPayload: t2.statePatch.draftPayload as Record<string, unknown>,
+    });
+
+    const t3 = decideConversation(
+      inp({
+        state: itemSpecState,
+        originalText: "óleo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_C,
+      }),
+    );
+    expect(t3.nextState).toBe("awaiting_expense_confirmation");
+    expect(t3.responseKey).toBe("expense_create_confirmation");
+    expect(t3.responseParams.categoria).toBe("Revisão");
+    expect(t3.responseParams.valor).toBe(800);
+  });
+
+  test("b) não-regressão: 2ª resposta 'gasolina' (categoria clara) segue direto para awaiting_expense_confirmation, sem passar por awaiting_item_specification", () => {
+    const t1 = decideConversation(inp({ originalText: "800 reais", vehicles: [veh(VEH_1)] }));
+    expect(t1.nextState).toBe("awaiting_expense_category");
+
+    const categoryState = state({
+      state: "awaiting_expense_category",
+      currentIntent: "expense",
+      awaitingField: "categoria",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: categoryState,
+        originalText: "gasolina",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_confirmation");
+    expect(t2.responseKey).toBe("expense_create_confirmation");
+    expect(t2.responseParams.categoria).toBe("Combustível");
+    expect(t2.responseParams.valor).toBe(800);
+  });
+
+  test("c) não-regressão: 2ª resposta 'xyz' (não reconhecida) continua repetindo a pergunta de categoria, sem contar fallback", () => {
+    const t1 = decideConversation(inp({ originalText: "800 reais", vehicles: [veh(VEH_1)] }));
+    expect(t1.nextState).toBe("awaiting_expense_category");
+
+    const categoryState = state({
+      state: "awaiting_expense_category",
+      currentIntent: "expense",
+      awaitingField: "categoria",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: categoryState,
+        originalText: "xyz",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_category");
+    expect(t2.responseKey).toBe("expense_category_prompt");
+    expect(t2.responseParams.valor).toBe(800);
+    expect(t2.nextFallbackCount).toBe(0);
+  });
+});
