@@ -12,7 +12,9 @@ import type { ConversationCoreInput, ConversationState, ConversationVehicle } fr
 import { EXPENSE_REPORTED_EVENT_KIND } from "../expense-create-protocol.ts";
 
 const MSG_A = "11111111-1111-4111-8111-111111111111";
+const MSG_B = "22222222-2222-4222-8222-222222222222";
 const VEH_1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01";
+const VEH_2 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02";
 
 function state(overrides: Partial<ConversationState> = {}): ConversationState {
   return {
@@ -148,5 +150,152 @@ describe("T1 despesa — gatilho de especificação de item (Passo B)", () => {
     expect(d.nextState).toBe("awaiting_expense_category");
     expect(d.responseKey).toBe("expense_category_prompt");
     expect(d.responseParams.valor).toBe(300);
+  });
+});
+
+describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () => {
+  function itemSpecState(overrides: Partial<ConversationState> = {}): ConversationState {
+    return state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: MSG_A,
+      draftVersion: 0,
+      draftPayload: {
+        phase: "awaiting_item_specification",
+        valor: 300,
+        requestMessageId: MSG_A,
+        trigger: "revision_item_unspecified",
+        fallbackCategory: "Manutenção",
+      },
+      ...overrides,
+    });
+  }
+
+  test("a) responde 'óleo' → awaiting_expense_confirmation, categoria Revisão, valor preservado", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState(),
+        originalText: "óleo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.eventKind).toBe("category_reply");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.valor).toBe(300);
+    expect(d.statePatch.draftVersion).toBe(1);
+    expect(d.statePatch.draftId).toBe(MSG_A);
+    expect(d.statePatch.activeVehicleId).toBe(VEH_1);
+  });
+
+  test("b) responde 'sei lá' → awaiting_expense_confirmation, categoria Manutenção (fallback), sem repetir a pergunta", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState(),
+        originalText: "sei lá",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
+    expect(d.responseParams.valor).toBe(300);
+  });
+
+  test("c) responde 'banana' (lixo genuinamente aleatório) → mesmo resultado de (b), sem distinção", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState(),
+        originalText: "banana",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
+    expect(d.responseParams.valor).toBe(300);
+  });
+
+  test("d) gatilho ac_service_unspecified, responde 'conserto' → categoria Manutenção (fallback, 'conserto' não é conceito de motor)", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState({
+          draftPayload: {
+            phase: "awaiting_item_specification",
+            valor: 200,
+            requestMessageId: MSG_A,
+            trigger: "ac_service_unspecified",
+            fallbackCategory: "Manutenção",
+          },
+        }),
+        originalText: "conserto",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseParams.categoria).toBe("Manutenção");
+    expect(d.responseParams.valor).toBe(200);
+  });
+
+  test("e) gatilho ac_service_unspecified, responde 'filtro do ar condicionado' → categoria Revisão (reconhece cabin_filter)", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState({
+          draftPayload: {
+            phase: "awaiting_item_specification",
+            valor: 200,
+            requestMessageId: MSG_A,
+            trigger: "ac_service_unspecified",
+            fallbackCategory: "Manutenção",
+          },
+        }),
+        originalText: "filtro do ar condicionado",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.valor).toBe(200);
+  });
+
+  test("f) mídia durante awaiting_item_specification → media_unclear_during_confirmation, mantém o estado", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState(),
+        messageType: "image",
+        originalText: null,
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.responseKey).toBe("media_unclear_during_confirmation");
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.decisionKind).toBe("respond");
+  });
+
+  test("g) 2+ veículos elegíveis, activeVehicleId null → awaiting_vehicle em vez de awaiting_expense_confirmation", () => {
+    const d = decideConversation(
+      inp({
+        state: itemSpecState({ activeVehicleId: null }),
+        originalText: "óleo",
+        vehicles: [veh(VEH_1), veh(VEH_2, "VW", "Gol", "XYZ2E34")],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_vehicle");
+    expect(d.responseKey).toBe("vehicle_ambiguous");
+    expect(d.statePatch.draftType).toBe("expense");
+    expect(d.statePatch.draftVersion).toBe(1);
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.phase).toBe("awaiting_vehicle");
+    expect(payload?.categoria).toBe("Revisão");
   });
 });
