@@ -13,9 +13,9 @@ import { normalizeExpenseSemanticText } from "./normalization.ts";
  * nem reimplementado aqui. Este classificador é usado apenas quando nenhum conceito
  * de motor foi reconhecido no mesmo texto.
  *
- * NOTA DE ESCOPO: GNV como combustível (reabastecimento) não está incluído no
- * dicionário de Combustível, porque a palavra "gnv" colide com "kit gnv" (Acessórios).
- * Fica para calibração futura, com termo mais específico (ex.: "abasteci gnv").
+ * NOTA DE ESCOPO (resolvida): GNV como combustível (reabastecimento) — "gnv" bare
+ * resolve Combustível (ver matchesGnvFuel), exceto quando a mesma mensagem contém
+ * "kit gnv" (Acessórios), que continua resolvendo sozinho sem Combustível concorrendo.
  */
 
 export type NonEngineCategory =
@@ -132,6 +132,33 @@ function matchesAny(haystack: string, keywords: readonly string[]): boolean {
   return keywords.some((keyword) => hasKeyword(haystack, keyword));
 }
 
+const GNV_BARE_KEYWORD = "gnv";
+const GNV_ACESSORIOS_QUALIFIED_KEYWORD = "kit gnv";
+
+/**
+ * REGRA ESPECIAL — "gnv" sozinho (Combustível):
+ * "gnv" bare normalmente significa reabastecimento ("abasteci gnv", "coloquei gnv",
+ * "gnv 30") — Combustível. Mas "gnv" também aparece dentro de "kit gnv" (instalação
+ * do kit, Acessórios — CATEGORY_KEYWORDS.Acessórios). Quando a mesma mensagem já
+ * contém "kit gnv", a palavra solta "gnv" NÃO dispara Combustível adicionalmente —
+ * evita reconhecer as duas categorias pela mesma menção a "kit gnv", que já é
+ * suficientemente específica sozinha. Mesmo padrão de matchesEngineOil/
+ * matchesEngineAirFilter em engine-concept-recognizer.ts: termo específico do
+ * "outro lado" presente suprime o termo bare/ambíguo.
+ */
+function matchesGnvFuel(haystack: string): boolean {
+  if (!hasKeyword(haystack, GNV_BARE_KEYWORD)) return false;
+  if (hasKeyword(haystack, GNV_ACESSORIOS_QUALIFIED_KEYWORD)) return false;
+  return true;
+}
+
+function isCategoryRecognized(category: NonEngineCategory, haystack: string): boolean {
+  if (category === "Combustível") {
+    return matchesAny(haystack, CATEGORY_KEYWORDS.Combustível) || matchesGnvFuel(haystack);
+  }
+  return matchesAny(haystack, CATEGORY_KEYWORDS[category]);
+}
+
 const GERAL_KEYWORD = "geral";
 const GERAL_CANDIDATE_CATEGORIES: readonly NonEngineCategory[] = ["Lavagem"];
 
@@ -182,7 +209,7 @@ export function classifyNonEngineExpense(originalText: string): NonEngineHeurist
 
   const matched: NonEngineCategory[] = [];
   for (const category of NON_ENGINE_CATEGORIES) {
-    if (matchesAny(haystack, CATEGORY_KEYWORDS[category])) matched.push(category);
+    if (isCategoryRecognized(category, haystack)) matched.push(category);
   }
 
   const specialCategories: NonEngineCategory[] = [];

@@ -230,3 +230,42 @@ describe("non-engine heuristic classifier — casos específicos do dicionário"
     }
   });
 });
+
+describe("non-engine heuristic classifier — gnv (fechamento de gap de escopo)", () => {
+  it.each(["abasteci gnv", "coloquei gnv", "gnv 30"])("resolve Combustível para '%s'", (text) => {
+    expect(classifyNonEngineExpense(text)).toEqual({
+      status: "resolved",
+      category: "Combustível",
+    });
+  });
+
+  it("resolve Acessórios para 'kit gnv' sozinho, sem Combustível concorrendo", () => {
+    expect(classifyNonEngineExpense("kit gnv")).toEqual({
+      status: "resolved",
+      category: "Acessórios",
+    });
+  });
+
+  // Caso-limite: "kit gnv" (Acessórios) + "gnv" bare (suprimido pela regra especial,
+  // ver matchesGnvFuel) NA MESMA frase que também contém "abasteci" — que já é, por
+  // si só, um keyword de Combustível independente de "gnv" (CATEGORY_KEYWORDS.
+  // Combustível já tinha "abasteci" antes deste build). Por isso o resultado é
+  // "ambiguous" (Acessórios + Combustível) — não porque a regra especial do gnv
+  // falhou em suprimir o bare "gnv", mas porque "abasteci" sozinho já dispara
+  // Combustível de qualquer forma, com ou sem gnv. A supressão em si (gnv bare não
+  // reforçar Combustível quando "kit gnv" está presente) é comprovada pelo teste
+  // seguinte, com um verbo que NÃO é keyword de Combustível.
+  it("'instalei o kit gnv, abasteci gnv' → ambiguous (Acessórios + Combustível, via 'abasteci' independente do gnv)", () => {
+    expect(classifyNonEngineExpense("instalei o kit gnv, abasteci gnv")).toEqual({
+      status: "ambiguous",
+      candidateCategories: ["Acessórios", "Combustível"],
+    });
+  });
+
+  it("'instalei o kit gnv, coloquei gnv' → resolved Acessórios (gnv bare suprimido pela regra especial, nenhum outro keyword de Combustível presente)", () => {
+    expect(classifyNonEngineExpense("instalei o kit gnv, coloquei gnv")).toEqual({
+      status: "resolved",
+      category: "Acessórios",
+    });
+  });
+});
