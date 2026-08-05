@@ -56,17 +56,29 @@ export type NeedsSemanticClarification = Readonly<{
   /**
    * Só preenchido quando reason === "category_ambiguous_non_engine".
    *
-   * PENDÊNCIA BLOQUEANTE (P0-3B-R): expense-semantics-to-guided-contract.ts (o
-   * adapter em supabase/functions/_shared/whatsapp/conversation/) ainda NÃO sabe
-   * interpretar o reason "category_ambiguous_non_engine" — o branch else do seu
-   * case "needs_clarification" assume incondicionalmente "oil_system_ambiguous" e
-   * mapearia isso incorretamente (ex.: perguntaria sobre sistema de óleo para uma
-   * mensagem sobre "farol"). Este reason NÃO deve ser considerado seguro para uso
-   * em produção até o adapter ser atualizado para tratá-lo explicitamente. Isso é
-   * escopo obrigatório do início do Build 4 (P0-3B-R), antes de qualquer conexão
-   * com core.ts.
+   * Histórico (P0-3B-R): o adapter (expense-semantics-to-guided-contract.ts)
+   * não sabia interpretar este reason até o PR #16 (commit f5822a4), que o
+   * adicionou como um case explícito no switch, com um "ambiguous_category"
+   * correspondente em ClarificationReason (guided-expense-contracts.ts).
    */
   candidateCategories?: readonly ExpenseSemanticCategory[];
+}>;
+
+/**
+ * Caso em que a categoria não é ambígua entre alternativas, mas o texto usa um
+ * termo genérico demais para identificar QUAL item específico está sendo
+ * tratado (ex.: "ar condicionado" sozinho, "revisão"/"revisão preventiva"
+ * sozinha) — uma pergunta de especificação de item é necessária antes de
+ * prosseguir. Diferente de NeedsSemanticClarification: aqui não há
+ * ambiguidade de categoria (fallbackCategory já é conhecida), só falta saber
+ * qual item, dentro dessa categoria, o usuário quis dizer.
+ */
+export type NeedsItemSpecification = Readonly<{
+  status: "needs_item_specification";
+  persistable: false;
+  trigger: "revision_item_unspecified" | "ac_service_unspecified";
+  fallbackCategory: ExpenseSemanticCategory;
+  decisionCode: "item_specification_required";
 }>;
 
 export type ConversationOnlyExpenseSemantics = Readonly<{
@@ -90,5 +102,6 @@ export type UnsupportedExpenseSemantics = Readonly<{
 export type ExpenseSemanticResult =
   | ResolvedExpenseSemantics
   | NeedsSemanticClarification
+  | NeedsItemSpecification
   | ConversationOnlyExpenseSemantics
   | UnsupportedExpenseSemantics;

@@ -5,6 +5,7 @@ import {
   type RecognizedAutomotiveConcept,
 } from "./concept-event-contract.ts";
 import { findExpenseSemanticConcept, type ExpenseSemanticConceptKey } from "./registry.ts";
+import { normalizeExpenseSemanticText } from "./normalization.ts";
 import type {
   ExpenseSemanticFacts,
   ExpenseSemanticItemKey,
@@ -54,12 +55,10 @@ import type {
  *     defensivo de resolveCategoryForConcepts retornar "conflict" (ver comentário
  *     no corpo da função).
  *
- * PENDÊNCIA BLOQUEANTE (ver types.ts, junto à definição de NeedsSemanticClarification):
- * expense-semantics-to-guided-contract.ts (o adapter em
- * supabase/functions/_shared/whatsapp/conversation/) ainda NÃO sabe interpretar o
- * reason "category_ambiguous_non_engine" — hoje mapearia isso incorretamente para
- * ambiguidade de óleo. Corrigir o adapter é escopo obrigatório do início do Build 4,
- * antes de qualquer conexão com core.ts.
+ * Histórico (ver types.ts, junto à definição de NeedsSemanticClarification): o
+ * adapter (expense-semantics-to-guided-contract.ts) não sabia interpretar o
+ * reason "category_ambiguous_non_engine" até o PR #16 (commit f5822a4), que
+ * corrigiu isso.
  */
 
 function toRecognizedAutomotiveConcepts(
@@ -108,6 +107,55 @@ function buildEngineRecognizedSystems(
     }
   }
   return systems;
+}
+
+/**
+ * Mesma técnica de normalização/checagem de frase-com-bordas-de-espaço já usada
+ * em non-engine-heuristic-classifier.ts (hasKeyword). Não é importada de lá
+ * porque aquele módulo não exporta esse helper — reproduzida aqui para evitar
+ * acoplar este orquestrador a um detalhe interno de outro módulo.
+ */
+function hasBareKeyword(haystack: string, keyword: string): boolean {
+  const normalizedKeyword = normalizeExpenseSemanticText(keyword);
+  if (normalizedKeyword === "") return false;
+  return haystack.indexOf(" " + normalizedKeyword + " ") >= 0;
+}
+
+const ITEM_SPECIFICATION_TRIGGERS: ReadonlyArray<{
+  keywords: readonly string[];
+  trigger: "revision_item_unspecified" | "ac_service_unspecified";
+}> = [
+  { keywords: ["revisao", "revisao preventiva"], trigger: "revision_item_unspecified" },
+  { keywords: ["ar condicionado"], trigger: "ac_service_unspecified" },
+];
+
+/**
+ * Só é chamada como ÚLTIMO RECURSO, depois que recognizeEngineConcepts veio
+ * vazio E classifyNonEngineExpense devolveu "unrecognized" — ou seja, motor
+ * sempre vence, e um item não-motor já reconhecido (ex.: "revisão, troquei a
+ * bateria") também sempre vence, e nenhum deles chega a chamar esta função.
+ * Só quando AMBOS os reconhecedores normais vierem vazios é que verificamos se
+ * o texto é um dos 2 casos especiais conhecidos ("ar condicionado" sozinho,
+ * "revisão"/"revisão preventiva" sozinha), que precisam de uma pergunta de
+ * especificação de item antes de prosseguir.
+ *
+ * A ação de turno 2 (reabrir recognizeEngineConcepts na resposta do usuário,
+ * com fallback para fallbackCategory se nada for reconhecido) é
+ * responsabilidade de um build futuro que conecta isso a core.ts — este
+ * módulo permanece puro e desconectado da conversa.
+ */
+function detectItemSpecificationTrigger(
+  originalText: string,
+): "revision_item_unspecified" | "ac_service_unspecified" | undefined {
+  if (typeof originalText !== "string") return undefined;
+  const normalized = normalizeExpenseSemanticText(originalText);
+  if (normalized === "") return undefined;
+  const haystack = " " + normalized + " ";
+
+  for (const { keywords, trigger } of ITEM_SPECIFICATION_TRIGGERS) {
+    if (keywords.some((keyword) => hasBareKeyword(haystack, keyword))) return trigger;
+  }
+  return undefined;
 }
 
 export function recognizeExpenseSemantics(originalText: string): ExpenseSemanticResult {
@@ -166,6 +214,17 @@ export function recognizeExpenseSemantics(originalText: string): ExpenseSemantic
       reason: "category_ambiguous_non_engine",
       decisionCode: "clarification_required",
       candidateCategories: nonEngineResult.candidateCategories,
+    };
+  }
+
+  const itemSpecificationTrigger = detectItemSpecificationTrigger(originalText);
+  if (itemSpecificationTrigger !== undefined) {
+    return {
+      status: "needs_item_specification",
+      persistable: false,
+      trigger: itemSpecificationTrigger,
+      fallbackCategory: "Manutenção",
+      decisionCode: "item_specification_required",
     };
   }
 
