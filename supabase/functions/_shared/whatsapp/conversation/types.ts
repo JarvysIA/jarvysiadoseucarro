@@ -15,6 +15,7 @@ export type ConversationStateName =
   | "awaiting_expense_confirmation"
   | "awaiting_expense_correction"
   | "awaiting_maintenance_confirmation"
+  | "awaiting_item_specification"
   | "completed"
   | "cancelled"
   | "expired"
@@ -33,7 +34,8 @@ export type ConversationAwaitingField =
   | "requested_km"
   | "maintenance_items"
   | "maintenance_value"
-  | "maintenance_filter";
+  | "maintenance_filter"
+  | "item_specification";
 
 export type ConversationEventKind =
   | "greeting"

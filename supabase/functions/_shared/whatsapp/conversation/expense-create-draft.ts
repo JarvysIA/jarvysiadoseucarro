@@ -67,6 +67,14 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly ambiguousFilterMention?: boolean;
 };
 
+export type AwaitingItemSpecificationDraft = {
+  readonly phase: "awaiting_item_specification";
+  readonly valor: number;
+  readonly requestMessageId: string;
+  readonly trigger: "revision_item_unspecified" | "ac_service_unspecified";
+  readonly fallbackCategory: ExpenseCategory;
+};
+
 export type CollectingMaintenanceExpenseDraft = {
   readonly phase: "collecting_maintenance";
   readonly categoria: "Revisão" | "Manutenção";
@@ -100,7 +108,8 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_maintenance_item_keys"
   | "duplicate_maintenance_item_keys"
   | "invalid_descricao"
-  | "invalid_ambiguous_filter_mention";
+  | "invalid_ambiguous_filter_mention"
+  | "invalid_trigger";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -205,6 +214,26 @@ const CATEGORY_ALL_KEYS: ReadonlyArray<string> = [
   ...CATEGORY_REQUIRED_KEYS,
   ...CATEGORY_OPTIONAL_KEYS,
 ];
+
+const ITEM_SPECIFICATION_REQUIRED_KEYS = [
+  "phase",
+  "valor",
+  "requestMessageId",
+  "trigger",
+  "fallbackCategory",
+] as const;
+const ITEM_SPECIFICATION_ALL_KEYS: ReadonlyArray<string> = [...ITEM_SPECIFICATION_REQUIRED_KEYS];
+
+const ITEM_SPECIFICATION_TRIGGERS_SET: ReadonlySet<string> = new Set([
+  "revision_item_unspecified",
+  "ac_service_unspecified",
+]);
+
+function isValidItemSpecificationTrigger(
+  value: unknown,
+): value is "revision_item_unspecified" | "ac_service_unspecified" {
+  return typeof value === "string" && ITEM_SPECIFICATION_TRIGGERS_SET.has(value);
+}
 
 const VEHICLE_REQUIRED_KEYS = ["phase", "categoria", "valor", "requestMessageId"] as const;
 const VEHICLE_OPTIONAL_KEYS = [
@@ -362,6 +391,48 @@ export function validateAwaitingCategoryExpenseDraft(
       ...(hasAmbiguousFilterMention
         ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
         : {}),
+    },
+  };
+}
+
+export function validateAwaitingItemSpecificationDraft(
+  input: unknown,
+): ExpenseDraftValidationResult<AwaitingItemSpecificationDraft> {
+  if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
+
+  for (const k of Object.keys(input)) {
+    if (!ITEM_SPECIFICATION_ALL_KEYS.includes(k)) {
+      return { ok: false, code: "unexpected_field" };
+    }
+  }
+  for (const k of ITEM_SPECIFICATION_REQUIRED_KEYS) {
+    if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
+  }
+
+  if (input.phase !== "awaiting_item_specification") {
+    return { ok: false, code: "invalid_phase" };
+  }
+  if (!isValidValor(input.valor)) {
+    return { ok: false, code: "invalid_valor" };
+  }
+  if (!isValidUuid(input.requestMessageId)) {
+    return { ok: false, code: "invalid_request_message_id" };
+  }
+  if (!isValidItemSpecificationTrigger(input.trigger)) {
+    return { ok: false, code: "invalid_trigger" };
+  }
+  if (!isValidCategoria(input.fallbackCategory)) {
+    return { ok: false, code: "invalid_categoria" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      phase: "awaiting_item_specification",
+      valor: input.valor,
+      requestMessageId: input.requestMessageId,
+      trigger: input.trigger,
+      fallbackCategory: input.fallbackCategory,
     },
   };
 }

@@ -8,6 +8,7 @@ import {
   EXPENSE_CREATE_PROMOTED_TWICE_VERSION,
   validateAwaitingCategoryExpenseDraft,
   validateAwaitingConfirmationExpenseDraft,
+  validateAwaitingItemSpecificationDraft,
   validateAwaitingVehicleExpenseDraft,
   validateExpenseCreateDraft,
 } from "../expense-create-draft.ts";
@@ -206,6 +207,132 @@ describe("validateAwaitingCategoryExpenseDraft", () => {
     });
     const snap = JSON.stringify(input);
     validateAwaitingCategoryExpenseDraft(input);
+    expect(JSON.stringify(input)).toBe(snap);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// awaiting_item_specification
+// ---------------------------------------------------------------------------
+
+function itemSpecificationBase() {
+  return {
+    phase: "awaiting_item_specification" as const,
+    valor: 149.9,
+    requestMessageId: UUID_A,
+    trigger: "revision_item_unspecified" as const,
+    fallbackCategory: "Manutenção" as const,
+  };
+}
+
+describe("validateAwaitingItemSpecificationDraft", () => {
+  it("aceita objeto válido completo", () => {
+    const r = validateAwaitingItemSpecificationDraft(itemSpecificationBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.phase).toBe("awaiting_item_specification");
+      expect(r.value.valor).toBe(149.9);
+      expect(r.value.requestMessageId).toBe(UUID_A);
+      expect(r.value.trigger).toBe("revision_item_unspecified");
+      expect(r.value.fallbackCategory).toBe("Manutenção");
+    }
+  });
+
+  it("aceita trigger ac_service_unspecified", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      trigger: "ac_service_unspecified",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.trigger).toBe("ac_service_unspecified");
+  });
+
+  const REQUIRED = ["phase", "valor", "requestMessageId", "trigger", "fallbackCategory"] as const;
+
+  it.each(REQUIRED)("rejeita campo obrigatório ausente: %s", (field: string) => {
+    const input = { ...itemSpecificationBase() } as Record<string, unknown>;
+    delete input[field];
+    const r = validateAwaitingItemSpecificationDraft(input);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("missing_field");
+  });
+
+  it("rejeita campo inesperado extra", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      foo: "bar",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("unexpected_field");
+  });
+
+  it("rejeita trigger com string aleatória", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      trigger: "bogus_trigger",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_trigger");
+  });
+
+  it("rejeita trigger com valor de outro union por engano (ex.: reason de needs_clarification)", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      trigger: "oil_system_ambiguous",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_trigger");
+  });
+
+  it("rejeita fallbackCategory inválido", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      fallbackCategory: "Outros",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_categoria");
+  });
+
+  it("rejeita phase errado", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      phase: "awaiting_category",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_phase");
+  });
+
+  it("rejeita valor inválido", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      valor: -1,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_valor");
+  });
+
+  it("rejeita requestMessageId não-UUID", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      requestMessageId: "not-a-uuid",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_request_message_id");
+  });
+
+  it.each([[null], [[]], ["x"], [1], [true], [new Date()]])(
+    "rejeita não-objeto %p",
+    (v: unknown) => {
+      const r = validateAwaitingItemSpecificationDraft(v);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.code).toBe("not_an_object");
+    },
+  );
+
+  it("não modifica o input", () => {
+    const input = freeze({ ...itemSpecificationBase() });
+    const snap = JSON.stringify(input);
+    validateAwaitingItemSpecificationDraft(input);
     expect(JSON.stringify(input)).toBe(snap);
   });
 });
