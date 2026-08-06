@@ -76,6 +76,17 @@ export type AwaitingItemSpecificationDraft = {
     | "ac_service_unspecified"
     | "maintenance_unspecified";
   readonly fallbackCategory: ExpenseCategory;
+  // P0-3B-R (retry once) — obrigatórios, não opcionais com default. Este
+  // draft, diferente dos outros (que têm recognizedTags/descricao/
+  // ambiguousFilterMention como metadados opcionais de exibição), não tinha
+  // NENHUM campo opcional até aqui — e allowRetry/retriedOnce não são
+  // metadados, são a política de comportamento do turno 2. Um default
+  // implícito arriscaria um ponto de criação futuro (ex.: Passo D-4,
+  // correção de categoria) esquecer de declarar allowRetry e herdar
+  // silenciosamente o valor errado. Obrigatório força cada ponto de criação
+  // a decidir explicitamente.
+  readonly allowRetry: boolean;
+  readonly retriedOnce: boolean;
 };
 
 export type CollectingMaintenanceExpenseDraft = {
@@ -112,7 +123,9 @@ export type ExpenseDraftValidationErrorCode =
   | "duplicate_maintenance_item_keys"
   | "invalid_descricao"
   | "invalid_ambiguous_filter_mention"
-  | "invalid_trigger";
+  | "invalid_trigger"
+  | "invalid_allow_retry"
+  | "invalid_retried_once";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -224,6 +237,8 @@ const ITEM_SPECIFICATION_REQUIRED_KEYS = [
   "requestMessageId",
   "trigger",
   "fallbackCategory",
+  "allowRetry",
+  "retriedOnce",
 ] as const;
 const ITEM_SPECIFICATION_ALL_KEYS: ReadonlyArray<string> = [...ITEM_SPECIFICATION_REQUIRED_KEYS];
 
@@ -428,6 +443,12 @@ export function validateAwaitingItemSpecificationDraft(
   if (!isValidCategoria(input.fallbackCategory)) {
     return { ok: false, code: "invalid_categoria" };
   }
+  if (typeof input.allowRetry !== "boolean") {
+    return { ok: false, code: "invalid_allow_retry" };
+  }
+  if (typeof input.retriedOnce !== "boolean") {
+    return { ok: false, code: "invalid_retried_once" };
+  }
 
   return {
     ok: true,
@@ -437,6 +458,8 @@ export function validateAwaitingItemSpecificationDraft(
       requestMessageId: input.requestMessageId,
       trigger: input.trigger,
       fallbackCategory: input.fallbackCategory,
+      allowRetry: input.allowRetry,
+      retriedOnce: input.retriedOnce,
     },
   };
 }

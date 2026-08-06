@@ -999,6 +999,8 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
             requestMessageId: effectiveState.draftId,
             trigger: semanticResult.trigger,
             fallbackCategory: semanticResult.fallbackCategory,
+            allowRetry: true,
+            retriedOnce: false,
           };
           const validated = validateAwaitingItemSpecificationDraft(candidate);
           if (validated.ok) {
@@ -1072,11 +1074,14 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
   }
 
   // 6.55) Resposta a state pendente (awaiting_item_specification) — turno 2
-  // do gatilho "revisão"/"ar condicionado" bare (P0-3B-R, Passo C). Diferente
-  // de awaiting_expense_category, aqui NÃO existe caminho de "não reconheceu,
-  // repete a pergunta": qualquer resposta que não reconheça nenhum conceito
-  // de motor finaliza imediatamente com fallbackCategory (guardado no draft
-  // no turno 1) — não há resposta "errada" contra a qual repetir a pergunta.
+  // do gatilho "revisão"/"ar condicionado"/"manutenção" bare (P0-3B-R, Passo
+  // C). Se a resposta não reconhecer nenhum conceito de motor, o draft pode
+  // ganhar UMA repetição da mesma pergunta antes de finalizar com
+  // fallbackCategory — só quando allowRetry===true e retriedOnce===false
+  // (drafts criados em T1/Passo B e awaiting_expense_category/Passo D-3; o
+  // Passo D-4, correção de categoria durante confirmação, ainda não
+  // implementado, criará drafts com allowRetry: false, sem repetição, para
+  // nunca "fingir" na tela uma categoria diferente da que será gravada).
   if (effectiveState.state === "awaiting_item_specification") {
     const currentDraft = validateAwaitingItemSpecificationDraft(effectiveState.draftPayload);
     if (
@@ -1086,6 +1091,50 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       typeof input.originalText === "string"
     ) {
       const engineConcepts = recognizeEngineConcepts(input.originalText);
+      if (
+        engineConcepts.length === 0 &&
+        currentDraft.value.allowRetry &&
+        !currentDraft.value.retriedOnce
+      ) {
+        const retryCandidate = {
+          phase: "awaiting_item_specification" as const,
+          valor: currentDraft.value.valor,
+          requestMessageId: currentDraft.value.requestMessageId,
+          trigger: currentDraft.value.trigger,
+          fallbackCategory: currentDraft.value.fallbackCategory,
+          allowRetry: currentDraft.value.allowRetry,
+          retriedOnce: true,
+        };
+        const validatedRetry = validateAwaitingItemSpecificationDraft(retryCandidate);
+        if (validatedRetry.ok) {
+          const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+          return buildDecision({
+            eventKind: "category_reply",
+            decisionKind: "respond",
+            previousState,
+            nextState: "awaiting_item_specification",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, {
+                state: "awaiting_item_specification",
+                currentIntent: "expense",
+                awaitingField: "item_specification",
+                draftType: "expense",
+                draftId: effectiveState.draftId,
+                draftVersion: nextVersion,
+                draftPayload: validatedRetry.value as unknown as Record<string, unknown>,
+              }),
+              input.sourceMessageId,
+            ),
+            responseKey: "expense_item_specification_prompt",
+            responseParams: {
+              valor: currentDraft.value.valor,
+              itemSpecificationTrigger: currentDraft.value.trigger,
+            },
+            nextFallbackCount: 0,
+            reasonCode: "item_specification_retry_prompted",
+          });
+        }
+      }
       const categoria: ExpenseCategory =
         engineConcepts.length > 0 ? "Revisão" : currentDraft.value.fallbackCategory;
       const extras = computeMaintenanceDraftExtras(categoria, input.originalText);
@@ -1565,6 +1614,8 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
           requestMessageId: input.sourceMessageId,
           trigger: semanticResult.trigger,
           fallbackCategory: semanticResult.fallbackCategory,
+          allowRetry: true,
+          retriedOnce: false,
         };
         const validated = validateAwaitingItemSpecificationDraft(candidate);
         if (validated.ok) {
