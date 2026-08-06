@@ -215,6 +215,8 @@ describe("validateAwaitingCategoryExpenseDraft", () => {
 // awaiting_item_specification
 // ---------------------------------------------------------------------------
 
+// allowRetry/retriedOnce (P0-3B-R, retry once): campos obrigatórios desde a
+// introdução do mecanismo de 2ª chance no turno 2 — ver core.ts, bloco 6.55.
 function itemSpecificationBase() {
   return {
     phase: "awaiting_item_specification" as const,
@@ -222,6 +224,8 @@ function itemSpecificationBase() {
     requestMessageId: UUID_A,
     trigger: "revision_item_unspecified" as const,
     fallbackCategory: "Manutenção" as const,
+    allowRetry: true,
+    retriedOnce: false,
   };
 }
 
@@ -235,6 +239,8 @@ describe("validateAwaitingItemSpecificationDraft", () => {
       expect(r.value.requestMessageId).toBe(UUID_A);
       expect(r.value.trigger).toBe("revision_item_unspecified");
       expect(r.value.fallbackCategory).toBe("Manutenção");
+      expect(r.value.allowRetry).toBe(true);
+      expect(r.value.retriedOnce).toBe(false);
     }
   });
 
@@ -247,7 +253,15 @@ describe("validateAwaitingItemSpecificationDraft", () => {
     if (r.ok) expect(r.value.trigger).toBe("ac_service_unspecified");
   });
 
-  const REQUIRED = ["phase", "valor", "requestMessageId", "trigger", "fallbackCategory"] as const;
+  const REQUIRED = [
+    "phase",
+    "valor",
+    "requestMessageId",
+    "trigger",
+    "fallbackCategory",
+    "allowRetry",
+    "retriedOnce",
+  ] as const;
 
   it.each(REQUIRED)("rejeita campo obrigatório ausente: %s", (field: string) => {
     const input = { ...itemSpecificationBase() } as Record<string, unknown>;
@@ -318,6 +332,24 @@ describe("validateAwaitingItemSpecificationDraft", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe("invalid_request_message_id");
+  });
+
+  it("rejeita allowRetry não-boolean", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      allowRetry: "yes",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_allow_retry");
+  });
+
+  it("rejeita retriedOnce não-boolean", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      retriedOnce: "no",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_retried_once");
   });
 
   it.each([[null], [[]], ["x"], [1], [true], [new Date()]])(

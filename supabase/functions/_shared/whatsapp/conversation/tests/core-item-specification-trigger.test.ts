@@ -167,6 +167,8 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
         requestMessageId: MSG_A,
         trigger: "revision_item_unspecified",
         fallbackCategory: "Manutenção",
+        allowRetry: true,
+        retriedOnce: false,
       },
       ...overrides,
     });
@@ -191,10 +193,25 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
     expect(d.statePatch.activeVehicleId).toBe(VEH_1);
   });
 
-  test("b) responde 'sei lá' → awaiting_expense_confirmation, categoria Manutenção (fallback), sem repetir a pergunta", () => {
+  // Atualizado no P0-3B-R (retry once): estes testes verificam o
+  // comportamento de FALLBACK final (2ª resposta vaga, ou draft que já usou
+  // a repetição) — não o novo comportamento de repetição em si (coberto por
+  // testes dedicados abaixo). Por isso o draftPayload aqui usa
+  // retriedOnce: true, simulando um draft que já passou pela 1ª chance.
+  test("b) responde 'sei lá' (retriedOnce já true) → awaiting_expense_confirmation, categoria Manutenção (fallback), sem repetir a pergunta de novo", () => {
     const d = decideConversation(
       inp({
-        state: itemSpecState(),
+        state: itemSpecState({
+          draftPayload: {
+            phase: "awaiting_item_specification",
+            valor: 300,
+            requestMessageId: MSG_A,
+            trigger: "revision_item_unspecified",
+            fallbackCategory: "Manutenção",
+            allowRetry: true,
+            retriedOnce: true,
+          },
+        }),
         originalText: "sei lá",
         vehicles: [veh(VEH_1)],
         sourceMessageId: MSG_B,
@@ -206,10 +223,20 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
     expect(d.responseParams.valor).toBe(300);
   });
 
-  test("c) responde 'banana' (lixo genuinamente aleatório) → mesmo resultado de (b), sem distinção", () => {
+  test("c) responde 'banana' (lixo genuinamente aleatório, retriedOnce já true) → mesmo resultado de (b), sem distinção", () => {
     const d = decideConversation(
       inp({
-        state: itemSpecState(),
+        state: itemSpecState({
+          draftPayload: {
+            phase: "awaiting_item_specification",
+            valor: 300,
+            requestMessageId: MSG_A,
+            trigger: "revision_item_unspecified",
+            fallbackCategory: "Manutenção",
+            allowRetry: true,
+            retriedOnce: true,
+          },
+        }),
         originalText: "banana",
         vehicles: [veh(VEH_1)],
         sourceMessageId: MSG_B,
@@ -221,7 +248,7 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
     expect(d.responseParams.valor).toBe(300);
   });
 
-  test("d) gatilho ac_service_unspecified, responde 'conserto' → categoria Manutenção (fallback, 'conserto' não é conceito de motor)", () => {
+  test("d) gatilho ac_service_unspecified, responde 'conserto' (retriedOnce já true) → categoria Manutenção (fallback, 'conserto' não é conceito de motor)", () => {
     const d = decideConversation(
       inp({
         state: itemSpecState({
@@ -231,6 +258,8 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
             requestMessageId: MSG_A,
             trigger: "ac_service_unspecified",
             fallbackCategory: "Manutenção",
+            allowRetry: true,
+            retriedOnce: true,
           },
         }),
         originalText: "conserto",
@@ -243,7 +272,7 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
     expect(d.responseParams.valor).toBe(200);
   });
 
-  test("e) gatilho ac_service_unspecified, responde 'filtro do ar condicionado' → categoria Revisão (reconhece cabin_filter)", () => {
+  test("e) gatilho ac_service_unspecified, responde 'filtro do ar condicionado' → categoria Revisão (reconhece cabin_filter, não passa pela repetição)", () => {
     const d = decideConversation(
       inp({
         state: itemSpecState({
@@ -253,6 +282,8 @@ describe("T1 despesa — turno 2 de awaiting_item_specification (Passo C)", () =
             requestMessageId: MSG_A,
             trigger: "ac_service_unspecified",
             fallbackCategory: "Manutenção",
+            allowRetry: true,
+            retriedOnce: false,
           },
         }),
         originalText: "filtro do ar condicionado",
@@ -328,6 +359,8 @@ describe("T1 despesa — gatilho maintenance_unspecified (3º gatilho)", () => {
         requestMessageId: MSG_A,
         trigger: "maintenance_unspecified",
         fallbackCategory: "Manutenção",
+        allowRetry: true,
+        retriedOnce: false,
       },
       ...overrides,
     });
@@ -348,10 +381,20 @@ describe("T1 despesa — gatilho maintenance_unspecified (3º gatilho)", () => {
     expect(d.responseParams.valor).toBe(800);
   });
 
-  test("c) turno 2: responde 'só um reparo mesmo' (sem termo de motor) → awaiting_expense_confirmation, categoria Manutenção (fallback)", () => {
+  test("c) turno 2: responde 'só um reparo mesmo' (sem termo de motor, retriedOnce já true) → awaiting_expense_confirmation, categoria Manutenção (fallback)", () => {
     const d = decideConversation(
       inp({
-        state: maintenanceItemSpecState(),
+        state: maintenanceItemSpecState({
+          draftPayload: {
+            phase: "awaiting_item_specification",
+            valor: 800,
+            requestMessageId: MSG_A,
+            trigger: "maintenance_unspecified",
+            fallbackCategory: "Manutenção",
+            allowRetry: true,
+            retriedOnce: true,
+          },
+        }),
         originalText: "só um reparo mesmo",
         vehicles: [veh(VEH_1)],
         sourceMessageId: MSG_B,
@@ -480,5 +523,130 @@ describe("awaiting_expense_category — gatilho de especificação de item (Pass
     expect(t2.responseKey).toBe("expense_category_prompt");
     expect(t2.responseParams.valor).toBe(800);
     expect(t2.nextFallbackCount).toBe(0);
+  });
+});
+
+// P0-3B-R (retry once): drafts de origem de CRIAÇÃO (T1/Passo B,
+// awaiting_expense_category/Passo D-3) ganham allowRetry: true. Se o turno 2
+// não reconhecer nenhum conceito de motor, o draft ganha UMA repetição da
+// mesma pergunta (retriedOnce: false → true) antes de cair no
+// fallbackCategory. Reconhecer um item de motor de primeira nunca passa por
+// este mecanismo (curto-circuita antes do check de retry).
+describe("awaiting_item_specification — repetição única para origem de criação (P0-3B-R, retry once)", () => {
+  const MSG_C = "33333333-3333-4333-8333-333333333333";
+
+  test("a) turno 2, resposta vaga pela 1ª vez → permanece em awaiting_item_specification, mesma pergunta, draft com retriedOnce: true", () => {
+    const t1 = decideConversation(
+      inp({ originalText: "revisão 300 reais", vehicles: [veh(VEH_1)] }),
+    );
+    expect(t1.nextState).toBe("awaiting_item_specification");
+    expect(t1.responseKey).toBe("expense_item_specification_prompt");
+
+    const t1Payload = t1.statePatch.draftPayload as Record<string, unknown>;
+    expect(t1Payload.allowRetry).toBe(true);
+    expect(t1Payload.retriedOnce).toBe(false);
+
+    const itemSpecStateT2 = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1Payload,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: itemSpecStateT2,
+        originalText: "sei lá",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_item_specification");
+    expect(t2.decisionKind).toBe("respond");
+    expect(t2.responseKey).toBe("expense_item_specification_prompt");
+    expect(t2.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
+    expect(t2.responseParams.valor).toBe(300);
+    expect(t2.nextFallbackCount).toBe(0);
+
+    const t2Payload = t2.statePatch.draftPayload as Record<string, unknown>;
+    expect(t2Payload.retriedOnce).toBe(true);
+    expect(t2Payload.allowRetry).toBe(true);
+  });
+
+  test("b) turno 3 (depois da repetição do teste a), 2ª resposta vaga → agora cai no fallback, awaiting_expense_confirmation com fallbackCategory", () => {
+    const t1 = decideConversation(
+      inp({ originalText: "revisão 300 reais", vehicles: [veh(VEH_1)] }),
+    );
+    const itemSpecStateT2 = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+    });
+    const t2 = decideConversation(
+      inp({
+        state: itemSpecStateT2,
+        originalText: "sei lá",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_item_specification");
+
+    const itemSpecStateT3 = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t2.statePatch.draftId as string,
+      draftVersion: t2.statePatch.draftVersion as number,
+      draftPayload: t2.statePatch.draftPayload as Record<string, unknown>,
+    });
+    const t3 = decideConversation(
+      inp({
+        state: itemSpecStateT3,
+        originalText: "ainda não sei",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_C,
+      }),
+    );
+    expect(t3.nextState).toBe("awaiting_expense_confirmation");
+    expect(t3.responseKey).toBe("expense_create_confirmation");
+    expect(t3.responseParams.categoria).toBe("Manutenção");
+    expect(t3.responseParams.valor).toBe(300);
+  });
+
+  test("c) turno 2, resposta reconhece item de motor de primeira ('óleo') → vai direto para Revisão, sem passar pela repetição", () => {
+    const t1 = decideConversation(
+      inp({ originalText: "revisão 300 reais", vehicles: [veh(VEH_1)] }),
+    );
+    const itemSpecStateT2 = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+    });
+    const t2 = decideConversation(
+      inp({
+        state: itemSpecStateT2,
+        originalText: "óleo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_confirmation");
+    expect(t2.responseKey).toBe("expense_create_confirmation");
+    expect(t2.responseParams.categoria).toBe("Revisão");
+    expect(t2.responseParams.valor).toBe(300);
+    expect(t2.reasonCode).toBe("item_specification_reply_engine_recognized");
   });
 });
