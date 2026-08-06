@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { isDeterministicRevisionItem } from "../../../../../../src/lib/maintenance-jarvys-schedule-rules.ts";
 import { recognizeExpenseSemantics } from "../expense-category-recognizer.ts";
 
 describe("expense category recognizer — conceito de motor único", () => {
@@ -213,5 +214,27 @@ describe("expense category recognizer — entradas vazias", () => {
     expect(() => recognizeExpenseSemantics(undefined as unknown as string)).not.toThrow();
     const undefinedResult = recognizeExpenseSemantics(undefined as unknown as string);
     expect(undefinedResult.status).toBe("unsupported");
+  });
+});
+
+// Migrado de resolver.test.ts (resolver.ts foi removido — órfão da fase
+// S1-S3, superado por este reconhecedor). Mesma checagem cruzada de antes,
+// agora contra o sistema novo: toda item key emitida por
+// recognizeExpenseSemantics precisa ser reconhecida pelo helper existente
+// isDeterministicRevisionItem.
+describe("expense category recognizer — checagem cruzada com isDeterministicRevisionItem", () => {
+  it("o helper existente reconhece todas as item keys emitidas", () => {
+    function resolvedItemKeys(text: string): readonly string[] {
+      const result = recognizeExpenseSemantics(text);
+      expect(result.status).toBe("resolved");
+      if (result.status !== "resolved") throw new Error(`Expected resolved for: ${text}`);
+      return result.itemKeys;
+    }
+
+    const emitted = [
+      ...resolvedItemKeys("troquei o oleo do motor"),
+      ...resolvedItemKeys("troquei o filtro de oleo"),
+    ];
+    for (const key of new Set(emitted)) expect(isDeterministicRevisionItem(key)).toBe(true);
   });
 });

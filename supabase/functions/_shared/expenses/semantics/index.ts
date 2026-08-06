@@ -1,5 +1,4 @@
 export { normalizeExpenseSemanticText } from "./normalization.ts";
-export { resolveExpenseSemantics } from "./resolver.ts";
 export {
   resolveCategoryForConcepts,
   validateExpenseSemanticOccurrence,
