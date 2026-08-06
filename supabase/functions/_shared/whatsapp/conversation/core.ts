@@ -31,11 +31,7 @@ import {
   validateAwaitingVehicleKmUpdateDraft,
 } from "./km-update-draft.ts";
 import { CONFIRM_KM_UPDATE_HANDOFF_KIND, KM_REPORTED_EVENT_KIND } from "./km-update-protocol.ts";
-import {
-  parseExpenseValorText,
-  parseExpenseValorBareNumber,
-  matchExpenseCategoria,
-} from "./expense-create-parser.ts";
+import { parseExpenseValorText, parseExpenseValorBareNumber } from "./expense-create-parser.ts";
 import {
   type ExpenseCategory,
   EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
@@ -1457,40 +1453,108 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
   ) {
     const currentDraft = validateAwaitingConfirmationExpenseDraft(effectiveState.draftPayload);
     if (currentDraft.ok) {
-      const categoriaMatch = matchExpenseCategoria(input.originalText);
-      if (categoriaMatch.ok && categoriaMatch.categoria !== currentDraft.value.categoria) {
-        const candidate = {
-          phase: "awaiting_confirmation" as const,
-          categoria: categoriaMatch.categoria,
-          valor: currentDraft.value.valor,
-          vehicleId: currentDraft.value.vehicleId,
-          requestMessageId: currentDraft.value.requestMessageId,
-        };
-        const validated = validateAwaitingConfirmationExpenseDraft(candidate);
-        if (validated.ok) {
-          const veh = input.vehicles.find((v) => v.id === currentDraft.value.vehicleId);
-          return buildDecision({
-            eventKind: "category_reply",
-            decisionKind: "transition",
-            previousState,
-            nextState: "awaiting_expense_correction",
-            statePatch: withLastMessage(
-              mergePatch(basePatch, {
-                state: "awaiting_expense_correction",
-                draftPayload: validated.value as unknown as Record<string, unknown>,
-              }),
-              input.sourceMessageId,
-            ),
-            responseKey: "expense_create_correction_confirmation",
-            responseParams: {
-              vehicleLabel: veh ? labelFor(veh) : undefined,
+      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      switch (semanticResult.status) {
+        case "resolved": {
+          const conceptualCategory = semanticResult.conceptualCategory;
+          if (conceptualCategory !== currentDraft.value.categoria) {
+            const candidate = {
+              phase: "awaiting_confirmation" as const,
+              categoria: conceptualCategory,
               valor: currentDraft.value.valor,
-              categoria: categoriaMatch.categoria,
-            },
-            nextFallbackCount: 0,
-            reasonCode: "expense_category_corrected_at_confirmation",
-          });
+              vehicleId: currentDraft.value.vehicleId,
+              requestMessageId: currentDraft.value.requestMessageId,
+            };
+            const validated = validateAwaitingConfirmationExpenseDraft(candidate);
+            if (validated.ok) {
+              const veh = input.vehicles.find((v) => v.id === currentDraft.value.vehicleId);
+              return buildDecision({
+                eventKind: "category_reply",
+                decisionKind: "transition",
+                previousState,
+                nextState: "awaiting_expense_correction",
+                statePatch: withLastMessage(
+                  mergePatch(basePatch, {
+                    state: "awaiting_expense_correction",
+                    draftPayload: validated.value as unknown as Record<string, unknown>,
+                  }),
+                  input.sourceMessageId,
+                ),
+                responseKey: "expense_create_correction_confirmation",
+                responseParams: {
+                  vehicleLabel: veh ? labelFor(veh) : undefined,
+                  valor: currentDraft.value.valor,
+                  categoria: conceptualCategory,
+                },
+                nextFallbackCount: 0,
+                reasonCode: "expense_category_corrected_at_confirmation",
+              });
+            }
+          }
+          // categoria igual à atual (ou validated.ok falhando defensivamente)
+          // — mesmo comportamento de hoje: não faz nada, cai no fluxo padrão.
+          break;
         }
+
+        // Passo D-4 (P0-3B-R): tentar corrigir a categoria com "revisão"/"ar
+        // condicionado"/"manutenção" sozinha agora dispara o mecanismo de
+        // especificação de item já existente (D-2/D-3), em vez de ser
+        // silenciosamente ignorado. allowRetry: false por decisão de
+        // produto — nunca mostrar na tela uma categoria diferente da que
+        // será de fato gravada, então não há 2ª chance aqui (diferente das
+        // origens de criação, que ganham retry once).
+        case "needs_item_specification": {
+          const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+          const candidate = {
+            phase: "awaiting_item_specification" as const,
+            valor: currentDraft.value.valor,
+            requestMessageId: currentDraft.value.requestMessageId,
+            trigger: semanticResult.trigger,
+            fallbackCategory: semanticResult.fallbackCategory,
+            allowRetry: false,
+            retriedOnce: false,
+          };
+          const validated = validateAwaitingItemSpecificationDraft(candidate);
+          if (validated.ok) {
+            return buildDecision({
+              eventKind: "category_reply",
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_item_specification",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_item_specification",
+                  currentIntent: "expense",
+                  awaitingField: "item_specification",
+                  draftType: "expense",
+                  draftId: effectiveState.draftId,
+                  draftVersion: nextVersion,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_item_specification_prompt",
+              responseParams: {
+                valor: currentDraft.value.valor,
+                itemSpecificationTrigger: semanticResult.trigger,
+              },
+              nextFallbackCount: 0,
+              reasonCode: "expense_category_correction_awaiting_item_specification",
+            });
+          }
+          break;
+        }
+
+        // needs_clarification, unsupported e conversation_only: nenhuma
+        // mudança de comportamento — mesmo tratamento fail-open de hoje, cai
+        // no "sem categoria nova válida" abaixo sem nenhum branch novo.
+        case "needs_clarification":
+        case "unsupported":
+        case "conversation_only":
+          break;
+
+        default:
+          return assertNever(semanticResult);
       }
     }
     // sem categoria nova válida — segue fluxo padrão abaixo.
