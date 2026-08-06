@@ -411,6 +411,143 @@ describe("T1 despesa — confirm/deny/correction", () => {
   });
 });
 
+// Passo D-4 (P0-3B-R, final): CHAMADA 2 (correção de categoria durante
+// awaiting_expense_confirmation/correction) migrada de matchExpenseCategoria
+// para recognizeExpenseSemantics — último dos 4 pontos de chamada. Corrigir
+// a categoria com "revisão"/"ar condicionado"/"manutenção" sozinha agora
+// dispara o mesmo mecanismo de especificação de item de D-2/D-3, mas com
+// allowRetry: false (sem 2ª chance — nunca mostrar na tela uma categoria
+// diferente da que será de fato gravada).
+describe("T1 despesa — correção de categoria via recognizeExpenseSemantics (Passo D-4)", () => {
+  const MSG_C = "33333333-3333-4333-8333-333333333333";
+
+  test("a) correção normal: categoria clara e diferente da atual → awaiting_expense_correction (comportamento preservado)", () => {
+    const s = confState({
+      draftPayload: {
+        phase: "awaiting_confirmation",
+        categoria: "Lavagem",
+        valor: 80,
+        vehicleId: VEH_1,
+        requestMessageId: MSG_A,
+      },
+    });
+    const d = decideConversation(
+      inp({ state: s, originalText: "gasolina", vehicles: [veh(VEH_1)], sourceMessageId: MSG_B }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_correction");
+    expect(d.responseKey).toBe("expense_create_correction_confirmation");
+    expect(d.responseParams.categoria).toBe("Combustível");
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.categoria).toBe("Combustível");
+  });
+
+  test("b) correção com 'revisão' sozinha → dispara especificação de item, awaiting_item_specification com allowRetry: false", () => {
+    const d = decideConversation(
+      inp({
+        state: confState(),
+        originalText: "revisão",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_item_specification");
+    expect(d.responseKey).toBe("expense_item_specification_prompt");
+    expect(d.responseParams.itemSpecificationTrigger).toBe("revision_item_unspecified");
+    expect(d.responseParams.valor).toBe(80);
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.allowRetry).toBe(false);
+    expect(payload?.retriedOnce).toBe(false);
+    expect(payload?.fallbackCategory).toBe("Manutenção");
+  });
+
+  test("c) turno 2 dessa especificação: resposta vaga ('sei lá') → NÃO repete (allowRetry false), vai direto para awaiting_expense_confirmation com fallbackCategory", () => {
+    const t1 = decideConversation(
+      inp({
+        state: confState(),
+        originalText: "revisão",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t1.nextState).toBe("awaiting_item_specification");
+
+    const itemSpecState = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+      activeVehicleId: VEH_1,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: itemSpecState,
+        originalText: "sei lá",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_C,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_confirmation");
+    expect(t2.responseKey).toBe("expense_create_confirmation");
+    expect(t2.responseParams.categoria).toBe("Manutenção");
+    expect(t2.responseParams.valor).toBe(80);
+  });
+
+  test("d) turno 2 alternativo: resposta 'óleo' (motor reconhecido) → awaiting_expense_confirmation com categoria Revisão", () => {
+    const t1 = decideConversation(
+      inp({
+        state: confState(),
+        originalText: "revisão",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(t1.nextState).toBe("awaiting_item_specification");
+
+    const itemSpecState = state({
+      state: "awaiting_item_specification",
+      currentIntent: "expense",
+      awaitingField: "item_specification",
+      draftType: "expense",
+      draftId: t1.statePatch.draftId as string,
+      draftVersion: t1.statePatch.draftVersion as number,
+      draftPayload: t1.statePatch.draftPayload as Record<string, unknown>,
+      activeVehicleId: VEH_1,
+    });
+
+    const t2 = decideConversation(
+      inp({
+        state: itemSpecState,
+        originalText: "óleo",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_C,
+      }),
+    );
+    expect(t2.nextState).toBe("awaiting_expense_confirmation");
+    expect(t2.responseKey).toBe("expense_create_confirmation");
+    expect(t2.responseParams.categoria).toBe("Revisão");
+    expect(t2.responseParams.valor).toBe(80);
+  });
+
+  test("e) categoria não reconhecida ('xyz') → nada muda, segue fluxo padrão (comportamento de hoje)", () => {
+    const d = decideConversation(
+      inp({
+        state: confState(),
+        originalText: "xyz",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).not.toBe("awaiting_expense_correction");
+    expect(d.nextState).not.toBe("awaiting_item_specification");
+    expect(d.responseKey).not.toBe("expense_create_correction_confirmation");
+    expect(d.responseKey).not.toBe("expense_item_specification_prompt");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // E) Regressão / interações
 // ---------------------------------------------------------------------------
