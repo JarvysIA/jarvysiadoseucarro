@@ -103,4 +103,5 @@ $function$;
 -- REVOKE explícito — Supabase auto-concede EXECUTE a anon/authenticated
 -- em toda função nova. Sem isso, qualquer usuário autenticado poderia
 -- chamar esta RPC diretamente.
+REVOKE EXECUTE ON FUNCTION public.record_whatsapp_milestone_notice FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.record_whatsapp_milestone_notice FROM anon, authenticated;
