@@ -1463,6 +1463,50 @@ export type Database = {
           },
         ]
       }
+      whatsapp_milestone_notices: {
+        Row: {
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          milestone_km: number
+          notified_at: string | null
+          snoozed_until: string | null
+          status: string
+          user_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          milestone_km: number
+          notified_at?: string | null
+          snoozed_until?: string | null
+          status?: string
+          user_id: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          milestone_km?: number
+          notified_at?: string | null
+          snoozed_until?: string | null
+          status?: string
+          user_id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_milestone_notices_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_outbound_queue: {
         Row: {
           attempts: number
@@ -1926,6 +1970,15 @@ export type Database = {
           phone_e164: string
           result: string
         }[]
+      }
+      record_whatsapp_milestone_notice: {
+        Args: {
+          p_action: string
+          p_milestone_km: number
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: Json
       }
       registrar_comissao_indicacao: {
         Args: {
