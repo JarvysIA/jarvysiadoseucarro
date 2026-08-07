@@ -5,7 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 const ENDPOINT = "https://ai.gateway.lovable.dev/v1/audio/transcriptions";
 const MODEL = "openai/gpt-4o-mini-transcribe";
 
-function makeBeepWav(seconds = 2.5, sampleRate = 16000, freq = 440): Uint8Array {
+function makeBeepWav(seconds = 2.5, sampleRate = 16000, freq = 440): ArrayBuffer {
   const n = Math.floor(seconds * sampleRate);
   const dataBytes = n * 2;
   const buf = new ArrayBuffer(44 + dataBytes);
@@ -30,7 +30,7 @@ function makeBeepWav(seconds = 2.5, sampleRate = 16000, freq = 440): Uint8Array 
     const v = Math.sin((2 * Math.PI * freq * i) / sampleRate) * 0.3 * 32767;
     dv.setInt16(44 + i * 2, v, true);
   }
-  return new Uint8Array(buf);
+  return buf;
 }
 
 export const Route = createFileRoute("/api/public/scratch-voice-test")({
