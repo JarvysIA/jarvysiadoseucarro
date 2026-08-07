@@ -26,7 +26,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOnboardingWhatsappRouteImport } from './routes/_authenticated/onboarding-whatsapp'
 import { Route as AuthenticatedAdminCorpusSmokeRouteImport } from './routes/_authenticated/admin-corpus-smoke'
-import { Route as ApiPublicScratchVoiceTestRouteImport } from './routes/api/public/scratch-voice-test'
 import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/api/public/hooks/fipe-monthly-refresh'
 
 const WelcomeRoute = WelcomeRouteImport.update({
@@ -115,12 +114,6 @@ const AuthenticatedAdminCorpusSmokeRoute =
     path: '/admin-corpus-smoke',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const ApiPublicScratchVoiceTestRoute =
-  ApiPublicScratchVoiceTestRouteImport.update({
-    id: '/api/public/scratch-voice-test',
-    path: '/api/public/scratch-voice-test',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHooksFipeMonthlyRefreshRoute =
   ApiPublicHooksFipeMonthlyRefreshRouteImport.update({
     id: '/api/public/hooks/fipe-monthly-refresh',
@@ -145,7 +138,6 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
-  '/api/public/scratch-voice-test': typeof ApiPublicScratchVoiceTestRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesByTo {
@@ -165,7 +157,6 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
-  '/api/public/scratch-voice-test': typeof ApiPublicScratchVoiceTestRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRoutesById {
@@ -187,7 +178,6 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/_authenticated/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/_authenticated/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
-  '/api/public/scratch-voice-test': typeof ApiPublicScratchVoiceTestRoute
   '/api/public/hooks/fipe-monthly-refresh': typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 export interface FileRouteTypes {
@@ -209,7 +199,6 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/admin-corpus-smoke'
     | '/onboarding-whatsapp'
-    | '/api/public/scratch-voice-test'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -229,7 +218,6 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/admin-corpus-smoke'
     | '/onboarding-whatsapp'
-    | '/api/public/scratch-voice-test'
     | '/api/public/hooks/fipe-monthly-refresh'
   id:
     | '__root__'
@@ -250,7 +238,6 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/_authenticated/admin-corpus-smoke'
     | '/_authenticated/onboarding-whatsapp'
-    | '/api/public/scratch-voice-test'
     | '/api/public/hooks/fipe-monthly-refresh'
   fileRoutesById: FileRoutesById
 }
@@ -270,7 +257,6 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
   WelcomeRoute: typeof WelcomeRoute
-  ApiPublicScratchVoiceTestRoute: typeof ApiPublicScratchVoiceTestRoute
   ApiPublicHooksFipeMonthlyRefreshRoute: typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
 
@@ -395,13 +381,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCorpusSmokeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/public/scratch-voice-test': {
-      id: '/api/public/scratch-voice-test'
-      path: '/api/public/scratch-voice-test'
-      fullPath: '/api/public/scratch-voice-test'
-      preLoaderRoute: typeof ApiPublicScratchVoiceTestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hooks/fipe-monthly-refresh': {
       id: '/api/public/hooks/fipe-monthly-refresh'
       path: '/api/public/hooks/fipe-monthly-refresh'
@@ -441,7 +420,6 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
   WelcomeRoute: WelcomeRoute,
-  ApiPublicScratchVoiceTestRoute: ApiPublicScratchVoiceTestRoute,
   ApiPublicHooksFipeMonthlyRefreshRoute: ApiPublicHooksFipeMonthlyRefreshRoute,
 }
 export const routeTree = rootRouteImport
