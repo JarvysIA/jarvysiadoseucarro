@@ -10,14 +10,18 @@ const NOW = new Date("2026-08-07T12:00:00.000Z");
 const VEHICLE_ID = "veh-1";
 
 describe("evaluateProactiveTriggers", () => {
-  test("km dentro da janela, existingMilestoneNotice null → 1 decisão, milestone_notice, shouldTrigger true, reason first_notice", () => {
+  const ONE_DAY_AGO = new Date(NOW.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  test("km dentro da janela, existingMilestoneNotice null → 2 decisões, milestone_notice shouldTrigger true, reason first_notice", () => {
     const decisions = evaluateProactiveTriggers({
       vehicleId: VEHICLE_ID,
       km: 60000,
       now: NOW,
       existingMilestoneNotice: null,
+      lastInboundAt: ONE_DAY_AGO,
+      lastOutboundAt: null,
     });
-    expect(decisions).toHaveLength(1);
+    expect(decisions).toHaveLength(2);
     expect(decisions[0]?.kind).toBe("milestone_notice");
     expect(decisions[0]?.shouldTrigger).toBe(true);
     expect(decisions[0]?.milestone).toBe(60000);
@@ -30,8 +34,10 @@ describe("evaluateProactiveTriggers", () => {
       km: 57000,
       now: NOW,
       existingMilestoneNotice: null,
+      lastInboundAt: ONE_DAY_AGO,
+      lastOutboundAt: null,
     });
-    expect(decisions).toHaveLength(1);
+    expect(decisions).toHaveLength(2);
     expect(decisions[0]?.shouldTrigger).toBe(false);
     expect(decisions[0]?.reason).toBe("outside_window");
   });
@@ -49,8 +55,10 @@ describe("evaluateProactiveTriggers", () => {
       km: 60000,
       now: NOW,
       existingMilestoneNotice,
+      lastInboundAt: ONE_DAY_AGO,
+      lastOutboundAt: null,
     });
-    expect(decisions).toHaveLength(1);
+    expect(decisions).toHaveLength(2);
     expect(decisions[0]?.shouldTrigger).toBe(false);
     expect(decisions[0]?.reason).toBe("dismissed");
   });

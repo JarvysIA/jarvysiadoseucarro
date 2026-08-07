@@ -3,12 +3,15 @@ import {
   type ExistingMilestoneNotice,
   type MilestoneNoticeReason,
 } from "./milestone-notice-decision.ts";
+import {
+  decideInactivityReengagement,
+  type InactivityReengagementReason,
+} from "./inactivity-reengagement-decision.ts";
 
-export type ProactiveTriggerKind = "milestone_notice";
-// NOTA: union terá mais membros ("km_prompt", "inactivity_reengagement")
-// quando esses gatilhos forem definidos e adicionados em builds futuros.
-// Não adicione esses membros agora — não existe regra de negócio definida
-// para eles ainda.
+export type ProactiveTriggerKind = "milestone_notice" | "inactivity_reengagement";
+// NOTA: union terá mais membros ("km_prompt") quando esse gatilho for
+// definido e adicionado em builds futuros. Não adicione esse membro agora
+// — não existe regra de negócio definida para ele ainda.
 
 export type MilestoneNoticeTriggerDecision = {
   kind: "milestone_notice";
@@ -17,7 +20,16 @@ export type MilestoneNoticeTriggerDecision = {
   reason: MilestoneNoticeReason;
 };
 
-export type ProactiveTriggerDecision = MilestoneNoticeTriggerDecision;
+export type InactivityReengagementTriggerDecision = {
+  kind: "inactivity_reengagement";
+  shouldTrigger: boolean;
+  daysSinceLastContact: number | null;
+  reason: InactivityReengagementReason;
+};
+
+export type ProactiveTriggerDecision =
+  | MilestoneNoticeTriggerDecision
+  | InactivityReengagementTriggerDecision;
 // União cresce conforme novos gatilhos entram no registro.
 
 export type ProactiveTriggerContext = {
@@ -25,6 +37,8 @@ export type ProactiveTriggerContext = {
   km: number;
   now: Date;
   existingMilestoneNotice: ExistingMilestoneNotice | null;
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
 };
 
 /**
@@ -42,12 +56,24 @@ export function evaluateProactiveTriggers(
     now: context.now,
   });
 
+  const inactivityDecision = decideInactivityReengagement({
+    lastInboundAt: context.lastInboundAt,
+    lastOutboundAt: context.lastOutboundAt,
+    now: context.now,
+  });
+
   const decisions: ProactiveTriggerDecision[] = [
     {
       kind: "milestone_notice",
       shouldTrigger: milestoneDecision.shouldNotify,
       milestone: milestoneDecision.milestone,
       reason: milestoneDecision.reason,
+    },
+    {
+      kind: "inactivity_reengagement",
+      shouldTrigger: inactivityDecision.shouldTrigger,
+      daysSinceLastContact: inactivityDecision.daysSinceLastContact,
+      reason: inactivityDecision.reason,
     },
   ];
 
