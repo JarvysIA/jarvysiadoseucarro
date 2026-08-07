@@ -376,13 +376,37 @@ jobs:
         id: g6
         run: bun test supabase/tests/mj4x-v/g6-rejected-no-link.test.ts
 
+      - name: MJ2C-V N1 — notified cria linha nova (Postgres real)
+        id: n1
+        run: bun test supabase/tests/mj2c-notices/n1-notified-creates-row.test.ts
 
+      - name: MJ2C-V N2 — snooze atualiza linha existente (Postgres real)
+        id: n2
+        run: bun test supabase/tests/mj2c-notices/n2-snooze-updates-existing.test.ts
 
+      - name: MJ2C-V N3 — dismiss atualiza linha existente (Postgres real)
+        id: n3
+        run: bun test supabase/tests/mj2c-notices/n3-dismiss-updates-existing.test.ts
 
+      - name: MJ2C-V N4 — notified idempotente (Postgres real)
+        id: n4
+        run: bun test supabase/tests/mj2c-notices/n4-notified-idempotent.test.ts
 
+      - name: MJ2C-V N5 — vehicle_not_owned (Postgres real)
+        id: n5
+        run: bun test supabase/tests/mj2c-notices/n5-vehicle-not-owned.test.ts
 
+      - name: MJ2C-V N6 — vehicle_not_found (Postgres real)
+        id: n6
+        run: bun test supabase/tests/mj2c-notices/n6-vehicle-not-found.test.ts
 
+      - name: MJ2C-V N7 — invariant_violation (Postgres real)
+        id: n7
+        run: bun test supabase/tests/mj2c-notices/n7-invalid-action.test.ts
 
+      - name: MJ2C-V N8 — REVOKE de anon/authenticated (Postgres real)
+        id: n8
+        run: bun test supabase/tests/mj2c-notices/n8-revoke-anon-authenticated.test.ts
 
       - name: Teardown (sempre)
         id: teardown
@@ -440,6 +464,7 @@ jobs:
             echo "- MJ2A-V: E1=${{ steps.e1.outcome }}, E2=${{ steps.e2.outcome }}, E3=${{ steps.e3.outcome }}, E4=${{ steps.e4.outcome }}, E5=${{ steps.e5.outcome }}, E6=${{ steps.e6.outcome }}, E7=${{ steps.e7.outcome }}, E8=${{ steps.e8.outcome }}, E9=${{ steps.e9.outcome }}, E10=${{ steps.e10.outcome }}, E11=${{ steps.e11.outcome }}, E12=${{ steps.e12.outcome }}"
             echo "- MJ2B-V: F1=${{ steps.f1.outcome }}, F2=${{ steps.f2.outcome }}, F3=${{ steps.f3.outcome }}"
             echo "- MJ4x-V: G1=${{ steps.g1.outcome }}, G2=${{ steps.g2.outcome }}, G3=${{ steps.g3.outcome }}, G4=${{ steps.g4.outcome }}, G5=${{ steps.g5.outcome }}, G6=${{ steps.g6.outcome }}"
+            echo "- MJ2C-V: N1=${{ steps.n1.outcome }}, N2=${{ steps.n2.outcome }}, N3=${{ steps.n3.outcome }}, N4=${{ steps.n4.outcome }}, N5=${{ steps.n5.outcome }}, N6=${{ steps.n6.outcome }}, N7=${{ steps.n7.outcome }}, N8=${{ steps.n8.outcome }}"
             echo ""
             echo "## Encerramento"
             echo ""
