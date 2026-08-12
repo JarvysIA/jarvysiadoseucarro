@@ -1160,6 +1160,9 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       "supabase/functions/_shared/whatsapp/conversation-handoff/execution-contract.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.test.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.type-test.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/executor.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.test.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.type-test.ts",
     ]);
     const proc = spawnSync(
       "rg",
@@ -1185,6 +1188,9 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       "supabase/functions/_shared/whatsapp/conversation-handoff/execution-contract.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.test.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.type-test.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/executor.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.test.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.type-test.ts",
     ]);
     const allowedToolingFiles = new Set([
       "tsconfig.conversation-handoff-c2a.json",
