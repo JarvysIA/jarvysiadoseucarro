@@ -1155,7 +1155,7 @@ describe("Bloco H — ausência de dependências operacionais", () => {
     );
   });
 
-  it("86. nenhum consumidor externo referencia os símbolos novos deste build fora dos 3 arquivos", () => {
+  it("86a. nenhum código externo consome os símbolos exportados deste build fora dos 3 arquivos", () => {
     const allowedRelativePaths = new Set([
       "supabase/functions/_shared/whatsapp/conversation-handoff/execution-contract.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.test.ts",
@@ -1165,7 +1165,7 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       "rg",
       [
         "-l",
-        "ConversationHandoffExecutionCommandV1|ConversationHandoffExecutionResultV1|execution-contract",
+        "ConversationHandoffExecutionCommandV1|ConversationHandoffExecutionResultV1|validateConversationHandoffExecutionCommandV1|validateConversationHandoffExecutionResultV1",
         ".",
       ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
@@ -1177,6 +1177,33 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       .map((line) => line.replace(/^\.\//, ""));
     expect(matched.length).toBeGreaterThan(0);
     const unexpected = matched.filter((file) => !allowedRelativePaths.has(file));
+    expect(unexpected).toEqual([]);
+  });
+
+  it("86b. apenas build-tooling autorizado referencia o caminho execution-contract fora dos 3 arquivos", () => {
+    const allowedFiles = new Set([
+      "supabase/functions/_shared/whatsapp/conversation-handoff/execution-contract.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.test.ts",
+      "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/execution-contract.type-test.ts",
+    ]);
+    const allowedToolingFiles = new Set([
+      "tsconfig.conversation-handoff-c2a.json",
+      "package.json",
+      ".github/workflows/jarvys-test-db.yml",
+    ]);
+    const proc = spawnSync("rg", ["-l", "execution-contract", "."], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const matched = (proc.stdout ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => line.replace(/^\.\//, ""));
+    expect(matched.length).toBeGreaterThan(0);
+    const unexpected = matched.filter(
+      (file) => !allowedFiles.has(file) && !allowedToolingFiles.has(file),
+    );
     expect(unexpected).toEqual([]);
   });
 });

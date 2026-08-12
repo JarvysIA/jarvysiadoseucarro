@@ -63,6 +63,10 @@ jobs:
         id: typecheck
         run: bun run typecheck
 
+      - name: Typecheck do C2A (conversation-handoff)
+        id: typecheck_conversation_handoff_c2a
+        run: bun run typecheck:conversation-handoff-c2a
+
       - name: Build de producao
         id: build
         run: bun run build
@@ -439,6 +443,7 @@ jobs:
             echo "- instalação congelada: ${{ steps.install.outcome }}"
             echo "- suíte automatizada completa (\`bun test\`): ${{ steps.test_suite.outcome }}"
             echo "- typecheck (\`bun run typecheck\`): ${{ steps.typecheck.outcome }}"
+            echo "- typecheck C2A (conversation-handoff): ${{ steps.typecheck_conversation_handoff_c2a.outcome }}"
             echo "- build de produção (\`bun run build\`): ${{ steps.build.outcome }}"
             echo "- testes puros do guard: ${{ steps.guard_tests.outcome }}"
             echo ""
