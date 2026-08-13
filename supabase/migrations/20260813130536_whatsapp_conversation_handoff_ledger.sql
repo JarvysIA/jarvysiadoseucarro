@@ -125,7 +125,7 @@ BEGIN
     UPDATE public.whatsapp_conversation_handoff_ledger
       SET reserved_at = v_now,
           expires_at = v_expires
-      WHERE id = v_existing.id;
+      WHERE public.whatsapp_conversation_handoff_ledger.id = v_existing.id;
     RETURN QUERY SELECT v_existing.id, 'reserved'::text, true;
     RETURN;
   END IF;
@@ -139,7 +139,8 @@ BEGIN
   IF v_existing.status = 'invoking' AND v_existing.expires_at < v_now THEN
     UPDATE public.whatsapp_conversation_handoff_ledger
       SET status = 'failed', result_status = 'transient_failure', completed_at = v_now
-      WHERE id = v_existing.id AND status = 'invoking';
+      WHERE public.whatsapp_conversation_handoff_ledger.id = v_existing.id
+        AND public.whatsapp_conversation_handoff_ledger.status = 'invoking';
     RETURN QUERY SELECT v_existing.id, 'failed'::text, false;
     RETURN;
   END IF;
