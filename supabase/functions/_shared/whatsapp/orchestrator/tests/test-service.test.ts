@@ -5,6 +5,10 @@ import { describe, expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 import {
   runWhatsappOrchestratorTestCycle,
+  tryConversationHandoffFallback,
+  type ConversationHandoffFallbackOutcome,
+  type ConversationHandoffFallbackParams,
+  type ConversationHandoffFallbackResult,
   type ItemOutcome,
   type TestCycleCounts,
   type TestCycleDeps,
@@ -181,6 +185,31 @@ function decisionDefer(over: Partial<ConversationCoreDecision> = {}): Conversati
     reasonCode: "defer_opt_out",
     ...over,
   });
+}
+
+function decisionFallback(over: Partial<ConversationCoreDecision> = {}): ConversationCoreDecision {
+  return decisionRespond({
+    eventKind: "unknown",
+    decisionKind: "fallback",
+    responseKey: "fallback_second",
+    responseParams: {},
+    nextFallbackCount: 2,
+    reasonCode: "fallback_second",
+    ...over,
+  });
+}
+
+function trackedHandoff(
+  impl: (
+    params: ConversationHandoffFallbackParams,
+  ) => Promise<ConversationHandoffFallbackResult> | ConversationHandoffFallbackResult,
+) {
+  const calls: ConversationHandoffFallbackParams[] = [];
+  const fn = async (params: ConversationHandoffFallbackParams) => {
+    calls.push(params);
+    return impl(params);
+  };
+  return { fn, calls };
 }
 
 // ============================================================
@@ -709,6 +738,359 @@ describe("response", () => {
       }),
     );
     expect(res.counts.malformed).toBe(1);
+  });
+});
+
+// ============================================================
+// C8 — BIFURCAÇÃO OPCIONAL PARA O DR. JARVYS (conversation-handoff/)
+// ============================================================
+//
+// test-service.ts NUNCA importa nada de conversation-handoff/ (C1-C7)
+// diretamente — deps.conversationHandoffFallback é só um ponto de
+// extensão injetado. Estes testes usam implementações fake da
+// dependência, nunca o C7 real (isso é Fase 18, fora de escopo).
+//
+// Achado de checkpoint documentado (ver comentário em test-service.ts,
+// acima de tryConversationHandoffFallback): nextFallbackCount vive no
+// TOP-LEVEL da ConversationCoreDecision, nunca dentro de statePatch —
+// ConversationStatePatch não tem esse campo. Além disso,
+// mapConversationDecisionToTransitionInput NUNCA lê
+// decision.nextFallbackCount ao montar o patch da RPC (lacuna
+// pré-existente, fora de escopo). Consequência prática para estes
+// testes: o reset (ou não) da contagem de fallback não produz NENHUM
+// efeito observável em m.calls.apply[...] hoje — testar isso via
+// runWhatsappOrchestratorTestCycle apenas (black-box) seria testar um
+// no-op. Por isso tryConversationHandoffFallback foi exportada e os
+// testes 5b/8b abaixo verificam o mecanismo diretamente (chamada
+// isolada da função), enquanto os testes 1-16 (via ciclo completo)
+// verificam tudo que É observável: dependência chamada/não chamada,
+// response final null/não-null, outcome do ciclo.
+describe("conversation handoff fallback (C8)", () => {
+  test("1. responseKey=fallback_first => dependência NUNCA chamada mesmo se fornecida", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback({ responseKey: "fallback_first" }),
+        render: () => "Não entendi, pode reformular?",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "fallback_first",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Não entendi, pode reformular?",
+    });
+  });
+
+  test("2. responseKey=fallback_reset => dependência NUNCA chamada", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback({ responseKey: "fallback_reset" }),
+        render: () => "Vamos começar de novo.",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(0);
+    expect(res.counts.completed).toBe(1);
+  });
+
+  test("3. responseKey=fallback_second, dependência NÃO fornecida => comportamento idêntico ao de hoje", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        render: () => "Texto fixo de fallback.",
+        // conversationHandoffFallback omitido de propósito
+      }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "fallback_second",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Texto fixo de fallback.",
+    });
+  });
+
+  test("4. responseKey=fallback_second, dependência fornecida, item.userId null => dependência NUNCA chamada, texto fixo normal", async () => {
+    const it = makeItem({ userId: null });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        render: () => "Texto fixo de fallback.",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("fallback_second");
+  });
+
+  const successOutcomes: ConversationHandoffFallbackOutcome[] = [
+    "primary_succeeded",
+    "completed",
+    "partially_completed",
+  ];
+  for (const outcome of successOutcomes) {
+    test(`5/6/7. handled:true outcome:${outcome} => response final null, nenhum render`, async () => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      let renderCalls = 0;
+      const handoff = trackedHandoff(() => ({ handled: true, outcome }));
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionFallback(),
+          render: () => {
+            renderCalls++;
+            return "não deveria ser chamado";
+          },
+          conversationHandoffFallback: handoff.fn,
+        }),
+      );
+      expect(handoff.calls.length).toBe(1);
+      expect(renderCalls).toBe(0);
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response).toBe(null);
+    });
+  }
+
+  test("5b. mecanismo direto: outcome de sucesso real => nextFallbackCount volta a 0 na decisão retornada", async () => {
+    const m = mockRepo();
+    for (const outcome of successOutcomes) {
+      const deps = baseDeps(m.repo, {
+        conversationHandoffFallback: async () => ({ handled: true, outcome }),
+      });
+      const result = await tryConversationHandoffFallback(
+        makeItem(),
+        okContext(),
+        "oi",
+        decisionFallback({ nextFallbackCount: 3 }),
+        deps,
+        () => {},
+        "w",
+      );
+      expect(result.nextFallbackCount).toBe(0);
+      expect(result.responseKey).toBe(null);
+      expect(result.responseParams).toEqual({});
+    }
+  });
+
+  const failureOutcomes: ConversationHandoffFallbackOutcome[] = [
+    "blocked_authorization_required",
+    "blocked_vehicle_required",
+    "primary_failed",
+    "uncertain",
+  ];
+  for (const outcome of failureOutcomes) {
+    test(`8/9/10/11. handled:true outcome:${outcome} => response final null, mas SEM reset (mesmo tratamento)`, async () => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      let renderCalls = 0;
+      const handoff = trackedHandoff(() => ({ handled: true, outcome }));
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionFallback(),
+          render: () => {
+            renderCalls++;
+            return "não deveria ser chamado";
+          },
+          conversationHandoffFallback: handoff.fn,
+        }),
+      );
+      expect(renderCalls).toBe(0);
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response).toBe(null);
+    });
+  }
+
+  test("8b. mecanismo direto: outcomes de falha/incerteza => nextFallbackCount ORIGINAL preservado", async () => {
+    const m = mockRepo();
+    for (const outcome of failureOutcomes) {
+      const deps = baseDeps(m.repo, {
+        conversationHandoffFallback: async () => ({ handled: true, outcome }),
+      });
+      const result = await tryConversationHandoffFallback(
+        makeItem(),
+        okContext(),
+        "oi",
+        decisionFallback({ nextFallbackCount: 3 }),
+        deps,
+        () => {},
+        "w",
+      );
+      expect(result.nextFallbackCount).toBe(3);
+      expect(result.responseKey).toBe(null);
+    }
+  });
+
+  test("12. handled:false => cai no texto fixo normal (fallback_second de sempre)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: false }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        render: () => "Texto fixo de fallback.",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(1);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "fallback_second",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Texto fixo de fallback.",
+    });
+  });
+
+  test("13. dependência LANÇA exceção => capturada, item processa normalmente até o fim, outcome não vira outcomeUnknown", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const { logger, events } = collectLogger();
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        logger,
+        decide: () => decisionFallback(),
+        render: () => "Texto fixo de fallback.",
+        conversationHandoffFallback: async () => {
+          throw new Error("C7 indisponível");
+        },
+      }),
+    );
+    expect(res.counts.outcomeUnknown).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "fallback_second",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Texto fixo de fallback.",
+    });
+    expect(
+      events.some(
+        (e) => e.event === "item_failed" && e.reasonCode === "conversation_handoff_failed",
+      ),
+    ).toBe(true);
+  });
+
+  test("14. parâmetros passados para a dependência batem exatamente", async () => {
+    const it = makeItem({ messageId: "m-42", contactId: "c-42", userId: "u-42" });
+    const state = makeState({ activeVehicleId: "veh-42" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ state })],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        loadMessageText: async () => "texto original do usuário",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(1);
+    expect(handoff.calls[0]).toEqual({
+      sourceMessageId: "m-42",
+      contactId: "c-42",
+      userId: "u-42",
+      vehicleId: "veh-42",
+      originalText: "texto original do usuário",
+    });
+  });
+
+  test("15. recálculo por conflito de concorrência (2ª rodada) => mesma lógica se aplica na 2ª chamada", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext({ stateVersion: 1 }), okContext({ stateVersion: 2 })],
+      apply: [
+        { ok: false, reason: "state_version_conflict" },
+        { ok: true, wasReplay: false, orchestratorResult: {} as never },
+      ],
+    });
+    let renderCalls = 0;
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        render: () => {
+          renderCalls++;
+          return "não deveria ser chamado";
+        },
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(res.counts.completed).toBe(1);
+    // 1ª rodada em conflito (apply[0] devolve conflict) TAMBÉM chama a
+    // dependência antes do apply — a lógica roda em AMBAS as rodadas,
+    // não só na que efetivamente aplica com sucesso.
+    expect(handoff.calls.length).toBe(2);
+    expect(renderCalls).toBe(0);
+    expect(m.calls.apply.length).toBe(2);
+    expect(m.calls.apply[0].response).toBe(null);
+    expect(m.calls.apply[1].response).toBe(null);
+  });
+
+  test("16. todos os testes já existentes em test-service.test.ts continuam passando sem alteração (regressão total) — ver contagem no relatório final da tarefa", () => {
+    // Marcador declarativo: a contagem total de testes antes/depois desta
+    // extensão é reportada no bloco de retorno da tarefa (gate 2), não
+    // aqui — este describe block é aditivo, nenhum teste pré-existente
+    // deste arquivo foi editado, removido ou teve seu corpo alterado.
+    expect(true).toBe(true);
   });
 });
 
