@@ -10,12 +10,14 @@ import {
   TransportError,
   UnknownReasonError,
   WhatsappOrchestratorRepository,
+  mapConversationDecisionToTransitionInput,
   serializePatch,
   serializeResponse,
   type RpcInvoker,
   type SupabaseLike,
   type TransitionInput,
 } from "../index.ts";
+import type { ConversationCoreDecision } from "../../conversation/types.ts";
 
 // ---------- helpers ----------
 
@@ -103,6 +105,193 @@ describe("serializePatch", () => {
     expect(() =>
       serializePatch({ state: "idle", chaveInexistente: "x" } as never),
     ).toThrow(/not accepted/);
+  });
+});
+
+// ============================================================
+// serializePatch — fallback_count (pré-requisito C9)
+// ============================================================
+
+describe("serializePatch — fallback_count", () => {
+  test("4. fallbackCount=2 => out.fallback_count=2", () => {
+    const out = serializePatch({ state: "idle", fallbackCount: 2 });
+    expect(out.fallback_count).toBe(2);
+  });
+
+  test("5. fallbackCount=0 => out.fallback_count=0 (checagem explícita de !== undefined, não truthiness)", () => {
+    const out = serializePatch({ state: "idle", fallbackCount: 0 });
+    // 0 é falsy em JS — a asserção abaixo prova que serializePatch NÃO usa
+    // `if (value)` (que trataria 0 como ausente), e sim `value !== undefined`.
+    expect(Object.prototype.hasOwnProperty.call(out, "fallback_count")).toBe(true);
+    expect(out.fallback_count).toBe(0);
+  });
+
+  test("fallbackCount ausente (undefined) continua omitido, como qualquer outra chave", () => {
+    const out = serializePatch({ state: "idle" });
+    expect(Object.prototype.hasOwnProperty.call(out, "fallback_count")).toBe(false);
+  });
+
+  test("6. regressão — os outros 12 campos de ConversationStatePatch continuam mapeando exatamente como antes", () => {
+    const out = serializePatch({
+      state: "awaiting_vehicle",
+      currentIntent: "log_expense",
+      awaitingField: "km",
+      requestSource: "user_initiated",
+      draftType: "km_update",
+      draftId: "abc",
+      draftVersion: 2,
+      draftPayload: { foo: 1 },
+      activeVehicleId: "veh-1",
+      confirmedAt: "2026-01-01T00:00:00Z",
+      executedAt: null,
+      expiresAt: "2026-01-01T01:00:00Z",
+      fallbackCount: 1,
+    });
+    expect(out).toEqual({
+      next_state: "awaiting_vehicle",
+      current_intent: "log_expense",
+      awaiting_field: "km",
+      request_source: "user_initiated",
+      draft_type: "km_update",
+      draft_id: "abc",
+      draft_version: 2,
+      draft_payload: { foo: 1 },
+      active_vehicle_id: "veh-1",
+      confirmed_at: "2026-01-01T00:00:00Z",
+      executed_at: null,
+      expires_at: "2026-01-01T01:00:00Z",
+      fallback_count: 1,
+    });
+  });
+});
+
+// ============================================================
+// Pré-requisito C9 — round-trip fallback_count via o pipeline real
+// (mapConversationDecisionToTransitionInput + serializePatch), depois
+// confirmando que loadContext/mapStateRow leem de volta o mesmo valor a
+// partir de uma linha simulada de whatsapp_conversation_states. Prova o
+// item 7/8 da matriz de testes sem depender de test-service.ts nem de
+// nenhum arquivo fora do escopo deste build.
+// ============================================================
+
+describe("round-trip fallback_count — core decision -> patch -> RPC -> leitura de volta", () => {
+  test("7. nextFallbackCount=1 sobrevive ponta a ponta: mapper -> serializePatch -> simulação de leitura -> loadContext", async () => {
+    const decision: ConversationCoreDecision = {
+      eventKind: "unknown",
+      decisionKind: "fallback",
+      previousState: "idle",
+      nextState: "idle",
+      outcome: "none",
+      statePatch: { state: "idle" },
+      responseKey: null,
+      responseParams: {},
+      nextFallbackCount: 1,
+      deferToLegacyRouter: false,
+      deferToLegacyOptOut: false,
+      reasonCode: "fallback_first",
+    };
+    const transitionInput = mapConversationDecisionToTransitionInput({
+      decision,
+      queueItemId: "11111111-1111-1111-1111-111111111111",
+      leaseToken: "22222222-2222-2222-2222-222222222222",
+      expectedStateVersion: 0,
+      orchestratorVersion: "test",
+      response: null,
+    });
+    const serialized = serializePatch(transitionInput.patch);
+    expect(serialized.fallback_count).toBe(1);
+
+    // Simula o que a RPC faria: persiste fallback_count e devolve a mesma
+    // linha na próxima leitura de contexto — exercitando o pipeline real
+    // de loadContext (o mesmo já coberto pelos testes de "com state
+    // existente" acima, linha 671+).
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          id: "33333333-3333-3333-3333-333333333333",
+          state: "idle",
+          current_intent: null,
+          awaiting_field: null,
+          request_source: null,
+          draft_type: null,
+          draft_id: null,
+          draft_version: 0,
+          draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null,
+          executed_at: null,
+          last_message_id: null,
+          expires_at: null,
+          state_version: 1,
+          fallback_count: serialized.fallback_count,
+          contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.fallbackCount).toBe(1);
+    }
+  });
+
+  test("8. nextFallbackCount=0 (reset após 3 falhas) sobrevive ponta a ponta igualmente", async () => {
+    const decision: ConversationCoreDecision = {
+      eventKind: "unknown",
+      decisionKind: "fallback",
+      previousState: "idle",
+      nextState: "idle",
+      outcome: "none",
+      statePatch: { state: "idle" },
+      responseKey: "fallback_reset",
+      responseParams: {},
+      nextFallbackCount: 0, // core.ts já reseta para 0 após a 3ª falha
+      deferToLegacyRouter: false,
+      deferToLegacyOptOut: false,
+      reasonCode: "fallback_reset",
+    };
+    const transitionInput = mapConversationDecisionToTransitionInput({
+      decision,
+      queueItemId: "11111111-1111-1111-1111-111111111111",
+      leaseToken: "22222222-2222-2222-2222-222222222222",
+      expectedStateVersion: 3,
+      orchestratorVersion: "test",
+      response: { responseKey: "fallback_reset", textBody: "Vamos começar de novo." },
+    });
+    const serialized = serializePatch(transitionInput.patch);
+    expect(serialized.fallback_count).toBe(0);
+    expect(Object.prototype.hasOwnProperty.call(serialized, "fallback_count")).toBe(true);
+
+    const rows = baseRows({
+      whatsapp_conversation_states: [
+        {
+          id: "44444444-4444-4444-4444-444444444444",
+          state: "idle",
+          current_intent: null,
+          awaiting_field: null,
+          request_source: null,
+          draft_type: null,
+          draft_id: null,
+          draft_version: 0,
+          draft_payload: null,
+          active_vehicle_id: null,
+          confirmed_at: null,
+          executed_at: null,
+          last_message_id: null,
+          expires_at: null,
+          state_version: 4,
+          fallback_count: serialized.fallback_count,
+          contact_id: "c1",
+        },
+      ],
+    });
+    const repo = new WhatsappOrchestratorRepository(makeCtxClient(rows));
+    const res = await repo.loadContext(CLAIMED);
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.fallbackCount).toBe(0);
+    }
   });
 });
 

@@ -227,6 +227,7 @@ const PATCH_KEY_MAP: Record<keyof ConversationStatePatch, string> = {
   executedAt: "executed_at",
   expiresAt: "expires_at",
   lastMessageId: "last_message_id", // Build 5.7F2E1A.5-HARD: deliberadamente ignorado em serializePatch — a RPC grava last_message_id sozinha a partir de v_msg.id; core.ts inclui esse campo em quase toda decisão via withLastMessage().
+  fallbackCount: "fallback_count", // pré-requisito C9: mapConversationDecisionToTransitionInput agora sempre popula patch.fallbackCount a partir de decision.nextFallbackCount — este mapeamento fecha o caminho até a RPC.
 };
 
 // Somente estas chaves são aceitas pela RPC.
@@ -276,9 +277,13 @@ export function serializePatch(patch: ConversationStatePatch): Record<string, un
     out[sqlKey] = value; // null é permitido → limpa campo
   }
 
-  // fallback_count não está no ConversationStatePatch original; o caller precisa
-  // passá-lo via `unsafeExtraPatch` se quiser controlá-lo (não implementado
-  // aqui para manter type safety).
+  // fallback_count: mapeado normalmente via PATCH_KEY_MAP/RPC_PATCH_KEYS_ALLOWED
+  // como qualquer outra chave do patch, desde o pré-requisito C9 —
+  // ConversationStatePatch.fallbackCount agora existe e
+  // mapConversationDecisionToTransitionInput sempre o popula a partir de
+  // decision.nextFallbackCount. Não há (nem nunca existiu) um mecanismo
+  // `unsafeExtraPatch` — essa ideia foi descartada em favor de tornar
+  // fallbackCount um campo de primeira classe do tipo.
   return out;
 }
 

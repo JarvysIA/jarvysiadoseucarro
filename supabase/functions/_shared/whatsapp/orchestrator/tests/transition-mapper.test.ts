@@ -636,3 +636,42 @@ describe("11. coerência entre responseKey e response fornecida", () => {
     expect(src.includes('from "../conversation/responses')).toBe(false);
   });
 });
+
+// ===========================================================================
+// 6. fallback_count — pré-requisito C9 (persistência real)
+// ===========================================================================
+//
+// decision.nextFallbackCount é OBRIGATÓRIO em toda ConversationCoreDecision
+// (nunca undefined) — por isso patch.fallbackCount é SEMPRE definido no
+// TransitionInput resultante, nunca condicionalmente omitido. 0 é um valor
+// real (contagem zerada), não "ausente" — os testes abaixo cobrem
+// explicitamente esse caso para não confundir com omissão.
+describe("6. fallback_count sempre propagado de decision.nextFallbackCount", () => {
+  test("1. nextFallbackCount=1 => patch.fallbackCount=1", () => {
+    const d = decision({ nextFallbackCount: 1 });
+    const out = callMapper({ ...INFRA, decision: d });
+    expect(out.patch.fallbackCount).toBe(1);
+  });
+
+  test("2. nextFallbackCount=0 => patch.fallbackCount=0 (presente, não omitido)", () => {
+    const d = decision({ nextFallbackCount: 0 });
+    const out = callMapper({ ...INFRA, decision: d });
+    expect(out.patch.fallbackCount).toBe(0);
+    expect("fallbackCount" in out.patch).toBe(true);
+  });
+
+  test("3. nextFallbackCount=3 => patch.fallbackCount=3", () => {
+    const d = decision({ nextFallbackCount: 3 });
+    const out = callMapper({ ...INFRA, decision: d });
+    expect(out.patch.fallbackCount).toBe(3);
+  });
+
+  test("decision.nextFallbackCount prevalece mesmo se statePatch já tiver fallbackCount", () => {
+    const d = decision({
+      nextFallbackCount: 2,
+      statePatch: { state: "idle", fallbackCount: 99 },
+    });
+    const out = callMapper({ ...INFRA, decision: d });
+    expect(out.patch.fallbackCount).toBe(2);
+  });
+});

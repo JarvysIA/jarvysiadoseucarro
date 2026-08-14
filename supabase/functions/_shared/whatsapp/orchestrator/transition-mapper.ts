@@ -95,6 +95,10 @@ export type MapConversationDecisionToTransitionInputArgs = Readonly<{
  *  7. response é apenas transportada do argumento; coerência com responseKey
  *     é validada, mas nenhum textBody é fabricado.
  *  8. Nenhum campo da decisão ou da response original é mutado.
+ *  9. patch.fallbackCount é SEMPRE definido a partir de
+ *     decision.nextFallbackCount (nunca omitido — é um campo obrigatório
+ *     da decisão), prevalecendo sobre qualquer valor porventura já
+ *     presente em decision.statePatch.fallbackCount.
  */
 export function mapConversationDecisionToTransitionInput(
   args: MapConversationDecisionToTransitionInputArgs,
@@ -126,6 +130,16 @@ export function mapConversationDecisionToTransitionInput(
     if (value === undefined) continue;      // preserva omissão
     (patch as Record<string, unknown>)[key] = value;
   }
+
+  // fallback_count — pré-requisito C9: decision.nextFallbackCount é
+  // OBRIGATÓRIO em toda ConversationCoreDecision (nunca omitido/undefined),
+  // então SEMPRE é incluído no patch, nunca condicionalmente. Nenhum lugar
+  // do core.ts hoje define statePatch.fallbackCount (confirmado por grep no
+  // checkpoint deste build) — mas caso algum decisor futuro o faça, decisão
+  // explícita: decision.nextFallbackCount é a fonte única de verdade e
+  // SEMPRE prevalece, sobrescrevendo o que o loop acima já tiver copiado de
+  // decision.statePatch.fallbackCount.
+  patch.fallbackCount = decision.nextFallbackCount;
 
   if (patch.state === undefined) {
     patch.state = decision.nextState;
