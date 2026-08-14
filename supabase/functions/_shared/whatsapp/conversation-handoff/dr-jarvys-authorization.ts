@@ -29,7 +29,17 @@ import type { DrJarvysVehicleContext } from "../dr-jarvys/ask-dr-jarvys.ts";
 
 export type ConversationHandoffAuthorizationResultV1 =
   | Readonly<{ authorized: true; vehicleContext?: DrJarvysVehicleContext }>
-  | Readonly<{ authorized: false; reason: "authorization_required" | "vehicle_required" }>;
+  | Readonly<{
+      authorized: false;
+      reason: "authorization_required" | "vehicle_required";
+      // Só presente quando vehicleId===null, nenhum veículo é full, e
+      // EXATAMENTE 1 veículo está passive_with_km — regra de negócio
+      // externa garante no máximo 1 veículo free por usuário nesse
+      // estado, então a sugestão é inequívoca. Com 0 ou 2+ candidatos,
+      // a chave é omitida (nunca undefined) — fail-closed, nunca
+      // adivinha entre múltiplos.
+      suggestedVehicleId?: string;
+    }>;
 
 const DENIED: ConversationHandoffAuthorizationResultV1 = {
   authorized: false,
@@ -166,16 +176,25 @@ export async function resolveConversationHandoffAuthorization(
     user_id: userId,
   });
   if (!vehiclesFetch.ok) return DENIED;
+  let passiveWithKmCount = 0;
+  let passiveWithKmVehicleId: string | null = null;
   for (const row of vehiclesFetch.data) {
     const status = typeof row.status === "string" ? row.status : null;
     if (status === "archived") continue; // fora da busca, nunca considerado
-    const accessMode = computeWhatsappVehicleAccessMode(
-      profile,
-      toAccessVehicleInput(row, activationSet),
-      userId,
-      now,
-    );
+    const vehicleInput = toAccessVehicleInput(row, activationSet);
+    const accessMode = computeWhatsappVehicleAccessMode(profile, vehicleInput, userId, now);
     if (accessMode === "full") return { authorized: true };
+    if (accessMode === "passive_with_km") {
+      passiveWithKmCount += 1;
+      passiveWithKmVehicleId = vehicleInput.id;
+    }
+  }
+  if (passiveWithKmCount === 1 && passiveWithKmVehicleId !== null) {
+    return {
+      authorized: false,
+      reason: "authorization_required",
+      suggestedVehicleId: passiveWithKmVehicleId,
+    };
   }
   return DENIED;
 }
