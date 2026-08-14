@@ -9,22 +9,29 @@
 // Fail-closed sempre: qualquer erro de RPC (retornado em res.error ou
 // lançado como exceção) vira o retorno seguro (null/false), nunca
 // propaga mensagem, código SQL ou stack de erro em lugar nenhum.
+//
+// reserveConversationHandoffExecution também devolve resultStatus
+// (pré-requisito do C7, migration
+// ...ledger_result_status_and_outbound_lookup) — omitido (não
+// undefined) enquanto reserved/invoking, presente quando
+// completed/failed.
 
 import type { SupabaseLike } from "../orchestrator/repository.ts";
 
 export const CONVERSATION_HANDOFF_RESERVATION_TTL_SECONDS = 45;
-
-export type ConversationHandoffLedgerReservation = Readonly<{
-  id: string;
-  status: "reserved" | "invoking" | "completed" | "failed";
-  isNewReservation: boolean;
-}>;
 
 export type ConversationHandoffLedgerResultStatus =
   | "success"
   | "blocked"
   | "transient_failure"
   | "permanent_failure";
+
+export type ConversationHandoffLedgerReservation = Readonly<{
+  id: string;
+  status: "reserved" | "invoking" | "completed" | "failed";
+  isNewReservation: boolean;
+  resultStatus?: ConversationHandoffLedgerResultStatus;
+}>;
 
 const RESERVATION_STATUSES: ReadonlySet<string> = new Set([
   "reserved",
@@ -33,9 +40,19 @@ const RESERVATION_STATUSES: ReadonlySet<string> = new Set([
   "failed",
 ]);
 
-function isValidReservationRow(
-  row: unknown,
-): row is { id: string; status: string; is_new_reservation: boolean } {
+const RESULT_STATUSES: ReadonlySet<string> = new Set([
+  "success",
+  "blocked",
+  "transient_failure",
+  "permanent_failure",
+]);
+
+function isValidReservationRow(row: unknown): row is {
+  id: string;
+  status: string;
+  is_new_reservation: boolean;
+  result_status: string | null;
+} {
   if (typeof row !== "object" || row === null) return false;
   const candidate = row as Record<string, unknown>;
   return (
@@ -43,7 +60,9 @@ function isValidReservationRow(
     candidate.id !== "" &&
     typeof candidate.status === "string" &&
     RESERVATION_STATUSES.has(candidate.status) &&
-    typeof candidate.is_new_reservation === "boolean"
+    typeof candidate.is_new_reservation === "boolean" &&
+    (candidate.result_status === null ||
+      (typeof candidate.result_status === "string" && RESULT_STATUSES.has(candidate.result_status)))
   );
 }
 
@@ -55,6 +74,9 @@ function parseReservationRow(raw: unknown): ConversationHandoffLedgerReservation
     id: row.id,
     status: row.status as ConversationHandoffLedgerReservation["status"],
     isNewReservation: row.is_new_reservation,
+    ...(row.result_status === null
+      ? {}
+      : { resultStatus: row.result_status as ConversationHandoffLedgerResultStatus }),
   };
 }
 

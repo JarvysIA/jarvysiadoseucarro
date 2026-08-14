@@ -1,6 +1,6 @@
 // C6 — Wrapper TypeScript para o outbound persistido do Conversation
 // Handoff (migration whatsapp_conversation_handoff_outbound). Reaproveita
-// a whatsapp_outbound_queue existente via 1 RPC SECURITY DEFINER — nunca
+// a whatsapp_outbound_queue existente via RPCs SECURITY DEFINER — nunca
 // .insert/.update/.delete/.upsert diretos. Reaproveita só o tipo
 // estrutural SupabaseLike do repository do orquestrador (nunca a classe
 // inteira, que é específica de fila/lease). Sem Supabase real, sem I/O
@@ -10,6 +10,11 @@
 // Fail-closed sempre: qualquer erro de RPC (retornado em res.error ou
 // lançado como exceção) vira o retorno seguro (null), nunca propaga
 // mensagem, código SQL ou stack de erro em lugar nenhum.
+//
+// getConversationHandoffOutboundByKey (pré-requisito do C7, migration
+// ...ledger_result_status_and_outbound_lookup) é só leitura — busca o
+// texto já persistido de uma resposta pela idempotency_key, sem nunca
+// enfileirar nem escrever nada.
 
 import type { SupabaseLike } from "../orchestrator/repository.ts";
 
@@ -102,6 +107,52 @@ export async function enqueueConversationHandoffOutbound(
     });
     if (res.error) return null;
     return parseOutboundResult(res.data);
+  } catch {
+    return null;
+  }
+}
+
+export type ConversationHandoffOutboundLookupResult =
+  | Readonly<{
+      found: true;
+      textBody: string;
+      outboundMessageId: string;
+      outboundQueueId: string;
+    }>
+  | Readonly<{ found: false }>;
+
+function parseOutboundLookupResult(raw: unknown): ConversationHandoffOutboundLookupResult | null {
+  if (!Array.isArray(raw)) return null;
+  if (raw.length === 0) return { found: false };
+  const row = raw[0];
+  if (typeof row !== "object" || row === null) return null;
+  const candidate = row as Record<string, unknown>;
+  const textBody = candidate.text_body;
+  const outboundMessageId = candidate.outbound_message_id;
+  const outboundQueueId = candidate.outbound_queue_id;
+  if (
+    typeof textBody !== "string" ||
+    textBody === "" ||
+    typeof outboundMessageId !== "string" ||
+    outboundMessageId === "" ||
+    typeof outboundQueueId !== "string" ||
+    outboundQueueId === ""
+  ) {
+    return null;
+  }
+  return { found: true, textBody, outboundMessageId, outboundQueueId };
+}
+
+export async function getConversationHandoffOutboundByKey(
+  client: SupabaseLike,
+  idempotencyKey: string,
+): Promise<ConversationHandoffOutboundLookupResult | null> {
+  try {
+    const res = await client.rpc("get_conversation_handoff_outbound_by_key", {
+      p_idempotency_key: idempotencyKey,
+    });
+    if (res.error) return null;
+    return parseOutboundLookupResult(res.data);
   } catch {
     return null;
   }

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildConversationHandoffIdempotencyKey,
   enqueueConversationHandoffOutbound,
+  getConversationHandoffOutboundByKey,
 } from "../outbound.ts";
 import type { RpcInvoker, SupabaseLike } from "../../orchestrator/repository.ts";
 
@@ -295,6 +296,92 @@ describe("Bloco G — helper de idempotency key", () => {
   });
 });
 
+describe("Bloco I — getConversationHandoffOutboundByKey", () => {
+  const KEY = "conversation-handoff:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa:primary";
+
+  it("27. found:true com os 3 campos (text_body, outbound_message_id, outbound_queue_id)", async () => {
+    const client = makeClient(
+      jsonInvoker([
+        {
+          text_body: "Sua troca de óleo já passou do prazo recomendado.",
+          outbound_message_id: MESSAGE_ID,
+          outbound_queue_id: QUEUE_ID,
+        },
+      ]),
+    );
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toEqual({
+      found: true,
+      textBody: "Sua troca de óleo já passou do prazo recomendado.",
+      outboundMessageId: MESSAGE_ID,
+      outboundQueueId: QUEUE_ID,
+    });
+  });
+
+  it("28. found:false quando a RPC retorna array vazio (chave inexistente)", async () => {
+    const client = makeClient(jsonInvoker([]));
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toEqual({ found: false });
+  });
+
+  it("29. client.rpc lança exceção → retorna null, não propaga", async () => {
+    const client = makeClient(throwingInvoker("boom-lookup"));
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toBeNull();
+  });
+
+  it("30. client.rpc retorna {error} → retorna null", async () => {
+    const client = makeClient(errorInvoker("boom-lookup", "P0001"));
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toBeNull();
+  });
+
+  it("31. nenhum retorno vaza error.message/stack (RPC error e exceção)", async () => {
+    const secretMarker = "SECRET_ERROR_MARKER_lookup77";
+
+    const errorResult = await getConversationHandoffOutboundByKey(
+      makeClient(errorInvoker(secretMarker, "P0001")),
+      KEY,
+    );
+    const thrownResult = await getConversationHandoffOutboundByKey(
+      makeClient(throwingInvoker(secretMarker)),
+      KEY,
+    );
+
+    for (const value of [errorResult, thrownResult]) {
+      expect(JSON.stringify(value)).not.toContain(secretMarker);
+    }
+  });
+
+  it("32. resposta malformada (campo faltando) → retorna null, não lança", async () => {
+    const client = makeClient(
+      jsonInvoker([{ text_body: "texto qualquer", outbound_message_id: MESSAGE_ID }]),
+    );
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toBeNull();
+  });
+
+  it("33. resposta não-array → retorna null, não lança", async () => {
+    const client = makeClient(
+      jsonInvoker({ text_body: "texto qualquer", outbound_message_id: MESSAGE_ID }),
+    );
+
+    const result = await getConversationHandoffOutboundByKey(client, KEY);
+
+    expect(result).toBeNull();
+  });
+});
+
 describe("Bloco H — pureza e ausência de escrita direta", () => {
   const outboundSource = readFileSync(
     fileURLToPath(new URL("../outbound.ts", import.meta.url)),
@@ -304,6 +391,15 @@ describe("Bloco H — pureza e ausência de escrita direta", () => {
     fileURLToPath(
       new URL(
         "../../../../../migrations/20260813204354_whatsapp_conversation_handoff_outbound.sql",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
+  );
+  const lookupMigrationSource = readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../../../../migrations/20260814022011_whatsapp_conversation_handoff_ledger_result_status_and_outbound_lookup.sql",
         import.meta.url,
       ),
     ),
@@ -347,5 +443,28 @@ describe("Bloco H — pureza e ausência de escrita direta", () => {
   it("26. migration referencia purpose='conversation' tanto na validação de replay quanto no INSERT da nova emissão", () => {
     expect(migrationSource).toContain("v_existing_q.purpose <> 'conversation'");
     expect(migrationSource).toContain("'text','conversation', p_text_body");
+  });
+
+  it("34. get_conversation_handoff_outbound_by_key é só leitura: zero INSERT/UPDATE/DELETE no corpo da função", () => {
+    const fnMatch = lookupMigrationSource.match(
+      /CREATE OR REPLACE FUNCTION public\.get_conversation_handoff_outbound_by_key[\s\S]*?\$fn\$;/,
+    );
+    expect(fnMatch).not.toBeNull();
+    const fnBody = fnMatch?.[0] ?? "";
+    expect(fnBody).not.toMatch(/INSERT INTO|UPDATE public\.|DELETE FROM/);
+    expect(fnBody).toContain("WHERE idempotency_key = p_idempotency_key");
+    expect(fnBody).toContain("AND purpose = 'conversation'");
+  });
+
+  it("35. get_conversation_handoff_outbound_by_key tem REVOKE de PUBLIC/anon/authenticated e GRANT só a service_role", () => {
+    expect(lookupMigrationSource).toContain(
+      "REVOKE EXECUTE ON FUNCTION public.get_conversation_handoff_outbound_by_key FROM PUBLIC;",
+    );
+    expect(lookupMigrationSource).toContain(
+      "REVOKE EXECUTE ON FUNCTION public.get_conversation_handoff_outbound_by_key FROM anon, authenticated;",
+    );
+    expect(lookupMigrationSource).toContain(
+      "GRANT EXECUTE ON FUNCTION public.get_conversation_handoff_outbound_by_key TO service_role;",
+    );
   });
 });
