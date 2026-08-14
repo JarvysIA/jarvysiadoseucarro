@@ -326,6 +326,11 @@ function AppPage() {
         return;
       }
       await reloadVehicles(session.session.user.id);
+      const ativarVehicleId = new URLSearchParams(window.location.search).get("ativar");
+      if (ativarVehicleId) {
+        setSelectedId(ativarVehicleId);
+        setActivateOpen(true);
+      }
     })();
   }, [navigate, reloadVehicles]);
 
