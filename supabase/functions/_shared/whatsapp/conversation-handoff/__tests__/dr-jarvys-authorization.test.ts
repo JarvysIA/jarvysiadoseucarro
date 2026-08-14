@@ -279,7 +279,7 @@ describe("Bloco C — vehicleId ausente, múltiplos veículos", () => {
     expect(Object.hasOwn(result, "vehicleContext")).toBe(false);
   });
 
-  it("10. só veículos passive_with_km → authorization_required", async () => {
+  it("10. só 1 veículo passive_with_km → authorization_required COM suggestedVehicleId (regra de negócio: no máximo 1 free por usuário torna a sugestão inequívoca)", async () => {
     const client = makeTestClient({
       profiles: [ATIVO_PROFILE],
       pagamentos_pix: [],
@@ -288,7 +288,11 @@ describe("Bloco C — vehicleId ausente, múltiplos veículos", () => {
 
     const result = await resolveConversationHandoffAuthorization(client, USER_ID, null);
 
-    expect(result).toEqual({ authorized: false, reason: "authorization_required" });
+    expect(result).toEqual({
+      authorized: false,
+      reason: "authorization_required",
+      suggestedVehicleId: VEHICLE_ID,
+    });
   });
 
   it("11. só veículos denied (status não reconhecido) → authorization_required", async () => {
@@ -512,5 +516,70 @@ describe("Bloco F — reaproveitamento e pureza", () => {
 
   it("25. zero any/as any/as unknown as/@ts-ignore/@ts-nocheck no arquivo", () => {
     expect(authorizationSource).not.toMatch(/\bany\b|as any|as unknown as|@ts-ignore|@ts-nocheck/);
+  });
+});
+
+describe("Bloco G — suggestedVehicleId", () => {
+  it("26. vehicleId null, 1 único veículo full → authorized:true (comportamento existente intacto)", async () => {
+    const client = makeTestClient({
+      profiles: [VIP_PROFILE],
+      pagamentos_pix: [],
+      veiculos: [{ id: VEHICLE_ID, user_id: USER_ID, status: "ativo" }],
+    });
+
+    const result = await resolveConversationHandoffAuthorization(client, USER_ID, null);
+
+    expect(result).toEqual({ authorized: true });
+  });
+
+  it("27. vehicleId null, 0 full, 0 passive_with_km (só denied) → authorization_required SEM suggestedVehicleId", async () => {
+    const client = makeTestClient({
+      profiles: [VIP_PROFILE],
+      pagamentos_pix: [],
+      veiculos: [{ id: VEHICLE_ID, user_id: USER_ID, status: "totalmente_desconhecido" }],
+    });
+
+    const result = await resolveConversationHandoffAuthorization(client, USER_ID, null);
+
+    expect(result).toEqual({ authorized: false, reason: "authorization_required" });
+    expect(Object.hasOwn(result, "suggestedVehicleId")).toBe(false);
+  });
+
+  it("28. vehicleId null, 0 full, 2 veículos passive_with_km → authorization_required SEM suggestedVehicleId (ambíguo, fail-closed)", async () => {
+    const client = makeTestClient({
+      profiles: [ATIVO_PROFILE],
+      pagamentos_pix: [],
+      veiculos: [
+        { id: VEHICLE_ID, user_id: USER_ID, status: "ativo" },
+        { id: OTHER_VEHICLE_ID, user_id: USER_ID, status: "ativo" },
+      ],
+    });
+
+    const result = await resolveConversationHandoffAuthorization(client, USER_ID, null);
+
+    expect(result).toEqual({ authorized: false, reason: "authorization_required" });
+    expect(Object.hasOwn(result, "suggestedVehicleId")).toBe(false);
+  });
+
+  it("29. vehicleId presente (negado) → suggestedVehicleId nunca aparece nesse caminho", async () => {
+    const client = makeTestClient({
+      profiles: [ATIVO_PROFILE],
+      pagamentos_pix: [],
+      veiculos: [
+        {
+          id: VEHICLE_ID,
+          user_id: USER_ID,
+          marca: "Fiat",
+          modelo: "Argo",
+          ano: "2022",
+          status: "ativo",
+        },
+      ],
+    });
+
+    const result = await resolveConversationHandoffAuthorization(client, USER_ID, VEHICLE_ID);
+
+    expect(result).toEqual({ authorized: false, reason: "authorization_required" });
+    expect(Object.hasOwn(result, "suggestedVehicleId")).toBe(false);
   });
 });
