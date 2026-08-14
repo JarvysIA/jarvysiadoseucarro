@@ -85,6 +85,39 @@ export type TestCycleInput = {
 
 export type TestServiceLogger = (evt: TestServiceLogEvent) => void;
 
+// Ponto de extensão opcional do C8 — bifurcação para o Dr. Jarvys
+// (conversation-handoff/, C1-C7) quando o core determinístico chega em
+// fallback_second. test-service.ts NUNCA importa nada de
+// conversation-handoff/ diretamente: a implementação real desta
+// dependência (que chamaria executeConversationHandoffEntrypoint de
+// verdade) é responsabilidade de quem conectar o C7 ao runtime — Fase 18,
+// fora do escopo deste build.
+export type ConversationHandoffFallbackParams = Readonly<{
+  sourceMessageId: string;
+  contactId: string;
+  userId: string;
+  vehicleId: string | null;
+  originalText: string;
+}>;
+
+export type ConversationHandoffFallbackOutcome =
+  | "blocked_authorization_required"
+  | "blocked_vehicle_required"
+  | "primary_succeeded"
+  | "primary_failed"
+  | "completed"
+  | "partially_completed"
+  | "uncertain";
+
+export type ConversationHandoffFallbackResult = Readonly<{
+  // true = já enfileirou a resposta sozinho (via C6) — test-service NÃO
+  // deve construir response própria para este item.
+  handled: boolean;
+  // só para log/observabilidade — nunca usado para ramificar lógica além
+  // do reset (ou não) da contagem de fallback.
+  outcome?: ConversationHandoffFallbackOutcome;
+}>;
+
 export type TestCycleDeps = {
   repository: OrchestratorRepositoryPort;
   loadMessageText: (messageId: string) => Promise<string | null>;
@@ -95,6 +128,9 @@ export type TestCycleDeps = {
   kmActionDeps: ConfirmedKmUpdateDeps;
   expenseActionDeps: ConfirmedExpenseCreateDeps;
   logger?: TestServiceLogger;
+  conversationHandoffFallback?: (
+    params: ConversationHandoffFallbackParams,
+  ) => Promise<ConversationHandoffFallbackResult>;
 };
 
 export type ItemOutcome =
@@ -133,6 +169,7 @@ export type TestServiceLogEventName =
   | "transition_replayed"
   | "state_conflict_recalculated"
   | "deferred_unsupported"
+  | "conversation_handoff_attempted"
   | "item_released"
   | "lease_lost"
   | "outcome_unknown"
@@ -240,6 +277,97 @@ function isDeferred(d: ConversationCoreDecision): boolean {
     d.eventKind === "explicit_opt_out" ||
     d.eventKind === "replay"
   );
+}
+
+// Outcomes do handoff que contam como "o Dr. Jarvys resolveu de verdade" —
+// só nesses casos a contagem de fallback é resetada. blocked_*,
+// primary_failed e uncertain continuam contando como uma falha normal do
+// ponto de vista da conversa determinística (o usuário não foi atendido).
+const CONVERSATION_HANDOFF_RESET_OUTCOMES: ReadonlySet<ConversationHandoffFallbackOutcome> =
+  new Set(["primary_succeeded", "completed", "partially_completed"]);
+
+// C8 — bifurcação opcional para o Dr. Jarvys (C7) quando o core
+// determinístico decide fallback_second. Só chama deps.conversationHandoffFallback
+// quando: responseKey é exatamente "fallback_second", a dependência foi
+// injetada, e item.userId não é null (fail-closed: sem userId, nem
+// tenta). Qualquer erro da dependência é capturado e NUNCA propaga —
+// o item segue o fluxo normal com a decisão original, como se a
+// dependência não tivesse sido chamada.
+//
+// IMPORTANTE (achado do checkpoint, não uma decisão deste build): o reset
+// da contagem de fallback usa o campo `nextFallbackCount` — TOP-LEVEL na
+// ConversationCoreDecision, NUNCA dentro de statePatch. ConversationStatePatch
+// (conversation/types.ts) não tem nenhum campo de fallback count; a RPC
+// aceita uma chave `fallback_count` no patch (repository.ts,
+// RPC_PATCH_KEYS_ALLOWED), mas nada em PATCH_KEY_MAP/transition-mapper.ts
+// jamais copia decision.nextFallbackCount para dentro do patch — ou seja,
+// hoje `nextFallbackCount` computado pelo core (e por este handoff) NUNCA
+// chega a ser persistido em whatsapp_conversation_states.fallback_count.
+// Essa é uma lacuna real, pré-existente, fora do escopo deste build
+// (exigiria tocar em repository.ts/transition-mapper.ts, ambos
+// protegidos) — setamos nextFallbackCount corretamente no nível da
+// decisão mesmo assim, para que o campo já exista e esteja correto no
+// dia em que essa lacuna for endereçada em outro build.
+// Exportada (só para teste direto): o efeito de nextFallbackCount sobre a
+// decisão retornada não é observável via runWhatsappOrchestratorTestCycle
+// no estado atual do pipeline (mapConversationDecisionToTransitionInput
+// nunca lê decision.nextFallbackCount — ver comentário acima e o
+// checkpoint deste build). Exportar esta função pura permite testar
+// diretamente, sem depender de um efeito colateral que hoje não existe.
+export async function tryConversationHandoffFallback(
+  item: ClaimedItem,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  text: string,
+  decision: ConversationCoreDecision,
+  deps: TestCycleDeps,
+  log: TestServiceLogger,
+  workerId: string,
+): Promise<ConversationCoreDecision> {
+  if (decision.responseKey !== "fallback_second") return decision;
+  if (deps.conversationHandoffFallback === undefined) return decision;
+  if (item.userId === null) return decision;
+
+  try {
+    const result = await deps.conversationHandoffFallback({
+      sourceMessageId: item.messageId,
+      contactId: item.contactId,
+      userId: item.userId,
+      vehicleId: ctx.context.state.activeVehicleId,
+      originalText: text,
+    });
+
+    log({
+      event: "conversation_handoff_attempted",
+      workerId,
+      queueItemId: item.queueId,
+      messageId: item.messageId,
+      contactId: item.contactId,
+      ok: result.handled,
+      ...(result.outcome !== undefined ? { reasonCode: result.outcome } : {}),
+    });
+
+    if (result.handled !== true) return decision;
+
+    const shouldReset =
+      result.outcome !== undefined && CONVERSATION_HANDOFF_RESET_OUTCOMES.has(result.outcome);
+
+    const handoffDecision: ConversationCoreDecision = {
+      ...decision,
+      responseKey: null,
+      responseParams: {},
+      ...(shouldReset ? { nextFallbackCount: 0 } : {}),
+    };
+    return handoffDecision;
+  } catch (err) {
+    log({
+      event: "item_failed",
+      workerId,
+      queueItemId: item.queueId,
+      errorCategory: classifyError(err),
+      reasonCode: "conversation_handoff_failed",
+    });
+    return decision;
+  }
 }
 
 // ============================================================
@@ -366,7 +494,17 @@ async function processItem(
     return await handleConfirmExpenseCreate(item, ctx1.result, deps, render, log, workerId, 1);
   }
 
-  const resp1 = buildResponse(decision1, render, log, workerId, item);
+  const effectiveDecision1 = await tryConversationHandoffFallback(
+    item,
+    ctx1.result,
+    text1.text,
+    decision1,
+    deps,
+    log,
+    workerId,
+  );
+
+  const resp1 = buildResponse(effectiveDecision1, render, log, workerId, item);
   if (resp1.kind !== "ok") {
     return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   }
@@ -374,7 +512,7 @@ async function processItem(
   const apply1 = await runApply(
     item,
     ctx1.result.context.stateVersion,
-    decision1,
+    effectiveDecision1,
     resp1.payload,
     deps,
     log,
@@ -421,7 +559,17 @@ async function processItem(
     return await handleConfirmExpenseCreate(item, ctx2.result, deps, render, log, workerId, 2);
   }
 
-  const resp2 = buildResponse(decision2, render, log, workerId, item);
+  const effectiveDecision2 = await tryConversationHandoffFallback(
+    item,
+    ctx2.result,
+    text2.text,
+    decision2,
+    deps,
+    log,
+    workerId,
+  );
+
+  const resp2 = buildResponse(effectiveDecision2, render, log, workerId, item);
   if (resp2.kind !== "ok") {
     return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   }
@@ -429,7 +577,7 @@ async function processItem(
   const apply2 = await runApply(
     item,
     ctx2.result.context.stateVersion,
-    decision2,
+    effectiveDecision2,
     resp2.payload,
     deps,
     log,
