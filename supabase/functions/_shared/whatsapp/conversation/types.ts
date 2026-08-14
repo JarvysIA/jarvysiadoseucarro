@@ -158,6 +158,7 @@ export type ConversationStatePatch = Partial<{
   executedAt: string | null;
   expiresAt: string | null;
   lastMessageId: string | null;
+  fallbackCount: number; // espelha decision.nextFallbackCount; 0..3 (já opcional via Partial<> acima)
 }>;
 
 export type ConversationResponseKey =
