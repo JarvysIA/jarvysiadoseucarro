@@ -57,9 +57,11 @@ const RESERVE_PARAMS = {
 const RESERVATION_ID = "55555555-5555-5555-5555-555555555555";
 
 describe("Bloco A — reserve, caminho feliz", () => {
-  it("1. primeira reserva de um par novo → isNewReservation:true, status:'reserved'", async () => {
+  it("1. primeira reserva de um par novo → isNewReservation:true, status:'reserved', resultStatus OMITIDO", async () => {
     const client = makeClient(
-      jsonInvoker([{ id: RESERVATION_ID, status: "reserved", is_new_reservation: true }]),
+      jsonInvoker([
+        { id: RESERVATION_ID, status: "reserved", is_new_reservation: true, result_status: null },
+      ]),
     );
 
     const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
@@ -69,11 +71,14 @@ describe("Bloco A — reserve, caminho feliz", () => {
       status: "reserved",
       isNewReservation: true,
     });
+    expect(Object.hasOwn(result ?? {}, "resultStatus")).toBe(false);
   });
 
-  it("2. RPC retorna linha 'reserved' não expirada existente → isNewReservation:false", async () => {
+  it("2. RPC retorna linha 'reserved' não expirada existente → isNewReservation:false, resultStatus OMITIDO", async () => {
     const client = makeClient(
-      jsonInvoker([{ id: RESERVATION_ID, status: "reserved", is_new_reservation: false }]),
+      jsonInvoker([
+        { id: RESERVATION_ID, status: "reserved", is_new_reservation: false, result_status: null },
+      ]),
     );
 
     const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
@@ -83,11 +88,19 @@ describe("Bloco A — reserve, caminho feliz", () => {
       status: "reserved",
       isNewReservation: false,
     });
+    expect(Object.hasOwn(result ?? {}, "resultStatus")).toBe(false);
   });
 
-  it("3. RPC retorna linha 'completed' → isNewReservation:false, status:'completed'", async () => {
+  it("3. RPC retorna linha 'completed' → isNewReservation:false, status:'completed', resultStatus PRESENTE", async () => {
     const client = makeClient(
-      jsonInvoker([{ id: RESERVATION_ID, status: "completed", is_new_reservation: false }]),
+      jsonInvoker([
+        {
+          id: RESERVATION_ID,
+          status: "completed",
+          is_new_reservation: false,
+          result_status: "success",
+        },
+      ]),
     );
 
     const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
@@ -96,12 +109,20 @@ describe("Bloco A — reserve, caminho feliz", () => {
       id: RESERVATION_ID,
       status: "completed",
       isNewReservation: false,
+      resultStatus: "success",
     });
   });
 
-  it("3b. RPC retorna sweep de 'invoking' expirado → isNewReservation:false, status:'failed' (Opção A: nunca reabre invoking expirado)", async () => {
+  it("3b. RPC retorna sweep de 'invoking' expirado → isNewReservation:false, status:'failed', resultStatus:'transient_failure' PRESENTE (Opção A: nunca reabre invoking expirado)", async () => {
     const client = makeClient(
-      jsonInvoker([{ id: RESERVATION_ID, status: "failed", is_new_reservation: false }]),
+      jsonInvoker([
+        {
+          id: RESERVATION_ID,
+          status: "failed",
+          is_new_reservation: false,
+          result_status: "transient_failure",
+        },
+      ]),
     );
 
     const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
@@ -110,12 +131,15 @@ describe("Bloco A — reserve, caminho feliz", () => {
       id: RESERVATION_ID,
       status: "failed",
       isNewReservation: false,
+      resultStatus: "transient_failure",
     });
   });
 
-  it("3c. RPC retorna sweep de 'reserved' expirado reaberto → isNewReservation:true, status:'reserved' (continua permitido)", async () => {
+  it("3c. RPC retorna sweep de 'reserved' expirado reaberto → isNewReservation:true, status:'reserved', resultStatus OMITIDO (continua permitido)", async () => {
     const client = makeClient(
-      jsonInvoker([{ id: RESERVATION_ID, status: "reserved", is_new_reservation: true }]),
+      jsonInvoker([
+        { id: RESERVATION_ID, status: "reserved", is_new_reservation: true, result_status: null },
+      ]),
     );
 
     const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
@@ -124,6 +148,29 @@ describe("Bloco A — reserve, caminho feliz", () => {
       id: RESERVATION_ID,
       status: "reserved",
       isNewReservation: true,
+    });
+    expect(Object.hasOwn(result ?? {}, "resultStatus")).toBe(false);
+  });
+
+  it("3d. RPC retorna linha 'failed' pré-existente (não-sweep) com result_status:'permanent_failure' → resultStatus PRESENTE", async () => {
+    const client = makeClient(
+      jsonInvoker([
+        {
+          id: RESERVATION_ID,
+          status: "failed",
+          is_new_reservation: false,
+          result_status: "permanent_failure",
+        },
+      ]),
+    );
+
+    const result = await reserveConversationHandoffExecution(client, RESERVE_PARAMS);
+
+    expect(result).toEqual({
+      id: RESERVATION_ID,
+      status: "failed",
+      isNewReservation: false,
+      resultStatus: "permanent_failure",
     });
   });
 });
@@ -246,7 +293,7 @@ describe("Bloco D — tipos", () => {
 
   it("15. assinatura de reserveConversationHandoffExecution aceita vehicleId: null", async () => {
     const { invoker, calls } = capturingInvoker([
-      { id: RESERVATION_ID, status: "reserved", is_new_reservation: true },
+      { id: RESERVATION_ID, status: "reserved", is_new_reservation: true, result_status: null },
     ]);
     const client = makeClient(invoker);
 
@@ -269,6 +316,15 @@ describe("Bloco E — pureza e ausência de escrita direta", () => {
     fileURLToPath(
       new URL(
         "../../../../../migrations/20260813130536_whatsapp_conversation_handoff_ledger.sql",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
+  );
+  const resultStatusMigrationSource = readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../../../../migrations/20260814022011_whatsapp_conversation_handoff_ledger_result_status_and_outbound_lookup.sql",
         import.meta.url,
       ),
     ),
@@ -315,5 +371,54 @@ describe("Bloco E — pureza e ausência de escrita direta", () => {
     expect(completeFunctionBody).toContain(
       "'success', 'blocked', 'transient_failure', 'permanent_failure'",
     );
+  });
+
+  it("21. migration nova faz DROP FUNCTION antes do CREATE de reserve_conversation_handoff_execution (mudança de assinatura)", () => {
+    expect(resultStatusMigrationSource).toContain(
+      "DROP FUNCTION IF EXISTS public.reserve_conversation_handoff_execution(uuid,text,uuid,uuid,uuid,integer);",
+    );
+    expect(resultStatusMigrationSource).toContain(
+      "RETURNS TABLE(id uuid, status text, is_new_reservation boolean, result_status text)",
+    );
+  });
+
+  it("22. migration nova reaplica REVOKE de reserve_conversation_handoff_execution depois do CREATE (o DROP derruba o REVOKE anterior)", () => {
+    const reserveFnMatch = resultStatusMigrationSource.match(
+      /CREATE OR REPLACE FUNCTION public\.reserve_conversation_handoff_execution[\s\S]*?\$fn\$;[\s\S]*?COMMENT ON FUNCTION public\.reserve_conversation_handoff_execution IS[\s\S]*?;/,
+    );
+    expect(reserveFnMatch).not.toBeNull();
+    const reserveFnBlock = reserveFnMatch?.[0] ?? "";
+    expect(reserveFnBlock).toContain(
+      "REVOKE EXECUTE ON FUNCTION public.reserve_conversation_handoff_execution FROM PUBLIC;",
+    );
+    expect(reserveFnBlock).toContain(
+      "REVOKE EXECUTE ON FUNCTION public.reserve_conversation_handoff_execution FROM anon, authenticated;",
+    );
+  });
+
+  it("23. os 3 RETURN QUERY SELECT de sweep/reabertura levam a 4ª coluna result_status com o valor correto em cada ramo", () => {
+    expect(resultStatusMigrationSource).toContain(
+      "RETURN QUERY SELECT v_new_id, 'reserved'::text, true, NULL::text;",
+    );
+    expect(resultStatusMigrationSource).toContain(
+      "RETURN QUERY SELECT v_existing.id, 'reserved'::text, true, NULL::text;",
+    );
+    expect(resultStatusMigrationSource).toContain(
+      "RETURN QUERY SELECT v_existing.id, 'failed'::text, false, 'transient_failure'::text;",
+    );
+    expect(resultStatusMigrationSource).toContain(
+      "RETURN QUERY SELECT v_existing.id, v_existing.status, false, v_existing.result_status;",
+    );
+  });
+
+  it("24. get_conversation_handoff_outbound_by_key existe na migration nova, LANGUAGE sql STABLE, sem nenhum INSERT/UPDATE/DELETE", () => {
+    const lookupFnMatch = resultStatusMigrationSource.match(
+      /CREATE OR REPLACE FUNCTION public\.get_conversation_handoff_outbound_by_key[\s\S]*?\$fn\$;/,
+    );
+    expect(lookupFnMatch).not.toBeNull();
+    const lookupFnBody = lookupFnMatch?.[0] ?? "";
+    expect(lookupFnBody).toContain("LANGUAGE sql");
+    expect(lookupFnBody).toContain("STABLE");
+    expect(lookupFnBody).not.toMatch(/INSERT INTO|UPDATE public\.|DELETE FROM/);
   });
 });
