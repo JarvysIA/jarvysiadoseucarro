@@ -196,6 +196,7 @@ type FakeOutboundRow = {
   id: string;
   messageId: string;
   textBody: string;
+  deliverable: boolean | undefined;
 };
 
 function strParam(params: Record<string, unknown>, key: string): string {
@@ -279,6 +280,7 @@ function makeFakeBackend(): {
           id: nextId("queue"),
           messageId: nextId("msg"),
           textBody: strParam(params, "p_text_body"),
+          deliverable: typeof params.p_deliverable === "boolean" ? params.p_deliverable : undefined,
         };
         outbound.set(key, row);
         return {
@@ -400,6 +402,9 @@ describe("Bloco A — curto-circuito (bloqueio de autorização)", () => {
     const [outboundRow] = [...backend.outbound.values()];
     expect(outboundRow?.textBody).toContain(`?ativar=${VEHICLE_ID}`);
     expect(outboundRow?.textBody).toBe(buildConversationHandoffActivationUpsellText(VEHICLE_ID));
+    // Achado crítico do C9: a única linha de um bloqueio é a resposta
+    // final ao usuário (chave ":final") — deliverable:true, nunca "internal".
+    expect(outboundRow?.deliverable).toBe(true);
   });
 
   it("2. authorized:false/authorization_required SEM suggestedVehicleId → texto contém link SEM ?ativar=", async () => {
@@ -512,12 +517,59 @@ describe("Bloco B — invoker guardado, caminho novo", () => {
     );
     expect(segmentEnqueue).toBeDefined();
     expect(segmentEnqueue?.params.p_text_body).toBe("Troque o óleo a cada 10 mil km.");
+    // Achado crítico do C9: a linha de SEGMENTO é uso interno (recuperação
+    // em replay) — NUNCA pode entrar como "queued", ou o sender real a
+    // reivindicaria e mandaria pro usuário. deliverable:false garante
+    // status inicial "internal" na RPC real.
+    expect(segmentEnqueue?.params.p_deliverable).toBe(false);
+
+    const finalKey = buildConversationHandoffFinalIdempotencyKey(SOURCE_MESSAGE_ID);
+    const finalEnqueue = spy.calls.find(
+      (c) =>
+        c.fn === "enqueue_conversation_handoff_outbound" && c.params.p_idempotency_key === finalKey,
+    );
+    expect(finalEnqueue).toBeDefined();
+    // A linha FINAL é a resposta de verdade ao usuário — deliverable:true
+    // garante status inicial "queued", a única que o sender real reivindica.
+    expect(finalEnqueue?.params.p_deliverable).toBe(true);
 
     const completeCalls = spy.calls.filter(
       (c) => c.fn === "complete_conversation_handoff_execution",
     );
     expect(completeCalls.length).toBe(1);
     expect(completeCalls[0]?.params.p_result_status).toBe("success");
+  });
+
+  it("7b. enqueue do SEGMENTO (interno) devolvendo invalid_deliverable_flag não muda o fluxo — mesma filosofia de qualquer enqueue de segmento falhando silenciosamente", async () => {
+    setDenoEnv({ LOVABLE_API_KEY: VALID_KEY });
+    const fetchMock = mockFetchSuccess("Troque o óleo a cada 10 mil km.");
+    const backend = makeFakeBackend();
+    // 1ª chamada de enqueue_conversation_handoff_outbound é sempre a do
+    // SEGMENTO (dentro de createLedgerGuardedInvoker, antes da chamada
+    // FINAL do entrypoint) — força só essa a devolver
+    // invalid_deliverable_flag, sem afetar a 2ª (final).
+    const rpcWithSegmentEnqueueRejected = withNthCallOverride(
+      backend.rpc,
+      "enqueue_conversation_handoff_outbound",
+      1,
+      () => ({ data: { result: "invalid_deliverable_flag" }, error: null }),
+    );
+    const client = makeClient(AUTHORIZED_ROWS, rpcWithSegmentEnqueueRejected);
+
+    const result = await executeConversationHandoffEntrypoint(
+      client,
+      executionCommand(primaryCommand(SOURCE_MESSAGE_ID, null)),
+    );
+
+    // Idêntico ao comportamento já existente quando o enqueue do texto
+    // cru falha por qualquer outro motivo (RPC error, exceção, etc.):
+    // o entrypoint.ts nunca checa o retorno dessa chamada específica
+    // (ver comentário em createLedgerGuardedInvoker: "Mesmo se o enqueue
+    // do texto cru falhar, ainda completamos o ledger com o status
+    // real") — o ciclo segue normalmente até primary_succeeded.
+    expect(result.outcome).toBe("primary_succeeded");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.outboundResult?.result).toBe("created");
   });
 
   it("8. resultado success → complete_ chamado com 'success'", async () => {

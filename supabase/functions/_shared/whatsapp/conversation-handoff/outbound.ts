@@ -35,7 +35,8 @@ export type ConversationHandoffOutboundRejectResult =
   | "contact_context_mismatch"
   | "contact_not_linked"
   | "vehicle_not_found"
-  | "idempotency_context_mismatch";
+  | "idempotency_context_mismatch"
+  | "invalid_deliverable_flag";
 
 export type ConversationHandoffOutboundResult =
   | Readonly<{
@@ -54,6 +55,7 @@ const REJECT_RESULTS: ReadonlySet<string> = new Set([
   "contact_not_linked",
   "vehicle_not_found",
   "idempotency_context_mismatch",
+  "invalid_deliverable_flag",
 ]);
 
 function isRejectResult(value: string): value is ConversationHandoffOutboundRejectResult {
@@ -95,6 +97,13 @@ export async function enqueueConversationHandoffOutbound(
     userId: string;
     vehicleId: string | null;
     textBody: string;
+    // Obrigatório, sem valor padrão: true = linha entregável (o sender
+    // real deve mandar pro usuário, status inicial "queued"); false =
+    // uso interno (recuperação de texto em replay, status inicial
+    // "internal" — nunca reivindicada por
+    // whatsapp-send-outbound/index.ts::claimBatch(), que só reivindica
+    // status="queued").
+    deliverable: boolean;
   }>,
 ): Promise<ConversationHandoffOutboundResult | null> {
   try {
@@ -104,6 +113,7 @@ export async function enqueueConversationHandoffOutbound(
       p_user_id: params.userId,
       p_vehicle_id: params.vehicleId,
       p_text_body: params.textBody,
+      p_deliverable: params.deliverable,
     });
     if (res.error) return null;
     return parseOutboundResult(res.data);

@@ -239,6 +239,11 @@ function createLedgerGuardedInvoker(
         userId: segmentCommand.userId,
         vehicleId: segmentCommand.vehicleId,
         textBody: validated.value.responseText,
+        // Uso interno (recuperação em replay via
+        // getConversationHandoffOutboundByKey) — NUNCA deve ser
+        // reivindicada/enviada pelo sender real como se fosse a
+        // resposta final ao usuário.
+        deliverable: false,
       });
       await completeConversationHandoffExecution(client, reservation.id, "success");
     } else {
@@ -318,6 +323,8 @@ export async function executeConversationHandoffEntrypoint(
       userId: validCommand.primary.userId,
       vehicleId: validCommand.primary.vehicleId,
       textBody: text,
+      // Resposta final ao usuário — o sender real deve entregar.
+      deliverable: true,
     });
 
     return { outcome, outboundResult };
@@ -335,6 +342,8 @@ export async function executeConversationHandoffEntrypoint(
     userId: validCommand.primary.userId,
     vehicleId: validCommand.primary.vehicleId,
     textBody: text,
+    // Resposta final ao usuário — o sender real deve entregar.
+    deliverable: true,
   });
 
   return { outcome, outboundResult };
