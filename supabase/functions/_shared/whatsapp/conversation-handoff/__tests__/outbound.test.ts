@@ -49,6 +49,7 @@ const BASE_PARAMS = {
   userId: "33333333-3333-3333-3333-333333333333",
   vehicleId: "44444444-4444-4444-4444-444444444444" as string | null,
   textBody: "Sua troca de óleo já passou do prazo recomendado.",
+  deliverable: true,
 };
 
 const MESSAGE_ID = "55555555-5555-5555-5555-555555555555";
@@ -251,6 +252,42 @@ describe("Bloco F — fail-closed em erro de RPC", () => {
     const result = await enqueueConversationHandoffOutbound(client, BASE_PARAMS);
 
     expect(result).toBeNull();
+  });
+});
+
+describe("Bloco J — deliverable (status internal vs queued)", () => {
+  it("36. deliverable:true → p_deliverable enviado como true na chamada da RPC", async () => {
+    const { invoker, calls } = capturingInvoker({
+      result: "created",
+      outbound_message_id: MESSAGE_ID,
+      outbound_queue_id: QUEUE_ID,
+    });
+    const client = makeClient(invoker);
+
+    await enqueueConversationHandoffOutbound(client, { ...BASE_PARAMS, deliverable: true });
+
+    expect(calls[0]?.params.p_deliverable).toBe(true);
+  });
+
+  it("37. deliverable:false → p_deliverable enviado como false na chamada da RPC", async () => {
+    const { invoker, calls } = capturingInvoker({
+      result: "created",
+      outbound_message_id: MESSAGE_ID,
+      outbound_queue_id: QUEUE_ID,
+    });
+    const client = makeClient(invoker);
+
+    await enqueueConversationHandoffOutbound(client, { ...BASE_PARAMS, deliverable: false });
+
+    expect(calls[0]?.params.p_deliverable).toBe(false);
+  });
+
+  it("38. resposta invalid_deliverable_flag é tratada como qualquer outra rejeição (fail-closed, sem vazar detalhe)", async () => {
+    const client = makeClient(jsonInvoker({ result: "invalid_deliverable_flag" }));
+
+    const result = await enqueueConversationHandoffOutbound(client, BASE_PARAMS);
+
+    expect(result).toEqual({ result: "invalid_deliverable_flag" });
   });
 });
 
