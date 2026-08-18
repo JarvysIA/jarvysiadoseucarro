@@ -392,7 +392,6 @@ describe("expense semantics adapter — conversation only", () => {
     "future_service",
     "quote",
     "technical_question",
-    "purchase_before_service",
   ] as const satisfies readonly ConversationOnlyExpenseSemantics["reason"][];
 
   for (const reason of reasons) {
@@ -665,7 +664,6 @@ describe("expense semantics adapter - precedencia semantica", () => {
     ["technical_question", operationalData({ humanDescription: "  " })],
     ["future_service", operationalData({ totalAmount: Number.NaN })],
     ["quote", operationalData({ km: 1.5 })],
-    ["purchase_before_service", operationalData({ vehicleId: "" })],
   ] as const satisfies readonly (readonly [
     ConversationOnlyExpenseSemantics["reason"],
     GuidedExpenseOperationalData,
