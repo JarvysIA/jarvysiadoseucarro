@@ -1080,6 +1080,76 @@ export type Database = {
           },
         ]
       }
+      whatsapp_conversation_handoff_ledger: {
+        Row: {
+          completed_at: string | null
+          contact_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          invoking_at: string | null
+          reserved_at: string
+          result_status: string | null
+          segment: string
+          source_message_id: string
+          status: string
+          user_id: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          contact_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          invoking_at?: string | null
+          reserved_at?: string
+          result_status?: string | null
+          segment: string
+          source_message_id: string
+          status?: string
+          user_id: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          contact_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invoking_at?: string | null
+          reserved_at?: string
+          result_status?: string | null
+          segment?: string
+          source_message_id?: string
+          status?: string
+          user_id?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversation_handoff_ledger_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_handoff_ledger_source_message_id_fkey"
+            columns: ["source_message_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversation_handoff_ledger_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversation_states: {
         Row: {
           active_vehicle_id: string | null
@@ -1804,6 +1874,10 @@ export type Database = {
           was_recovered: boolean
         }[]
       }
+      complete_conversation_handoff_execution: {
+        Args: { p_id: string; p_result_status: string }
+        Returns: boolean
+      }
       confirm_whatsapp_link_code: {
         Args: {
           p_code_hash_candidate: string
@@ -1848,6 +1922,17 @@ export type Database = {
           phone_e164: string
           result: string
         }[]
+      }
+      enqueue_conversation_handoff_outbound: {
+        Args: {
+          p_contact_id: string
+          p_deliverable: boolean
+          p_idempotency_key: string
+          p_text_body: string
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: Json
       }
       enqueue_whatsapp_km_prompt: {
         Args: {
@@ -1923,6 +2008,10 @@ export type Database = {
           expired_count: number
         }[]
       }
+      fail_conversation_handoff_execution: {
+        Args: { p_id: string; p_result_status: string }
+        Returns: boolean
+      }
       finalize_whatsapp_km_prompt_failed: {
         Args: {
           p_error_message: string
@@ -1936,6 +2025,14 @@ export type Database = {
         Returns: Json
       }
       gerar_codigo_indicacao: { Args: { _nome: string }; Returns: string }
+      get_conversation_handoff_outbound_by_key: {
+        Args: { p_idempotency_key: string }
+        Returns: {
+          outbound_message_id: string
+          outbound_queue_id: string
+          text_body: string
+        }[]
+      }
       get_indicacao_dias_bloqueio: { Args: never; Returns: number }
       get_indicacao_saque_minimo: { Args: never; Returns: number }
       get_indicacao_valor_comissao: { Args: never; Returns: number }
@@ -1953,6 +2050,10 @@ export type Database = {
           canceladas: number
           liberadas: number
         }[]
+      }
+      mark_conversation_handoff_invoking: {
+        Args: { p_id: string }
+        Returns: boolean
       }
       promote_whatsapp_km_prompt_request_to_pending: {
         Args: { p_prompt_message_id: string }
@@ -2000,6 +2101,22 @@ export type Database = {
           p_retry_kind: string
         }
         Returns: Json
+      }
+      reserve_conversation_handoff_execution: {
+        Args: {
+          p_contact_id: string
+          p_segment: string
+          p_source_message_id: string
+          p_ttl_seconds: number
+          p_user_id: string
+          p_vehicle_id: string
+        }
+        Returns: {
+          id: string
+          is_new_reservation: boolean
+          result_status: string
+          status: string
+        }[]
       }
       reserve_whatsapp_km_prompt_request: {
         Args: {
