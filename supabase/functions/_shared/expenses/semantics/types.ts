@@ -84,7 +84,7 @@ export type NeedsItemSpecification = Readonly<{
 export type ConversationOnlyExpenseSemantics = Readonly<{
   status: "conversation_only";
   persistable: false;
-  reason: "future_service" | "quote" | "technical_question" | "purchase_before_service";
+  reason: "future_service" | "quote" | "technical_question";
   decisionCode: "non_persistable_conversation";
 }>;
 
