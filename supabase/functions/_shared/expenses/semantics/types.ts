@@ -24,7 +24,7 @@ export type ExpenseSemanticInput = Readonly<{
   originalText: string;
   candidateCategory?: unknown;
   candidateItemKeys?: readonly unknown[];
-  explicitIntent?: ExplicitExpenseIntent;
+  explicitIntent?: ExplicitExpenseIntent | "ambiguous";
   knownFacts?: Readonly<Record<string, unknown>>;
 }>;
 

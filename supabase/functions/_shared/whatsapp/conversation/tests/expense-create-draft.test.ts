@@ -977,3 +977,149 @@ describe("awaiting_confirmation — campos aditivos (build 3/9 do item 6)", () =
     if (!r.ok) expect(r.code).toBe("unexpected_field");
   });
 });
+
+// ---------------------------------------------------------------------------
+// I2 — occurrenceKind (opcional, sem default implícito) nas 4 fases:
+// awaiting_category, awaiting_vehicle, awaiting_confirmation,
+// awaiting_item_specification. Só aceita/preserva o campo — popular de fato
+// (I4) e propagar entre fases ponta a ponta (também I4) não é escopo deste
+// build; ver comentário em expense-create-draft.ts.
+// ---------------------------------------------------------------------------
+
+describe("occurrenceKind — awaiting_category (I2)", () => {
+  it("aceita occurrenceKind='request_quote'", () => {
+    const r = validateAwaitingCategoryExpenseDraft({
+      phase: "awaiting_category",
+      valor: 100,
+      requestMessageId: UUID_A,
+      occurrenceKind: "request_quote",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("request_quote");
+  });
+
+  it("aceita ausência de occurrenceKind (opcional de verdade)", () => {
+    const r = validateAwaitingCategoryExpenseDraft({
+      phase: "awaiting_category",
+      valor: 100,
+      requestMessageId: UUID_A,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("occurrenceKind" in r.value).toBe(false);
+  });
+
+  it("rejeita occurrenceKind com valor fora dos 5 válidos", () => {
+    const r = validateAwaitingCategoryExpenseDraft({
+      phase: "awaiting_category",
+      valor: 100,
+      requestMessageId: UUID_A,
+      occurrenceKind: "bogus_kind",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_occurrence_kind");
+  });
+});
+
+describe("occurrenceKind — awaiting_vehicle (I2)", () => {
+  it("aceita occurrenceKind='discuss_future_service'", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      occurrenceKind: "discuss_future_service",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("discuss_future_service");
+  });
+
+  it("aceita ausência de occurrenceKind (opcional de verdade)", () => {
+    const r = validateAwaitingVehicleExpenseDraft(vehicleBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("occurrenceKind" in r.value).toBe(false);
+  });
+
+  it("rejeita occurrenceKind com valor fora dos 5 válidos", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      occurrenceKind: "bogus_kind",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_occurrence_kind");
+  });
+});
+
+describe("occurrenceKind — awaiting_confirmation (I2)", () => {
+  it("aceita occurrenceKind='ambiguous'", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      occurrenceKind: "ambiguous",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("ambiguous");
+  });
+
+  it("aceita ausência de occurrenceKind (opcional de verdade)", () => {
+    const r = validateAwaitingConfirmationExpenseDraft(confirmationBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("occurrenceKind" in r.value).toBe(false);
+  });
+
+  it("rejeita occurrenceKind com valor fora dos 5 válidos", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      occurrenceKind: "bogus_kind",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_occurrence_kind");
+  });
+});
+
+describe("occurrenceKind — awaiting_item_specification (I2)", () => {
+  it("aceita occurrenceKind='record_completed_expense'", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      occurrenceKind: "record_completed_expense",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("record_completed_expense");
+  });
+
+  it("aceita ausência de occurrenceKind (opcional de verdade)", () => {
+    const r = validateAwaitingItemSpecificationDraft(itemSpecificationBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("occurrenceKind" in r.value).toBe(false);
+  });
+
+  it("rejeita occurrenceKind com valor fora dos 5 válidos", () => {
+    const r = validateAwaitingItemSpecificationDraft({
+      ...itemSpecificationBase(),
+      occurrenceKind: "bogus_kind",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_occurrence_kind");
+  });
+});
+
+describe("occurrenceKind — preservação isolada entre fases (I2; ponta a ponta via core.ts é I4)", () => {
+  it("candidate de awaiting_confirmation copiando occurrenceKind de uma fase anterior (awaiting_vehicle) é aceito e preserva o valor exato", () => {
+    const previousPhase = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      occurrenceKind: "ask_question",
+    });
+    expect(previousPhase.ok).toBe(true);
+    if (!previousPhase.ok) return;
+
+    // Simula o que um ponto de construção em core.ts (fora de escopo deste
+    // build) faria no I4: copiar occurrenceKind da fase anterior pro
+    // candidate da próxima fase.
+    const nextCandidate = {
+      phase: "awaiting_confirmation" as const,
+      categoria: previousPhase.value.categoria,
+      valor: previousPhase.value.valor,
+      vehicleId: UUID_V,
+      requestMessageId: previousPhase.value.requestMessageId,
+      occurrenceKind: previousPhase.value.occurrenceKind,
+    };
+    const r = validateAwaitingConfirmationExpenseDraft(nextCandidate);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("ask_question");
+  });
+});

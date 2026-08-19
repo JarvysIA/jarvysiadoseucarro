@@ -861,7 +861,7 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       currentDraft.ok &&
       typeof input.originalText === "string"
     ) {
-      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      const semanticResult = recognizeExpenseSemantics({ originalText: input.originalText });
       switch (semanticResult.status) {
         case "resolved": {
           const conceptualCategory = semanticResult.conceptualCategory;
@@ -1453,7 +1453,7 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
   ) {
     const currentDraft = validateAwaitingConfirmationExpenseDraft(effectiveState.draftPayload);
     if (currentDraft.ok) {
-      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      const semanticResult = recognizeExpenseSemantics({ originalText: input.originalText });
       switch (semanticResult.status) {
         case "resolved": {
           const conceptualCategory = semanticResult.conceptualCategory;
@@ -1634,7 +1634,7 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       // aqui: qualquer sinal de categoria, incluindo needs_clarification e
       // needs_item_specification, já justifica tentar a reinterpretação —
       // não precisa ser uma resolução completa (status "resolved").
-      const categoriaHint = recognizeExpenseSemantics(input.originalText);
+      const categoriaHint = recognizeExpenseSemantics({ originalText: input.originalText });
       if (
         categoriaHint.status !== "unsupported" &&
         !looksLikeMaintenanceMilestoneReference(input.originalText)
@@ -1670,7 +1670,7 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       // Para qualquer outro status (resolved, needs_clarification,
       // conversation_only, unsupported) o fluxo abaixo é idêntico ao de
       // antes desta mudança — matchExpenseCategoria decide normalmente.
-      const semanticResult = recognizeExpenseSemantics(input.originalText);
+      const semanticResult = recognizeExpenseSemantics({ originalText: input.originalText });
       if (semanticResult.status === "needs_item_specification") {
         const candidate = {
           phase: "awaiting_item_specification" as const,
