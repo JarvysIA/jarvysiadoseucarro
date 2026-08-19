@@ -1,47 +1,53 @@
-# Recuperar o acesso da conta admin adm.fernando@yahoo.com
+# Recuperar o acesso da conta admin adm.fernando@yahoo.com — via link por e-mail
 
-## O que eu já verifiquei (agora, no ambiente real)
+## Diagnóstico já confirmado
 
-- **O preview está funcionando.** Abri `/` e `/login` no navegador: as duas páginas
-  renderizam normalmente, sem erro de JavaScript. O erro de "variáveis do backend
-  ausentes" que apareceu era antigo — as variáveis foram recarregadas e estão presentes.
-- **A conta existe e está saudável**: e-mail confirmado, sem banimento, sem exclusão,
-  com senha definida, último acesso em 10/07/2026. O perfil tem `is_super_admin = true`,
-  então o Painel Master continua liberado assim que você entrar.
-- **O único provedor vinculado é e-mail/senha.** Não existe identidade Google nem Apple
-  ligada a essa conta.
-- **A causa está confirmada**: enviei uma tentativa de login pela própria tela e o backend
-  respondeu `400 Invalid login credentials`. Ou seja, o fluxo funciona — o que não bate é
-  a senha. Se você estiver clicando em "Continuar com Google/Apple", o segundo motivo
-  possível é a conta não ter essa identidade vinculada.
+- **O preview está funcionando.** `/` e `/login` renderizam normalmente; o erro antigo de
+  variáveis do backend não se reproduz mais (as variáveis estão presentes).
+- **A conta existe e está saudável**: e-mail confirmado, sem banimento, senha definida,
+  último acesso em 10/07/2026, `is_super_admin = true` no perfil.
+- **Único provedor vinculado é e-mail/senha** — não há identidade Google nem Apple.
+- **Causa**: uma tentativa de login pela própria tela retornou `400 Invalid login
+  credentials`. O fluxo funciona; a senha é que não bate.
+- A tela "Esqueci minha senha" já existe e chama a recuperação apontando para
+  `/reset-password`, que também já existe. Nenhum código novo é necessário para o fluxo.
 
-## Plano
+## Plano (caminho escolhido: link por e-mail)
 
-1. **Redefinição de senha por e-mail (caminho padrão, sem tocar em código)**
-   Usar a tela "Esqueci minha senha" que já existe no app. Ela envia o link para
-   adm.fernando@yahoo.com e leva para `/reset-password`, onde você define a nova senha.
-   Antes disso, confirmo que o envio de e-mail de recuperação está ativo no backend.
+1. **Verificar o envio de e-mails de autenticação do projeto**
+   Checar se o domínio de e-mail e o envio de mensagens de autenticação estão ativos e se
+   o limite horário de envio não está estourado (esse limite devolve erro 429 e faz o
+   "Enviar link" parecer que não fez nada). Se estiver baixo, ajustar para um valor
+   compatível com o uso real.
 
-2. **Se o e-mail não chegar (Yahoo costuma filtrar)**
-   Defino uma senha nova diretamente na conta admin, via operação administrativa no
-   backend, e você troca depois de entrar. Preciso apenas que você me diga a senha
-   desejada (ou eu gero uma provisória forte e te passo).
+2. **Disparar a recuperação para adm.fernando@yahoo.com**
+   Enviar o link de redefinição pela tela `/forgot-password` do próprio app, para exercitar
+   exatamente o caminho que você usaria.
 
-3. **Verificação final**
-   Faço o login de teste no preview com a nova senha e confirmo três coisas: entra na
-   `/app`, o `is_super_admin` é reconhecido e a rota `/master-admin` abre.
+3. **Confirmar a saída do e-mail**
+   Verificar nos registros de envio do backend se a mensagem saiu com sucesso para o
+   endereço. Se sair com erro, eu te reporto o motivo exato em vez de deixar você esperando
+   na caixa de entrada.
+
+4. **Você define a nova senha**
+   Ao clicar no link, você cai em `/reset-password` e escolhe a senha nova.
+
+5. **Verificação final**
+   Após você confirmar a troca, faço um login de teste no preview e confirmo três coisas:
+   entra na `/app`, o `is_super_admin` é reconhecido e `/master-admin` abre.
+
+## Plano B, se o e-mail não chegar
+
+Yahoo filtra bastante. Se o passo 3 mostrar envio bem-sucedido e nada chegar em ~10
+minutos (incluindo spam), eu defino uma senha provisória forte diretamente na conta e te
+passo, para você trocar depois de entrar.
 
 ## Observações técnicas
 
-- Nenhuma alteração de schema, RLS ou código de aplicação é necessária: o defeito não
-  está no app.
-- Vincular Google a essa conta não é o caminho recomendado agora — o Supabase só liga a
-  identidade social automaticamente em condições específicas, e mexer nisso durante a
-  recuperação pode gerar conta duplicada com o mesmo e-mail.
-- Se quiser, depois da recuperação eu incluo um aviso mais claro na tela de login para
-  "Invalid login credentials" (hoje a mensagem crua do backend aparece em inglês).
-
-## Decisão que preciso de você
-
-Prefere o **caminho 1** (link por e-mail) ou o **caminho 2** (eu já defino uma senha
-provisória)? Se não responder, sigo pelo caminho 1 e, se o e-mail não chegar, passo ao 2.
+- Nenhuma alteração de schema, RLS ou lógica de aplicação é necessária: o defeito não está
+  no app.
+- Não vou vincular Google/Apple a essa conta durante a recuperação — isso pode gerar conta
+  duplicada com o mesmo e-mail.
+- Melhoria opcional, para depois: hoje a tela de login mostra a mensagem crua do backend
+  em inglês ("Invalid login credentials"). Posso traduzir para algo como "E-mail ou senha
+  incorretos" se você quiser.
