@@ -1,6 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { isDeterministicRevisionItem } from "../../../../../../src/lib/maintenance-jarvys-schedule-rules.ts";
 import { recognizeExpenseSemantics } from "../expense-category-recognizer.ts";
+import * as nonEngineHeuristicClassifierModule from "../non-engine-heuristic-classifier.ts";
 
 describe("expense category recognizer — conceito de motor único", () => {
   it("reconhece 'troquei o oleo' como resolved, Revisão, itemKeys ['oleo_motor']", () => {
@@ -350,4 +351,67 @@ describe("I2 — curto-circuito por explicitIntent", () => {
       }
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// I3 — resolução de prioridade explícita (substitui o atalho motor-sempre-
+// vence). Ver expense-category-recognizer.ts para a prova matemática de
+// equivalência. Os describes acima (não tocados nesta build) já são, por si
+// só, o teste de equivalência mais forte: mesmos textos, mesmos resultados
+// esperados, implementação por trás totalmente trocada.
+// ---------------------------------------------------------------------------
+
+describe("I3 — motor + cada uma das 7 categorias não-motor na mesma mensagem: motor sempre vence, itemKeys só do motor", () => {
+  it.each([
+    ["Manutenção", "troquei o oleo e a bateria"],
+    ["Lavagem", "troquei o oleo e fiz lavagem"],
+    ["Combustível", "troquei o oleo e abasteci gasolina"],
+    ["IPVA", "troquei o oleo e paguei o ipva"],
+    ["Multas", "troquei o oleo e paguei uma multa"],
+    ["Seguro", "troquei o oleo e paguei o seguro"],
+    ["Acessórios", "troquei o oleo e o som automotivo"],
+  ])(
+    "motor + %s (%p) → resolved, Revisão, itemKeys só do motor",
+    (_category: string, text: string) => {
+      const result = recognizeExpenseSemantics({ originalText: text });
+      expect(result.status).toBe("resolved");
+      if (result.status === "resolved") {
+        expect(result.conceptualCategory).toBe("Revisão");
+        expect(result.itemKeys).toEqual(["oleo_motor"]);
+        expect(result.decisionCode).toBe("completed_deterministic_revision_item");
+      }
+    },
+  );
+});
+
+describe("I3 — ambiguidade não-motor concorrente com motor: motor vence, ambiguidade descartada silenciosamente", () => {
+  it("'troquei o oleo e o farol' → resolved/Revisão via motor, nunca needs_clarification (farol seria ambíguo sozinho)", () => {
+    // Controle: 'farol' sozinho, sem motor, é needs_clarification (já coberto
+    // acima em "termo não-motor ambíguo"). Combinado com motor no mesmo
+    // texto, o voto de motor (Revisão, maior prioridade) precisa vencer, e a
+    // ambiguidade do lado não-motor precisa ser descartada sem vazar.
+    const result = recognizeExpenseSemantics({ originalText: "troquei o oleo e o farol" });
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.conceptualCategory).toBe("Revisão");
+      expect(result.itemKeys).toEqual(["oleo_motor"]);
+    }
+  });
+});
+
+describe("I3 — prova estrutural: classifyNonEngineExpense é sempre chamada, mesmo com engineConcepts não-vazio", () => {
+  afterEach(() => {
+    mock.restore();
+  });
+
+  it("conta 1 chamada a classifyNonEngineExpense mesmo quando o motor já reconheceu algo", () => {
+    const spy = spyOn(nonEngineHeuristicClassifierModule, "classifyNonEngineExpense");
+    const result = recognizeExpenseSemantics({ originalText: "troquei o oleo" });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith("troquei o oleo");
+    // A chamada não é só cosmética: o resultado real continua correto (o
+    // spy, sem mockImplementation, deixa a implementação real rodar).
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") expect(result.conceptualCategory).toBe("Revisão");
+  });
 });
