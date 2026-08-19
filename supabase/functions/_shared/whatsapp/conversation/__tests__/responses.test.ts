@@ -174,4 +174,29 @@ describe("renderResponse guardrails", () => {
     expect(msg.length).toBeGreaterThan(0);
     expect(msg).toContain("?");
   });
+
+  // I4a — textos fixos, sem interpolação (comparação de string completa).
+  test("expense_quote_acknowledged uses the exact approved text", () => {
+    expect(renderResponse("expense_quote_acknowledged", {})).toBe(
+      "Entendi, é uma pergunta de valor! Ainda não tenho essa informação pra te passar por aqui, mas assim que você fizer o serviço, é só me contar quanto ficou que eu registro 😉",
+    );
+  });
+
+  test("expense_future_service_acknowledged uses the exact approved text", () => {
+    expect(renderResponse("expense_future_service_acknowledged", {})).toBe(
+      "Entendi, você ainda vai fazer isso! Quando for concluído, me conta que eu registro certinho.",
+    );
+  });
+
+  test("expense_technical_question_acknowledged uses the exact approved text", () => {
+    expect(renderResponse("expense_technical_question_acknowledged", {})).toBe(
+      "Essa é uma pergunta técnica — ainda não consigo responder isso por aqui, mas em breve vou conseguir te ajudar com esse tipo de dúvida também.",
+    );
+  });
+
+  test("expense_occurrence_clarification uses the exact approved text", () => {
+    expect(renderResponse("expense_occurrence_clarification", {})).toBe(
+      "Isso já aconteceu (você já pagou/fez) ou é algo que ainda vai rolar?",
+    );
+  });
 });

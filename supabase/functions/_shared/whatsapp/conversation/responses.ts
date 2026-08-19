@@ -138,6 +138,14 @@ export function renderResponse(
       return "Sem problema! Quando souber a km, é só me contar 😉";
     case "media_unclear_during_confirmation":
       return "Recebi algo que ainda não consigo entender. Pode descrever em texto, ou só confirmar com 'sim' ou 'não'?";
+    case "expense_quote_acknowledged":
+      return "Entendi, é uma pergunta de valor! Ainda não tenho essa informação pra te passar por aqui, mas assim que você fizer o serviço, é só me contar quanto ficou que eu registro 😉";
+    case "expense_future_service_acknowledged":
+      return "Entendi, você ainda vai fazer isso! Quando for concluído, me conta que eu registro certinho.";
+    case "expense_technical_question_acknowledged":
+      return "Essa é uma pergunta técnica — ainda não consigo responder isso por aqui, mas em breve vou conseguir te ajudar com esse tipo de dúvida também.";
+    case "expense_occurrence_clarification":
+      return "Isso já aconteceu (você já pagou/fez) ou é algo que ainda vai rolar?";
   }
 }
 

@@ -46,6 +46,7 @@ import {
 } from "./expense-create-protocol.ts";
 import { recognizeExpenseSemantics } from "../../expenses/semantics/expense-category-recognizer.ts";
 import { recognizeEngineConcepts } from "../../expenses/semantics/engine-concept-recognizer.ts";
+import { recognizeExpenseIntent } from "../../expenses/semantics/expense-intent-recognizer.ts";
 
 function isEligibleKmConfirmationState(state: ConversationState): boolean {
   if (state.state !== "awaiting_km_confirmation" && state.state !== "awaiting_km_correction")
@@ -1646,6 +1647,57 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
       }
     }
     if (parsedValor.ok) {
+      // I4a — curto-circuito por intenção explícita, logo que um valor
+      // numérico é confirmado. Só os 3 sinais CONFIANTES de não-conclusão
+      // (orçamento/futuro/pergunta técnica) desviam do fluxo normal —
+      // "ambiguous" é tratado igual a "record_completed_expense" aqui
+      // dentro do T1: a própria presença de um valor numérico (condição de
+      // entrada deste bloco) já é evidência estrutural suficiente de
+      // despesa, mesmo sem verbo de conclusão explícito (ex.: "gasolina
+      // 80", "coxim do motor 30" — nenhum dos dois tem verbo, e os dois
+      // sempre foram despesas válidas). "ambiguous" só passa a significar
+      // algo diferente no I4b (mensagens SEM valor numérico, onde não há
+      // essa evidência estrutural). expense_occurrence_clarification
+      // (response key já criada e testada) fica SEM USO neste build —
+      // reservada para o I4b.
+      const expenseIntent = recognizeExpenseIntent(input.originalText);
+      if (
+        expenseIntent === "request_quote" ||
+        expenseIntent === "discuss_future_service" ||
+        expenseIntent === "ask_question"
+      ) {
+        const responseKeyByIntent: Record<
+          "request_quote" | "discuss_future_service" | "ask_question",
+          ConversationResponseKey
+        > = {
+          request_quote: "expense_quote_acknowledged",
+          discuss_future_service: "expense_future_service_acknowledged",
+          ask_question: "expense_technical_question_acknowledged",
+        };
+        const reasonCodeByIntent: Record<
+          "request_quote" | "discuss_future_service" | "ask_question",
+          string
+        > = {
+          request_quote: "expense_reported_quote_acknowledged",
+          discuss_future_service: "expense_reported_future_service_acknowledged",
+          ask_question: "expense_reported_technical_question_acknowledged",
+        };
+        return buildDecision({
+          eventKind: EXPENSE_REPORTED_EVENT_KIND,
+          decisionKind: "respond",
+          previousState,
+          nextState: "idle",
+          outcome: expiredOutcome,
+          statePatch: withLastMessage(basePatch, input.sourceMessageId),
+          responseKey: responseKeyByIntent[expenseIntent],
+          nextFallbackCount: 0,
+          reasonCode: reasonCodeByIntent[expenseIntent],
+        });
+      }
+
+      // expenseIntent === "record_completed_expense" OU "ambiguous": segue
+      // EXATAMENTE o comportamento já existente antes deste build, sem
+      // nenhuma mudança de lógica de Passo D-1/D-2 abaixo.
       const pool = firstEligible(input.vehicles);
       if (pool.length === 0) {
         return buildDecision({
