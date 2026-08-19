@@ -552,6 +552,117 @@ describe("T1 despesa — correção de categoria via recognizeExpenseSemantics (
 // E) Regressão / interações
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// F) I4a — curto-circuito por intenção explícita (só os 3 sinais confiantes
+// de não-conclusão: orçamento/futuro/pergunta técnica). "ambiguous" é
+// tratado igual a "record_completed_expense" dentro do T1 — a presença de
+// valor numérico já é evidência estrutural suficiente. Nenhum draft de
+// despesa é criado nos 3 casos novos, volta pro estado idle,
+// nextFallbackCount 0.
+// ---------------------------------------------------------------------------
+
+describe("T1 despesa — I4a curto-circuito por intenção (quote/futuro/pergunta)", () => {
+  test("valor + orçamento ('quanto custa...') → respond, expense_quote_acknowledged, idle", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "quanto custa trocar o oleo, uns 200 reais?",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_quote_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  test("valor + intenção futura ('vou trocar...') → respond, expense_future_service_acknowledged, idle", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "vou trocar o oleo, acho que uns 200 reais",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_future_service_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  test("valor + pergunta técnica ('sera que...') → respond, expense_technical_question_acknowledged, idle", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "sera que 200 reais e caro pra trocar o oleo?",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_technical_question_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  // REGRESSÃO CRÍTICA — os 2 textos que quebraram na tentativa anterior
+  // deste build (bare "categoria + valor", sem verbo, sempre classificados
+  // "ambiguous" pelo I1): precisam continuar EXATAMENTE como já testado em
+  // "T1 despesa — draft direto em idle" (describe A, acima, não tocado).
+  test("REGRESSÃO: 'gasolina R$ 80' (ambiguous no I1, sem verbo) → draft criado normalmente, comportamento idêntico ao já testado", () => {
+    const d = decideConversation(inp({ originalText: "gasolina R$ 80", vehicles: [veh(VEH_1)] }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.statePatch.draftType).toBe("expense");
+    expect(d.responseParams.valor).toBe(80);
+    expect(d.responseParams.categoria).toBe("Combustível");
+  });
+
+  test("REGRESSÃO: 'coxim do motor 30,00' (ambiguous no I1, categoria não reconhecida) → awaiting_expense_category, comportamento idêntico ao já testado", () => {
+    const d = decideConversation(
+      inp({ originalText: "coxim do motor 30,00", vehicles: [veh(VEH_1)] }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.nextState).toBe("awaiting_expense_category");
+    expect(d.responseKey).toBe("expense_category_prompt");
+    expect(d.statePatch.draftType).toBe("expense");
+    expect(d.responseParams.valor).toBe(30);
+  });
+
+  // Ambiguous com categoria reconhecível ("farol" é ambíguo entre
+  // Manutenção/Acessórios no não-motor) — segue o fluxo normal de despesa,
+  // NUNCA produz expense_occurrence_clarification (reservada pro I4b).
+  test("valor + ambiguous com categoria reconhecível ('farol 50') → segue fluxo normal de despesa, não expense_occurrence_clarification", () => {
+    const d = decideConversation(inp({ originalText: "farol 50", vehicles: [veh(VEH_1)] }));
+    expect(d.responseKey).not.toBe("expense_occurrence_clarification");
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+  });
+
+  // Caso de borda: o texto TAMBÉM reconheceria um conceito de motor
+  // ("óleo"), mas a intenção é orçamento — orçamento vence, nenhum draft é
+  // criado, mesmo "óleo" sendo reconhecível.
+  test("BORDA: valor + orçamento sobre item de motor reconhecível ('quanto custa trocar o óleo...') → orçamento vence, sem draft", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "quanto custa trocar o oleo, acho que uns 150 reais?",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_quote_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+});
+
 describe("T1 despesa — regressões", () => {
   test("KM continua com prioridade: 'km atual 45000 km' → fluxo KM, não expense", () => {
     const d = decideConversation(

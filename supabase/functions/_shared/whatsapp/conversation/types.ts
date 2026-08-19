@@ -189,7 +189,11 @@ export type ConversationResponseKey =
   | "expense_create_completed_with_km_prompt"
   | "expense_create_retry_needed"
   | "requested_km_unknown"
-  | "media_unclear_during_confirmation";
+  | "media_unclear_during_confirmation"
+  | "expense_quote_acknowledged"
+  | "expense_future_service_acknowledged"
+  | "expense_technical_question_acknowledged"
+  | "expense_occurrence_clarification";
 
 export type ConversationResponseParams = {
   vehicleLabel?: string;
