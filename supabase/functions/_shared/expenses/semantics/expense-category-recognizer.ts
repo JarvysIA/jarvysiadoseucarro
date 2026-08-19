@@ -7,6 +7,7 @@ import {
 import { findExpenseSemanticConcept, type ExpenseSemanticConceptKey } from "./registry.ts";
 import { normalizeExpenseSemanticText } from "./normalization.ts";
 import type {
+  ExpenseSemanticCategory,
   ExpenseSemanticFacts,
   ExpenseSemanticInput,
   ExpenseSemanticItemKey,
@@ -72,7 +73,51 @@ import type {
  * adapter (expense-semantics-to-guided-contract.ts) não sabia interpretar o
  * reason "category_ambiguous_non_engine" até o PR #16 (commit f5822a4), que
  * corrigiu isso.
+ *
+ * I3 — até este build, "motor reconhecido → Revisão direto" era um ATALHO:
+ * quando engineConcepts não vinha vazio, classifyNonEngineExpense nunca era
+ * sequer chamada, e o resultado não-motor (se existisse) era descartado sem
+ * checagem. Isso funcionava por uma coincidência matemática, não por
+ * desenho: os 15 conceitos que recognizeEngineConcepts pode devolver têm
+ * TODOS defaultCategory "Revisão" no registry (registry.ts), e Revisão é
+ * sempre a categoria de maior prioridade entre as 8 — logo "motor
+ * reconhecido → Revisão" e "motor reconhecido → resolver prioridade entre
+ * motor e não-motor, e Revisão sempre vence" produzem exatamente o mesmo
+ * resultado observável. Este build substitui o atalho por uma resolução de
+ * prioridade EXPLÍCITA (CATEGORY_PRIORITY_ORDER, abaixo): as duas fontes
+ * (engine e non-engine) são sempre calculadas, cada uma vira um "voto" de
+ * categoria se resolver, e o voto de categoria mais prioritária ganha. O
+ * resultado observável não muda (provado por teste de equivalência
+ * exaustivo) — o que muda é que a garantia deixa de depender de uma
+ * coincidência do registry (que poderia silenciosamente deixar de valer se
+ * um conceito de motor futuro ganhasse defaultCategory diferente de
+ * "Revisão") e passa a ser uma invariante explícita e testável. NÃO
+ * reverter isso pra um atalho "motor sempre vence sozinho" sem entender por
+ * que a forma explícita foi escolhida.
  */
+
+// I3 — ordem de prioridade entre categorias quando mais de um lado
+// (motor/não-motor) reconhece algo na mesma mensagem. Nenhuma constante
+// equivalente já existia no repo (checkpoint deste build) — as únicas
+// ocorrências encontradas eram a enumeração EXPENSE_SEMANTIC_CATEGORIES
+// (ordem de DECLARAÇÃO, não de prioridade) replicada em módulos não
+// relacionados (OCR de recibo, migrations SQL). Local a este arquivo,
+// deliberadamente não exportada — nenhum outro módulo precisa dela hoje.
+const CATEGORY_PRIORITY_ORDER: readonly ExpenseSemanticCategory[] = [
+  "Revisão",
+  "Manutenção",
+  "Acessórios",
+  "Combustível",
+  "Multas",
+  "IPVA",
+  "Seguro",
+  "Lavagem",
+];
+
+type CategoryVote = Readonly<{
+  category: ExpenseSemanticCategory;
+  source: "engine" | "non_engine";
+}>;
 
 function toRecognizedAutomotiveConcepts(
   conceptKeys: readonly ExpenseSemanticConceptKey[],
@@ -231,7 +276,13 @@ export function recognizeExpenseSemantics(input: ExpenseSemanticInput): ExpenseS
     };
   }
 
+  // I3 — as duas fontes SEMPRE são calculadas, incondicionalmente (nunca uma
+  // dependendo da outra ter ou não reconhecido algo). Ver comentário de
+  // cabeçalho do arquivo para a prova de equivalência com o atalho antigo.
   const engineConcepts = recognizeEngineConcepts(originalText);
+  const nonEngineResult = classifyNonEngineExpense(originalText);
+
+  const votes: CategoryVote[] = [];
 
   if (engineConcepts.length > 0) {
     const categoryResolution = resolveCategoryForConcepts(
@@ -243,6 +294,8 @@ export function recognizeExpenseSemantics(input: ExpenseSemanticInput): ExpenseS
       // no registry (a regra 1 da cascata sempre vence sozinha). Mantido como
       // fail-closed caso o registry ganhe, no futuro, um conceito de motor com
       // defaultCategory divergente sem que este orquestrador seja revisado junto.
+      // Fail-closed imediato, fora do sistema de votos — um conflito interno
+      // do lado motor não deve ser mascarado por um resultado não-motor.
       return {
         status: "unsupported",
         persistable: false,
@@ -250,26 +303,33 @@ export function recognizeExpenseSemantics(input: ExpenseSemanticInput): ExpenseS
         decisionCode: "fail_closed",
       };
     }
-    return {
-      status: "resolved",
-      persistable: true,
-      conceptualCategory: categoryResolution.category,
-      itemKeys: collectItemKeys(engineConcepts),
-      facts: {
-        serviceCompleted: true,
-        recognizedSystems: buildEngineRecognizedSystems(engineConcepts),
-      },
-      decisionCode: "completed_deterministic_revision_item",
-    };
+    votes.push({ category: categoryResolution.category, source: "engine" });
   }
 
-  const nonEngineResult = classifyNonEngineExpense(originalText);
-
   if (nonEngineResult.status === "resolved") {
+    votes.push({ category: nonEngineResult.category, source: "non_engine" });
+  }
+
+  for (const category of CATEGORY_PRIORITY_ORDER) {
+    const winner = votes.find((vote) => vote.category === category);
+    if (winner === undefined) continue;
+    if (winner.source === "engine") {
+      return {
+        status: "resolved",
+        persistable: true,
+        conceptualCategory: category,
+        itemKeys: collectItemKeys(engineConcepts),
+        facts: {
+          serviceCompleted: true,
+          recognizedSystems: buildEngineRecognizedSystems(engineConcepts),
+        },
+        decisionCode: "completed_deterministic_revision_item",
+      };
+    }
     return {
       status: "resolved",
       persistable: true,
-      conceptualCategory: nonEngineResult.category,
+      conceptualCategory: category,
       itemKeys: [],
       facts: {
         serviceCompleted: true,
@@ -279,6 +339,8 @@ export function recognizeExpenseSemantics(input: ExpenseSemanticInput): ExpenseS
     };
   }
 
+  // Nenhum voto "resolved" de nenhum dos dois lados — fallback IDÊNTICO ao
+  // já existente antes deste build.
   if (nonEngineResult.status === "ambiguous") {
     return {
       status: "needs_clarification",
