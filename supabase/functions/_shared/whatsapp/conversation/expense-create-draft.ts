@@ -6,6 +6,16 @@ import {
   type MaintenanceItemKey,
   type MaintenanceTriggerTag,
 } from "./expense-maintenance-items-parser.ts";
+import type { ExplicitExpenseIntent } from "../../expenses/semantics/types.ts";
+
+// I2 — occurrenceKind usa o mesmo union inline de
+// ExpenseSemanticInput.explicitIntent (expenses/semantics/types.ts),
+// deliberadamente SEM tipo nomeado novo: o resultado de
+// recognizeExpenseIntent (expense-intent-recognizer.ts) encaixa direto onde
+// esse campo aparece, sem cast e sem import cruzado adicional. Preservação
+// ponta a ponta entre fases (copiar o valor de uma fase pra próxima) é
+// trabalho do I4 — este build só garante que cada validador abaixo aceita e
+// preserva o campo quando presente no candidate que já vier montado.
 
 export const EXPENSE_CREATE_INITIAL_DRAFT_VERSION = 0 as const;
 export const EXPENSE_CREATE_PROMOTED_ONCE_VERSION = 1 as const;
@@ -36,6 +46,10 @@ export type AwaitingCategoryExpenseDraft = {
   readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   readonly descricaoPreliminar?: string | null;
   readonly ambiguousFilterMention?: boolean;
+  // I2 — opcional de verdade (sem default implícito). Produzido por
+  // recognizeExpenseIntent numa camada anterior; este build só aceita e
+  // preserva o campo quando presente, ainda não o popula (isso é o I4).
+  readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
 };
 
 export type AwaitingVehicleExpenseDraft = {
@@ -52,6 +66,8 @@ export type AwaitingVehicleExpenseDraft = {
   // Build 4c/9 do item 6 — carregado ao longo do fluxo pra a resposta final
   // poder perguntar "qual filtro?" quando aplicável.
   readonly ambiguousFilterMention?: boolean;
+  // I2 — ver comentário em AwaitingCategoryExpenseDraft.
+  readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
 };
 
 export type AwaitingConfirmationExpenseDraft = {
@@ -65,6 +81,8 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly descricao?: string | null;
   // Build 4c/9 do item 6.
   readonly ambiguousFilterMention?: boolean;
+  // I2 — ver comentário em AwaitingCategoryExpenseDraft.
+  readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
 };
 
 export type AwaitingItemSpecificationDraft = {
@@ -87,6 +105,12 @@ export type AwaitingItemSpecificationDraft = {
   // a decidir explicitamente.
   readonly allowRetry: boolean;
   readonly retriedOnce: boolean;
+  // I2 — primeiro campo opcional deste draft (ver comentário acima sobre
+  // allowRetry/retriedOnce serem obrigatórios: aquele raciocínio é sobre
+  // política de comportamento, não se aplica aqui — occurrenceKind é
+  // metadado, mesmo papel que recognizedTags/descricao* têm nos outros
+  // drafts). Ver comentário em AwaitingCategoryExpenseDraft.
+  readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
 };
 
 export type CollectingMaintenanceExpenseDraft = {
@@ -125,7 +149,8 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_ambiguous_filter_mention"
   | "invalid_trigger"
   | "invalid_allow_retry"
-  | "invalid_retried_once";
+  | "invalid_retried_once"
+  | "invalid_occurrence_kind";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -161,6 +186,21 @@ const CATEGORIES_SET: ReadonlySet<string> = new Set(EXPENSE_CATEGORIES);
 
 function isValidCategoria(value: unknown): value is ExpenseCategory {
   return typeof value === "string" && CATEGORIES_SET.has(value);
+}
+
+// I2 — os mesmos 5 valores de ExplicitExpenseIntent | "ambiguous", como
+// literais locais (o union de types.ts não exporta um array em runtime, só
+// o tipo).
+const OCCURRENCE_KIND_SET: ReadonlySet<string> = new Set([
+  "record_completed_expense",
+  "ask_question",
+  "discuss_future_service",
+  "request_quote",
+  "ambiguous",
+]);
+
+function isValidOccurrenceKind(value: unknown): value is ExplicitExpenseIntent | "ambiguous" {
+  return typeof value === "string" && OCCURRENCE_KIND_SET.has(value);
 }
 
 const MAINTENANCE_TAGS_SET: ReadonlySet<string> = new Set(MAINTENANCE_TRIGGER_TAGS);
@@ -225,6 +265,7 @@ const CATEGORY_OPTIONAL_KEYS = [
   "recognizedTags",
   "descricaoPreliminar",
   "ambiguousFilterMention",
+  "occurrenceKind",
 ] as const;
 const CATEGORY_ALL_KEYS: ReadonlyArray<string> = [
   ...CATEGORY_REQUIRED_KEYS,
@@ -240,7 +281,11 @@ const ITEM_SPECIFICATION_REQUIRED_KEYS = [
   "allowRetry",
   "retriedOnce",
 ] as const;
-const ITEM_SPECIFICATION_ALL_KEYS: ReadonlyArray<string> = [...ITEM_SPECIFICATION_REQUIRED_KEYS];
+const ITEM_SPECIFICATION_OPTIONAL_KEYS = ["occurrenceKind"] as const;
+const ITEM_SPECIFICATION_ALL_KEYS: ReadonlyArray<string> = [
+  ...ITEM_SPECIFICATION_REQUIRED_KEYS,
+  ...ITEM_SPECIFICATION_OPTIONAL_KEYS,
+];
 
 const ITEM_SPECIFICATION_TRIGGERS_SET: ReadonlySet<string> = new Set([
   "revision_item_unspecified",
@@ -259,6 +304,7 @@ const VEHICLE_OPTIONAL_KEYS = [
   "recognizedTags",
   "descricaoPreliminar",
   "ambiguousFilterMention",
+  "occurrenceKind",
 ] as const;
 const VEHICLE_ALL_KEYS: ReadonlyArray<string> = [
   ...VEHICLE_REQUIRED_KEYS,
@@ -276,6 +322,7 @@ const CONFIRMATION_OPTIONAL_KEYS = [
   "recognizedTags",
   "descricao",
   "ambiguousFilterMention",
+  "occurrenceKind",
 ] as const;
 const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
   ...CONFIRMATION_REQUIRED_KEYS,
@@ -394,6 +441,10 @@ export function validateAwaitingCategoryExpenseDraft(
   if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
     return { ok: false, code: "invalid_ambiguous_filter_mention" };
   }
+  const hasOccurrenceKind = hasOwn(input, "occurrenceKind");
+  if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
+    return { ok: false, code: "invalid_occurrence_kind" };
+  }
 
   return {
     ok: true,
@@ -409,6 +460,9 @@ export function validateAwaitingCategoryExpenseDraft(
         : {}),
       ...(hasAmbiguousFilterMention
         ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
+      ...(hasOccurrenceKind
+        ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),
     },
   };
@@ -449,6 +503,10 @@ export function validateAwaitingItemSpecificationDraft(
   if (typeof input.retriedOnce !== "boolean") {
     return { ok: false, code: "invalid_retried_once" };
   }
+  const hasOccurrenceKind = hasOwn(input, "occurrenceKind");
+  if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
+    return { ok: false, code: "invalid_occurrence_kind" };
+  }
 
   return {
     ok: true,
@@ -460,6 +518,9 @@ export function validateAwaitingItemSpecificationDraft(
       fallbackCategory: input.fallbackCategory,
       allowRetry: input.allowRetry,
       retriedOnce: input.retriedOnce,
+      ...(hasOccurrenceKind
+        ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
+        : {}),
     },
   };
 }
@@ -503,6 +564,10 @@ export function validateAwaitingVehicleExpenseDraft(
   if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
     return { ok: false, code: "invalid_ambiguous_filter_mention" };
   }
+  const hasOccurrenceKind = hasOwn(input, "occurrenceKind");
+  if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
+    return { ok: false, code: "invalid_occurrence_kind" };
+  }
 
   return {
     ok: true,
@@ -519,6 +584,9 @@ export function validateAwaitingVehicleExpenseDraft(
         : {}),
       ...(hasAmbiguousFilterMention
         ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
+      ...(hasOccurrenceKind
+        ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),
     },
   };
@@ -566,6 +634,10 @@ export function validateAwaitingConfirmationExpenseDraft(
   if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
     return { ok: false, code: "invalid_ambiguous_filter_mention" };
   }
+  const hasOccurrenceKind = hasOwn(input, "occurrenceKind");
+  if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
+    return { ok: false, code: "invalid_occurrence_kind" };
+  }
 
   return {
     ok: true,
@@ -581,6 +653,9 @@ export function validateAwaitingConfirmationExpenseDraft(
       ...(hasDescricao ? { descricao: input.descricao as string | null } : {}),
       ...(hasAmbiguousFilterMention
         ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
+      ...(hasOccurrenceKind
+        ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),
     },
   };

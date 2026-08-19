@@ -8,6 +8,7 @@ import { findExpenseSemanticConcept, type ExpenseSemanticConceptKey } from "./re
 import { normalizeExpenseSemanticText } from "./normalization.ts";
 import type {
   ExpenseSemanticFacts,
+  ExpenseSemanticInput,
   ExpenseSemanticItemKey,
   ExpenseSemanticResult,
 } from "./types.ts";
@@ -17,9 +18,21 @@ import type {
  * e non-engine-heuristic-classifier.ts (build 2) num único ExpenseSemanticResult.
  *
  * Módulo 100% puro: sem I/O, sem Deno, sem fetch, sem clock, sem crypto, sem logs, sem IA.
- * Não lida com "conversation_only" (pergunta técnica, orçamento, intenção futura) —
- * assume que o texto já foi identificado, numa camada anterior, como tentativa de
- * registrar uma despesa. Ainda desconectado de core.ts (isso é o build 4).
+ *
+ * I2 — recebe ExpenseSemanticInput (não mais uma string solta). O campo
+ * explicitIntent (opcional, produzido em uma camada anterior por
+ * recognizeExpenseIntent, ver expense-intent-recognizer.ts) habilita um
+ * curto-circuito por intenção, checado ANTES de qualquer heurística de
+ * categoria: ask_question/discuss_future_service/request_quote retornam
+ * "conversation_only" direto (technical_question/future_service/quote), e
+ * "ambiguous" retorna "needs_clarification" (reason:
+ * expense_or_question_intent_ambiguous). Ou seja, a partir deste build o
+ * módulo PASSA a poder produzir "conversation_only" — ao contrário do que
+ * esta mesma frase afirmava antes do I2. Quando explicitIntent é
+ * "record_completed_expense" OU está ausente (undefined, o caso de hoje em
+ * core.ts, que ainda não passa esse campo — isso é o I4), o comportamento é
+ * IDÊNTICO ao histórico: nenhuma linha da lógica abaixo do curto-circuito foi
+ * alterada por este build.
  *
  * Campos usados de cada variante de ExpenseSemanticResult, e de onde vêm:
  *
@@ -176,7 +189,48 @@ function detectItemSpecificationTrigger(
   return undefined;
 }
 
-export function recognizeExpenseSemantics(originalText: string): ExpenseSemanticResult {
+export function recognizeExpenseSemantics(input: ExpenseSemanticInput): ExpenseSemanticResult {
+  const { originalText, explicitIntent } = input;
+
+  // I2 — curto-circuito por intenção, inerte quando explicitIntent está
+  // ausente (ver comentário de cabeçalho do arquivo).
+  if (explicitIntent === "ask_question") {
+    return {
+      status: "conversation_only",
+      persistable: false,
+      reason: "technical_question",
+      decisionCode: "non_persistable_conversation",
+    };
+  }
+  if (explicitIntent === "discuss_future_service") {
+    return {
+      status: "conversation_only",
+      persistable: false,
+      reason: "future_service",
+      decisionCode: "non_persistable_conversation",
+    };
+  }
+  if (explicitIntent === "request_quote") {
+    return {
+      status: "conversation_only",
+      persistable: false,
+      reason: "quote",
+      decisionCode: "non_persistable_conversation",
+    };
+  }
+  if (explicitIntent === "ambiguous") {
+    // candidateCategories deliberadamente OMITIDO (não []): o campo, por
+    // contrato documentado em types.ts, só é preenchido quando reason ===
+    // "category_ambiguous_non_engine" — aqui a ambiguidade é sobre SE é
+    // despesa, não sobre QUAL categoria.
+    return {
+      status: "needs_clarification",
+      persistable: false,
+      reason: "expense_or_question_intent_ambiguous",
+      decisionCode: "clarification_required",
+    };
+  }
+
   const engineConcepts = recognizeEngineConcepts(originalText);
 
   if (engineConcepts.length > 0) {
