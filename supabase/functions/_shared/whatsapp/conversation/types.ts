@@ -14,6 +14,7 @@ export type ConversationStateName =
   | "awaiting_expense_category"
   | "awaiting_expense_confirmation"
   | "awaiting_expense_correction"
+  | "awaiting_expense_value"
   | "awaiting_maintenance_confirmation"
   | "awaiting_item_specification"
   | "completed"
@@ -35,7 +36,8 @@ export type ConversationAwaitingField =
   | "maintenance_items"
   | "maintenance_value"
   | "maintenance_filter"
-  | "item_specification";
+  | "item_specification"
+  | "expense_value";
 
 export type ConversationEventKind =
   | "greeting"
@@ -193,7 +195,8 @@ export type ConversationResponseKey =
   | "expense_quote_acknowledged"
   | "expense_future_service_acknowledged"
   | "expense_technical_question_acknowledged"
-  | "expense_occurrence_clarification";
+  | "expense_occurrence_clarification"
+  | "expense_value_prompt";
 
 export type ConversationResponseParams = {
   vehicleLabel?: string;

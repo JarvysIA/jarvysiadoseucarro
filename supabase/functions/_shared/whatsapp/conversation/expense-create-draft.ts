@@ -85,6 +85,19 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
 };
 
+export type AwaitingValueExpenseDraft = {
+  readonly phase: "awaiting_expense_value";
+  readonly categoria: ExpenseCategory;
+  readonly requestMessageId: string;
+  // Mesmos campos aditivos opcionais dos outros drafts (build 3/9 e I2,
+  // ver AwaitingVehicleExpenseDraft) — sem valor ainda, é exatamente o que
+  // esta fase está esperando o usuário responder.
+  readonly recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
+  readonly descricaoPreliminar?: string | null;
+  readonly ambiguousFilterMention?: boolean;
+  readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
+};
+
 export type AwaitingItemSpecificationDraft = {
   readonly phase: "awaiting_item_specification";
   readonly valor: number;
@@ -298,6 +311,15 @@ function isValidItemSpecificationTrigger(
 ): value is "revision_item_unspecified" | "ac_service_unspecified" | "maintenance_unspecified" {
   return typeof value === "string" && ITEM_SPECIFICATION_TRIGGERS_SET.has(value);
 }
+
+const VALUE_REQUIRED_KEYS = ["phase", "categoria", "requestMessageId"] as const;
+const VALUE_OPTIONAL_KEYS = [
+  "recognizedTags",
+  "descricaoPreliminar",
+  "ambiguousFilterMention",
+  "occurrenceKind",
+] as const;
+const VALUE_ALL_KEYS: ReadonlyArray<string> = [...VALUE_REQUIRED_KEYS, ...VALUE_OPTIONAL_KEYS];
 
 const VEHICLE_REQUIRED_KEYS = ["phase", "categoria", "valor", "requestMessageId"] as const;
 const VEHICLE_OPTIONAL_KEYS = [
@@ -518,6 +540,69 @@ export function validateAwaitingItemSpecificationDraft(
       fallbackCategory: input.fallbackCategory,
       allowRetry: input.allowRetry,
       retriedOnce: input.retriedOnce,
+      ...(hasOccurrenceKind
+        ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
+        : {}),
+    },
+  };
+}
+
+export function validateAwaitingValueExpenseDraft(
+  input: unknown,
+): ExpenseDraftValidationResult<AwaitingValueExpenseDraft> {
+  if (!isPlainObject(input)) return { ok: false, code: "not_an_object" };
+
+  for (const k of Object.keys(input)) {
+    if (!VALUE_ALL_KEYS.includes(k)) {
+      return { ok: false, code: "unexpected_field" };
+    }
+  }
+  for (const k of VALUE_REQUIRED_KEYS) {
+    if (!hasOwn(input, k)) return { ok: false, code: "missing_field" };
+  }
+
+  if (input.phase !== "awaiting_expense_value") {
+    return { ok: false, code: "invalid_phase" };
+  }
+  if (!isValidCategoria(input.categoria)) {
+    return { ok: false, code: "invalid_categoria" };
+  }
+  if (!isValidUuid(input.requestMessageId)) {
+    return { ok: false, code: "invalid_request_message_id" };
+  }
+
+  const hasRecognizedTags = hasOwn(input, "recognizedTags");
+  if (hasRecognizedTags && !isValidRecognizedTags(input.recognizedTags)) {
+    return { ok: false, code: "invalid_recognized_tags" };
+  }
+  const hasDescricaoPreliminar = hasOwn(input, "descricaoPreliminar");
+  if (hasDescricaoPreliminar && !isValidDescricaoField(input.descricaoPreliminar)) {
+    return { ok: false, code: "invalid_descricao" };
+  }
+  const hasAmbiguousFilterMention = hasOwn(input, "ambiguousFilterMention");
+  if (hasAmbiguousFilterMention && typeof input.ambiguousFilterMention !== "boolean") {
+    return { ok: false, code: "invalid_ambiguous_filter_mention" };
+  }
+  const hasOccurrenceKind = hasOwn(input, "occurrenceKind");
+  if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
+    return { ok: false, code: "invalid_occurrence_kind" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      phase: "awaiting_expense_value",
+      categoria: input.categoria,
+      requestMessageId: input.requestMessageId,
+      ...(hasRecognizedTags
+        ? { recognizedTags: input.recognizedTags as ReadonlyArray<MaintenanceTriggerTag> }
+        : {}),
+      ...(hasDescricaoPreliminar
+        ? { descricaoPreliminar: input.descricaoPreliminar as string | null }
+        : {}),
+      ...(hasAmbiguousFilterMention
+        ? { ambiguousFilterMention: input.ambiguousFilterMention as boolean }
+        : {}),
       ...(hasOccurrenceKind
         ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),

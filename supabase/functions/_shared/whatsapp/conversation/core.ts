@@ -39,6 +39,7 @@ import {
   validateAwaitingVehicleExpenseDraft,
   validateAwaitingConfirmationExpenseDraft,
   validateAwaitingItemSpecificationDraft,
+  validateAwaitingValueExpenseDraft,
 } from "./expense-create-draft.ts";
 import {
   CONFIRM_EXPENSE_CREATE_HANDOFF_KIND,
@@ -1372,6 +1373,161 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
     }
   }
 
+  // 6.7) Resposta a state pendente (awaiting_expense_value) — I4c, valor
+  // faltando após categoria já ter resolvido limpa (criado na seção 9.5,
+  // dentro do curto-circuito do I4b). Mesmo padrão estrutural da 6.5
+  // (awaiting_expense_category), adaptado: aqui falta valor, não categoria.
+  if (effectiveState.state === "awaiting_expense_value") {
+    const currentDraft = validateAwaitingValueExpenseDraft(effectiveState.draftPayload);
+    if (
+      effectiveState.draftType === "expense" &&
+      isUuid(effectiveState.draftId) &&
+      currentDraft.ok &&
+      typeof input.originalText === "string"
+    ) {
+      let parsedValor = parseExpenseValorText(input.originalText);
+      if (!parsedValor.ok) {
+        const bareValor = parseExpenseValorBareNumber(input.originalText);
+        if (bareValor.ok) {
+          parsedValor = bareValor;
+        }
+      }
+      if (parsedValor.ok) {
+        const categoria = currentDraft.value.categoria;
+        // Carrega adiante os campos de manutenção já computados na criação
+        // do draft (seção 9.5) — mesmo padrão já usado em toda transição de
+        // fase deste módulo (ver gateMaintenanceItemsByCategory em 6.5),
+        // pra não perder silenciosamente o que já foi reconhecido.
+        const gated = gateMaintenanceItemsByCategory(categoria, currentDraft.value);
+        const resolvedVeh = resolveVehicle({
+          text: null,
+          vehicles: input.vehicles,
+          activeVehicleId: effectiveState.activeVehicleId,
+        });
+        const nextVersion = (effectiveState.draftVersion ?? 0) + 1;
+        if (resolvedVeh.kind === "matched") {
+          const veh = resolvedVeh.vehicle;
+          const candidate = {
+            phase: "awaiting_confirmation" as const,
+            categoria,
+            valor: parsedValor.valor,
+            vehicleId: veh.id,
+            requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricao: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
+          };
+          const validated = validateAwaitingConfirmationExpenseDraft(candidate);
+          if (validated.ok && isUuid(veh.id)) {
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_expense_confirmation",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_expense_confirmation",
+                  currentIntent: "expense",
+                  awaitingField: "confirmation",
+                  draftType: "expense",
+                  draftId: effectiveState.draftId,
+                  draftVersion: nextVersion,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                  activeVehicleId: veh.id,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_create_confirmation",
+              responseParams: {
+                vehicleLabel: labelFor(veh),
+                valor: parsedValor.valor,
+                categoria,
+                ...buildMaintenanceResponseExtras(
+                  gated
+                    ? {
+                        recognizedTags: gated.recognizedTags,
+                        descricao: gated.descricaoPreliminar,
+                        ambiguousFilterMention: gated.ambiguousFilterMention,
+                      }
+                    : null,
+                ),
+              },
+              nextFallbackCount: 0,
+              reasonCode: "expense_value_reply_complete",
+            });
+          }
+        } else if (resolvedVeh.kind === "ambiguous" || resolvedVeh.kind === "not_found") {
+          const candidate = {
+            phase: "awaiting_vehicle" as const,
+            categoria,
+            valor: parsedValor.valor,
+            requestMessageId: effectiveState.draftId,
+            ...(gated
+              ? {
+                  recognizedTags: gated.recognizedTags,
+                  descricaoPreliminar: gated.descricaoPreliminar,
+                  ambiguousFilterMention: gated.ambiguousFilterMention,
+                }
+              : {}),
+          };
+          const validated = validateAwaitingVehicleExpenseDraft(candidate);
+          if (validated.ok) {
+            const pool = firstEligible(input.vehicles);
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_vehicle",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_vehicle",
+                  currentIntent: "expense",
+                  awaitingField: "vehicle",
+                  draftType: "expense",
+                  draftId: effectiveState.draftId,
+                  draftVersion: nextVersion,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "vehicle_ambiguous",
+              responseParams: { options: pool.map(labelFor) },
+              nextFallbackCount: 0,
+              reasonCode: "expense_value_reply_awaiting_vehicle",
+            });
+          }
+        } else {
+          // Achado 3 do checkpoint deste build, decisão confirmada: Padrão
+          // A (idêntico às linhas 869/1138, resolveVehicle com text: null)
+          // — restricted E no_eligible_vehicle colapsam no MESMO
+          // tratamento aqui, sem restrictedDecision (esse é o padrão do
+          // OUTRO caso, resolveVehicle com texto do usuário — seção 6, não
+          // se aplica a esta chamada).
+          return buildDecision({
+            eventKind: EXPENSE_REPORTED_EVENT_KIND,
+            decisionKind: "respond",
+            previousState,
+            nextState: "idle",
+            outcome: "completed",
+            statePatch: withLastMessage(
+              mergePatch(basePatch, { ...CLEAR_TASK_PATCH, state: "idle" }),
+              input.sourceMessageId,
+            ),
+            responseKey: "no_eligible_vehicle",
+            nextFallbackCount: 0,
+            reasonCode: "expense_value_reply_no_eligible_vehicle",
+          });
+        }
+      }
+      // Não parseou como valor — cai no fallback genérico da seção 10, sem
+      // retry (mesmo padrão confirmado no checkpoint pra seção 6.6).
+    }
+  }
+
   // 7) Confirmação / negação
   if (command === "confirm" && isEligibleKmConfirmationState(effectiveState)) {
     return buildDecision({
@@ -1699,6 +1855,69 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
             nextFallbackCount: 0,
             reasonCode: reasonCodeByIntent[noValueIntent],
           });
+        }
+
+        // I4c — record_completed_expense sem valor, categoria resolve
+        // LIMPA (status "resolved", sem ambiguidade nem especificação de
+        // item necessária): cria o rascunho novo (awaiting_expense_value),
+        // pergunta só o valor. Reaproveita categoryHintForNoValue (já
+        // calculado acima) em vez de chamar recognizeExpenseSemantics de
+        // novo. Categoria NÃO resolvida limpa (needs_clarification/
+        // needs_item_specification/unsupported): NENHUMA mudança, cai no
+        // fluxo já existente (fallback) — não tenta resolver os dois
+        // problemas (o quê + quanto) ao mesmo tempo.
+        //
+        // Mesma guarda de referência de marco de manutenção já usada no
+        // Passo D-1 acima (achado real deste build, corrigido: sem ela,
+        // "revisão dos 40 mil, troquei oleo e filtro" — um marco de km, não
+        // um valor — virava awaiting_expense_value por engano, quebrando
+        // core-revisao-milestone.test.ts). "N mil" aqui é quilometragem, não
+        // dinheiro; perguntar "quanto foi?" pra esse tipo de frase confunde
+        // o usuário com um valor que a mensagem nunca mencionou.
+        if (
+          noValueIntent === "record_completed_expense" &&
+          categoryHintForNoValue.status === "resolved" &&
+          !looksLikeMaintenanceMilestoneReference(input.originalText)
+        ) {
+          const conceptualCategory = categoryHintForNoValue.conceptualCategory;
+          const extras = computeMaintenanceDraftExtras(conceptualCategory, input.originalText);
+          const candidate = {
+            phase: "awaiting_expense_value" as const,
+            categoria: conceptualCategory,
+            requestMessageId: input.sourceMessageId,
+            ...(extras
+              ? {
+                  recognizedTags: extras.recognizedTags,
+                  descricaoPreliminar: extras.descricaoPreliminar,
+                  ambiguousFilterMention: extras.ambiguousFilterMention,
+                }
+              : {}),
+          };
+          const validated = validateAwaitingValueExpenseDraft(candidate);
+          if (validated.ok) {
+            return buildDecision({
+              eventKind: EXPENSE_REPORTED_EVENT_KIND,
+              decisionKind: "transition",
+              previousState,
+              nextState: "awaiting_expense_value",
+              statePatch: withLastMessage(
+                mergePatch(basePatch, {
+                  state: "awaiting_expense_value",
+                  currentIntent: "expense",
+                  awaitingField: "expense_value",
+                  draftType: "expense",
+                  draftId: input.sourceMessageId,
+                  draftVersion: EXPENSE_CREATE_INITIAL_DRAFT_VERSION,
+                  draftPayload: validated.value as unknown as Record<string, unknown>,
+                }),
+                input.sourceMessageId,
+              ),
+              responseKey: "expense_value_prompt",
+              responseParams: { categoria: conceptualCategory },
+              nextFallbackCount: 0,
+              reasonCode: "expense_reported_awaiting_value",
+            });
+          }
         }
       }
     }

@@ -146,6 +146,10 @@ export function renderResponse(
       return "Essa é uma pergunta técnica — ainda não consigo responder isso por aqui, mas em breve vou conseguir te ajudar com esse tipo de dúvida também.";
     case "expense_occurrence_clarification":
       return "Isso já aconteceu (você já pagou/fez) ou é algo que ainda vai rolar?";
+    case "expense_value_prompt": {
+      const cat = params.categoria ?? "essa categoria";
+      return `Show, despesa registrada como ${cat}! Só falta o valor — quanto foi?`;
+    }
   }
 }
 

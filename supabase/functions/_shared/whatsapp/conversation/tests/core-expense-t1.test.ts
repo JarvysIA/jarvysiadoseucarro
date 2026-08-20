@@ -751,6 +751,121 @@ describe("T1 despesa — I4b curto-circuito por intenção sem valor numérico (
   });
 });
 
+// ---------------------------------------------------------------------------
+// H) I4c — awaiting_expense_value: despesa concluída sem valor, categoria
+// resolve LIMPA (status "resolved", sem ambiguidade/especificação de item)
+// → cria rascunho novo perguntando só o valor. Categoria NÃO resolvida
+// limpa: nenhuma mudança, cai no fluxo já existente (fallback).
+// ---------------------------------------------------------------------------
+
+describe("T1 despesa — I4c criação de awaiting_expense_value (categoria limpa, sem valor)", () => {
+  test("'troquei o óleo' (sem valor, categoria resolve limpo pra Revisão) → transition, awaiting_expense_value, expense_value_prompt", () => {
+    const d = decideConversation(inp({ originalText: "troquei o óleo", vehicles: [veh(VEH_1)] }));
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_expense_value");
+    expect(d.responseKey).toBe("expense_value_prompt");
+    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.statePatch.draftType).toBe("expense");
+    expect(d.statePatch.draftVersion).toBe(0);
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.phase).toBe("awaiting_expense_value");
+    expect(payload?.categoria).toBe("Revisão");
+    expect(payload && "valor" in payload).toBe(false);
+  });
+
+  test("'troquei a bateria' (sem valor, resolve limpo pra Manutenção) → mesmo padrão, categoria Manutenção", () => {
+    const d = decideConversation(
+      inp({ originalText: "troquei a bateria", vehicles: [veh(VEH_1)] }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_expense_value");
+    expect(d.responseKey).toBe("expense_value_prompt");
+    expect(d.responseParams.categoria).toBe("Manutenção");
+  });
+
+  test("mensagem sem valor com categoria AMBÍGUA ('farol') → comportamento IDÊNTICO ao já existente (fallback), NÃO cria awaiting_expense_value", () => {
+    const d = decideConversation(inp({ originalText: "farol", vehicles: [veh(VEH_1)] }));
+    expect(d.decisionKind).toBe("fallback");
+    expect(d.responseKey).toBe("fallback_first");
+    expect(d.nextState).not.toBe("awaiting_expense_value");
+    expect(d.statePatch.draftType ?? null).toBeNull();
+  });
+});
+
+describe("T1 despesa — I4c resposta em awaiting_expense_value", () => {
+  const valueState = state({
+    state: "awaiting_expense_value",
+    currentIntent: "expense",
+    awaitingField: "expense_value",
+    draftType: "expense",
+    draftId: MSG_A,
+    draftVersion: 0,
+    draftPayload: {
+      phase: "awaiting_expense_value",
+      categoria: "Revisão",
+      requestMessageId: MSG_A,
+    },
+  });
+
+  test("valor válido ('200') + 1 veículo elegível → transition pra awaiting_expense_confirmation, categoria preservada, valor novo", () => {
+    const d = decideConversation(
+      inp({
+        state: valueState,
+        originalText: "200",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    expect(d.responseKey).toBe("expense_create_confirmation");
+    expect(d.responseParams.categoria).toBe("Revisão");
+    expect(d.responseParams.valor).toBe(200);
+    expect(d.statePatch.draftVersion).toBe(1);
+    expect(d.statePatch.activeVehicleId).toBe(VEH_1);
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.categoria).toBe("Revisão");
+    expect(payload?.valor).toBe(200);
+    expect(payload?.vehicleId).toBe(VEH_1);
+  });
+
+  test("mesmo cenário com 2+ veículos elegíveis → awaiting_vehicle, categoria+valor preservados no draft parcial", () => {
+    const d = decideConversation(
+      inp({
+        state: valueState,
+        originalText: "200",
+        vehicles: [veh(VEH_1), veh(VEH_2, "VW", "Gol", "XYZ2E34")],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("transition");
+    expect(d.nextState).toBe("awaiting_vehicle");
+    expect(d.responseKey).toBe("vehicle_ambiguous");
+    expect(d.statePatch.draftVersion).toBe(1);
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.phase).toBe("awaiting_vehicle");
+    expect(payload?.categoria).toBe("Revisão");
+    expect(payload?.valor).toBe(200);
+  });
+
+  test("resposta que NÃO parseia como valor ('nao sei') → cai no fallback genérico, permanece em awaiting_expense_value", () => {
+    const d = decideConversation(
+      inp({
+        state: valueState,
+        originalText: "nao sei",
+        vehicles: [veh(VEH_1)],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.decisionKind).toBe("fallback");
+    expect(d.responseKey).toBe("fallback_first");
+  });
+});
+
 describe("T1 despesa — regressões", () => {
   test("KM continua com prioridade: 'km atual 45000 km' → fluxo KM, não expense", () => {
     const d = decideConversation(
