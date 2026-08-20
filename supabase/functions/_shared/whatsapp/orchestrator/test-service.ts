@@ -286,9 +286,25 @@ function isDeferred(d: ConversationCoreDecision): boolean {
 const CONVERSATION_HANDOFF_RESET_OUTCOMES: ReadonlySet<ConversationHandoffFallbackOutcome> =
   new Set(["primary_succeeded", "completed", "partially_completed"]);
 
+// I6 — chaves de resposta que disparam a bifurcação opcional pro Dr.
+// Jarvys. "fallback_second" é o gatilho original do C8 (core
+// determinístico esgotou 2 tentativas). "expense_quote_acknowledged"/
+// "expense_technical_question_acknowledged" são o gatilho novo do I6
+// (Opção C, já fechada): perguntas confiantes e imediatas vão direto,
+// sem esperar fallback nenhum. "expense_future_service_acknowledged"
+// fica DE FORA de propósito — é uma afirmação de intenção futura, não
+// uma pergunta esperando resposta, não vale gastar uma chamada de IA.
+const DIRECT_ROUTE_RESPONSE_KEYS: ReadonlySet<string> = new Set([
+  "fallback_second",
+  "expense_quote_acknowledged",
+  "expense_technical_question_acknowledged",
+]);
+
 // C8 — bifurcação opcional para o Dr. Jarvys (C7) quando o core
-// determinístico decide fallback_second. Só chama deps.conversationHandoffFallback
-// quando: responseKey é exatamente "fallback_second", a dependência foi
+// determinístico decide fallback_second (esgotou 2 tentativas), OU
+// (I6) quando decide uma das perguntas confiantes e imediatas listadas
+// em DIRECT_ROUTE_RESPONSE_KEYS. Só chama deps.conversationHandoffFallback
+// quando: responseKey está em DIRECT_ROUTE_RESPONSE_KEYS, a dependência foi
 // injetada, e item.userId não é null (fail-closed: sem userId, nem
 // tenta). Qualquer erro da dependência é capturado e NUNCA propaga —
 // o item segue o fluxo normal com a decisão original, como se a
@@ -323,7 +339,7 @@ export async function tryConversationHandoffFallback(
   log: TestServiceLogger,
   workerId: string,
 ): Promise<ConversationCoreDecision> {
-  if (decision.responseKey !== "fallback_second") return decision;
+  if (!DIRECT_ROUTE_RESPONSE_KEYS.has(decision.responseKey ?? "")) return decision;
   if (deps.conversationHandoffFallback === undefined) return decision;
   if (item.userId === null) return decision;
 
