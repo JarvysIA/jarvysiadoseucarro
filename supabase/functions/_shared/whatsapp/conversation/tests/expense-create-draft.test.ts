@@ -9,6 +9,7 @@ import {
   validateAwaitingCategoryExpenseDraft,
   validateAwaitingConfirmationExpenseDraft,
   validateAwaitingItemSpecificationDraft,
+  validateAwaitingValueExpenseDraft,
   validateAwaitingVehicleExpenseDraft,
   validateExpenseCreateDraft,
 } from "../expense-create-draft.ts";
@@ -1121,5 +1122,151 @@ describe("occurrenceKind — preservação isolada entre fases (I2; ponta a pont
     const r = validateAwaitingConfirmationExpenseDraft(nextCandidate);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.occurrenceKind).toBe("ask_question");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I4c — awaiting_expense_value (categoria já resolvida, falta só o valor)
+// ---------------------------------------------------------------------------
+
+function valueBase() {
+  return {
+    phase: "awaiting_expense_value" as const,
+    categoria: "Revisão" as const,
+    requestMessageId: UUID_A,
+  };
+}
+
+describe("validateAwaitingValueExpenseDraft", () => {
+  it("aceita candidate mínimo válido", () => {
+    const r = validateAwaitingValueExpenseDraft(valueBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.phase).toBe("awaiting_expense_value");
+      expect(r.value.categoria).toBe("Revisão");
+      expect(r.value.requestMessageId).toBe(UUID_A);
+      expect("recognizedTags" in r.value).toBe(false);
+      expect("descricaoPreliminar" in r.value).toBe(false);
+      expect("ambiguousFilterMention" in r.value).toBe(false);
+      expect("occurrenceKind" in r.value).toBe(false);
+    }
+  });
+
+  it.each(["phase", "categoria", "requestMessageId"])(
+    "rejeita campo obrigatório ausente: %s",
+    (field: string) => {
+      const input = { ...valueBase() } as Record<string, unknown>;
+      delete input[field];
+      const r = validateAwaitingValueExpenseDraft(input);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.code).toBe("missing_field");
+    },
+  );
+
+  it.each([
+    ["vazia", ""],
+    ["minúscula", "revisão"],
+    ["sem acento", "Revisao"],
+    ["desconhecida", "Outros"],
+    ["número", 1],
+    ["null", null],
+  ])("rejeita categoria %s", (_l: string, v: unknown) => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      categoria: v as string,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_categoria");
+  });
+
+  it("rejeita phase inválido", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      phase: "awaiting_category" as unknown as "awaiting_expense_value",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_phase");
+  });
+
+  it("rejeita requestMessageId inválido", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      requestMessageId: "not-a-uuid",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_request_message_id");
+  });
+
+  it("rejeita valor (não pertence a esta fase — é exatamente o que falta)", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      valor: 100,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("unexpected_field");
+  });
+
+  it("rejeita campo arbitrário", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      foo: "bar",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("unexpected_field");
+  });
+
+  it("aceita e preserva occurrenceKind quando presente (mesmo padrão do I2)", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      occurrenceKind: "request_quote",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.occurrenceKind).toBe("request_quote");
+  });
+
+  it("aceita ausência de occurrenceKind (opcional de verdade)", () => {
+    const r = validateAwaitingValueExpenseDraft(valueBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect("occurrenceKind" in r.value).toBe(false);
+  });
+
+  it("rejeita occurrenceKind com valor fora dos 5 válidos", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      occurrenceKind: "bogus_kind",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_occurrence_kind");
+  });
+
+  it("aceita e preserva recognizedTags/descricaoPreliminar/ambiguousFilterMention", () => {
+    const r = validateAwaitingValueExpenseDraft({
+      ...valueBase(),
+      recognizedTags: ["oleo"],
+      descricaoPreliminar: "troquei o oleo",
+      ambiguousFilterMention: false,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.recognizedTags).toEqual(["oleo"]);
+      expect(r.value.descricaoPreliminar).toBe("troquei o oleo");
+      expect(r.value.ambiguousFilterMention).toBe(false);
+    }
+  });
+
+  it.each([[null], [[]], ["x"], [1], [true], [new Date()]])(
+    "rejeita não-objeto %p",
+    (v: unknown) => {
+      const r = validateAwaitingValueExpenseDraft(v);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.code).toBe("not_an_object");
+    },
+  );
+
+  it("não modifica o input", () => {
+    const input = freeze({ ...valueBase() });
+    const snap = JSON.stringify(input);
+    validateAwaitingValueExpenseDraft(input);
+    expect(JSON.stringify(input)).toBe(snap);
   });
 });
