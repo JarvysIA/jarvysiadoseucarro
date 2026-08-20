@@ -1645,6 +1645,62 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
           parsedValor = bareValor;
         }
       }
+      // I4b — simétrico ao I4a, no ramo contrário: só roda quando,
+      // genuinamente, nenhum valor foi encontrado nem pela tentativa de
+      // reinterpretação acima. Guarda por sinal automotivo (2ª tentativa,
+      // corrige a 1ª: usar parseKmUpdateText como guarda era amplo demais —
+      // o Ramo 3 dessa regex aceita qualquer "N mil" solto, suprimindo
+      // orçamento/futuro/pergunta genuínos que mencionem quilometragem).
+      // Mesmo critério já usado no Passo D-1 acima (status !== "unsupported")
+      // — só intercepta com a resposta nova se recognizeExpenseSemantics
+      // encontrar ALGUM sinal automotivo no texto. Sem sinal automotivo
+      // nenhum, ou intenção record_completed_expense/ambiguous: NENHUMA
+      // mudança, segue pro fluxo já existente (seção 9.6 KM, depois 10
+      // fallback).
+      const categoryHintForNoValue = recognizeExpenseSemantics({
+        originalText: input.originalText,
+      });
+      if (categoryHintForNoValue.status !== "unsupported") {
+        const noValueIntent = recognizeExpenseIntent(input.originalText);
+        if (
+          noValueIntent === "request_quote" ||
+          noValueIntent === "discuss_future_service" ||
+          noValueIntent === "ask_question"
+        ) {
+          // Duplicado localmente, não extraído pro escopo compartilhado com
+          // o mapeamento equivalente do I4a (mais abaixo, dentro de
+          // `if (parsedValor.ok)`) — mesma justificativa: extrair exigiria
+          // tocar num bloco já mesclado/testado/em produção (PR #61) só pra
+          // economizar linhas, sem ganho real. Mesmos 3 valores, mesmo texto.
+          const responseKeyByIntent: Record<
+            "request_quote" | "discuss_future_service" | "ask_question",
+            ConversationResponseKey
+          > = {
+            request_quote: "expense_quote_acknowledged",
+            discuss_future_service: "expense_future_service_acknowledged",
+            ask_question: "expense_technical_question_acknowledged",
+          };
+          const reasonCodeByIntent: Record<
+            "request_quote" | "discuss_future_service" | "ask_question",
+            string
+          > = {
+            request_quote: "expense_reported_quote_acknowledged",
+            discuss_future_service: "expense_reported_future_service_acknowledged",
+            ask_question: "expense_reported_technical_question_acknowledged",
+          };
+          return buildDecision({
+            eventKind: EXPENSE_REPORTED_EVENT_KIND,
+            decisionKind: "respond",
+            previousState,
+            nextState: "idle",
+            outcome: expiredOutcome,
+            statePatch: withLastMessage(basePatch, input.sourceMessageId),
+            responseKey: responseKeyByIntent[noValueIntent],
+            nextFallbackCount: 0,
+            reasonCode: reasonCodeByIntent[noValueIntent],
+          });
+        }
+      }
     }
     if (parsedValor.ok) {
       // I4a — curto-circuito por intenção explícita, logo que um valor

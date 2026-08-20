@@ -663,6 +663,94 @@ describe("T1 despesa — I4a curto-circuito por intenção (quote/futuro/pergunt
   });
 });
 
+// ---------------------------------------------------------------------------
+// G) I4b — curto-circuito por intenção explícita SEM valor numérico
+// (simétrico ao I4a, ramo `!parsedValor.ok`, só depois da tentativa de
+// reinterpretação de número solto ter falhado). Guarda por sinal automotivo
+// (recognizeExpenseSemantics.status !== "unsupported", mesmo critério do
+// Passo D-1) — 2ª tentativa: a 1ª guarda (parseKmUpdateText) era ampla
+// demais e suprimia orçamento/futuro/pergunta genuínos que mencionassem
+// quilometragem (ver histórico desta build). Sem sinal automotivo, ou
+// intenção record_completed_expense/ambiguous: nenhuma mudança, segue pro
+// fluxo já existente (9.6 KM, depois 10 fallback).
+// ---------------------------------------------------------------------------
+
+describe("T1 despesa — I4b curto-circuito por intenção sem valor numérico (guarda por sinal automotivo)", () => {
+  // REGRESSÃO CRÍTICA — a colisão original (1ª tentativa desta build): sem
+  // sinal automotivo nenhum ("rodei"/"40 mil"/"essa semana" não ativam
+  // recognizeExpenseSemantics), a guarda por sinal automotivo NÃO
+  // intercepta, e o texto segue pro fluxo de KM normal — comportamento
+  // idêntico ao já testado em core-revisao-milestone.test.ts.
+  test("REGRESSÃO: 'rodei 40 mil essa semana' (sem sinal automotivo, intent discuss_future_service por falso positivo de 'essa semana') → segue pro fluxo de KM, km 40000", () => {
+    const d = decideConversation(
+      inp({ originalText: "rodei 40 mil essa semana", vehicles: [veh(VEH_1)] }),
+    );
+    expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
+    expect(d.responseKey).not.toBe("expense_future_service_acknowledged");
+  });
+
+  test("sem valor + orçamento com sinal automotivo ('quanto custa a revisão dos 45 mil km?') → expense_quote_acknowledged", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "quanto custa a revisão dos 45 mil km?",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_quote_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  test("sem valor + futuro com sinal automotivo ('vou fazer a revisão dos 40 mil essa semana') → expense_future_service_acknowledged", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "vou fazer a revisão dos 40 mil essa semana",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_future_service_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  test("sem valor + orçamento com sinal automotivo, km na frente ('40 mil km, quanto fica a revisão?') → expense_quote_acknowledged", () => {
+    const d = decideConversation(
+      inp({
+        originalText: "40 mil km, quanto fica a revisão?",
+        vehicles: [veh(VEH_1)],
+      }),
+    );
+    expect(d.eventKind).toBe(EXPENSE_REPORTED_EVENT_KIND);
+    expect(d.decisionKind).toBe("respond");
+    expect(d.responseKey).toBe("expense_quote_acknowledged");
+    expect(d.nextState).toBe("idle");
+    expect(d.nextFallbackCount).toBe(0);
+    expect(d.statePatch.draftType ?? null).toBeNull();
+    expect(d.statePatch.draftPayload ?? null).toBeNull();
+  });
+
+  // Limitação pré-existente, fora de escopo desta correção — documentada,
+  // não corrigida (instrução explícita: não tentar consertar). Sem sinal
+  // automotivo (nem "revisão"/"trocar"/etc — só "bateu"/"km"), a guarda não
+  // intercepta, e o texto acaba caindo no fluxo de KM (não havia teste
+  // anterior cobrindo isso; este teste documenta o comportamento real de
+  // hoje, sem afirmar que é o comportamento correto/desejado).
+  test("DOCUMENTAÇÃO (limitação pré-existente, não corrigida): 'sera que já bateu 40 mil km?' (pergunta técnica genuína, sem sinal automotivo) cai no fluxo de KM em vez de expense_technical_question_acknowledged", () => {
+    const d = decideConversation(
+      inp({ originalText: "sera que já bateu 40 mil km?", vehicles: [veh(VEH_1)] }),
+    );
+    expect(d.eventKind).toBe(KM_REPORTED_EVENT_KIND);
+  });
+});
+
 describe("T1 despesa — regressões", () => {
   test("KM continua com prioridade: 'km atual 45000 km' → fluxo KM, não expense", () => {
     const d = decideConversation(
