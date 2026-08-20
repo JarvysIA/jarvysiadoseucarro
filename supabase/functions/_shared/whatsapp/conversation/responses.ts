@@ -86,17 +86,17 @@ export function renderResponse(
       return "Não consegui concluir agora. Pode me dizer a quilometragem de novo?";
     case "expense_category_prompt": {
       const v = formatValor(params.valor);
-      return `Registrei o valor de ${v}. Pro lançamento ficar mais claro, essa despesa foi o quê?`;
+      return `Entendi o valor de ${v}. Pra eu registrar certinho, essa despesa foi o quê?`;
     }
     case "expense_item_specification_prompt": {
       const v = formatValor(params.valor);
       if (params.itemSpecificationTrigger === "revision_item_unspecified") {
-        return `Registrei ${v} em revisão. Qual item você trocou? (óleo, filtro, pastilha, correia...)`;
+        return `Entendi que foi revisão, ${v}. Qual item você trocou? (óleo, filtro, pastilha, correia...)`;
       }
       if (params.itemSpecificationTrigger === "maintenance_unspecified") {
         return `Pra um melhor lançamento nas despesas, o que foi feito nessa manutenção de ${v}?`;
       }
-      return `Registrei ${v}. Foi o filtro do ar-condicionado, ou foi conserto/carga de gás?`;
+      return `Entendi o valor de ${v}. Foi o filtro do ar-condicionado, ou foi conserto/carga de gás?`;
     }
     case "expense_create_confirmation": {
       const label = params.vehicleLabel ?? "seu carro";
@@ -148,7 +148,7 @@ export function renderResponse(
       return "Isso já aconteceu (você já pagou/fez) ou é algo que ainda vai rolar?";
     case "expense_value_prompt": {
       const cat = params.categoria ?? "essa categoria";
-      return `Show, despesa registrada como ${cat}! Só falta o valor — quanto foi?`;
+      return `Show, entendi que foi ${cat}! Só falta o valor — quanto foi?`;
     }
   }
 }

@@ -276,7 +276,7 @@ describe("expense_category_prompt — pergunta aberta (sem lista fechada)", () =
     );
     expect(decision.responseKey).toBe("expense_category_prompt");
     expect(text).toBe(
-      "Registrei o valor de R$ 30,00. Pro lançamento ficar mais claro, essa despesa foi o quê?",
+      "Entendi o valor de R$ 30,00. Pra eu registrar certinho, essa despesa foi o quê?",
     );
   });
 });
