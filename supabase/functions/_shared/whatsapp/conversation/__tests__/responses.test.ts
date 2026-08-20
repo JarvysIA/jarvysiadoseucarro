@@ -113,10 +113,34 @@ describe("renderResponse guardrails", () => {
       options: ["Manutenção", "Lavagem"],
     });
     expect(msg).toBe(
-      "Registrei o valor de R$ 30,00. Pro lançamento ficar mais claro, essa despesa foi o quê?",
+      "Entendi o valor de R$ 30,00. Pra eu registrar certinho, essa despesa foi o quê?",
     );
     expect(msg).not.toContain("Manutenção");
     expect(msg).not.toContain("Lavagem");
+  });
+
+  // I5 — microcopy corrigida: não afirma "Registrei"/"registrada" antes da
+  // confirmação real do usuário acontecer.
+  test("expense_item_specification_prompt (revision_item_unspecified) texto exato", () => {
+    const msg = renderResponse("expense_item_specification_prompt", {
+      valor: 30,
+      itemSpecificationTrigger: "revision_item_unspecified",
+    });
+    expect(msg).toBe(
+      "Entendi que foi revisão, R$ 30,00. Qual item você trocou? (óleo, filtro, pastilha, correia...)",
+    );
+  });
+
+  test("expense_item_specification_prompt (ramo default, ar-condicionado) texto exato", () => {
+    const msg = renderResponse("expense_item_specification_prompt", { valor: 30 });
+    expect(msg).toBe(
+      "Entendi o valor de R$ 30,00. Foi o filtro do ar-condicionado, ou foi conserto/carga de gás?",
+    );
+  });
+
+  test("expense_value_prompt texto exato", () => {
+    const msg = renderResponse("expense_value_prompt", { categoria: "Revisão" });
+    expect(msg).toBe("Show, entendi que foi Revisão! Só falta o valor — quanto foi?");
   });
 
   test("expense_create_confirmation uses valor/categoria/label", () => {
