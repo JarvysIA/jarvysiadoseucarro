@@ -1092,6 +1092,208 @@ describe("conversation handoff fallback (C8)", () => {
     // deste arquivo foi editado, removido ou teve seu corpo alterado.
     expect(true).toBe(true);
   });
+
+  // ============================================================
+  // I6 — gatilho ampliado: expense_quote_acknowledged /
+  // expense_technical_question_acknowledged vão direto pro Dr. Jarvys,
+  // sem esperar fallback nenhum. expense_future_service_acknowledged
+  // fica de fora de propósito (afirmação, não pergunta).
+  // ============================================================
+
+  const directRouteKeys: ConversationResponseKey[] = [
+    "expense_quote_acknowledged",
+    "expense_technical_question_acknowledged",
+  ];
+
+  for (const key of directRouteKeys) {
+    test(`I6-1. responseKey=${key}, dependência fornecida, handled:true outcome:primary_succeeded => response final null, dependência FOI chamada`, async () => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      let renderCalls = 0;
+      const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionFallback({ responseKey: key, reasonCode: key }),
+          render: () => {
+            renderCalls++;
+            return "não deveria ser chamado";
+          },
+          conversationHandoffFallback: handoff.fn,
+        }),
+      );
+      expect(handoff.calls.length).toBe(1);
+      expect(renderCalls).toBe(0);
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response).toBe(null);
+    });
+  }
+
+  test("I6-3. responseKey=expense_future_service_acknowledged, dependência fornecida => dependência NUNCA chamada (exclusão deliberada)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () =>
+          decisionFallback({
+            responseKey: "expense_future_service_acknowledged",
+            reasonCode: "expense_future_service_acknowledged",
+          }),
+        render: () => "Entendi, você ainda vai fazer isso!",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "expense_future_service_acknowledged",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Entendi, você ainda vai fazer isso!",
+    });
+  });
+
+  test("I6-4. responseKey=fallback_first, dependência fornecida => dependência NUNCA chamada (regressão do comportamento já existente)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback({ responseKey: "fallback_first" }),
+        render: () => "Não entendi, pode reformular?",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toEqual({
+      responseKey: "fallback_first",
+      messageType: "text",
+      purpose: "general",
+      textBody: "Não entendi, pode reformular?",
+    });
+  });
+
+  test("I6-5. responseKey=fallback_second continua funcionando exatamente como antes (regressão explícita do C8 original)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        decide: () => decisionFallback(),
+        render: () => "não deveria ser chamado",
+        conversationHandoffFallback: handoff.fn,
+      }),
+    );
+    expect(handoff.calls.length).toBe(1);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response).toBe(null);
+  });
+
+  for (const key of directRouteKeys) {
+    test(`I6-6. responseKey=${key}, dependência NÃO fornecida => comportamento idêntico ao existente hoje (texto fixo normal, sem interceptação)`, async () => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionFallback({ responseKey: key, reasonCode: key }),
+          render: () => "Texto fixo normal.",
+          // conversationHandoffFallback omitido de propósito
+        }),
+      );
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response).toEqual({
+        responseKey: key,
+        messageType: "text",
+        purpose: "general",
+        textBody: "Texto fixo normal.",
+      });
+    });
+  }
+
+  for (const key of directRouteKeys) {
+    test(`I6-7. responseKey=${key}, dependência LANÇA exceção => capturada, item segue com o texto fixo normal, não trava`, async () => {
+      const it = makeItem();
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      const { logger, events } = collectLogger();
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          logger,
+          decide: () => decisionFallback({ responseKey: key, reasonCode: key }),
+          render: () => "Texto fixo normal.",
+          conversationHandoffFallback: async () => {
+            throw new Error("C7 indisponível");
+          },
+        }),
+      );
+      expect(res.counts.outcomeUnknown).toBe(0);
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response).toEqual({
+        responseKey: key,
+        messageType: "text",
+        purpose: "general",
+        textBody: "Texto fixo normal.",
+      });
+      expect(
+        events.some(
+          (e) => e.event === "item_failed" && e.reasonCode === "conversation_handoff_failed",
+        ),
+      ).toBe(true);
+    });
+  }
+
+  for (const key of directRouteKeys) {
+    test(`I6-8. responseKey=${key}, dependência fornecida, item.userId null => dependência NUNCA chamada (fail-closed já existente)`, async () => {
+      const it = makeItem({ userId: null });
+      const m = mockRepo({
+        claim: [[it]],
+        loadContext: [okContext()],
+        apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+      });
+      const handoff = trackedHandoff(() => ({ handled: true, outcome: "primary_succeeded" }));
+      const res = await runWhatsappOrchestratorTestCycle(
+        { workerId: "w" },
+        baseDeps(m.repo, {
+          decide: () => decisionFallback({ responseKey: key, reasonCode: key }),
+          render: () => "Texto fixo normal.",
+          conversationHandoffFallback: handoff.fn,
+        }),
+      );
+      expect(handoff.calls.length).toBe(0);
+      expect(res.counts.completed).toBe(1);
+      expect(m.calls.apply[0].response?.responseKey).toBe(key);
+    });
+  }
 });
 
 // ============================================================
