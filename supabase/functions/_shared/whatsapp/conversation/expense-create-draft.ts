@@ -68,6 +68,14 @@ export type AwaitingVehicleExpenseDraft = {
   readonly ambiguousFilterMention?: boolean;
   // I2 — ver comentário em AwaitingCategoryExpenseDraft.
   readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
+  // OCR-KM-1 — campos aditivos vindos do OCR de nota fiscal (Build OCR-1/2,
+  // ParsedReceipt.km_registrada/data_servico). null explícito = o OCR
+  // processou a nota mas não achou o dado; campo ausente (undefined) = este
+  // draft não veio de OCR (fluxo de texto normal). Este build só transporta
+  // o valor entre fases — nenhuma regra de negócio (não usa pra pular
+  // awaiting_requested_km, isso é OCR-KM-2).
+  readonly kmRegistrada?: number | null;
+  readonly dataServico?: string | null;
 };
 
 export type AwaitingConfirmationExpenseDraft = {
@@ -83,6 +91,9 @@ export type AwaitingConfirmationExpenseDraft = {
   readonly ambiguousFilterMention?: boolean;
   // I2 — ver comentário em AwaitingCategoryExpenseDraft.
   readonly occurrenceKind?: ExplicitExpenseIntent | "ambiguous";
+  // OCR-KM-1 — ver comentário em AwaitingVehicleExpenseDraft.
+  readonly kmRegistrada?: number | null;
+  readonly dataServico?: string | null;
 };
 
 export type AwaitingValueExpenseDraft = {
@@ -163,7 +174,9 @@ export type ExpenseDraftValidationErrorCode =
   | "invalid_trigger"
   | "invalid_allow_retry"
   | "invalid_retried_once"
-  | "invalid_occurrence_kind";
+  | "invalid_occurrence_kind"
+  | "invalid_km_registrada"
+  | "invalid_data_servico";
 
 export type ExpenseDraftValidationResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -214,6 +227,37 @@ const OCCURRENCE_KIND_SET: ReadonlySet<string> = new Set([
 
 function isValidOccurrenceKind(value: unknown): value is ExplicitExpenseIntent | "ambiguous" {
   return typeof value === "string" && OCCURRENCE_KIND_SET.has(value);
+}
+
+// OCR-KM-1 — mesmos bounds de KM_MIN_VALUE/KM_MAX_VALUE em
+// km-update-draft.ts. Duplicado aqui (não importado) pelo mesmo critério já
+// usado em receipt-to-expense-draft.ts para UUID_REGEX: acoplar dois
+// módulos de draft por uma constante primitiva tão pequena criaria mais
+// dependência estrutural do que vale.
+const KM_REGISTRADA_MIN_VALUE = 0;
+const KM_REGISTRADA_MAX_VALUE = 2147483647;
+
+// OCR-KM-1 — null explícito (OCR processou e não achou km) é válido;
+// campo ausente é tratado no call site via hasOwn, não aqui.
+function isValidKmRegistradaField(value: unknown): value is number | null {
+  if (value === null) return true;
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= KM_REGISTRADA_MIN_VALUE &&
+    value <= KM_REGISTRADA_MAX_VALUE
+  );
+}
+
+// OCR-KM-1 — só formato (YYYY-MM-DD). Deliberadamente SEM regra de negócio
+// (não checa se a data é futura, não checa idade máxima) — fora de escopo
+// deste build. null explícito (OCR processou e não achou data) é válido.
+const DATA_SERVICO_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDataServicoField(value: unknown): value is string | null {
+  if (value === null) return true;
+  return typeof value === "string" && DATA_SERVICO_REGEX.test(value);
 }
 
 const MAINTENANCE_TAGS_SET: ReadonlySet<string> = new Set(MAINTENANCE_TRIGGER_TAGS);
@@ -327,6 +371,8 @@ const VEHICLE_OPTIONAL_KEYS = [
   "descricaoPreliminar",
   "ambiguousFilterMention",
   "occurrenceKind",
+  "kmRegistrada",
+  "dataServico",
 ] as const;
 const VEHICLE_ALL_KEYS: ReadonlyArray<string> = [
   ...VEHICLE_REQUIRED_KEYS,
@@ -345,6 +391,8 @@ const CONFIRMATION_OPTIONAL_KEYS = [
   "descricao",
   "ambiguousFilterMention",
   "occurrenceKind",
+  "kmRegistrada",
+  "dataServico",
 ] as const;
 const CONFIRMATION_ALL_KEYS: ReadonlyArray<string> = [
   ...CONFIRMATION_REQUIRED_KEYS,
@@ -653,6 +701,14 @@ export function validateAwaitingVehicleExpenseDraft(
   if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
     return { ok: false, code: "invalid_occurrence_kind" };
   }
+  const hasKmRegistrada = hasOwn(input, "kmRegistrada");
+  if (hasKmRegistrada && !isValidKmRegistradaField(input.kmRegistrada)) {
+    return { ok: false, code: "invalid_km_registrada" };
+  }
+  const hasDataServico = hasOwn(input, "dataServico");
+  if (hasDataServico && !isValidDataServicoField(input.dataServico)) {
+    return { ok: false, code: "invalid_data_servico" };
+  }
 
   return {
     ok: true,
@@ -673,6 +729,8 @@ export function validateAwaitingVehicleExpenseDraft(
       ...(hasOccurrenceKind
         ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),
+      ...(hasKmRegistrada ? { kmRegistrada: input.kmRegistrada as number | null } : {}),
+      ...(hasDataServico ? { dataServico: input.dataServico as string | null } : {}),
     },
   };
 }
@@ -723,6 +781,14 @@ export function validateAwaitingConfirmationExpenseDraft(
   if (hasOccurrenceKind && !isValidOccurrenceKind(input.occurrenceKind)) {
     return { ok: false, code: "invalid_occurrence_kind" };
   }
+  const hasKmRegistrada = hasOwn(input, "kmRegistrada");
+  if (hasKmRegistrada && !isValidKmRegistradaField(input.kmRegistrada)) {
+    return { ok: false, code: "invalid_km_registrada" };
+  }
+  const hasDataServico = hasOwn(input, "dataServico");
+  if (hasDataServico && !isValidDataServicoField(input.dataServico)) {
+    return { ok: false, code: "invalid_data_servico" };
+  }
 
   return {
     ok: true,
@@ -742,6 +808,8 @@ export function validateAwaitingConfirmationExpenseDraft(
       ...(hasOccurrenceKind
         ? { occurrenceKind: input.occurrenceKind as ExplicitExpenseIntent | "ambiguous" }
         : {}),
+      ...(hasKmRegistrada ? { kmRegistrada: input.kmRegistrada as number | null } : {}),
+      ...(hasDataServico ? { dataServico: input.dataServico as string | null } : {}),
     },
   };
 }

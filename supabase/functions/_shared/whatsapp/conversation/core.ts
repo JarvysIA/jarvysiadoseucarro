@@ -417,6 +417,8 @@ function extractPartialExpenseDraft(state: ConversationState): {
   recognizedTags?: ReadonlyArray<MaintenanceTriggerTag>;
   descricaoPreliminar?: string | null;
   ambiguousFilterMention?: boolean;
+  kmRegistrada?: number | null;
+  dataServico?: string | null;
 } | null {
   if (state.draftType !== "expense") return null;
   if (state.draftVersion !== 0 && state.draftVersion !== 1) return null;
@@ -435,6 +437,9 @@ function extractPartialExpenseDraft(state: ConversationState): {
     ...("ambiguousFilterMention" in v.value
       ? { ambiguousFilterMention: v.value.ambiguousFilterMention }
       : {}),
+    // OCR-KM-1 — mesmo padrão spread condicional dos campos acima.
+    ...("kmRegistrada" in v.value ? { kmRegistrada: v.value.kmRegistrada } : {}),
+    ...("dataServico" in v.value ? { dataServico: v.value.dataServico } : {}),
   };
 }
 
@@ -739,6 +744,11 @@ export function decideConversation(input: ConversationCoreInput): ConversationCo
           ...("descricaoPreliminar" in expensePartial
             ? { descricao: expensePartial.descricaoPreliminar }
             : {}),
+          // OCR-KM-1 — mesmo padrão condicional dos campos acima.
+          ...("kmRegistrada" in expensePartial
+            ? { kmRegistrada: expensePartial.kmRegistrada }
+            : {}),
+          ...("dataServico" in expensePartial ? { dataServico: expensePartial.dataServico } : {}),
         };
         const validated = validateAwaitingConfirmationExpenseDraft(candidate);
         if (validated.ok && isUuid(veh.id)) {

@@ -481,6 +481,78 @@ describe("validateAwaitingVehicleExpenseDraft", () => {
     validateAwaitingVehicleExpenseDraft(input);
     expect(JSON.stringify(input)).toBe(snap);
   });
+
+  // OCR-KM-1 — kmRegistrada/dataServico
+  it("aceita kmRegistrada e dataServico válidos", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      kmRegistrada: 45000,
+      dataServico: "2026-07-01",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.kmRegistrada).toBe(45000);
+      expect(r.value.dataServico).toBe("2026-07-01");
+    }
+  });
+
+  it("aceita kmRegistrada: null e dataServico: null explícitos", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      kmRegistrada: null,
+      dataServico: null,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.kmRegistrada).toBeNull();
+      expect(r.value.dataServico).toBeNull();
+    }
+  });
+
+  it("aceita ausência de kmRegistrada/dataServico (draft não veio de OCR)", () => {
+    const r = validateAwaitingVehicleExpenseDraft(vehicleBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("kmRegistrada" in r.value).toBe(false);
+      expect("dataServico" in r.value).toBe(false);
+    }
+  });
+
+  it.each([
+    ["negativo", -1],
+    ["não-inteiro", 45000.5],
+    ["acima do bound máximo", 2147483648],
+    ["string", "45000"],
+  ])("rejeita kmRegistrada %s", (_l: string, v: unknown) => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      kmRegistrada: v,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_km_registrada");
+  });
+
+  it("aceita kmRegistrada no bound máximo exato", () => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      kmRegistrada: 2147483647,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it.each([
+    ["formato errado (DD/MM/YYYY)", "01/07/2026"],
+    ["formato errado (sem zero-padding)", "2026-7-1"],
+    ["número", 20260701],
+    ["string vazia", ""],
+  ])("rejeita dataServico %s", (_l: string, v: unknown) => {
+    const r = validateAwaitingVehicleExpenseDraft({
+      ...vehicleBase(),
+      dataServico: v,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_data_servico");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -568,6 +640,78 @@ describe("validateAwaitingConfirmationExpenseDraft", () => {
     const snap = JSON.stringify(input);
     validateAwaitingConfirmationExpenseDraft(input);
     expect(JSON.stringify(input)).toBe(snap);
+  });
+
+  // OCR-KM-1 — kmRegistrada/dataServico
+  it("aceita kmRegistrada e dataServico válidos", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      kmRegistrada: 45000,
+      dataServico: "2026-07-01",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.kmRegistrada).toBe(45000);
+      expect(r.value.dataServico).toBe("2026-07-01");
+    }
+  });
+
+  it("aceita kmRegistrada: null e dataServico: null explícitos", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      kmRegistrada: null,
+      dataServico: null,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.kmRegistrada).toBeNull();
+      expect(r.value.dataServico).toBeNull();
+    }
+  });
+
+  it("aceita ausência de kmRegistrada/dataServico (draft não veio de OCR)", () => {
+    const r = validateAwaitingConfirmationExpenseDraft(confirmationBase());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("kmRegistrada" in r.value).toBe(false);
+      expect("dataServico" in r.value).toBe(false);
+    }
+  });
+
+  it.each([
+    ["negativo", -1],
+    ["não-inteiro", 45000.5],
+    ["acima do bound máximo", 2147483648],
+    ["string", "45000"],
+  ])("rejeita kmRegistrada %s", (_l: string, v: unknown) => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      kmRegistrada: v,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_km_registrada");
+  });
+
+  it("aceita kmRegistrada no bound máximo exato", () => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      kmRegistrada: 2147483647,
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it.each([
+    ["formato errado (DD/MM/YYYY)", "01/07/2026"],
+    ["formato errado (sem zero-padding)", "2026-7-1"],
+    ["número", 20260701],
+    ["string vazia", ""],
+  ])("rejeita dataServico %s", (_l: string, v: unknown) => {
+    const r = validateAwaitingConfirmationExpenseDraft({
+      ...confirmationBase(),
+      dataServico: v,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("invalid_data_servico");
   });
 });
 

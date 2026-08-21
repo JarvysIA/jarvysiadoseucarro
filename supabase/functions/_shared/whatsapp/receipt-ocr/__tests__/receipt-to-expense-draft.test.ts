@@ -33,6 +33,9 @@ describe("mapReceiptToExpenseDraft", () => {
       categoria: "Revisão",
       valor: 350.5,
       requestMessageId: REQUEST_MESSAGE_ID,
+      // OCR-KM-1 — transportados do receipt (makeReceipt() default).
+      kmRegistrada: 45000,
+      dataServico: "2026-08-01",
     });
     const validated = validateAwaitingVehicleExpenseDraft(result.draft);
     expect(validated.ok).toBe(true);
@@ -52,6 +55,9 @@ describe("mapReceiptToExpenseDraft", () => {
       valor: 350.5,
       vehicleId: VEHICLE_ID,
       requestMessageId: REQUEST_MESSAGE_ID,
+      // OCR-KM-1 — transportados do receipt (makeReceipt() default).
+      kmRegistrada: 45000,
+      dataServico: "2026-08-01",
     });
     if (result.draft.phase === "awaiting_confirmation") {
       expect(result.draft.vehicleId).toBe(VEHICLE_ID);
@@ -118,5 +124,68 @@ describe("mapReceiptToExpenseDraft", () => {
     expect(result.draft.phase).toBe("awaiting_vehicle");
     const validated = validateAwaitingVehicleExpenseDraft(result.draft);
     expect(validated.ok).toBe(true);
+  });
+
+  // OCR-KM-1
+  test("km_registrada: null (OCR não achou km) chega no draft como null, não ausente (fase awaiting_vehicle)", () => {
+    const result = mapReceiptToExpenseDraft(makeReceipt({ km_registrada: null }), {
+      requestMessageId: REQUEST_MESSAGE_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect("kmRegistrada" in result.draft).toBe(true);
+    expect(result.draft.kmRegistrada).toBeNull();
+    const validated = validateAwaitingVehicleExpenseDraft(result.draft);
+    expect(validated.ok).toBe(true);
+  });
+
+  test("km_registrada: null (OCR não achou km) chega no draft como null, não ausente (fase awaiting_confirmation)", () => {
+    const result = mapReceiptToExpenseDraft(makeReceipt({ km_registrada: null }), {
+      requestMessageId: REQUEST_MESSAGE_ID,
+      vehicleId: VEHICLE_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect("kmRegistrada" in result.draft).toBe(true);
+    expect(result.draft.kmRegistrada).toBeNull();
+    const validated = validateAwaitingConfirmationExpenseDraft(result.draft);
+    expect(validated.ok).toBe(true);
+  });
+
+  test("data_servico: null (OCR não achou data) chega no draft como null, não ausente", () => {
+    const result = mapReceiptToExpenseDraft(makeReceipt({ data_servico: null }), {
+      requestMessageId: REQUEST_MESSAGE_ID,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect("dataServico" in result.draft).toBe(true);
+    expect(result.draft.dataServico).toBeNull();
+    const validated = validateAwaitingVehicleExpenseDraft(result.draft);
+    expect(validated.ok).toBe(true);
+  });
+
+  test("km_registrada e data_servico presentes chegam intactos no draft, ambas as fases", () => {
+    const resultVehicle = mapReceiptToExpenseDraft(
+      makeReceipt({ km_registrada: 12345, data_servico: "2026-05-15" }),
+      { requestMessageId: REQUEST_MESSAGE_ID },
+    );
+    expect(resultVehicle.ok).toBe(true);
+    if (resultVehicle.ok) {
+      expect(resultVehicle.draft.kmRegistrada).toBe(12345);
+      expect(resultVehicle.draft.dataServico).toBe("2026-05-15");
+    }
+
+    const resultConfirmation = mapReceiptToExpenseDraft(
+      makeReceipt({ km_registrada: 12345, data_servico: "2026-05-15" }),
+      { requestMessageId: REQUEST_MESSAGE_ID, vehicleId: VEHICLE_ID },
+    );
+    expect(resultConfirmation.ok).toBe(true);
+    if (resultConfirmation.ok) {
+      expect(resultConfirmation.draft.kmRegistrada).toBe(12345);
+      expect(resultConfirmation.draft.dataServico).toBe("2026-05-15");
+    }
   });
 });

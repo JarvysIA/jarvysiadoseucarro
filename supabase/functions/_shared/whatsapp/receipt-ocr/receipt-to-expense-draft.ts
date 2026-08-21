@@ -76,6 +76,12 @@ export function mapReceiptToExpenseDraft(
         valor,
         vehicleId: context.vehicleId,
         requestMessageId: context.requestMessageId,
+        // OCR-KM-1 — transporte bruto do OCR pro draft; qualquer valor que o
+        // validator de expense-create-draft rejeitaria (km fora dos bounds,
+        // data em formato errado) é responsabilidade fail-closed do
+        // validator, não deste mapper.
+        kmRegistrada: receipt.km_registrada,
+        dataServico: receipt.data_servico,
       },
     };
   }
@@ -87,6 +93,8 @@ export function mapReceiptToExpenseDraft(
       categoria,
       valor,
       requestMessageId: context.requestMessageId,
+      kmRegistrada: receipt.km_registrada,
+      dataServico: receipt.data_servico,
     },
   };
 }
