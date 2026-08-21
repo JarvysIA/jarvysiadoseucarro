@@ -189,6 +189,7 @@ export type ConversationResponseKey =
   | "expense_create_correction_confirmation"
   | "expense_create_completed"
   | "expense_create_completed_with_km_prompt"
+  | "expense_create_completed_with_km_confirmation"
   | "expense_create_retry_needed"
   | "requested_km_unknown"
   | "media_unclear_during_confirmation"

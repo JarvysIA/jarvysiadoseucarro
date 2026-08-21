@@ -1180,7 +1180,13 @@ async function handleConfirmExpenseCreate(
     );
   }
   const expenseResult = await executeConfirmedExpenseCreate(expenseInput, deps.expenseActionDeps);
-  const finalization = buildExpenseFinalization(expenseResult, ctx, draft.vehicleId);
+  const finalization = buildExpenseFinalization(
+    expenseResult,
+    ctx,
+    draft.vehicleId,
+    "kmRegistrada" in draft ? draft.kmRegistrada : undefined,
+    item.messageId,
+  );
   if (finalization.kind === "retry") {
     return await releaseAs(item, deps, "transient_error", "expense_action_transient", "releasedForRetry", log, workerId);
   }

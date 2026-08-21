@@ -24,6 +24,7 @@ const ALL_KEYS = [
   "expense_create_correction_confirmation",
   "expense_create_completed",
   "expense_create_completed_with_km_prompt",
+  "expense_create_completed_with_km_confirmation",
   "expense_create_retry_needed",
 ] as const;
 
@@ -174,6 +175,52 @@ describe("renderResponse guardrails", () => {
     expect(msg).toContain("R$ 149,90");
     expect(msg).toContain("Combustível");
     expect(msg).toContain("Fiat Argo");
+  });
+
+  // OCR-KM-2 — variante normal (sem correção): previousKm presente,
+  // newKm >= previousKm.
+  test("expense_create_completed_with_km_confirmation (normal, sem correção)", () => {
+    const msg = renderResponse("expense_create_completed_with_km_confirmation", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+      newKm: 45000,
+      previousKm: 40000,
+    });
+    expect(msg).toContain("R$ 149,90");
+    expect(msg).toContain("Combustível");
+    expect(msg).toContain("Fiat Argo");
+    expect(msg).toContain("45000");
+    expect(msg).toContain("40000");
+    expect(msg.toLowerCase()).not.toContain("corrigir");
+  });
+
+  // OCR-KM-2 — variante sem previousKm (veículo sem kmAtual): não deve
+  // mencionar km anterior nenhum, mas ainda pede confirmação.
+  test("expense_create_completed_with_km_confirmation (sem previousKm)", () => {
+    const msg = renderResponse("expense_create_completed_with_km_confirmation", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+      newKm: 45000,
+    });
+    expect(msg).toContain("45000");
+    expect(msg.toLowerCase()).not.toContain("corrigir");
+  });
+
+  // OCR-KM-2 — variante de correção: newKm < previousKm, mesmo sinal que
+  // action-finalization.ts usa pra decidir isCorrection.
+  test("expense_create_completed_with_km_confirmation (correção, newKm < previousKm)", () => {
+    const msg = renderResponse("expense_create_completed_with_km_confirmation", {
+      valor: 149.9,
+      categoria: "Combustível",
+      vehicleLabel: "Fiat Argo",
+      newKm: 45000,
+      previousKm: 50000,
+    });
+    expect(msg).toContain("45000");
+    expect(msg).toContain("50000");
+    expect(msg.toLowerCase()).toContain("corrigir");
   });
 
   test("expense_create_retry_needed does not depend on params", () => {
