@@ -132,6 +132,26 @@ export function renderResponse(
       const cat = params.categoria ?? "essa categoria";
       return `Prontinho! Anotei ${v} em ${cat} no ${label}. Aproveitando, qual a km atual do carro?`;
     }
+    case "expense_create_completed_with_km_confirmation": {
+      const label = params.vehicleLabel ?? "seu carro";
+      const v = formatValor(params.valor);
+      const cat = params.categoria ?? "essa categoria";
+      const nk = formatKm(params.newKm);
+      const prev = params.previousKm;
+      // OCR-KM-2 — mesmo sinal (newKm < previousKm) que
+      // action-finalization.ts usa pra decidir isCorrection e que
+      // validateAwaitingConfirmationKmUpdateDraft usa pra checar
+      // consistência — não um mecanismo novo de diferenciação.
+      const isCorrection =
+        typeof prev === "number" && typeof params.newKm === "number" && params.newKm < prev;
+      if (isCorrection) {
+        return `Entendi, ${cat} de ${v} em ${label} registrada! A nota também mostrou ${nk} km, menor que os ${formatKm(prev)} km atuais — corrigir mesmo assim? Responda sim para confirmar.`;
+      }
+      if (typeof prev === "number") {
+        return `Entendi, ${cat} de ${v} em ${label} registrada! A nota também mostrou ${nk} km (hoje está ${formatKm(prev)} km) — confirma que é essa a km atual?`;
+      }
+      return `Entendi, ${cat} de ${v} em ${label} registrada! A nota também mostrou ${nk} km — confirma que é essa a km atual?`;
+    }
     case "expense_create_retry_needed":
       return "Não consegui concluir agora. Pode me contar a despesa de novo?";
     case "requested_km_unknown":

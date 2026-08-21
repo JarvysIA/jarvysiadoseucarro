@@ -15,6 +15,10 @@ import type {
 import type { ConfirmedKmUpdateResult } from "../actions/types.ts";
 import type { ConfirmedExpenseCreateResult } from "../actions/expense-types.ts";
 import type { LoadContextResult } from "./types.ts";
+import {
+  KM_UPDATE_INITIAL_DRAFT_VERSION,
+  validateAwaitingConfirmationKmUpdateDraft,
+} from "../conversation/km-update-draft.ts";
 
 const MAINTENANCE_TAG_ORDER: ReadonlyArray<string> = [
   "oleo",
@@ -160,6 +164,8 @@ export function buildExpenseFinalization(
   result: ConfirmedExpenseCreateResult,
   ctx: Extract<LoadContextResult, { kind: "ok" }>,
   vehicleId: string,
+  kmRegistrada?: number | null,
+  confirmationMessageId?: string,
 ): ExpenseFinalization {
   const clearingPatch: ConversationStatePatch = {
     state: "idle",
@@ -182,6 +188,70 @@ export function buildExpenseFinalization(
   switch (result.kind) {
     case "completed":
     case "replayed": {
+      // OCR-KM-2 — quando a despesa veio de uma nota fiscal com km lida
+      // (kmRegistrada), pula a pergunta aberta de awaiting_requested_km e
+      // vai direto pra uma confirmação de km já com o valor sugerido, numa
+      // única mensagem combinada com a confirmação da despesa. Só ativa
+      // quando AMBOS kmRegistrada e confirmationMessageId estão presentes —
+      // sem confirmationMessageId não há requestMessageId válido pro draft
+      // de km, e sem kmRegistrada não há valor pra sugerir. Qualquer
+      // invariante violada (validateAwaitingConfirmationKmUpdateDraft
+      // rejeitando) cai fail-safe no comportamento já existente abaixo,
+      // nunca quebra o fluxo de despesa por causa de um problema no lado km.
+      if (typeof kmRegistrada === "number" && typeof confirmationMessageId === "string") {
+        const veh = ctx.context.vehicles.find((x) => x.id === vehicleId);
+        const prev = veh?.kmAtual ?? null;
+        const isCorrection = prev !== null && kmRegistrada < prev;
+        const kmCandidate = {
+          phase: "awaiting_confirmation" as const,
+          vehicleId,
+          expectedPreviousKm: prev,
+          newKm: kmRegistrada,
+          requestMessageId: confirmationMessageId,
+          isCorrection,
+          linkedExpenseId: result.despesaId,
+        };
+        const validatedKm = validateAwaitingConfirmationKmUpdateDraft(kmCandidate);
+        if (validatedKm.ok) {
+          const kmConfirmationPatch: ConversationStatePatch = {
+            state: isCorrection ? "awaiting_km_correction" : "awaiting_km_confirmation",
+            currentIntent: "km_update",
+            awaitingField: "confirmation",
+            draftType: "km_update",
+            draftId: confirmationMessageId,
+            draftVersion: KM_UPDATE_INITIAL_DRAFT_VERSION,
+            draftPayload: validatedKm.value as unknown as Record<string, unknown>,
+            confirmedAt: null,
+            executedAt: null,
+          };
+          return {
+            kind: "finalize",
+            decision: {
+              previousState: ctx.context.state.state,
+              nextState: isCorrection
+                ? ("awaiting_km_correction" as const)
+                : ("awaiting_km_confirmation" as const),
+              statePatch: kmConfirmationPatch,
+              nextFallbackCount: ctx.context.fallbackCount,
+              deferToLegacyRouter: false,
+              deferToLegacyOptOut: false,
+              eventKind: "confirm",
+              decisionKind: "transition",
+              outcome: "completed",
+              responseKey: "expense_create_completed_with_km_confirmation",
+              responseParams: {
+                vehicleLabel,
+                valor: result.valor,
+                categoria: result.categoria,
+                newKm: kmRegistrada,
+                previousKm: prev,
+              },
+              reasonCode: `expense_action_${result.kind}_with_km_confirmation_skip`,
+            },
+          };
+        }
+        // Invariante violada — cai fail-safe no comportamento já existente.
+      }
       // Build 6a/9 do item 6 — guarda o ID da despesa recém-criada em
       // draftId, pra "viajar" durante o awaiting_requested_km e ser
       // recuperado quando a km for confirmada (ver core.ts, seção 6.6).

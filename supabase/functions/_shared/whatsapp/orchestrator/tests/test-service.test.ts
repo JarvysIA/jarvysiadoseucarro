@@ -2380,6 +2380,66 @@ describe("confirm_expense_create", () => {
     expect(m.calls.apply[0].patch.state).toBe("awaiting_requested_km");
   });
 
+  // OCR-KM-2 — draft de despesa com kmRegistrada (veio de OCR) → confirma
+  // despesa → estado final é awaiting_km_confirmation (não
+  // awaiting_requested_km), com draftPayload de km válido e
+  // linkedExpenseId apontando pra despesa recém-criada.
+  test("f) OCR-KM-2: draft com kmRegistrada => awaiting_km_confirmation (não awaiting_requested_km), linkedExpenseId correto", async () => {
+    const CONFIRMATION_MSG_ID = "55555555-5555-4555-8555-555555555555";
+    const it = makeItem({ messageId: CONFIRMATION_MSG_ID });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [
+        expenseContext({ state: expenseState(validExpensePayload({ kmRegistrada: 45000 })) }),
+      ],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe(
+      "expense_create_completed_with_km_confirmation",
+    );
+    const patch = m.calls.apply[0].patch;
+    expect(patch.state).toBe("awaiting_km_confirmation");
+    expect(patch.currentIntent).toBe("km_update");
+    expect(patch.awaitingField).toBe("confirmation");
+    expect(patch.draftType).toBe("km_update");
+    expect(patch.draftId).toBe(CONFIRMATION_MSG_ID);
+    const payload = patch.draftPayload as Record<string, unknown>;
+    expect(payload.phase).toBe("awaiting_confirmation");
+    expect(payload.newKm).toBe(45000);
+    expect(payload.vehicleId).toBe(VEHICLE_ID);
+    expect(payload.requestMessageId).toBe(CONFIRMATION_MSG_ID);
+    expect(payload.linkedExpenseId).toBe(DESP_ID);
+  });
+
+  // Draft SEM kmRegistrada (fluxo normal, sem OCR) → comportamento
+  // idêntico ao já existente, regressão explícita.
+  test("g) sem kmRegistrada no draft => continua awaiting_requested_km (regressão)", async () => {
+    const it = makeItem();
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [expenseContext({ state: expenseState() })],
+      apply: [applyOk],
+    });
+    const xp = mockExpenseDeps([
+      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+    ]);
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { decide: () => decisionConfirmExpense(), expenseActionDeps: xp.deps }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0].response?.responseKey).toBe("expense_create_completed_with_km_prompt");
+    expect(m.calls.apply[0].patch.state).toBe("awaiting_requested_km");
+  });
+
   test("c) rejected (categoria_invalid) => completed (apply ok), expense_create_retry_needed", async () => {
     const it = makeItem();
     const m = mockRepo({
