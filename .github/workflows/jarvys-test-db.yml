@@ -55,6 +55,14 @@ jobs:
         id: install
         run: bun install --frozen-lockfile
 
+      - name: Instalar ripgrep (dependência de testes estáticos)
+        id: install_ripgrep
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y ripgrep
+          rg --version
+
       - name: Suite automatizada TypeScript/JavaScript completa
         id: test_suite
         run: bun test
@@ -445,6 +453,7 @@ jobs:
             echo "- checkout: ${{ steps.checkout.outcome }}"
             echo "- setup Bun: ${{ steps.setup_bun.outcome }}"
             echo "- instalação congelada: ${{ steps.install.outcome }}"
+            echo "- instalação do ripgrep: ${{ steps.install_ripgrep.outcome }}"
             echo "- suíte automatizada completa (\`bun test\`): ${{ steps.test_suite.outcome }}"
             echo "- typecheck (\`bun run typecheck\`): ${{ steps.typecheck.outcome }}"
             echo "- typecheck C2A (conversation-handoff): ${{ steps.typecheck_conversation_handoff_c2a.outcome }}"
