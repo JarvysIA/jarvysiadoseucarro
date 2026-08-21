@@ -50,7 +50,7 @@ export type ParsedReceipt = {
 
 const SYSTEM_PROMPT = `Você é um sistema avançado de Inteligência Artificial Automotiva lendo notas fiscais e orçamentos do Brasil, que frequentemente contêm apenas códigos (SKUs), abreviações caóticas ou marcas sem o nome da peça. É muito importante o seu entendimento da leitura pra que você categorize as peças/produtos da forma correta. Cada auto peça, auto Center ou oficina descreve de uma forma diferente. Você tem que entender.
 
-REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 7 opções:
+REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 8 opções:
 - "Revisão": manutenção preventiva programada (troca de óleo/filtros/velas/correia/fluidos, revisão de fábrica).
 - "Manutenção": conserto imprevisto/corretivo (vidro quebrado, peça estourada, embreagem, suspensão, bateria queimada, freios por desgaste, funilaria, elétrica).
 - "Lavagem": lavagem simples/completa, higienização, polimento, enceramento.
@@ -58,6 +58,7 @@ REGRA DE CLASSIFICAÇÃO (campo "categoria") — escolha EXATAMENTE uma das 7 op
 - "IPVA": boleto/guia de imposto do veículo (Detran, Secretaria da Fazenda, IPVA, DPVAT, licenciamento anual, taxa de emplacamento).
 - "Multas": infração de trânsito, auto de infração, notificação de penalidade (Detran, prefeitura, PRF, radar).
 - "Seguro": apólice de seguro auto, parcela/boleto de seguradora (Porto, Bradesco, Allianz, Azul, HDI, etc.), assistência 24h, seguro de vidros.
+- "Acessórios": compra de itens não relacionados a manutenção/reparo mecânico (som automotivo, multimídia, tapetes, capas de banco, película, rodas estéticas, acabamentos, acessórios de personalização).
 
 DIRETRIZ DE CLASSIFICAÇÃO E DEDUÇÃO AUTOMOTIVA (VERSÃO DEFINITIVA):
 
@@ -85,7 +86,7 @@ Você tem liberdade total para deduzir e reescrever o NOME do item, mas é ESTRI
 Regra de Falha (Fallback): Se a imagem estiver completamente ilegível, não invente dados. Preencha a descrição com 'Documento ilegível, por favor preencha manualmente'.
 
 Retorne EXATAMENTE e APENAS um objeto JSON neste formato, sem markdown:
-{ "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível|IPVA|Multas|Seguro", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
+{ "data_servico": "YYYY-MM-DD", "km_registrada": numero_ou_null, "valor_total": numero, "categoria": "Revisão|Manutenção|Lavagem|Combustível|IPVA|Multas|Seguro|Acessórios", "itens_identificados": [{"descricao": "string", "categoria": "oleo|filtros|pneus|freios|bateria|outro", "valor": numero}] }`;
 
 
 function stripJsonFences(text: string): string {
