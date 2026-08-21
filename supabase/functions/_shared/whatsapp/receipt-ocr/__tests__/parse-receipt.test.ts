@@ -162,6 +162,30 @@ describe("parseReceiptImage", () => {
     }
   });
 
+  // Item 3 — Acessórios foi adicionada ao SYSTEM_PROMPT (a IA agora é
+  // ensinada a escolher essa opção); confirma que a categoria chega
+  // intacta, sem cair no fallback "Manutenção".
+  test("categoria Acessórios (ensinada no SYSTEM_PROMPT) → ok true, categoria preservada", async () => {
+    setDenoEnv({ LOVABLE_API_KEY: VALID_KEY });
+    const payload = {
+      data_servico: null,
+      km_registrada: null,
+      valor_total: 250,
+      categoria: "Acessórios",
+      itens_identificados: [],
+    };
+    mockFetchResponse(200, {
+      choices: [{ message: { content: JSON.stringify(payload) } }],
+    });
+
+    const result = await parseReceiptImage({ imageBase64: SMALL_IMAGE });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.receipt.categoria).toBe("Acessórios");
+    }
+  });
+
   test("item de itens_identificados com categoria inválida (ex: roda) → normaliza para outro", async () => {
     setDenoEnv({ LOVABLE_API_KEY: VALID_KEY });
     const payload = {
