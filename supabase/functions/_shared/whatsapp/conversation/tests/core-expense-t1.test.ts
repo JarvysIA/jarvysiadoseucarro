@@ -285,6 +285,77 @@ describe("T1 despesa — resposta em awaiting_vehicle", () => {
     );
     expect(d.nextState).toBe("awaiting_vehicle");
   });
+
+  // OCR-KM-1 — pega a classe de bug do achado crítico do plan: sem a
+  // extração em extractPartialExpenseDraft + o repasse no candidate de
+  // awaiting_confirmation, kmRegistrada/dataServico somem silenciosamente
+  // assim que o usuário responde qual veículo é (mesma classe de bug já
+  // corrigida no I2 para occurrenceKind).
+  test("kmRegistrada/dataServico vindos do OCR sobrevivem à resposta de veículo", () => {
+    const s = state({
+      state: "awaiting_vehicle",
+      currentIntent: "expense",
+      awaitingField: "vehicle",
+      draftType: "expense",
+      draftId: MSG_A,
+      draftVersion: 0,
+      draftPayload: {
+        phase: "awaiting_vehicle",
+        categoria: "Combustível",
+        valor: 80,
+        requestMessageId: MSG_A,
+        kmRegistrada: 45000,
+        dataServico: "2026-07-01",
+      },
+    });
+    const d = decideConversation(
+      inp({
+        state: s,
+        originalText: "argo",
+        vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    expect(d.nextState).toBe("awaiting_expense_confirmation");
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload?.kmRegistrada).toBe(45000);
+    expect(payload?.dataServico).toBe("2026-07-01");
+  });
+
+  // kmRegistrada: null (OCR processou, não achou km) também precisa
+  // sobreviver — diferente de campo ausente.
+  test("kmRegistrada: null explícito sobrevive à resposta de veículo (não vira ausente)", () => {
+    const s = state({
+      state: "awaiting_vehicle",
+      currentIntent: "expense",
+      awaitingField: "vehicle",
+      draftType: "expense",
+      draftId: MSG_A,
+      draftVersion: 0,
+      draftPayload: {
+        phase: "awaiting_vehicle",
+        categoria: "Combustível",
+        valor: 80,
+        requestMessageId: MSG_A,
+        kmRegistrada: null,
+        dataServico: null,
+      },
+    });
+    const d = decideConversation(
+      inp({
+        state: s,
+        originalText: "argo",
+        vehicles: [veh(VEH_1, "Fiat", "Argo", "ABC1D23")],
+        sourceMessageId: MSG_B,
+      }),
+    );
+    const payload = d.statePatch.draftPayload as Record<string, unknown> | null;
+    expect(payload).not.toBeNull();
+    expect(payload && "kmRegistrada" in payload).toBe(true);
+    expect(payload?.kmRegistrada).toBeNull();
+    expect(payload && "dataServico" in payload).toBe(true);
+    expect(payload?.dataServico).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
