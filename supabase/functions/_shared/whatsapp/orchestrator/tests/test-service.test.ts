@@ -2395,7 +2395,13 @@ describe("confirm_expense_create", () => {
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
-      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+      {
+        kind: "applied",
+        actionExecutionId: EXEC_ID,
+        despesaId: DESP_ID,
+        valor: 149.9,
+        categoria: "Combustível",
+      },
     ]);
     const res = await runWhatsappOrchestratorTestCycle(
       { workerId: "w" },
@@ -2429,7 +2435,13 @@ describe("confirm_expense_create", () => {
       apply: [applyOk],
     });
     const xp = mockExpenseDeps([
-      { kind: "applied", actionExecutionId: EXEC_ID, despesaId: DESP_ID, valor: 149.9, categoria: "Combustível" },
+      {
+        kind: "applied",
+        actionExecutionId: EXEC_ID,
+        despesaId: DESP_ID,
+        valor: 149.9,
+        categoria: "Combustível",
+      },
     ]);
     const res = await runWhatsappOrchestratorTestCycle(
       { workerId: "w" },
