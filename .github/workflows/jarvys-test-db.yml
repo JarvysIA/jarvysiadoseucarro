@@ -67,6 +67,10 @@ jobs:
         id: typecheck_conversation_handoff_c2a
         run: bun run typecheck:conversation-handoff-c2a
 
+      - name: Typecheck do expense-concept-event-contract
+        id: typecheck_expense_concept_event_contract
+        run: bun run typecheck:expense-concept-event-contract
+
       - name: Build de producao
         id: build
         run: bun run build
@@ -444,6 +448,7 @@ jobs:
             echo "- suíte automatizada completa (\`bun test\`): ${{ steps.test_suite.outcome }}"
             echo "- typecheck (\`bun run typecheck\`): ${{ steps.typecheck.outcome }}"
             echo "- typecheck C2A (conversation-handoff): ${{ steps.typecheck_conversation_handoff_c2a.outcome }}"
+            echo "- typecheck expense-concept-event-contract (\`bun run typecheck:expense-concept-event-contract\`): ${{ steps.typecheck_expense_concept_event_contract.outcome }}"
             echo "- build de produção (\`bun run build\`): ${{ steps.build.outcome }}"
             echo "- testes puros do guard: ${{ steps.guard_tests.outcome }}"
             echo ""
