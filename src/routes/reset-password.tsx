@@ -21,14 +21,19 @@ function ResetPasswordPage() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Senha atualizada!");
+      navigate({ to: "/app" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível conectar. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
-    toast.success("Senha atualizada!");
-    navigate({ to: "/app" });
   };
 
   return (
