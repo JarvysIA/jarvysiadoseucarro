@@ -1,53 +1,34 @@
-# Recuperar o acesso da conta admin adm.fernando@yahoo.com — via link por e-mail
+# Corrigir autenticação quebrada no preview hospedado
 
-## Diagnóstico já confirmado
+## Diagnóstico confirmado
 
-- **O preview está funcionando.** `/` e `/login` renderizam normalmente; o erro antigo de
-  variáveis do backend não se reproduz mais (as variáveis estão presentes).
-- **A conta existe e está saudável**: e-mail confirmado, sem banimento, senha definida,
-  último acesso em 10/07/2026, `is_super_admin = true` no perfil.
-- **Único provedor vinculado é e-mail/senha** — não há identidade Google nem Apple.
-- **Causa**: uma tentativa de login pela própria tela retornou `400 Invalid login
-  credentials`. O fluxo funciona; a senha é que não bate.
-- A tela "Esqueci minha senha" já existe e chama a recuperação apontando para
-  `/reset-password`, que também já existe. Nenhum código novo é necessário para o fluxo.
+- O erro afeta login e cadastro antes de qualquer validação específica de usuário.
+- Os registros atuais do navegador mostram o erro saindo dos arquivos estáticos hospedados `index-CXKYmSw0.js` e `login-BkBZ-vIm.js`: esse bundle foi gerado sem `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- O processo local atual possui as variáveis públicas e de servidor. Portanto, reiniciar o servidor local ou trocar senhas não corrige o artefato hospedado que o celular está executando.
+- No login, o primeiro `supabase.auth.signInWithPassword` inicializa o cliente e lança o erro.
+- No cadastro, o primeiro `supabase.auth.signUp` lança o mesmo erro; o `catch` apenas acrescenta o prefixo “Falha no cadastro”. Nenhuma conta, perfil ou veículo chega a ser gravado nessa tentativa.
+- O WebSocket/HMR também falhou no aparelho, mas isso explica apenas por que a tela não recebeu atualizações; não muda o fato de que o bundle hospedado registrado foi compilado sem a configuração pública.
 
-## Plano (caminho escolhido: link por e-mail)
+## Implementação
 
-1. **Verificar o envio de e-mails de autenticação do projeto**
-   Checar se o domínio de e-mail e o envio de mensagens de autenticação estão ativos e se
-   o limite horário de envio não está estourado (esse limite devolve erro 429 e faz o
-   "Enviar link" parecer que não fez nada). Se estiver baixo, ajustar para um valor
-   compatível com o uso real.
+1. **Tornar a injeção das variáveis públicas determinística no build**
+   - Ajustar a configuração do Vite para resolver `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` a partir das variáveis públicas já gerenciadas pelo ambiente.
+   - Usar apenas URL e chave publicável; nenhum segredo administrativo será exposto.
+   - Não editar os arquivos auto-gerados da integração.
 
-2. **Disparar a recuperação para adm.fernando@yahoo.com**
-   Enviar o link de redefinição pela tela `/forgot-password` do próprio app, para exercitar
-   exatamente o caminho que você usaria.
+2. **Impedir novo bundle silenciosamente quebrado**
+   - Adicionar uma validação de configuração no build: se URL ou chave publicável não estiverem disponíveis, o build deve falhar com diagnóstico explícito em vez de produzir JavaScript que quebra somente quando o usuário clica em Entrar/Criar conta.
 
-3. **Confirmar a saída do e-mail**
-   Verificar nos registros de envio do backend se a mensagem saiu com sucesso para o
-   endereço. Se sair com erro, eu te reporto o motivo exato em vez de deixar você esperando
-   na caixa de entrada.
+3. **Gerar um artefato novo do preview**
+   - A alteração de configuração forçará a recompilação dos assets, substituindo os hashes registrados no erro por um bundle novo com a configuração pública incorporada.
+   - Não alterar usuários, senhas, perfis, RLS, schema ou fluxos de WhatsApp/despesas.
 
-4. **Você define a nova senha**
-   Ao clicar no link, você cai em `/reset-password` e escolhe a senha nova.
+4. **Validar os dois caminhos completos**
+   - Confirmar build sem erros e inspecionar o bundle gerado sem registrar valores sensíveis.
+   - Testar login com credencial inválida e comprovar que a resposta passa a vir do serviço de autenticação (“credenciais inválidas”), não do guard de ambiente.
+   - Testar o início do cadastro até a chamada real de criação e confirmar que o erro de variáveis desapareceu, sem criar dados descartáveis em produção.
+   - Verificar que o redirecionamento após autenticação continua apontando para `/app` e que a rota protegida usa `/login`.
 
-5. **Verificação final**
-   Após você confirmar a troca, faço um login de teste no preview e confirmo três coisas:
-   entra na `/app`, o `is_super_admin` é reconhecido e `/master-admin` abre.
+## Resultado esperado
 
-## Plano B, se o e-mail não chegar
-
-Yahoo filtra bastante. Se o passo 3 mostrar envio bem-sucedido e nada chegar em ~10
-minutos (incluindo spam), eu defino uma senha provisória forte diretamente na conta e te
-passo, para você trocar depois de entrar.
-
-## Observações técnicas
-
-- Nenhuma alteração de schema, RLS ou lógica de aplicação é necessária: o defeito não está
-  no app.
-- Não vou vincular Google/Apple a essa conta durante a recuperação — isso pode gerar conta
-  duplicada com o mesmo e-mail.
-- Melhoria opcional, para depois: hoje a tela de login mostra a mensagem crua do backend
-  em inglês ("Invalid login credentials"). Posso traduzir para algo como "E-mail ou senha
-  incorretos" se você quiser.
+Login e cadastro voltam a alcançar o backend no preview hospedado. Se uma credencial específica estiver incorreta, o usuário verá apenas o erro real de autenticação; o erro “Missing Supabase environment variable(s)” não poderá reaparecer em um build válido.
