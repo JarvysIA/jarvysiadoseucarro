@@ -86,6 +86,8 @@ export function evaluateProactiveTriggers(
  */
 export function triggersDueNow(
   decisions: ReadonlyArray<ProactiveTriggerDecision>,
-): ProactiveTriggerDecision[] {
-  return decisions.filter((d) => d.shouldTrigger);
+): MilestoneNoticeTriggerDecision[] | InactivityReengagementTriggerDecision[] {
+  return decisions.filter((d) => d.shouldTrigger) as
+    | MilestoneNoticeTriggerDecision[]
+    | InactivityReengagementTriggerDecision[];
 }

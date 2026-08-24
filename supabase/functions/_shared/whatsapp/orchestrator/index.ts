@@ -16,6 +16,7 @@ export type {
   SupabaseFromBuilder,
   SupabaseLike,
   SupabaseMaybeSingleResult,
+  SupabaseSelectBuilder,
   SupabaseSelectResult,
 } from "./repository.ts";
 export { runWhatsappOrchestratorTestCycle } from "./test-service.ts";

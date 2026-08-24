@@ -82,7 +82,7 @@ describe("ConversationHandoffCommandV1 — discriminantes e campos", () => {
     ["vehicleId vazio", { vehicleId: "" }, "invalid_vehicle_id"],
     ["vehicleId com tipo incorreto", { vehicleId: 123 }, "invalid_vehicle_id"],
     ["sourceMessageId inválido", { sourceMessageId: "message-1" }, "invalid_source_message_id"],
-  ])("rejeita %s", (_label, override, code) => {
+  ])("rejeita %s", (_label: string, override: Record<string, unknown>, code: string) => {
     expect(validateConversationHandoffCommandV1(commandWith(override))).toEqual({
       ok: false,
       code,
@@ -135,7 +135,7 @@ describe("ConversationHandoffCommandV1 — allowlist estrita", () => {
     "expectedStateVersion",
     "leaseToken",
     "idempotencyKey",
-  ])("rejeita a propriedade proibida %s", (field) => {
+  ])("rejeita a propriedade proibida %s", (field: string) => {
     expect(validateConversationHandoffCommandV1(commandWith({ [field]: "forbidden" }))).toEqual({
       ok: false,
       code: "unexpected_field",
@@ -238,7 +238,7 @@ describe("ConversationExecutionResult — união fechada", () => {
       "unexpected_field",
     ],
     [{ status: "success", responseText: "ok", reason: "vehicle_required" }, "unexpected_field"],
-  ])("rejeita combinação inválida %#", (input, code) => {
+  ])("rejeita combinação inválida %#", (input: Record<string, unknown>, code: string) => {
     expect(validateConversationExecutionResult(input)).toEqual({ ok: false, code });
   });
 
@@ -252,7 +252,7 @@ describe("ConversationExecutionResult — união fechada", () => {
   it.each([
     { status: "success", responseText: "Tudo certo.", amount: 250.75 },
     { status: "blocked", reason: "vehicle_required", accessMode: "write" },
-  ])("rejeita propriedade financeira ou operacional enumerável %#", (input) => {
+  ])("rejeita propriedade financeira ou operacional enumerável %#", (input: Record<string, unknown>) => {
     expect(validateConversationExecutionResult(input)).toEqual({
       ok: false,
       code: "unexpected_field",
