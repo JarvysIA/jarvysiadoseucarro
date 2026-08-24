@@ -2,6 +2,7 @@
 // Runner: bun test. Sem rede, sem banco, sem Supabase.
 
 import { describe, expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   runWhatsappOrchestratorTestCycle,
@@ -2918,8 +2919,9 @@ describe("confirm_expense_create", () => {
 
 describe("static safety", () => {
   test("módulo não importa Supabase/provider/sender/worker/IA/OCR nem lê env", async () => {
-    const src = await Deno.readTextFile(
+    const src = await readFile(
       fileURLToPath(new URL("../test-service.ts", import.meta.url)),
+      "utf8",
     );
     const banned = [
       "@supabase/",
