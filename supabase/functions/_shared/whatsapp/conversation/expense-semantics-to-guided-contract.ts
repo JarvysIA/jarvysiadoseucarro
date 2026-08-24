@@ -1,6 +1,7 @@
 import type {
   ConversationOnlyExpenseSemantics,
   ExpenseSemanticResult,
+  NeedsItemSpecification,
   NeedsSemanticClarification,
   ResolvedExpenseSemantics,
   UnsupportedExpenseSemantics,
@@ -33,6 +34,11 @@ export type PreservedSemanticDecision =
       status: "needs_clarification";
       persistable: false;
       decisionCode: NeedsSemanticClarification["decisionCode"];
+    }>
+  | Readonly<{
+      status: "needs_item_specification";
+      persistable: false;
+      decisionCode: NeedsItemSpecification["decisionCode"];
     }>
   | Readonly<{
       status: "conversation_only";
@@ -97,6 +103,12 @@ const preserveSemanticDecision = (
         conceptualCategory: semanticResult.conceptualCategory,
       };
     case "needs_clarification":
+      return {
+        status: semanticResult.status,
+        persistable: semanticResult.persistable,
+        decisionCode: semanticResult.decisionCode,
+      };
+    case "needs_item_specification":
       return {
         status: semanticResult.status,
         persistable: semanticResult.persistable,
@@ -234,6 +246,7 @@ export const adaptExpenseSemanticsToGuidedContract = ({
 
       if (missingFields.length === 1) {
         const missingField = missingFields[0];
+        if (missingField === undefined) return assertNever(missingField);
         const clarification =
           missingField === "vehicleId"
             ? {
@@ -286,6 +299,33 @@ export const adaptExpenseSemanticsToGuidedContract = ({
             : {}),
           requiresConfirmation: true,
           singleExpenseLine: true,
+        },
+      };
+    }
+
+    case "needs_item_specification": {
+      const operationalValidation = validateOperationalData(operationalData);
+      if (operationalValidation.valid === false) {
+        return {
+          status: "unsupported",
+          semanticDecision,
+          reason: operationalValidation.reason,
+          failureClass: "contract_violation",
+          technicalAuthorization: "none",
+        };
+      }
+
+      return {
+        status: "guided",
+        semanticDecision,
+        guidedContract: {
+          status: "use_guided_template",
+          reason: semanticResult.fallbackCategory === "Revisão"
+            ? "generic_revision"
+            : "generic_maintenance",
+          safeKnownData: toSafeKnownData(operationalData),
+          templateKey: "maintenance_expense",
+          technicalAuthorization: "none",
         },
       };
     }

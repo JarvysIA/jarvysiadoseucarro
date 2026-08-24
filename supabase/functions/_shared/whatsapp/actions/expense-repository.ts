@@ -29,10 +29,10 @@ export type ExpenseActionRpcResponse<T> = {
   error: ExpenseActionRpcError | null;
 };
 
-export type ExpenseActionRpcInvoker = <T = unknown>(
+export type ExpenseActionRpcInvoker = (
   fn: string,
   params: Record<string, unknown>,
-) => Promise<ExpenseActionRpcResponse<T>>;
+) => Promise<ExpenseActionRpcResponse<unknown>>;
 
 export type ExpenseActionSupabaseLike = {
   rpc: ExpenseActionRpcInvoker;
@@ -265,7 +265,7 @@ async function invokeRpc<T = unknown>(
 ): Promise<T> {
   let res: ExpenseActionRpcResponse<T>;
   try {
-    res = await client.rpc<T>(fn, params);
+    res = await client.rpc(fn, params) as ExpenseActionRpcResponse<T>;
   } catch (err) {
     throw new ExpenseActionTransportError(
       (err as Error)?.message ?? `${fn} failed`,

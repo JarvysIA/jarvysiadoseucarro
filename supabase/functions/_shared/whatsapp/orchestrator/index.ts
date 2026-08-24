@@ -13,7 +13,10 @@ export type {
   RpcError,
   RpcInvoker,
   RpcResponse,
+  SupabaseFromBuilder,
   SupabaseLike,
+  SupabaseMaybeSingleResult,
+  SupabaseSelectResult,
 } from "./repository.ts";
 export { runWhatsappOrchestratorTestCycle } from "./test-service.ts";
 export { buildKmFinalization } from "./test-service.ts";
