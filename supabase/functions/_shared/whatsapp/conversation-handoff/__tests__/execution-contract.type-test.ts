@@ -66,7 +66,8 @@ const aggregateWithExtraField: ConversationHandoffExecutionCommandV1 = {
 };
 void aggregateWithExtraField;
 
-// 92. supplemental: undefined explícito é aceito sem exactOptionalPropertyTypes.
+// 92. @ts-expect-error: supplemental: undefined explícito sob exactOptionalPropertyTypes.
+// @ts-expect-error exactOptionalPropertyTypes proíbe undefined explícito na chave opcional
 const aggregateWithExplicitUndefined: ConversationHandoffExecutionCommandV1 = {
   primary: validPrimary,
   supplemental: undefined,

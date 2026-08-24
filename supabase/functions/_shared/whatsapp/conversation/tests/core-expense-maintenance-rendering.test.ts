@@ -64,7 +64,6 @@ function renderFrom(input: ConversationCoreInput): {
   decision: ReturnType<typeof decideConversation>;
 } {
   const d = decideConversation(input);
-  if (d.responseKey === null) throw new Error("responseKey ausente");
   const text = renderResponse(d.responseKey, d.responseParams);
   return { text, decision: d };
 }

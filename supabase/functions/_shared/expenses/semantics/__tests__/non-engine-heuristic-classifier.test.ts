@@ -268,7 +268,7 @@ describe("non-engine heuristic classifier — casos específicos do dicionário"
 });
 
 describe("non-engine heuristic classifier — gnv (fechamento de gap de escopo)", () => {
-  it.each(["abasteci gnv", "coloquei gnv", "gnv 30"])("resolve Combustível para '%s'", (text: string) => {
+  it.each(["abasteci gnv", "coloquei gnv", "gnv 30"])("resolve Combustível para '%s'", (text) => {
     expect(classifyNonEngineExpense(text)).toEqual({
       status: "resolved",
       category: "Combustível",
