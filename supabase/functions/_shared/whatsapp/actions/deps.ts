@@ -81,5 +81,5 @@ export async function createConfirmedKmUpdateDepsFromEnv(
     "https://esm.sh/@supabase/supabase-js@2.45.4"
   );
   const client = mod.createClient(supabaseUrl, serviceRoleKey);
-  return createConfirmedKmUpdateDeps(client as unknown as KmActionSupabaseLike, options);
+  return createConfirmedKmUpdateDeps(client as KmActionSupabaseLike, options);
 }

@@ -278,8 +278,6 @@ const exhaustSemanticResult = (result: ExpenseSemanticResult): string => {
     case "resolved":
       return result.conceptualCategory;
     case "needs_clarification":
-    case "needs_item_specification":
-      return result.decisionCode;
     case "conversation_only":
     case "unsupported":
       return result.reason;

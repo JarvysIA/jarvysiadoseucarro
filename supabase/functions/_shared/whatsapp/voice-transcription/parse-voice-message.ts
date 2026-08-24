@@ -54,11 +54,9 @@ export async function parseVoiceMessage(input: ParseVoiceInput): Promise<ParseVo
   try {
     const formData = new FormData();
     formData.append("model", TRANSCRIPTION_MODEL);
-    const audioBuffer = new ArrayBuffer(bytes.byteLength);
-    new Uint8Array(audioBuffer).set(bytes);
     formData.append(
       "file",
-      new Blob([audioBuffer], { type: input.mimeType || "audio/ogg" }),
+      new Blob([bytes], { type: input.mimeType || "audio/ogg" }),
       "voice.ogg",
     );
 

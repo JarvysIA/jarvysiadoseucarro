@@ -67,11 +67,11 @@ export type RpcError = {
   hint?: string | null;
 };
 
-export type RpcInvoker = (
+export type RpcInvoker = <T = unknown>(
   fn: string,
   params: Record<string, unknown>,
   options?: { signal?: AbortSignal },
-) => Promise<RpcResponse<unknown>>;
+) => Promise<RpcResponse<T>>;
 
 /**
  * Builder mínimo compatível com PostgREST/supabase-js. Suporta apenas o
@@ -448,7 +448,7 @@ export class WhatsappOrchestratorRepository {
     const { signal, cleanup, timedOut } = composeSignal(options.signal, timeoutMs);
     const started = Date.now();
     try {
-      const res = await this.client.rpc(
+      const res = await this.client.rpc<unknown>(
         "claim_whatsapp_orchestrator_items",
         {
           p_worker_id: input.workerId,
@@ -545,7 +545,7 @@ export class WhatsappOrchestratorRepository {
     const started = Date.now();
     const queueItemId = String(params.p_queue_item_id);
     try {
-      const res = await this.client.rpc(
+      const res = await this.client.rpc<unknown>(
         "apply_whatsapp_orchestrator_transition",
         params,
         { signal },
@@ -592,7 +592,7 @@ export class WhatsappOrchestratorRepository {
     const { signal, cleanup, timedOut } = composeSignal(options.signal, timeoutMs);
     const started = Date.now();
     try {
-      const res = await this.client.rpc(
+      const res = await this.client.rpc<unknown>(
         "release_whatsapp_orchestrator_item",
         {
           p_queue_item_id: input.queueItemId,

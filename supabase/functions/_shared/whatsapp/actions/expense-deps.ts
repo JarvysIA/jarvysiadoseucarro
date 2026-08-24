@@ -68,7 +68,7 @@ export async function createConfirmedExpenseCreateDepsFromEnv(
   );
   const client = mod.createClient(supabaseUrl, serviceRoleKey);
   return createConfirmedExpenseCreateDeps(
-    client as unknown as ExpenseActionSupabaseLike,
+    client as ExpenseActionSupabaseLike,
     options,
   );
 }
