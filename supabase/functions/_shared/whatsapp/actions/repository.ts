@@ -29,10 +29,10 @@ export type KmActionRpcResponse<T> = {
   error: KmActionRpcError | null;
 };
 
-export type KmActionRpcInvoker = <T = unknown>(
+export type KmActionRpcInvoker = (
   fn: string,
   params: Record<string, unknown>,
-) => Promise<KmActionRpcResponse<T>>;
+) => Promise<KmActionRpcResponse<unknown>>;
 
 export type KmActionSupabaseLike = {
   rpc: KmActionRpcInvoker;
@@ -270,7 +270,7 @@ async function invokeRpc<T = unknown>(
 ): Promise<T> {
   let res: KmActionRpcResponse<T>;
   try {
-    res = await client.rpc<T>(fn, params);
+    res = await client.rpc(fn, params) as KmActionRpcResponse<T>;
   } catch (err) {
     throw new KmActionTransportError(
       (err as Error)?.message ?? `${fn} failed`,

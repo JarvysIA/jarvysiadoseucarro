@@ -699,6 +699,7 @@ describe("Bloco C — invoker guardado, replay", () => {
       id: "seed-queue-id",
       messageId: "seed-message-id",
       textBody: "Texto já persistido de uma execução anterior.",
+      deliverable: undefined,
     });
     const client = makeClient(AUTHORIZED_ROWS, backend.rpc);
 

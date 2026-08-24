@@ -15,6 +15,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
+type AnySupabaseClient = ReturnType<typeof createClient<any>>;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -76,7 +78,7 @@ class CpfRequiredError extends Error {
 
 async function ensureCustomer(
   apiKey: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: AnySupabaseClient,
   user_id: string,
 ): Promise<string> {
   const { data: profile } = await supabase
