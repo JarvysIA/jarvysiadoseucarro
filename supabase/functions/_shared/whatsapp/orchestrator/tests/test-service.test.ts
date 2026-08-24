@@ -2918,9 +2918,9 @@ describe("confirm_expense_create", () => {
 
 describe("static safety", () => {
   test("módulo não importa Supabase/provider/sender/worker/IA/OCR nem lê env", async () => {
-    const src = await Bun.file(
+    const src = await Deno.readTextFile(
       fileURLToPath(new URL("../test-service.ts", import.meta.url)),
-    ).text();
+    );
     const banned = [
       "@supabase/",
       "createClient",
