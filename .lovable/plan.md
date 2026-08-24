@@ -12,10 +12,14 @@
 1. **Fixar a configuração pública no código-fonte**
    - Criar um módulo pequeno e versionado com a URL do backend e a chave publicável (ambas são valores públicos, projetados para ficar no cliente — nenhum segredo administrativo entra aqui).
    - Nenhum arquivo auto-gerado da integração será tocado.
+   - **Identidade do backend já verificada agora**: os valores que serão fixados vêm do ambiente atual do projeto e apontam para exatamente o mesmo backend que você consulta o banco. Checagem feita nesta sessão: a URL pública, a chave publicável (o identificador do projeto embutido nela foi decodificado e comparado) e a URL usada no servidor apontam todas para o mesmo projeto — sem staging nem projeto alternativo. Nenhum risco de contas fantasma em outro banco.
+   - Na implementação, essa comparação será repetida antes de gravar o módulo: se o identificador embutido na chave não coincidir com o do backend em uso, a etapa é abortada em vez de fixar valor divergente.
 
 2. **Usar esse módulo como fonte de verdade no build**
    - Em `vite.config.ts`, a injeção de `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` passa a ser: variável de ambiente quando existir, senão o valor versionado.
    - Assim, qualquer build — sandbox, preview externo ou publicação — sempre produz um bundle com configuração válida.
+   - Validação extra ao final: confirmar que o identificador de projeto presente no bundle gerado é o mesmo do backend em uso (sem imprimir a chave).
+
 
 3. **Trocar a quebra de build por checagem que não deixa passar bundle vazio**
    - Remover o `throw` que hoje aborta o build quando o ambiente está incompleto (ele impede justamente a geração do artefato novo).
