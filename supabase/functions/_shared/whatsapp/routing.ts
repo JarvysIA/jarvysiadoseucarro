@@ -42,7 +42,7 @@ export type RouteOwnerInput = {
 };
 
 // Decisão de ownership. Regras, nesta ordem:
-//   1) messageType != 'text' → legacy   (mídia, audio, video, file, system, unknown, etc.)
+//   1) messageType não é 'text' nem 'audio' → legacy   (imagem, pdf, vídeo, arquivo, system, unknown, etc.)
 //   2) opt-out reconhecido   → legacy   (opt-out permanece 100% no legado nesta fase)
 //   3) orchestratorMode ∈ {'test','active'} → orchestrator
 //   4) qualquer outro caso (off, shadow, null, desconhecido) → legacy (fallback seguro)
