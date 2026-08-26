@@ -48,7 +48,7 @@ export type RouteOwnerInput = {
 //   4) qualquer outro caso (off, shadow, null, desconhecido) → legacy (fallback seguro)
 export function decideRouteOwner(input: RouteOwnerInput): RouteOwner {
   const messageType = (input.messageType ?? "").toString();
-  if (messageType !== "text") return "legacy";
+  if (messageType !== "text" && messageType !== "audio") return "legacy";
 
   if (isRoutingOptOut(input.textBody)) return "legacy";
 

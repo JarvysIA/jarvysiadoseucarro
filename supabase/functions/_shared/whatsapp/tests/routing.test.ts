@@ -158,7 +158,7 @@ describe("decideRouteOwner", () => {
     });
   }
 
-  const mediaTypes = ["image", "pdf", "audio", "video", "file", "system", "unknown"];
+  const mediaTypes = ["image", "pdf", "video", "file", "system", "unknown"];
   for (const mt of mediaTypes) {
     for (const mode of modes) {
       test(`${mt} + ${mode} → legacy`, () => {
@@ -167,6 +167,43 @@ describe("decideRouteOwner", () => {
         ).toBe("legacy");
       });
     }
+  }
+
+  // Audio segue o mesmo caminho de texto (WIRE-2): opt-out e modo já se
+  // aplicam sem distinção, então só off/shadow continuam legacy.
+  test("audio + off → legacy", () => {
+    expect(
+      decideRouteOwner({ messageType: "audio", textBody: null, orchestratorMode: "off" }),
+    ).toBe("legacy");
+  });
+
+  test("audio + shadow → legacy", () => {
+    expect(
+      decideRouteOwner({ messageType: "audio", textBody: null, orchestratorMode: "shadow" }),
+    ).toBe("legacy");
+  });
+
+  test("audio + test → orchestrator", () => {
+    expect(
+      decideRouteOwner({ messageType: "audio", textBody: null, orchestratorMode: "test" }),
+    ).toBe("orchestrator");
+  });
+
+  test("audio + active → orchestrator", () => {
+    expect(
+      decideRouteOwner({ messageType: "audio", textBody: null, orchestratorMode: "active" }),
+    ).toBe("orchestrator");
+  });
+
+  // Prova de que o escopo não vazou pra outros tipos de mídia além de
+  // audio, mesmo sob o modo mais permissivo (active).
+  const nonAudioMediaTypes = ["image", "pdf", "video", "file", "system"];
+  for (const mt of nonAudioMediaTypes) {
+    test(`${mt} + active → legacy (escopo não vazou além de audio)`, () => {
+      expect(
+        decideRouteOwner({ messageType: mt, textBody: null, orchestratorMode: "active" }),
+      ).toBe("legacy");
+    });
   }
 
   test("modo null → legacy", () => {
