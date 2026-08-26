@@ -118,6 +118,15 @@ export type ConversationHandoffFallbackResult = Readonly<{
   outcome?: ConversationHandoffFallbackOutcome;
 }>;
 
+// Resultado da transcrição de uma mensagem de áudio (WIRE-4). Distingue
+// falha transitória (rede, gateway, rate limit, créditos — vale a pena
+// tentar de novo) de falha permanente (validação de entrada, fala não
+// identificada — reexecutar não muda o resultado).
+export type TranscribeAudioResult =
+  | { kind: "ok"; text: string }
+  | { kind: "transient_error"; reason: string }
+  | { kind: "permanent_error"; reason: string };
+
 export type TestCycleDeps = {
   repository: OrchestratorRepositoryPort;
   loadMessageText: (messageId: string) => Promise<string | null>;
@@ -131,6 +140,10 @@ export type TestCycleDeps = {
   conversationHandoffFallback?: (
     params: ConversationHandoffFallbackParams,
   ) => Promise<ConversationHandoffFallbackResult>;
+  // Opcional (WIRE-4): quando ausente, item de áudio cai no fail-safe
+  // defensivo de sempre (malformed) — mesmo comportamento de antes desta
+  // build para quem ainda não conectou a dependência real (WIRE-5).
+  transcribeAudioMessage?: (messageId: string) => Promise<TranscribeAudioResult>;
 };
 
 export type ItemOutcome =
@@ -469,9 +482,9 @@ async function processItem(
     orchestratorMode: item.orchestratorMode,
   });
 
-  // Gate defensivo: só processamos texto. Claim atual já filtra, mas o
-  // tipo permite qualquer string.
-  if (item.messageType !== "text") {
+  // Gate defensivo: só processamos texto e áudio (WIRE-4). Claim atual já
+  // filtra (WIRE-1), mas o tipo permite qualquer string.
+  if (item.messageType !== "text" && item.messageType !== "audio") {
     return await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
   }
 
@@ -848,6 +861,10 @@ async function runMessageText(
   log: TestServiceLogger,
   workerId: string,
 ): Promise<TextOk | TextFail> {
+  if (item.messageType === "audio") {
+    return await runAudioTranscription(item, deps, log, workerId);
+  }
+
   let text: unknown;
   try {
     text = await deps.loadMessageText(item.messageId);
@@ -878,6 +895,69 @@ async function runMessageText(
     return { kind: "fail", outcome };
   }
   return { kind: "ok", text };
+}
+
+// Áudio (WIRE-4): transcreve via deps.transcribeAudioMessage em vez de ler
+// text_body direto. Resultado bem-sucedido segue pro resto do pipeline
+// exatamente como texto (runCore continua hardcoding messageType: "text" —
+// uma vez transcrito, é indistinguível de uma mensagem de texto real pro
+// core.ts; ver nota em runCore).
+async function runAudioTranscription(
+  item: ClaimedItem,
+  deps: TestCycleDeps,
+  log: TestServiceLogger,
+  workerId: string,
+): Promise<TextOk | TextFail> {
+  if (!deps.transcribeAudioMessage) {
+    // Fail-safe defensivo: sem a dependência conectada (antes do WIRE-5),
+    // mesmo comportamento de antes desta build — nunca processa áudio sem
+    // saber transcrevê-lo.
+    const outcome = await releaseAs(item, deps, "cancelled", "orchestrator_invariant", "malformed", log, workerId);
+    return { kind: "fail", outcome };
+  }
+
+  let result: TranscribeAudioResult;
+  try {
+    result = await deps.transcribeAudioMessage(item.messageId);
+  } catch (err) {
+    log({ event: "item_failed", workerId, queueItemId: item.queueId, errorCategory: classifyError(err) });
+    const outcome = await releaseAs(
+      item,
+      deps,
+      "transient_error",
+      "message_text_load_failed",
+      "releasedForRetry",
+      log,
+      workerId,
+    );
+    return { kind: "fail", outcome };
+  }
+
+  if (result.kind === "ok") {
+    return { kind: "ok", text: result.text };
+  }
+  if (result.kind === "transient_error") {
+    const outcome = await releaseAs(
+      item,
+      deps,
+      "transient_error",
+      "audio_transcription_transient",
+      "releasedForRetry",
+      log,
+      workerId,
+    );
+    return { kind: "fail", outcome };
+  }
+  const outcome = await releaseAs(
+    item,
+    deps,
+    "cancelled",
+    "audio_transcription_failed",
+    "contextRejected",
+    log,
+    workerId,
+  );
+  return { kind: "fail", outcome };
 }
 
 type CoreOk = { kind: "ok"; decision: ConversationCoreDecision };
