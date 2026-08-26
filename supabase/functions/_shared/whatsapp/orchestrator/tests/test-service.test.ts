@@ -556,6 +556,130 @@ describe("loadMessageText", () => {
 });
 
 // ============================================================
+// AUDIO (WIRE-4)
+// ============================================================
+
+describe("audio (WIRE-4)", () => {
+  test("messageType=audio sem transcribeAudioMessage => malformed (fail-safe defensivo)", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle({ workerId: "w" }, baseDeps(m.repo, {}));
+    expect(res.counts.malformed).toBe(1);
+    expect(m.calls.release[0].reason).toBe("orchestrator_invariant");
+  });
+
+  test("resultado ok => segue pro core normalmente, coreInput.messageType continua 'text'", async () => {
+    const it = makeItem({ messageType: "audio" });
+    let captured: ConversationCoreInput | null = null;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        transcribeAudioMessage: async () => ({ kind: "ok", text: "quanto custa a revisão?" }),
+        decide: (input) => {
+          captured = input;
+          return decisionRespond();
+        },
+      }),
+    );
+    expect(captured!.messageType).toBe("text");
+    expect(captured!.originalText).toBe("quanto custa a revisão?");
+    expect(res.counts.completed).toBe(1);
+  });
+
+  test("resultado transient_error => releasedForRetry com reasonCode audio_transcription_transient", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        transcribeAudioMessage: async () => ({
+          kind: "transient_error",
+          reason: "download_failed_status_500",
+        }),
+      }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.release[0].reason).toBe("audio_transcription_transient");
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+  });
+
+  test("resultado permanent_error => contextRejected com reasonCode audio_transcription_failed", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        transcribeAudioMessage: async () => ({
+          kind: "permanent_error",
+          reason: "no_speech_detected",
+        }),
+      }),
+    );
+    expect(res.counts.contextRejected).toBe(1);
+    expect(m.calls.release[0].reason).toBe("audio_transcription_failed");
+    expect(m.calls.release[0].retryKind).toBe("cancelled");
+  });
+
+  test("transcribeAudioMessage lança exceção => capturada, mesmo tratamento de exceção que loadMessageText hoje", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "queued", attempts: 1, willRetry: true }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        transcribeAudioMessage: async () => {
+          throw new Error("net down");
+        },
+      }),
+    );
+    expect(res.counts.releasedForRetry).toBe(1);
+    expect(m.calls.release[0].reason).toBe("message_text_load_failed");
+    expect(m.calls.release[0].retryKind).toBe("transient_error");
+  });
+
+  test("loadMessageText nunca é chamado para item de áudio", async () => {
+    const it = makeItem({ messageType: "audio" });
+    let loadTextCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        loadMessageText: async () => {
+          loadTextCalls++;
+          return "não deveria ser chamado";
+        },
+        transcribeAudioMessage: async () => ({ kind: "ok", text: "ok" }),
+      }),
+    );
+    expect(loadTextCalls).toBe(0);
+  });
+});
+
+// ============================================================
 // CORE INPUT
 // ============================================================
 
