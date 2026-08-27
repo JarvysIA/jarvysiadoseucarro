@@ -1165,6 +1165,9 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.type-test.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/entrypoint.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/entrypoint.test.ts",
+      // WIRE-5 (Fase 18): primeiro consumidor real do runtime, conecta C7
+      // ao worker de produção via executeConversationHandoffEntrypoint.
+      "supabase/functions/whatsapp-process-orchestrator/index.ts",
     ]);
     const proc = spawnSync(
       "rg",
@@ -1195,6 +1198,8 @@ describe("Bloco H — ausência de dependências operacionais", () => {
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/executor.type-test.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/entrypoint.ts",
       "supabase/functions/_shared/whatsapp/conversation-handoff/__tests__/entrypoint.test.ts",
+      // WIRE-5 (Fase 18): primeiro consumidor real do runtime.
+      "supabase/functions/whatsapp-process-orchestrator/index.ts",
     ]);
     const allowedToolingFiles = new Set([
       "tsconfig.conversation-handoff-c2a.json",
