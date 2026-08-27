@@ -860,7 +860,7 @@ export class WhatsappOrchestratorRepository {
         "SupabaseLike.from is required for loadContext",
       );
     }
-    return this.client.from;
+    return this.client.from.bind(this.client);
   }
 }
 

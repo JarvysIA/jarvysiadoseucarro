@@ -1491,4 +1491,87 @@ describe("loadContext — activations shape (Build 5.7F2E1A.5-MJ0.1)", () => {
   });
 });
 
+// ============================================================
+// requireFrom — regressão do bug de produção "this perdido" (Build
+// Fix-RequireFrom-Bind). Todos os outros testes de loadContext acima
+// usam makeCtxClient/makeFromMock, que são closures simples sem
+// dependência de `this` — por isso NUNCA teriam pego esse bug, mesmo
+// antes do fix. Este client é uma instância de classe de verdade, cujo
+// método .from() é um método de protótipo real que lê estado via `this`
+// — a mesma característica estrutural do client real do supabase-js
+// (que guarda estado interno e depende de `this` dentro de `.from()`).
+// Se requireFrom() voltasse a devolver this.client.from DESTACADO (sem
+// .bind(this.client)), `this` seria undefined dentro de from() aqui
+// embaixo, e o acesso a this.rows lançaria TypeError "Cannot read
+// properties of undefined (reading 'rows')" — mesma classe de erro do
+// bug real capturado em produção ("Cannot read properties of undefined
+// (reading 'rest')", WIRE-6).
+// ============================================================
+
+class ClassBasedRowsClient {
+  private readonly rows: TableRows;
+
+  constructor(rows: TableRows) {
+    this.rows = rows;
+  }
+
+  rpc: RpcInvoker = async () => ({ data: null, error: null });
+
+  from(table: string): SupabaseFromBuilder {
+    const filters: Array<[string, unknown]> = [];
+    const runSelect = (): SupabaseSelectResult => {
+      // `this.rows` só existe se `this` não foi perdido — é exatamente
+      // o que este teste verifica.
+      const matched = (this.rows[table] ?? []).filter((r) =>
+        filters.every(([c, v]) => r[c] === v),
+      );
+      return { data: matched, error: null };
+    };
+    const builder = {
+      eq(column: string, value: unknown) {
+        filters.push([column, value]);
+        return builder;
+      },
+      async maybeSingle(): Promise<SupabaseMaybeSingleResult> {
+        const r = runSelect();
+        return { data: r.data?.[0] ?? null, error: null };
+      },
+      then<T1, T2>(
+        onFulfilled?: (v: SupabaseSelectResult) => T1 | PromiseLike<T1>,
+        onRejected?: (e: unknown) => T2 | PromiseLike<T2>,
+      ) {
+        return Promise.resolve(runSelect()).then(onFulfilled, onRejected);
+      },
+    } as unknown as SupabaseSelectBuilderMock;
+    return { select: () => builder };
+  }
+}
+
+describe("requireFrom — this preservado com client baseado em classe (regressão de produção)", () => {
+  test("loadContext completo (ok) contra um client cujo .from() depende de `this` — nunca lança TypeError de `this` perdido", async () => {
+    const client: SupabaseLike = new ClassBasedRowsClient(baseRows());
+    const repo = new WhatsappOrchestratorRepository(client);
+
+    const res = await repo.loadContext(CLAIMED);
+
+    expect(res.kind).toBe("ok");
+    if (res.kind === "ok") {
+      expect(res.context.state.state).toBe("idle");
+      expect(res.context.vehicles).toEqual([]);
+    }
+  });
+
+  test("caminho de erro (queue_not_found) contra o mesmo client baseado em classe — também não lança", async () => {
+    const client: SupabaseLike = new ClassBasedRowsClient(baseRows({ whatsapp_processing_queue: [] }));
+    const repo = new WhatsappOrchestratorRepository(client);
+
+    const res = await repo.loadContext(CLAIMED);
+
+    expect(res.kind).toBe("error");
+    if (res.kind === "error") {
+      expect(res.reason).toBe("queue_not_found");
+    }
+  });
+});
+
 
