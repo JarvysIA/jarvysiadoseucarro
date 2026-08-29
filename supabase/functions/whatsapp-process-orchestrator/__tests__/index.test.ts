@@ -21,6 +21,7 @@ import {
   buildConversationHandoffCommand,
   createConversationHandoffFallback,
   createLoadMessageText,
+  createProductionLogger,
   handleRequest,
   safeEqual,
 } from "../index.ts";
@@ -30,7 +31,10 @@ import type {
   SupabaseLike,
   SupabaseMaybeSingleResult,
 } from "../../_shared/whatsapp/orchestrator/repository.ts";
-import type { ConversationHandoffFallbackParams } from "../../_shared/whatsapp/orchestrator/test-service.ts";
+import type {
+  ConversationHandoffFallbackParams,
+  TestServiceLogEvent,
+} from "../../_shared/whatsapp/orchestrator/test-service.ts";
 
 const ORIGINAL_DENO = (globalThis as unknown as { Deno?: unknown }).Deno;
 
@@ -80,6 +84,123 @@ describe("safeEqual", () => {
   });
   test("strings vazias => true (mesmo comprimento zero)", () => {
     expect(safeEqual("", "")).toBe(true);
+  });
+});
+
+// ============================================================
+// createProductionLogger
+// ============================================================
+
+describe("createProductionLogger", () => {
+  const ORIGINAL_CONSOLE_LOG = console.log;
+  const ORIGINAL_CONSOLE_ERROR = console.error;
+
+  afterEach(() => {
+    console.log = ORIGINAL_CONSOLE_LOG;
+    console.error = ORIGINAL_CONSOLE_ERROR;
+  });
+
+  test("evento item_failed vai pro console.error, não console.log", () => {
+    const logCalls: string[] = [];
+    const errorCalls: string[] = [];
+    console.log = ((...args: unknown[]) => {
+      logCalls.push(args.map(String).join(" "));
+    }) as typeof console.log;
+    console.error = ((...args: unknown[]) => {
+      errorCalls.push(args.map(String).join(" "));
+    }) as typeof console.error;
+
+    const logger = createProductionLogger();
+    const event: TestServiceLogEvent = {
+      event: "item_failed",
+      workerId: "w1",
+      queueItemId: "q1",
+      errorCategory: "transport_error",
+    };
+    logger(event);
+
+    expect(errorCalls.length).toBe(1);
+    expect(logCalls.length).toBe(0);
+  });
+
+  test("lease_lost e outcome_unknown também vão pro console.error (mesma lista FAILURE_EVENTS)", () => {
+    const errorCalls: string[] = [];
+    console.error = ((...args: unknown[]) => {
+      errorCalls.push(args.map(String).join(" "));
+    }) as typeof console.error;
+    console.log = (() => {}) as typeof console.log;
+
+    const logger = createProductionLogger();
+    logger({ event: "lease_lost", workerId: "w1", queueItemId: "q1", reasonCode: "lease_lost" });
+    logger({ event: "outcome_unknown", workerId: "w1", queueItemId: "q1" });
+
+    expect(errorCalls.length).toBe(2);
+  });
+
+  test("evento cycle_started vai pro console.log, não console.error", () => {
+    const logCalls: string[] = [];
+    const errorCalls: string[] = [];
+    console.log = ((...args: unknown[]) => {
+      logCalls.push(args.map(String).join(" "));
+    }) as typeof console.log;
+    console.error = ((...args: unknown[]) => {
+      errorCalls.push(args.map(String).join(" "));
+    }) as typeof console.error;
+
+    const logger = createProductionLogger();
+    logger({ event: "cycle_started", workerId: "w1" });
+
+    expect(logCalls.length).toBe(1);
+    expect(errorCalls.length).toBe(0);
+  });
+
+  test("JSON produzido inclui tag e todos os campos do evento original", () => {
+    const logCalls: string[] = [];
+    console.log = ((...args: unknown[]) => {
+      logCalls.push(args.map(String).join(" "));
+    }) as typeof console.log;
+    console.error = (() => {}) as typeof console.error;
+
+    const logger = createProductionLogger();
+    const event: TestServiceLogEvent = {
+      event: "decision_computed",
+      workerId: "w1",
+      queueItemId: "q1",
+      decisionKind: "respond",
+      eventKind: "greeting",
+      responseKey: "greeting",
+      reasonCode: "greeting_ok",
+    };
+    logger(event);
+
+    expect(logCalls.length).toBe(1);
+    const parsed = JSON.parse(logCalls[0]!);
+    expect(parsed).toEqual({ tag: "whatsapp-process-orchestrator", ...event });
+  });
+
+  test("nenhum campo além dos definidos no evento aparece na saída (teste negativo)", () => {
+    const logCalls: string[] = [];
+    console.log = ((...args: unknown[]) => {
+      logCalls.push(args.map(String).join(" "));
+    }) as typeof console.log;
+    console.error = (() => {}) as typeof console.error;
+
+    const logger = createProductionLogger();
+    const event: TestServiceLogEvent = {
+      event: "item_started",
+      workerId: "w1",
+      queueItemId: "q1",
+      messageId: "m1",
+      contactId: "c1",
+      provider: "zapi",
+      instanceId: "inst-1",
+      orchestratorMode: "active",
+    };
+    logger(event);
+
+    const parsed = JSON.parse(logCalls[0]!) as Record<string, unknown>;
+    const expectedKeys = new Set(["tag", ...Object.keys(event)]);
+    expect(new Set(Object.keys(parsed))).toEqual(expectedKeys);
   });
 });
 
