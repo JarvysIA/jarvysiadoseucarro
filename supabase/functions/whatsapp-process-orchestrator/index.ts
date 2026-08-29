@@ -34,6 +34,7 @@ import {
   type ConversationHandoffFallbackParams,
   type ConversationHandoffFallbackResult,
   type TestCycleDeps,
+  type TestServiceLogger,
 } from "../_shared/whatsapp/orchestrator/test-service.ts";
 import { createTranscribeAudioMessage } from "../_shared/whatsapp/orchestrator/audio-transcription-deps.ts";
 import { createConfirmedKmUpdateDepsFromEnv } from "../_shared/whatsapp/actions/deps.ts";
@@ -149,6 +150,30 @@ export function createLoadMessageText(
 }
 
 // ------------------------------------------------------------
+// createProductionLogger — TestServiceLogger é um tipo fechado (19 campos
+// possíveis, todos IDs/enums/números/booleanos, confirmado por
+// investigação prévia) — estruturalmente impossível vazar texto de
+// mensagem/base64/segredo através dele. Eventos de falha (item_failed,
+// lease_lost, outcome_unknown) vão pro console.error; todo o resto pro
+// console.log. Sem essa dependência, deps.logger fica ausente e
+// runWhatsappOrchestratorTestCycle usa um no-op silencioso — nenhum dos
+// 16 tipos de evento estruturado chega a ser registrado.
+// ------------------------------------------------------------
+
+const FAILURE_EVENTS = new Set(["item_failed", "lease_lost", "outcome_unknown"]);
+
+export function createProductionLogger(): TestServiceLogger {
+  return (event) => {
+    const line = JSON.stringify({ tag: "whatsapp-process-orchestrator", ...event });
+    if (FAILURE_EVENTS.has(event.event)) {
+      console.error(line);
+    } else {
+      console.log(line);
+    }
+  };
+}
+
+// ------------------------------------------------------------
 // Handler HTTP
 // ------------------------------------------------------------
 
@@ -199,6 +224,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       expenseActionDeps,
       transcribeAudioMessage: createTranscribeAudioMessage(client),
       conversationHandoffFallback: createConversationHandoffFallback(client),
+      logger: createProductionLogger(),
     };
 
     const result = await runWhatsappOrchestratorTestCycle(
