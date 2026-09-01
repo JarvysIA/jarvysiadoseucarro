@@ -14,7 +14,7 @@ import {
   runGenerateVehicleImage,
   type GenerateVehicleImageInput,
   type VehicleImageAdminClient,
-} from "../vehicle-image.functions";
+} from "../vehicle-image-cache";
 
 // O shim ambiente local (bun-test.d.ts) só declara describe/test/expect com
 // um Matchers mínimo (toBe/toContain/not.toBe/not.toContain) — sem `mock` e
