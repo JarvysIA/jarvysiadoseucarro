@@ -103,10 +103,14 @@ type MutationResult = { error: { message: string } | null };
 // qualquer ponto).
 type ContactsFilterStep4 = {
   not(column: "last_inbound_at", operator: "is", value: null): {
-    lte(column: "last_inbound_at", value: string): Promise<ListResult<ReengagementContactRow>>;
+    lte(column: "last_inbound_at", value: string): {
+      limit(n: number): Promise<ListResult<ReengagementContactRow>>;
+    };
   };
   is(column: "last_inbound_at", value: null): {
-    lte(column: "verified_at", value: string): Promise<ListResult<ReengagementContactRow>>;
+    lte(column: "verified_at", value: string): {
+      limit(n: number): Promise<ListResult<ReengagementContactRow>>;
+    };
   };
 };
 type ContactsFilterStep3 = {
@@ -212,7 +216,8 @@ export async function runReengagementBatch(
     .eq("opt_out", false)
     .eq("is_primary", true)
     .not("last_inbound_at", "is", null)
-    .lte("last_inbound_at", cutoffIso);
+    .lte("last_inbound_at", cutoffIso)
+    .limit(limit);
 
   // 2) Coorte B — verificou mas nunca mandou nada (last_inbound_at NULL,
   // conta a partir de verified_at).
@@ -223,15 +228,17 @@ export async function runReengagementBatch(
     .eq("opt_out", false)
     .eq("is_primary", true)
     .is("last_inbound_at", null)
-    .lte("verified_at", cutoffIso);
+    .lte("verified_at", cutoffIso)
+    .limit(limit);
 
   // 3) União — mutuamente exclusivas por construção (last_inbound_at é
   // NULL xor não-NULL, nunca as duas condições batem pro mesmo contato).
-  // Aplica o limite de batch por coorte antes do join (mesma decisão de
-  // whatsapp-maintenance-alerts: limita a consulta, não a lista já unida).
+  // O limite de batch por coorte já foi aplicado na própria consulta ao
+  // banco (.limit(limit) acima) — mesma decisão de whatsapp-maintenance-
+  // alerts: limita a consulta, não corta a lista em JavaScript depois.
   const candidates: Array<{ contact: ReengagementContactRow; cohort: "a" | "b" }> = [
-    ...(cohortARes.data ?? []).slice(0, limit).map((contact) => ({ contact, cohort: "a" as const })),
-    ...(cohortBRes.data ?? []).slice(0, limit).map((contact) => ({ contact, cohort: "b" as const })),
+    ...(cohortARes.data ?? []).map((contact) => ({ contact, cohort: "a" as const })),
+    ...(cohortBRes.data ?? []).map((contact) => ({ contact, cohort: "b" as const })),
   ];
 
   // 4) Instâncias de provider ativas — em lote.
