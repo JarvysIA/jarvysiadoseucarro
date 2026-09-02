@@ -124,6 +124,10 @@ type MockClientOptions = {
 function makeMockClient(opts: MockClientOptions) {
   const calls = {
     inserts: [] as Record<string, unknown>[],
+    // Cada valor passado a .limit(n) na cadeia de whatsapp_contacts — prova
+    // de que o limite chega até a consulta ao banco, não só que o
+    // resultado final tem N itens.
+    contactsLimitCalls: [] as number[],
   };
   const history = opts.commercialHistory ?? new Map<string, string>();
 
@@ -136,12 +140,17 @@ function makeMockClient(opts: MockClientOptions) {
               (c) => c.last_inbound_at !== null,
             );
             return {
-              lte: async (_c5: string, cutoffIso: string) => ({
-                data: afterLastInboundNotNull.filter(
+              lte: (_c5: string, cutoffIso: string) => {
+                const matched = afterLastInboundNotNull.filter(
                   (c) => (c.last_inbound_at as string) <= cutoffIso,
-                ),
-                error: null,
-              }),
+                );
+                return {
+                  limit: async (n: number) => {
+                    calls.contactsLimitCalls.push(n);
+                    return { data: matched.slice(0, n), error: null };
+                  },
+                };
+              },
             };
           },
           is: (_c4b: string, _v4b: null) => {
@@ -149,12 +158,17 @@ function makeMockClient(opts: MockClientOptions) {
               (c) => c.last_inbound_at === null,
             );
             return {
-              lte: async (_c5: string, cutoffIso: string) => ({
-                data: afterLastInboundNull.filter(
+              lte: (_c5: string, cutoffIso: string) => {
+                const matched = afterLastInboundNull.filter(
                   (c) => c.verified_at !== null && (c.verified_at as string) <= cutoffIso,
-                ),
-                error: null,
-              }),
+                );
+                return {
+                  limit: async (n: number) => {
+                    calls.contactsLimitCalls.push(n);
+                    return { data: matched.slice(0, n), error: null };
+                  },
+                };
+              },
             };
           },
         }),
@@ -431,6 +445,28 @@ describe("runReengagementBatch", () => {
     expect(result.sent).toBe(1);
     expect(result.sentByCohort).toEqual({ a: 0, b: 1 });
     expect(result.skipped.recently_engaged).toBe(1);
+  });
+
+  test("limit chega até a consulta ao banco: 3 candidatos elegíveis na coorte A, limit=2 => .limit(2) chamado, só 2 avaliados/enviados", async () => {
+    const contacts: ReengagementContactRow[] = [
+      baseContact({ id: "a1", last_inbound_at: daysAgoIso(10) }),
+      baseContact({ id: "a2", last_inbound_at: daysAgoIso(11) }),
+      baseContact({ id: "a3", last_inbound_at: daysAgoIso(12) }),
+    ];
+    const { client, calls } = makeMockClient({ contacts, instances: [baseInstance()] });
+
+    const result = await runReengagementBatch(client, { limit: 2, logger: silentLogger() });
+
+    // Prova explícita: o mock recebeu .limit(2) na chamada da cadeia de
+    // whatsapp_contacts (uma vez por coorte consultada — coorte A aqui
+    // tem 3 candidatos, coorte B não tem nenhum, mas a query da coorte B
+    // ainda roda e também chama .limit(2)).
+    expect(calls.contactsLimitCalls).toEqual([2, 2]);
+    // O resultado final bate com o limite já aplicado na "consulta ao
+    // banco" (o mock corta em .limit(), não em JavaScript depois).
+    expect(result.candidatesEvaluated).toBe(2);
+    expect(result.sent).toBe(2);
+    expect(result.sentByCohort).toEqual({ a: 2, b: 0 });
   });
 });
 
