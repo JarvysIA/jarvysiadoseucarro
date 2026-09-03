@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowRight, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({ meta: [{ title: "Nova senha — Jarvys" }] }),
@@ -16,8 +17,8 @@ function ResetPasswordPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("Use no mínimo 6 caracteres.");
+    if (!isStrongPassword(password)) {
+      toast.error("Use uma senha forte (mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial).");
       return;
     }
     setLoading(true);
@@ -51,16 +52,17 @@ function ResetPasswordPage() {
           <input
             required
             type="password"
-            minLength={6}
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 w-full bg-transparent text-base text-foreground focus:outline-none"
           />
         </label>
+        <PasswordChecklist password={password} />
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !isStrongPassword(password)}
           className="glow-neon mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
