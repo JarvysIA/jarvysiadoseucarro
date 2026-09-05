@@ -162,7 +162,7 @@ function SignupPage() {
       if (finalUserError || !user?.id) {
         throw new Error("Usuário não autenticado no Supabase");
       }
-      console.log("[signup] usuário autenticado antes de inserir veículo:", user);
+      console.log("[signup] usuário autenticado antes de inserir veículo:", user.id);
 
       const parseCilindradas = (raw: string | null | undefined): number | null => {
         if (raw == null) return null;
