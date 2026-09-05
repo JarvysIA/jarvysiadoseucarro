@@ -478,7 +478,26 @@ describe("smoke estrutural — createClient() real vs. SupabaseLike", () => {
     "client real tem .rpc/.from como funções, .from().select() encadeia .eq/.maybeSingle",
     async () => {
       const mod = await import(SUPABASE_JS_URL);
-      const client = mod.createClient("https://fake-project.supabase.co", "fake-anon-key");
+
+      // DIAGNÓSTICO TEMPORÁRIO — investigar o shape real do módulo
+      // importado via esm.sh no CI (removido depois, não é lógica
+      // permanente).
+      console.log("[DIAG-ESM] typeof mod:", typeof mod);
+      console.log("[DIAG-ESM] Object.keys(mod):", JSON.stringify(Object.keys(mod)));
+      console.log("[DIAG-ESM] typeof mod.createClient:", typeof mod.createClient);
+      console.log("[DIAG-ESM] typeof mod.default:", typeof mod.default);
+      console.log(
+        "[DIAG-ESM] mod.default keys (se existir):",
+        mod.default ? JSON.stringify(Object.keys(mod.default)) : "N/A",
+      );
+
+      let client: any;
+      try {
+        client = mod.createClient("https://fake-project.supabase.co", "fake-anon-key");
+      } catch (e) {
+        console.log("[DIAG-ESM] erro ao chamar mod.createClient:", String(e));
+        throw e;
+      }
 
       expect(typeof client.rpc).toBe("function");
       expect(typeof client.from).toBe("function");
