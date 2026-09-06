@@ -414,7 +414,7 @@ export const confirmWhatsappLinkCodeFn = createServerFn({ method: "POST" })
       );
 
       if (error) {
-        console.error("[whatsapp-link-confirm] rpc_error detail", { message: error.message, code: (error as { code?: string }).code, details: (error as { details?: string }).details, hint: (error as { hint?: string }).hint });
+        console.error("[whatsapp-link-confirm] rpc_error");
         logConfirm({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
         return { ok: false, reason: "internal_error" };
       }
@@ -497,10 +497,7 @@ async function runOptRpc(
       p_user_id: userId,
     });
     if (error) {
-      console.error(`[${tag}] rpc_error`, {
-        message: error.message,
-        code: (error as { code?: string }).code,
-      });
+      console.error(`[${tag}] rpc_error`);
       logOptToggle(tag, { user_id: userId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
       return { ok: false, reason: "internal_error" };
     }
@@ -619,10 +616,7 @@ export const confirmWhatsappPhoneChangeFn = createServerFn({ method: "POST" })
       );
 
       if (error) {
-        console.error("[whatsapp-phone-change-confirm] rpc_error detail", {
-          message: error.message,
-          code: (error as { code?: string }).code,
-        });
+        console.error("[whatsapp-phone-change-confirm] rpc_error");
         logPhoneChange({ user_id: userId, verification_id: verificationId, result: "internal_error", error_code: "rpc_error", elapsed_ms: Date.now() - t0 });
         return { ok: false, reason: "internal_error" };
       }
