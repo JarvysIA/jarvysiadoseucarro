@@ -99,7 +99,7 @@ export const jarvysChatFn = createServerFn({ method: "POST" })
       if (resp.status === 402) {
         throw new Error("Créditos de IA esgotados. Adicione créditos no workspace.");
       }
-      console.error("[jarvys-chat] gateway error", resp.status, text);
+      console.error("[jarvys-chat] gateway error", resp.status, text.slice(0, 200));
       throw new Error("Falha ao consultar o Jarvys.");
     }
 

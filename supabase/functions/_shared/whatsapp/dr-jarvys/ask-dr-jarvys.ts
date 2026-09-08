@@ -142,7 +142,7 @@ export async function askDrJarvys(input: AskDrJarvysInput): Promise<AskDrJarvysR
       if (resp.status === 402) {
         return { ok: false, error: "Créditos de IA esgotados. Adicione créditos na workspace." };
       }
-      console.error("[ask-dr-jarvys] gateway error:", resp.status, text);
+      console.error("[ask-dr-jarvys] gateway error:", resp.status, text.slice(0, 200));
       return { ok: false, error: "Falha ao consultar o Dr. Jarvys." };
     }
 

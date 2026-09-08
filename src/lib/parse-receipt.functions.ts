@@ -227,7 +227,7 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
         if (resp.status === 402) {
           return { ok: false, error: "Créditos de IA esgotados. Adicione créditos na workspace." };
         }
-        console.error("[parse-receipt] gateway error:", resp.status, text);
+        console.error("[parse-receipt] gateway error:", resp.status, text.slice(0, 200));
         return { ok: false, error: "Falha ao chamar a IA de visão." };
       }
 
@@ -241,7 +241,7 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
       try {
         parsed = JSON.parse(stripJsonFences(raw)) as ParsedReceipt;
       } catch (e) {
-        console.error("[parse-receipt] JSON parse failed:", raw);
+        console.error("[parse-receipt] JSON parse failed:", raw.slice(0, 200));
         return { ok: false, error: "A IA não retornou um JSON válido. Tente outra foto." };
       }
 

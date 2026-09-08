@@ -90,7 +90,7 @@ async function tryResolveWithAi(
       console.warn(
         "[JarvysTechnicalProfile:ai] gateway error",
         resp.status,
-        t,
+        t.slice(0, 200),
       );
       return null;
     }
@@ -108,7 +108,7 @@ async function tryResolveWithAi(
     if (!validated.ok) {
       console.warn(
         "[JarvysTechnicalProfile:ai] resposta inválida:",
-        validated.reason,
+        validated.reason.slice(0, 200),
       );
       return null;
     }
@@ -117,7 +117,7 @@ async function tryResolveWithAi(
       // IA declarou low — não persistimos como ia_resolvida.
       console.warn(
         "[JarvysTechnicalProfile:ai] IA retornou confidence=low; mantendo fallback local.",
-        validated.warnings,
+        JSON.stringify(validated.warnings).slice(0, 200),
       );
       return null;
     }
