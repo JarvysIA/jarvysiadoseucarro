@@ -71,10 +71,11 @@ export const classifyExpenseTextFn = createServerFn({ method: "POST" })
       const cleaned = raw.replace(/^["'`]+|["'`]+$/g, "").trim();
       return { ok: true, text: cleaned };
     } catch (e) {
-      console.error("[classify-expense-text] exception:", e);
+      const errMessage = e instanceof Error ? e.message : "erro";
+      console.error("[classify-expense-text] exception:", errMessage);
       return {
         ok: false,
-        error: e instanceof Error ? e.message : "erro",
+        error: errMessage,
         text: stripTags(data.text),
       };
     }

@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, fipe, informacoes_veiculo, raw: data });
   } catch (e) {
-    console.error("[consultar-placa]", e);
+    console.error("[consultar-placa]", e instanceof Error ? e.message : String(e));
     return json({ ok: false, error: (e as Error).message || "erro" }, 500);
   }
 });

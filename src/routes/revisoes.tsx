@@ -169,7 +169,7 @@ function RevisoesPage() {
         }
         setItems(all);
       } catch (e) {
-        console.error("[revisoes unified]", e);
+        console.error("[revisoes unified]", e instanceof Error ? e.message : String(e));
         setItems([]);
       } finally {
         if (!cancel) setLoading(false);

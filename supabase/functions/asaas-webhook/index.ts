@@ -71,10 +71,8 @@ Deno.serve(async (req) => {
     const result = await confirmarPagamento({ supabase, pagamento_id: row.id });
     return json({ ok: true, result });
   } catch (err) {
-    console.error("[asaas-webhook]", err);
-    return json(
-      { error: err instanceof Error ? err.message : "Erro desconhecido" },
-      500,
-    );
+    const errMessage = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[asaas-webhook]", errMessage);
+    return json({ error: errMessage }, 500);
   }
 });

@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
           }
         } catch (e) {
           // Cupom inválido não bloqueia — cai no preço cheio.
-          console.warn("[gerar-pix-asaas] cupom inválido:", e);
+          console.warn("[gerar-pix-asaas] cupom inválido:", e instanceof Error ? e.message : String(e));
         }
       }
     }
@@ -318,13 +318,11 @@ Deno.serve(async (req) => {
       cupom_aplicado: cupomAplicado !== null,
     });
   } catch (err) {
-    console.error("[gerar-pix-asaas]", err);
+    const errMessage = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[gerar-pix-asaas]", errMessage);
     if (err instanceof CpfRequiredError) {
       return json({ error: "CPF_REQUIRED", message: err.message }, 400);
     }
-    return json(
-      { error: err instanceof Error ? err.message : "Erro desconhecido" },
-      500,
-    );
+    return json({ error: errMessage }, 500);
   }
 });

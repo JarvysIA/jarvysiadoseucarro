@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, historico, raw: data });
   } catch (e) {
-    console.error("[consultar-historico-fipe]", e);
+    console.error("[consultar-historico-fipe]", e instanceof Error ? e.message : String(e));
     return json({ ok: false, error: (e as Error).message || "erro" }, 500);
   }
 });

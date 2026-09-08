@@ -205,7 +205,7 @@ export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
         if (vehicleErr) {
           console.error(
             "[resolveAndSaveVehicleTechnicalProfileFn] vehicle read error",
-            vehicleErr,
+            vehicleErr instanceof Error ? vehicleErr.message : String(vehicleErr),
           );
           return {
             ok: false,
@@ -237,7 +237,7 @@ export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
           if (corpusErr) {
             console.error(
               "[resolveAndSaveVehicleTechnicalProfileFn] corpus read error",
-              corpusErr,
+              corpusErr instanceof Error ? corpusErr.message : String(corpusErr),
             );
             extraReasons.push(
               "Falha na leitura do corpus técnico — usando fallback FIPE.",
@@ -317,7 +317,7 @@ export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
         if (updateErr) {
           console.error(
             "[resolveAndSaveVehicleTechnicalProfileFn] update error",
-            updateErr,
+            updateErr instanceof Error ? updateErr.message : String(updateErr),
           );
           return {
             ok: false,
@@ -342,7 +342,7 @@ export const resolveAndSaveVehicleTechnicalProfileFn = createServerFn({
       } catch (err) {
         console.error(
           "[resolveAndSaveVehicleTechnicalProfileFn] unexpected error",
-          err,
+          err instanceof Error ? err.message : String(err),
         );
         return {
           ok: false,

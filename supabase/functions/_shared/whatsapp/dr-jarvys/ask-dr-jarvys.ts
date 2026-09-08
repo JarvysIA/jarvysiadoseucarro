@@ -185,7 +185,8 @@ export async function askDrJarvys(input: AskDrJarvysInput): Promise<AskDrJarvysR
 
     return { ok: true, inScope: true, response: truncated };
   } catch (e) {
-    console.error("[ask-dr-jarvys] exception:", e);
-    return { ok: false, error: e instanceof Error ? e.message : "Erro desconhecido." };
+    const errMessage = e instanceof Error ? e.message : "Erro desconhecido.";
+    console.error("[ask-dr-jarvys] exception:", errMessage);
+    return { ok: false, error: errMessage };
   }
 }

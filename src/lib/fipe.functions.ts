@@ -163,7 +163,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
           }
         }
       } catch (e) {
-        console.warn("[refreshFipeFn] lookupPlacaFipe fallback erro", e);
+        console.warn("[refreshFipeFn] lookupPlacaFipe fallback erro", e instanceof Error ? e.message : String(e));
       }
     }
 
@@ -179,7 +179,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
         { body: { hash } },
       );
       if (histErr) {
-        console.error("[refreshFipeFn] consultar-historico-fipe error", histErr);
+        console.error("[refreshFipeFn] consultar-historico-fipe error", histErr instanceof Error ? histErr.message : String(histErr));
         return { refreshed: false as const, reason: "api_error" };
       }
       const arr: unknown[] = Array.isArray(histResp?.historico) ? histResp.historico : [];
@@ -206,7 +206,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
         })
         .filter((p) => (p.mes_ano_extenso || p.ano) && p.valor > 0);
     } catch (e) {
-      console.error("[refreshFipeFn] exception fetching historico", e);
+      console.error("[refreshFipeFn] exception fetching historico", e instanceof Error ? e.message : String(e));
       return { refreshed: false as const, reason: "api_error" };
     }
 
@@ -230,7 +230,7 @@ export const refreshFipeFn = createServerFn({ method: "POST" })
       } as never)
       .eq("id", v.id);
     if (upErr) {
-      console.error("[refreshFipeFn] update error", upErr);
+      console.error("[refreshFipeFn] update error", upErr instanceof Error ? upErr.message : String(upErr));
       return { refreshed: false as const, reason: "update_error" };
     }
 

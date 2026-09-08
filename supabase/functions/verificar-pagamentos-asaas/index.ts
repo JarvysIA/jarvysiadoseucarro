@@ -104,10 +104,8 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, ...resumo });
   } catch (err) {
-    console.error("[verificar-pagamentos-asaas]", err);
-    return json(
-      { error: err instanceof Error ? err.message : "Erro desconhecido" },
-      500,
-    );
+    const errMessage = err instanceof Error ? err.message : "Erro desconhecido";
+    console.error("[verificar-pagamentos-asaas]", errMessage);
+    return json({ error: errMessage }, 500);
   }
 });
