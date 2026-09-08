@@ -73,12 +73,13 @@ export async function confirmarPagamento(
           comissao_registrada = movId !== null;
         }
       } catch (e) {
-        console.error("[pipeline] auto-cura indicação falhou (não bloqueia):", e);
+        const errMessage = e instanceof Error ? e.message : String(e);
+        console.error("[pipeline] auto-cura indicação falhou (não bloqueia):", errMessage);
         try {
           await supabase.from("logs_erro_bonificacao").insert({
             pagamento_id,
             codigo_cupom: pag.codigo_cupom ?? null,
-            erro: ("auto-cura: " + (e instanceof Error ? e.message : String(e))).slice(0, 1000),
+            erro: ("auto-cura: " + errMessage).slice(0, 1000),
           });
         } catch (_) { /* swallow */ }
       }
@@ -190,12 +191,13 @@ export async function confirmarPagamento(
       }
     } catch (e) {
       // Pagamento confirmado é o evento principal: NÃO falhar webhook.
-      console.error("[pipeline] indicação falhou (não bloqueia ativação):", e);
+      const errMessage = e instanceof Error ? e.message : String(e);
+      console.error("[pipeline] indicação falhou (não bloqueia ativação):", errMessage);
       try {
         await supabase.from("logs_erro_bonificacao").insert({
           pagamento_id,
           codigo_cupom: pag.codigo_cupom ?? null,
-          erro: (e instanceof Error ? e.message : String(e)).slice(0, 1000),
+          erro: errMessage.slice(0, 1000),
         });
       } catch (_) { /* swallow */ }
     }

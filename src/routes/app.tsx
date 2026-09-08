@@ -1013,7 +1013,7 @@ function VehicleStatusSection({
       const { data, error } = await query.order("data", { ascending: false });
       if (cancelled) return;
       if (error) {
-        console.error("[maint history]", error);
+        console.error("[maint history]", error instanceof Error ? error.message : String(error));
         setRemoteExpenses([]);
         return;
       }
@@ -1058,7 +1058,7 @@ function VehicleStatusSection({
       .update({ km_atual: n })
       .eq("id", vehicleId);
     if (error) {
-      console.error("[saveKm]", error);
+      console.error("[saveKm]", error instanceof Error ? error.message : String(error));
       toast.error("Não foi possível atualizar a KM.");
       return;
     }
@@ -1099,7 +1099,7 @@ function VehicleStatusSection({
       receipt_image_url: receiptPath,
     });
     if (insErr) {
-      console.error("[despesas insert]", insErr);
+      console.error("[despesas insert]", insErr instanceof Error ? insErr.message : String(insErr));
       throw new Error("Não foi possível salvar a despesa.");
     }
 

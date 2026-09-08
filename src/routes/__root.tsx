@@ -34,7 +34,7 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : String(error));
   const router = useRouter();
 
   return (

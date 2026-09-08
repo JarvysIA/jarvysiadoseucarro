@@ -129,7 +129,7 @@ function DespesasPage() {
       const { data, error } = await query.order("data", { ascending: false });
       if (!cancel) {
         if (error) {
-          console.error("[despesas]", error);
+          console.error("[despesas]", error instanceof Error ? error.message : String(error));
           setItems([]);
         } else {
           setItems((data || []) as Despesa[]);
