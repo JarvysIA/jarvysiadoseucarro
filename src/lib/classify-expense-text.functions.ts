@@ -54,7 +54,7 @@ export const classifyExpenseTextFn = createServerFn({ method: "POST" })
 
       if (!resp.ok) {
         const t = await resp.text();
-        console.error("[classify-expense-text] gateway error:", resp.status, t);
+        console.error("[classify-expense-text] gateway error:", resp.status, t.slice(0, 200));
         // Fallback: devolve o texto original limpo de tags
         return { ok: false, error: `Gateway ${resp.status}`, text: stripTags(data.text) };
       }

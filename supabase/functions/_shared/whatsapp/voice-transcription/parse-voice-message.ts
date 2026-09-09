@@ -76,7 +76,7 @@ export async function parseVoiceMessage(input: ParseVoiceInput): Promise<ParseVo
       if (resp.status === 402) {
         return { ok: false, error: "Créditos de IA esgotados. Adicione créditos na workspace." };
       }
-      console.error("[parse-voice-message] gateway error:", resp.status, text);
+      console.error("[parse-voice-message] gateway error:", resp.status, text.slice(0, 200));
       return { ok: false, error: "Falha ao chamar o serviço de transcrição." };
     }
 
