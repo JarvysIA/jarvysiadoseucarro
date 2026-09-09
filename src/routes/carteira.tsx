@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { CarteiraJarvys } from "@/components/CarteiraJarvys";
+import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
 
 export const Route = createFileRoute("/carteira")({
   head: () => ({ meta: [{ title: "Minha Carteira Jarvys" }] }),
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/carteira")({
 });
 
 function CarteiraPage() {
+  useEnforceAccountActive();
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 

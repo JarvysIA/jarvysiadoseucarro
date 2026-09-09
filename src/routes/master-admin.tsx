@@ -24,6 +24,7 @@ import {
   type AdminUserRow,
   type PlanStatus,
 } from "@/lib/admin-users.functions";
+import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
 
 export const Route = createFileRoute("/master-admin")({
   head: () => ({
@@ -43,6 +44,7 @@ const STATUS_OPTIONS: { value: PlanStatus; label: string }[] = [
 ];
 
 function MasterAdminPage() {
+  useEnforceAccountActive();
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<"checking" | "denied" | "ok">("checking");
   const [rows, setRows] = useState<AdminUserRow[]>([]);

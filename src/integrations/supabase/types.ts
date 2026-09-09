@@ -562,6 +562,7 @@ export type Database = {
           placa: string | null
           referrer_id: string | null
           status_usuario: string
+          termos_aceitos_em: string | null
           trial_inicio: string | null
           uf: string | null
           whatsapp: string
@@ -582,6 +583,7 @@ export type Database = {
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string
+          termos_aceitos_em?: string | null
           trial_inicio?: string | null
           uf?: string | null
           whatsapp: string
@@ -602,6 +604,7 @@ export type Database = {
           placa?: string | null
           referrer_id?: string | null
           status_usuario?: string
+          termos_aceitos_em?: string | null
           trial_inicio?: string | null
           uf?: string | null
           whatsapp?: string

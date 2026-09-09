@@ -27,6 +27,7 @@ function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [hasReferrer, setHasReferrer] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     setHasReferrer(!!getStoredRef());
@@ -47,6 +48,10 @@ function SignupPage() {
     }
     if (!form.name.trim() || !form.email.trim() || !isStrongPassword(form.password)) {
       toast.error("Preencha todos os campos e use uma senha forte.");
+      return;
+    }
+    if (!termsAccepted) {
+      toast.error("É preciso aceitar os Termos de Uso e a Política de Privacidade.");
       return;
     }
     setModalOpen(true);
@@ -70,6 +75,7 @@ function SignupPage() {
         whatsapp: form.phone.trim(),
         email: user.email ?? form.email.trim(),
         placa: plate,
+        termos_aceitos_em: new Date().toISOString(),
       };
 
       for (let attempt = 0; attempt < 6; attempt++) {
@@ -352,7 +358,26 @@ function SignupPage() {
           />
         </Field>
 
-        <button type="submit" disabled={loading || !isStrongPassword(form.password)}
+        <label className="flex items-start gap-2.5 pt-1 text-xs leading-relaxed text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
+          />
+          <span>
+            Li e concordo com os{" "}
+            <Link to="/termos" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+              Termos de Uso
+            </Link>{" "}
+            e a{" "}
+            <Link to="/privacidade" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+              Política de Privacidade
+            </Link>
+          </span>
+        </label>
+
+        <button type="submit" disabled={loading || !isStrongPassword(form.password) || !termsAccepted}
           className="glow-neon mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-base font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-60">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
           {loading ? "Criando conta..." : "Entrar na garagem"}

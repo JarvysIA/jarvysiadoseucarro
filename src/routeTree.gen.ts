@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as SplashRouteImport } from './routes/splash'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ShoppingRouteImport } from './routes/shopping'
 import { Route as RevisoesRouteImport } from './routes/revisoes'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as MasterAdminRouteImport } from './routes/master-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
@@ -31,6 +33,11 @@ import { Route as ApiPublicHooksFipeMonthlyRefreshRouteImport } from './routes/a
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplashRoute = SplashRouteImport.update({
@@ -56,6 +63,11 @@ const RevisoesRoute = RevisoesRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MasterAdminRoute = MasterAdminRouteImport.update({
@@ -130,11 +142,13 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
@@ -149,11 +163,13 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
@@ -170,11 +186,13 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
   '/master-admin': typeof MasterAdminRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/reset-password': typeof ResetPasswordRoute
   '/revisoes': typeof RevisoesRoute
   '/shopping': typeof ShoppingRoute
   '/signup': typeof SignupRoute
   '/splash': typeof SplashRoute
+  '/termos': typeof TermosRoute
   '/welcome': typeof WelcomeRoute
   '/_authenticated/admin-corpus-smoke': typeof AuthenticatedAdminCorpusSmokeRoute
   '/_authenticated/onboarding-whatsapp': typeof AuthenticatedOnboardingWhatsappRoute
@@ -191,11 +209,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/privacidade'
     | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
     | '/splash'
+    | '/termos'
     | '/welcome'
     | '/admin-corpus-smoke'
     | '/onboarding-whatsapp'
@@ -210,11 +230,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/privacidade'
     | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
     | '/splash'
+    | '/termos'
     | '/welcome'
     | '/admin-corpus-smoke'
     | '/onboarding-whatsapp'
@@ -230,11 +252,13 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/login'
     | '/master-admin'
+    | '/privacidade'
     | '/reset-password'
     | '/revisoes'
     | '/shopping'
     | '/signup'
     | '/splash'
+    | '/termos'
     | '/welcome'
     | '/_authenticated/admin-corpus-smoke'
     | '/_authenticated/onboarding-whatsapp'
@@ -251,11 +275,13 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
   MasterAdminRoute: typeof MasterAdminRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RevisoesRoute: typeof RevisoesRoute
   ShoppingRoute: typeof ShoppingRoute
   SignupRoute: typeof SignupRoute
   SplashRoute: typeof SplashRoute
+  TermosRoute: typeof TermosRoute
   WelcomeRoute: typeof WelcomeRoute
   ApiPublicHooksFipeMonthlyRefreshRoute: typeof ApiPublicHooksFipeMonthlyRefreshRoute
 }
@@ -267,6 +293,13 @@ declare module '@tanstack/react-router' {
       path: '/welcome'
       fullPath: '/welcome'
       preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/splash': {
@@ -309,6 +342,13 @@ declare module '@tanstack/react-router' {
       path: '/master-admin'
       fullPath: '/master-admin'
       preLoaderRoute: typeof MasterAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -414,11 +454,13 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
   MasterAdminRoute: MasterAdminRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RevisoesRoute: RevisoesRoute,
   ShoppingRoute: ShoppingRoute,
   SignupRoute: SignupRoute,
   SplashRoute: SplashRoute,
+  TermosRoute: TermosRoute,
   WelcomeRoute: WelcomeRoute,
   ApiPublicHooksFipeMonthlyRefreshRoute: ApiPublicHooksFipeMonthlyRefreshRoute,
 }
