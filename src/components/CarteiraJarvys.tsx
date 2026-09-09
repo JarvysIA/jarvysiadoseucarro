@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getCarteiraIndicacao,
@@ -21,6 +22,7 @@ import {
   type CarteiraIndicacaoDTO,
   type MovimentacaoIndicacaoDTO,
 } from "@/lib/carteira-indicacao.functions";
+import { useGuidedTourStep } from "@/lib/use-guided-tour-step";
 
 const SAQUE_MINIMO = 20;
 
@@ -147,6 +149,7 @@ export function CarteiraJarvys() {
   const movs = data?.movimentacoes ?? [];
   const podeSaque = (carteira?.saldo_disponivel ?? 0) >= SAQUE_MINIMO;
   const indicacaoLiberada = data?.indicacao_liberada ?? false;
+  const carteiraTour = useGuidedTourStep("carteira");
 
   // Pré-carrega chave PIX salva ao abrir o modal.
   useEffect(() => {
@@ -255,27 +258,43 @@ export function CarteiraJarvys() {
       </header>
 
       {/* Resumo */}
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <Wallet className="h-3.5 w-3.5 text-primary" /> Resumo
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Stat
-            icon={<Users className="h-3.5 w-3.5" />}
-            label="Indicações"
-            value={`${carteira?.total_indicacoes ?? 0} ${
-              (carteira?.total_indicacoes ?? 0) === 1 ? "amigo" : "amigos"
-            }`}
-          />
-          <Stat
-            label="Saldo disponível"
-            value={BRL.format(carteira?.saldo_disponivel ?? 0)}
-            highlight
-          />
-          <Stat label="Pendente" value={BRL.format(carteira?.saldo_pendente ?? 0)} />
-          <Stat label="Reservado" value={BRL.format(carteira?.saldo_reservado ?? 0)} />
-        </div>
-      </section>
+      <Popover open={carteiraTour.shouldShow}>
+        <PopoverAnchor asChild>
+          <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Wallet className="h-3.5 w-3.5 text-primary" /> Resumo
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Stat
+                icon={<Users className="h-3.5 w-3.5" />}
+                label="Indicações"
+                value={`${carteira?.total_indicacoes ?? 0} ${
+                  (carteira?.total_indicacoes ?? 0) === 1 ? "amigo" : "amigos"
+                }`}
+              />
+              <Stat
+                label="Saldo disponível"
+                value={BRL.format(carteira?.saldo_disponivel ?? 0)}
+                highlight
+              />
+              <Stat label="Pendente" value={BRL.format(carteira?.saldo_pendente ?? 0)} />
+              <Stat label="Reservado" value={BRL.format(carteira?.saldo_reservado ?? 0)} />
+            </div>
+          </section>
+        </PopoverAnchor>
+        <PopoverContent side="bottom" className="w-64">
+          <p className="text-sm text-foreground">
+            Indique amigos e acompanhe suas comissões.
+          </p>
+          <button
+            type="button"
+            onClick={() => carteiraTour.markSeen()}
+            className="glow-neon mt-3 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+          >
+            Entendi
+          </button>
+        </PopoverContent>
+      </Popover>
 
       {/* Próximo saque */}
       <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">

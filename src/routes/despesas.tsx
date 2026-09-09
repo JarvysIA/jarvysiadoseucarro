@@ -13,6 +13,8 @@ import { useActivatedVehicleIds } from "@/lib/use-activated-vehicle-ids";
 import { useCurrentPlan } from "@/lib/use-current-plan";
 import { formatItemName } from "@/lib/format-item-name";
 import { hasPremiumHistoryAvailableFn } from "@/lib/vehicles.functions";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { useGuidedTourStep } from "@/lib/use-guided-tour-step";
 import {
   CATEGORIAS,
   CATEGORIA_COLOR,
@@ -62,6 +64,7 @@ function DespesasPage() {
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
+  const expenseTour = useGuidedTourStep("despesas");
 
   // Carrega metadados do veículo ativo (KM, lock e claim) para defaults do modal,
   // banner de Carfax Reverso e filtro da timeline.
@@ -366,14 +369,30 @@ function DespesasPage() {
       </section>
 
       {/* FAB — novo registro manual */}
-      <button
-        type="button"
-        onClick={() => setAddOpen(true)}
-        aria-label="Novo registro"
-        className="glow-neon fixed bottom-24 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.7_0.18_250)] text-primary-foreground shadow-xl transition-transform active:scale-95"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      <Popover open={expenseTour.shouldShow}>
+        <PopoverAnchor asChild>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            aria-label="Novo registro"
+            className="glow-neon fixed bottom-24 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.7_0.18_250)] text-primary-foreground shadow-xl transition-transform active:scale-95"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+        </PopoverAnchor>
+        <PopoverContent side="top" className="w-64">
+          <p className="text-sm text-foreground">
+            Registre gastos manualmente, por foto da nota, ou mande pro Jarvys no WhatsApp.
+          </p>
+          <button
+            type="button"
+            onClick={() => expenseTour.markSeen()}
+            className="glow-neon mt-3 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+          >
+            Entendi
+          </button>
+        </PopoverContent>
+      </Popover>
 
       {/* FAB IA — Ler nota com IA */}
       <ReceiptScanFab
