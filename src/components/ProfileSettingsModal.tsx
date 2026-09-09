@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
+import { AlertTriangle, Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PasswordChecklist, isStrongPassword } from "@/components/PasswordChecklist";
 import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
 import { WhatsappLinkCard } from "@/components/WhatsappLinkCard";
+import { deactivateAccountFn } from "@/lib/profile-status.functions";
 
 type Props = {
   open: boolean;
@@ -66,6 +67,8 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [linkedLoading, setLinkedLoading] = useState(true);
   const [linkedReloadKey, setLinkedReloadKey] = useState(0);
   const [changeNumberOpen, setChangeNumberOpen] = useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -156,6 +159,22 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       cancel = true;
     };
   }, [cep]);
+
+  const deactivateAccount = async () => {
+    if (deactivating) return;
+    setDeactivating(true);
+    try {
+      await deactivateAccountFn();
+      await supabase.auth.signOut();
+      toast.success("Conta desativada.");
+      onClose();
+      navigate({ to: "/welcome" });
+    } catch (e) {
+      console.error("[deactivateAccount]", e instanceof Error ? e.message : String(e));
+      toast.error(e instanceof Error ? e.message : "Não foi possível desativar a conta.");
+      setDeactivating(false);
+    }
+  };
 
   const save = async () => {
     if (!profile) return;
@@ -426,6 +445,49 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 {saving ? "Salvando..." : "Salvar"}
               </button>
+            </div>
+
+            <div className="mt-2 border-t border-border pt-4">
+              {deactivateOpen ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                    <p className="text-xs leading-relaxed text-foreground">
+                      Isso vai bloquear seu acesso à conta. Seus dados NÃO serão apagados
+                      automaticamente — para solicitar exclusão completa dos seus dados,
+                      entre em contato pelo e-mail{" "}
+                      <span className="font-medium">contato@jarvys.com.br</span>.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDeactivateOpen(false)}
+                      disabled={deactivating}
+                      className="flex-1 rounded-xl border border-border px-3 py-2.5 text-xs font-medium text-muted-foreground disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deactivateAccount}
+                      disabled={deactivating}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-destructive px-3 py-2.5 text-xs font-semibold text-destructive-foreground disabled:opacity-60"
+                    >
+                      {deactivating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Confirmar desativação
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDeactivateOpen(true)}
+                  className="w-full text-center text-xs font-medium text-destructive/80 hover:text-destructive"
+                >
+                  Desativar minha conta
+                </button>
+              )}
             </div>
           </div>
         )}

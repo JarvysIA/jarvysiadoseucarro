@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Mail, Lock, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -7,14 +7,26 @@ import { OAuthButtons } from "@/components/OAuthButtons";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Entrar — Jarvys" }] }),
+  validateSearch: (search: Record<string, unknown>): { motivo?: string } => ({
+    motivo: typeof search.motivo === "string" ? search.motivo : undefined,
+  }),
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { motivo } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (motivo === "conta_desativada") {
+      toast.error(
+        "Sua conta foi desativada. Entre em contato pelo e-mail contato@jarvys.com.br se isso for um engano.",
+      );
+    }
+  }, [motivo]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PlanContext } from "@/lib/plan-capabilities";
 import type { ProfileStatus } from "@/lib/profile-status";
+import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
 
 /**
  * Hook leve para montar o PlanContext do usuário autenticado.
@@ -14,6 +15,7 @@ import type { ProfileStatus } from "@/lib/profile-status";
  *   assinaturas não é usada porque não é alimentada pelo fluxo atual.
  */
 export function useCurrentPlan(refreshKey: number = 0): PlanContext | null {
+  useEnforceAccountActive();
   const [plan, setPlan] = useState<PlanContext | null>(null);
 
   useEffect(() => {
