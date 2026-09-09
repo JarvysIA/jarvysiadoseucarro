@@ -28,6 +28,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { useGuidedTourStep } from "@/lib/use-guided-tour-step";
 import { nextMilestone } from "@/lib/predictive-maintenance";
 import {
   hasUsableConfidence,
@@ -175,6 +177,7 @@ function AppPage() {
   const didInitialScrollRef = useRef(false);
   const [planRefreshKey, setPlanRefreshKey] = useState(0);
   const plan = useCurrentPlan(planRefreshKey);
+  const garageTour = useGuidedTourStep("app");
 
   const openLimitModal = () => {
     const eligible =
@@ -490,47 +493,62 @@ function AppPage() {
               {vehicles.map((v) => {
                 const active = v.id === selectedId;
                 return (
-                  <article
-                    key={v.id}
-                    data-vehicle-id={v.id}
-                    onClick={() => setSelectedId(v.id)}
-                    className={`w-full w-[82%] shrink-0 snap-center flex flex-col md:flex-row overflow-hidden rounded-3xl border bg-card transition-all ${
-                      active ? "glow-neon border-primary/40" : "border-border opacity-70"
-                    }`}
-                  >
-                    <div className="relative w-full h-56 md:w-[45%] md:h-full overflow-hidden bg-card md:bg-transparent flex-shrink-0">
-                      <VehicleImage
-                        vehicleId={v.id}
-                        cachedUrl={v.fotoUrl}
-                        marca={v.marca}
-                        modelo={v.modelo}
-                        ano={v.year}
-                        cor={v.color}
-                        alt={`${v.marca} ${v.modelo} ${v.color}`}
-                        onResolved={(url) =>
-                          setVehicles((prev) =>
-                            prev.map((x) => (x.id === v.id ? { ...x, fotoUrl: url } : x)),
-                          )
-                        }
-                      />
+                  <Popover key={v.id} open={active && garageTour.shouldShow}>
+                    <PopoverAnchor asChild>
+                      <article
+                        data-vehicle-id={v.id}
+                        onClick={() => setSelectedId(v.id)}
+                        className={`w-full w-[82%] shrink-0 snap-center flex flex-col md:flex-row overflow-hidden rounded-3xl border bg-card transition-all ${
+                          active ? "glow-neon border-primary/40" : "border-border opacity-70"
+                        }`}
+                      >
+                        <div className="relative w-full h-56 md:w-[45%] md:h-full overflow-hidden bg-card md:bg-transparent flex-shrink-0">
+                          <VehicleImage
+                            vehicleId={v.id}
+                            cachedUrl={v.fotoUrl}
+                            marca={v.marca}
+                            modelo={v.modelo}
+                            ano={v.year}
+                            cor={v.color}
+                            alt={`${v.marca} ${v.modelo} ${v.color}`}
+                            onResolved={(url) =>
+                              setVehicles((prev) =>
+                                prev.map((x) => (x.id === v.id ? { ...x, fotoUrl: url } : x)),
+                              )
+                            }
+                          />
 
-                      <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
-                        {v.plate}
-                      </span>
-                    </div>
-                    <div className="w-full md:w-[55%] flex flex-col justify-center p-4 md:p-6">
-                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                        {v.year} · {v.color}
+                          <span className="absolute top-3 left-3 z-[3] rounded-full bg-background/70 px-2.5 py-1 text-[10px] font-medium tracking-wider text-primary backdrop-blur">
+                            {v.plate}
+                          </span>
+                        </div>
+                        <div className="w-full md:w-[55%] flex flex-col justify-center p-4 md:p-6">
+                          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {v.year} · {v.color}
+                          </p>
+                          <h3 className="mt-1 text-lg font-semibold">
+                            {[v.marca, v.modelo].filter(Boolean).join(" ") || "Veículo"}
+                          </h3>
+                          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                            <Gauge className="h-4 w-4 text-primary" />
+                            {v.km.toLocaleString("pt-BR")} km
+                          </div>
+                        </div>
+                      </article>
+                    </PopoverAnchor>
+                    <PopoverContent side="bottom" className="w-64">
+                      <p className="text-sm text-foreground">
+                        Aqui fica sua garagem — toque num carro pra ver o status de manutenção.
                       </p>
-                      <h3 className="mt-1 text-lg font-semibold">
-                        {[v.marca, v.modelo].filter(Boolean).join(" ") || "Veículo"}
-                      </h3>
-                      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                        <Gauge className="h-4 w-4 text-primary" />
-                        {v.km.toLocaleString("pt-BR")} km
-                      </div>
-                    </div>
-                  </article>
+                      <button
+                        type="button"
+                        onClick={() => garageTour.markSeen()}
+                        className="glow-neon mt-3 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                      >
+                        Entendi
+                      </button>
+                    </PopoverContent>
+                  </Popover>
                 );
               })}
 
@@ -926,6 +944,7 @@ function VehicleStatusSection({
   const isPlanLoaded = !!plan;
   const isVip = plan?.status_usuario === "vip";
   const effectiveLock = historyLocked && !isVip;
+  const statusBadgeTour = useGuidedTourStep("app");
   useEffect(() => {
     if (!vehicleId) {
       setHistoryLocked(false);
@@ -1198,9 +1217,10 @@ function VehicleStatusSection({
 
       <section className="mt-4 px-6">
         <div className="grid grid-cols-2 gap-3">
-          {ITEMS.map((it) => {
+          {ITEMS.map((it, idx) => {
             const data = computed.find((c) => c.item.key === it.key);
             if (!data) return null;
+            const isFirst = idx === 0;
             return (
               <button
                 type="button"
@@ -1215,10 +1235,29 @@ function VehicleStatusSection({
                   >
                     {it.icon({ className: "h-5 w-5" })}
                   </div>
-                  <span
-                    className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
-                    aria-label={STATUS_LABEL_PT[data.status]}
-                  />
+                  <Popover open={isFirst && statusBadgeTour.shouldShow}>
+                    <PopoverAnchor asChild>
+                      <span
+                        className={`h-3 w-3 rounded-full ${STATUS_CLASS[data.status]} ${STATUS_RING[data.status]}`}
+                        aria-label={STATUS_LABEL_PT[data.status]}
+                      />
+                    </PopoverAnchor>
+                    <PopoverContent side="left" className="w-56">
+                      <p className="text-sm text-foreground">
+                        O selo colorido mostra a saúde de cada item.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          statusBadgeTour.markSeen();
+                        }}
+                        className="glow-neon mt-3 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                      >
+                        Entendi
+                      </button>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <p className="mt-4 text-[12px] font-medium leading-tight text-foreground min-h-[28px]">{it.label}</p>
                 <p

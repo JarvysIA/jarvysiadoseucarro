@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Check, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
+import { AlertTriangle, Check, HelpCircle, KeyRound, Loader2, Lock, Mail, MapPin, ShieldCheck, User as UserIcon, Wallet, MessageCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -14,6 +14,7 @@ import { PasswordChecklist, isStrongPassword } from "@/components/PasswordCheckl
 import { isValidCpf, maskCpf, onlyDigits } from "@/lib/cpf";
 import { WhatsappLinkCard } from "@/components/WhatsappLinkCard";
 import { deactivateAccountFn } from "@/lib/profile-status.functions";
+import { resetAllGuidedTours } from "@/lib/use-guided-tour-step";
 
 type Props = {
   open: boolean;
@@ -69,6 +70,7 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
   const [changeNumberOpen, setChangeNumberOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [resettingTour, setResettingTour] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -159,6 +161,24 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
       cancel = true;
     };
   }, [cep]);
+
+  const replayTour = async () => {
+    if (resettingTour) return;
+    setResettingTour(true);
+    try {
+      await resetAllGuidedTours();
+      // ProfileSettingsModal só é montado em /app (confirmado no Passo 0.5) —
+      // um reload garante que os hooks de tour releiam tours_vistos do zero
+      // e os balões reapareçam imediatamente nesta mesma tela; nas outras
+      // 4 telas, o balão volta a aparecer na próxima vez que o usuário
+      // navegar até lá (cada useGuidedTourStep busca seu próprio snapshot).
+      window.location.reload();
+    } catch (e) {
+      console.error("[replayTour]", e instanceof Error ? e.message : String(e));
+      toast.error("Não foi possível reiniciar o tour.");
+      setResettingTour(false);
+    }
+  };
 
   const deactivateAccount = async () => {
     if (deactivating) return;
@@ -267,6 +287,23 @@ export function ProfileSettingsModal({ open, onClose }: Props) {
                 Minha Carteira Jarvys
               </span>
               <span className="text-xs text-muted-foreground">Abrir →</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={replayTour}
+              disabled={resettingTour}
+              className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-3 text-left text-sm font-semibold hover:border-primary/60 disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2">
+                <HelpCircle className="h-4 w-4 text-primary" />
+                Ver tour novamente
+              </span>
+              {resettingTour ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              ) : (
+                <span className="text-xs text-muted-foreground">Reiniciar →</span>
+              )}
             </button>
 
             <Field label="E-mail" icon={<Mail className="h-3.5 w-3.5" />}>

@@ -18,7 +18,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useGuidedTourStep } from "@/lib/use-guided-tour-step";
 import {
   CATEGORIA_COLOR,
   formatBRL,
@@ -70,6 +71,7 @@ function RevisoesPage() {
   const isActivated = activeVehicleId
     ? activatedVehicleIds?.has(activeVehicleId) ?? undefined
     : undefined;
+  const revisoesTour = useGuidedTourStep("revisoes");
 
   useEffect(() => {
     if (!activeVehicleId) {
@@ -231,7 +233,23 @@ function RevisoesPage() {
   return (
     <div className="relative min-h-screen bg-background pb-40">
       <header className="px-6 pt-10">
-        <h1 className="text-2xl font-semibold">Revisões</h1>
+        <Popover open={revisoesTour.shouldShow}>
+          <PopoverAnchor asChild>
+            <h1 className="text-2xl font-semibold">Revisões</h1>
+          </PopoverAnchor>
+          <PopoverContent side="bottom" className="w-64">
+            <p className="text-sm text-foreground">
+              Acompanhe o cronograma de manutenção do seu veículo aqui.
+            </p>
+            <button
+              type="button"
+              onClick={() => revisoesTour.markSeen()}
+              className="glow-neon mt-3 w-full rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              Entendi
+            </button>
+          </PopoverContent>
+        </Popover>
         <p className="mt-1 text-sm text-muted-foreground">
           Histórico global de revisões e manutenções — seu porta-luvas digital.
         </p>

@@ -563,6 +563,7 @@ export type Database = {
           referrer_id: string | null
           status_usuario: string
           termos_aceitos_em: string | null
+          tours_vistos: Json
           trial_inicio: string | null
           uf: string | null
           whatsapp: string
@@ -584,6 +585,7 @@ export type Database = {
           referrer_id?: string | null
           status_usuario?: string
           termos_aceitos_em?: string | null
+          tours_vistos?: Json
           trial_inicio?: string | null
           uf?: string | null
           whatsapp: string
@@ -605,6 +607,7 @@ export type Database = {
           referrer_id?: string | null
           status_usuario?: string
           termos_aceitos_em?: string | null
+          tours_vistos?: Json
           trial_inicio?: string | null
           uf?: string | null
           whatsapp?: string
