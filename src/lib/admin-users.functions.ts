@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROFILE_STATUS_VALUES, type ProfileStatus } from "@/lib/profile-status";
+import { recordAuditEvent } from "@/lib/audit-log";
 
 export type AdminVehicle = {
   id: string;
@@ -84,11 +85,26 @@ export const updateUserStatusFn = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperAdmin(context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: before } = await supabaseAdmin
+      .from("profiles")
+      .select("status_usuario")
+      .eq("id", data.userId)
+      .maybeSingle();
+
     const permite_indicacao = data.status !== "trial";
     const { error } = await supabaseAdmin
       .from("profiles")
       .update({ status_usuario: data.status, permite_indicacao })
       .eq("id", data.userId);
     if (error) throw new Error(error.message);
+
+    void recordAuditEvent(supabaseAdmin, {
+      actorId: context.userId,
+      action: "user_status_updated",
+      targetId: data.userId,
+      details: { from: before?.status_usuario ?? null, to: data.status },
+    });
+
     return { ok: true };
   });
