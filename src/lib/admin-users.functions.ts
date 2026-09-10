@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROFILE_STATUS_VALUES, type ProfileStatus } from "@/lib/profile-status";
 import { recordAuditEvent } from "@/lib/audit-log";
+import type { Json } from "@/integrations/supabase/types";
 
 export type AdminVehicle = {
   id: string;
@@ -24,7 +25,7 @@ export type AdminUserRow = {
   created_at: string;
 };
 
-async function assertSuperAdmin(userId: string) {
+export async function assertSuperAdmin(userId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("profiles")
@@ -71,6 +72,70 @@ export const listAdminUsersFn = createServerFn({ method: "GET" })
       vehicles: byUser.get(p.id) ?? [],
       created_at: p.created_at,
     }));
+    return { rows };
+  });
+
+export type AuditLogRow = {
+  id: string;
+  action: string;
+  actorId: string;
+  actorNome: string | null;
+  targetId: string | null;
+  targetNome: string | null;
+  details: Record<string, Json>;
+  createdAt: string;
+};
+
+type AuditLogDbRow = {
+  id: string;
+  action: string;
+  actor_id: string;
+  target_id: string | null;
+  details: Json;
+  created_at: string;
+};
+
+export const listAuditLogFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ rows: AuditLogRow[] }> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: logs, error } = await supabaseAdmin
+      .from("audit_log")
+      .select("id, action, actor_id, target_id, details, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+
+    // Junta com profiles pra nome legível de actor/target — 1 SELECT só
+    // com .in() pros ids únicos envolvidos, depois monta id->nome (evita
+    // N+1 queries).
+    const ids = Array.from(
+      new Set(
+        (logs ?? []).flatMap((l: AuditLogDbRow) =>
+          [l.actor_id, l.target_id].filter((x): x is string => Boolean(x)),
+        ),
+      ),
+    );
+    const { data: profs } = ids.length
+      ? await supabaseAdmin.from("profiles").select("id, nome").in("id", ids)
+      : { data: [] as { id: string; nome: string }[] };
+    const nameById = new Map(
+      (profs ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]),
+    );
+
+    const rows: AuditLogRow[] = (logs ?? []).map((l: AuditLogDbRow) => ({
+      id: l.id,
+      action: l.action,
+      actorId: l.actor_id,
+      actorNome: nameById.get(l.actor_id) ?? null,
+      targetId: l.target_id,
+      targetNome: l.target_id ? (nameById.get(l.target_id) ?? null) : null,
+      details: (l.details as Record<string, Json>) ?? {},
+      createdAt: l.created_at,
+    }));
+
     return { rows };
   });
 
