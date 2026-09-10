@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordAiUsageAndMaybeAlert } from "@/lib/ai-usage-tracking";
 
 const SYSTEM_PROMPT = `Você é um classificador de autopeças. Receba o nome de um item digitado pelo usuário. Se o texto já vier com alguma tag entre colchetes (ex: [oleo], [filtro]), REMOVA-A antes de classificar para evitar duplicação.
 
@@ -27,7 +28,7 @@ export const classifyExpenseTextFn = createServerFn({ method: "POST" })
     const trimmed = data.text.trim().slice(0, 500);
     return { text: trimmed };
   })
-  .handler(async ({ data }): Promise<{ ok: true; text: string } | { ok: false; error: string; text: string }> => {
+  .handler(async ({ data, context }): Promise<{ ok: true; text: string } | { ok: false; error: string; text: string }> => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       return { ok: false, error: "LOVABLE_API_KEY não configurada.", text: data.text };
@@ -69,6 +70,7 @@ export const classifyExpenseTextFn = createServerFn({ method: "POST" })
 
       // Limpa eventuais aspas/backticks
       const cleaned = raw.replace(/^["'`]+|["'`]+$/g, "").trim();
+      void recordAiUsageAndMaybeAlert(context.userId, "classify_expense_text");
       return { ok: true, text: cleaned };
     } catch (e) {
       const errMessage = e instanceof Error ? e.message : "erro";

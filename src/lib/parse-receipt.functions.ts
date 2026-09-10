@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { trialActive } from "@/lib/plan-capabilities";
 import type { ProfileStatus } from "@/lib/profile-status";
 import { isActiveVehicleStatus, isArchivedVehicleStatus } from "@/lib/vehicle-status";
+import { recordAiUsageAndMaybeAlert } from "@/lib/ai-usage-tracking";
 
 
 export type ReceiptCategory =
@@ -265,6 +266,8 @@ export const parseReceiptFn = createServerFn({ method: "POST" })
       )
         ? (parsed.categoria as DespesaCategoria)
         : "Manutenção";
+
+      void recordAiUsageAndMaybeAlert(context.userId, "ocr_receipt");
 
       return {
         ok: true,
