@@ -6,7 +6,7 @@ export type AuditAction = "user_status_updated" | "account_deactivated";
 
 type AuditLogClient = {
   from: (table: "audit_log") => {
-    insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+    insert: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
   };
 };
 
