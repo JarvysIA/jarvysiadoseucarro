@@ -2157,10 +2157,7 @@ export type Database = {
         }[]
       }
       record_ai_usage_and_check_alert: {
-        Args: {
-          p_event_type: string
-          p_user_id: string
-        }
+        Args: { p_event_type: string; p_user_id: string }
         Returns: {
           daily_count: number
           should_alert: boolean
