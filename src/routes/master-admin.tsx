@@ -20,8 +20,10 @@ import {
 } from "@/components/ui/select";
 import {
   listAdminUsersFn,
+  listAuditLogFn,
   updateUserStatusFn,
   type AdminUserRow,
+  type AuditLogRow,
   type PlanStatus,
 } from "@/lib/admin-users.functions";
 import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
@@ -43,6 +45,11 @@ const STATUS_OPTIONS: { value: PlanStatus; label: string }[] = [
   { value: "enterprise", label: "Enterprise" },
 ];
 
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  user_status_updated: "Alteração de plano",
+  account_deactivated: "Conta desativada",
+};
+
 function MasterAdminPage() {
   useEnforceAccountActive();
   const navigate = useNavigate();
@@ -51,9 +58,14 @@ function MasterAdminPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"usuarios" | "auditoria">("usuarios");
+  const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditLoaded, setAuditLoaded] = useState(false);
 
   const listUsers = useServerFn(listAdminUsersFn);
   const updateStatus = useServerFn(updateUserStatusFn);
+  const listAudit = useServerFn(listAuditLogFn);
 
   useEffect(() => {
     (async () => {
@@ -90,6 +102,26 @@ function MasterAdminPage() {
       setLoading(false);
     }
   };
+
+  const refreshAudit = async () => {
+    setAuditLoading(true);
+    try {
+      const { rows } = await listAudit();
+      setAuditRows(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar auditoria.");
+    } finally {
+      setAuditLoading(false);
+      setAuditLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "auditoria" && !auditLoaded) {
+      void refreshAudit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, auditLoaded]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -164,7 +196,78 @@ function MasterAdminPage() {
         </button>
       </header>
 
-      <div className="mt-6 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="mt-6 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("usuarios")}
+          className={
+            activeTab === "usuarios"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Usuários
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("auditoria")}
+          className={
+            activeTab === "auditoria"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Auditoria
+        </button>
+      </div>
+
+      {activeTab === "auditoria" ? (
+        <div className="mt-4">
+          {auditLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : auditRows.length === 0 ? (
+            <div className="mt-3 rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+              Nenhum evento de auditoria registrado ainda.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {auditRows.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-2xl border border-border bg-card p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      {AUDIT_ACTION_LABELS[row.action] ?? row.action}
+                    </p>
+                    <p className="shrink-0 text-[11px] text-muted-foreground">
+                      {new Date(row.createdAt).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <p className="mt-1.5 text-[12px] text-muted-foreground">
+                    Quem fez: <span className="text-foreground">{row.actorNome ?? "—"}</span>
+                  </p>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">
+                    Em quem: <span className="text-foreground">{row.targetNome ?? "—"}</span>
+                  </p>
+                  {row.action === "user_status_updated" && (
+                    <p className="mt-0.5 text-[12px] text-muted-foreground">
+                      Mudança:{" "}
+                      <span className="text-foreground">
+                        de {String(row.details.from ?? "—")} para {String(row.details.to ?? "—")}
+                      </span>
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <>
+      <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
         <Search className="h-4 w-4 text-primary" />
         <input
           value={query}
@@ -277,6 +380,8 @@ function MasterAdminPage() {
             </AccordionItem>
           ))}
         </Accordion>
+      )}
+        </>
       )}
     </div>
   );
