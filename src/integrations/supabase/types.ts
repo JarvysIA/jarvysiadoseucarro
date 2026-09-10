@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_usage_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       assinaturas: {
         Row: {
           created_at: string
@@ -2106,6 +2127,16 @@ export type Database = {
           contact_id: string
           phone_e164: string
           result: string
+        }[]
+      }
+      record_ai_usage_and_check_alert: {
+        Args: {
+          p_event_type: string
+          p_user_id: string
+        }
+        Returns: {
+          daily_count: number
+          should_alert: boolean
         }[]
       }
       record_whatsapp_milestone_notice: {

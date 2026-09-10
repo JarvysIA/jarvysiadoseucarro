@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordAiUsageAndMaybeAlert } from "@/lib/ai-usage-tracking";
 
 // Build 8.8E1: limites runtime para o Dr. Jarvys chat.
 // Dr. Jarvys app continua LIVRE para usuário logado (regra comercial),
@@ -67,7 +68,7 @@ export const jarvysChatFn = createServerFn({ method: "POST" })
     }
     return parsed.data;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       throw new Error("LOVABLE_API_KEY não configurada.");
@@ -107,5 +108,6 @@ export const jarvysChatFn = createServerFn({ method: "POST" })
       choices?: Array<{ message?: { content?: string } }>;
     };
     const reply = json.choices?.[0]?.message?.content?.trim() || "Desculpe, não consegui responder agora.";
+    void recordAiUsageAndMaybeAlert(context.userId, "dr_jarvys_chat");
     return { reply };
   });
