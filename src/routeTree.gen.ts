@@ -337,18 +337,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/master-admin': {
-      id: '/master-admin'
-      path: '/master-admin'
-      fullPath: '/master-admin'
-      preLoaderRoute: typeof MasterAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/privacidade': {
       id: '/privacidade'
       path: '/privacidade'
       fullPath: '/privacidade'
       preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/master-admin': {
+      id: '/master-admin'
+      path: '/master-admin'
+      fullPath: '/master-admin'
+      preLoaderRoute: typeof MasterAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
