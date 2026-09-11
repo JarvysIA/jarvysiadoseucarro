@@ -7,6 +7,7 @@ import {
   aggregateRevenueByType,
   currentMonthCompetencia,
   nextMonthStart,
+  todayStartUTC,
 } from "@/lib/financial-aggregation";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -270,6 +271,52 @@ export const deleteManualCostEntryFn = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     return { ok: true };
+  });
+
+export type PlateApiUsage = {
+  todayCount: number;
+  monthCount: number;
+  todayByType: { tipo: string; count: number }[];
+};
+
+export const getPlateApiUsageFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PlateApiUsage> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const todayStart = todayStartUTC();
+    const monthStart = currentMonthCompetencia();
+    const monthEnd = nextMonthStart(monthStart);
+
+    const { count: todayCount, error: todayError } = await supabaseAdmin
+      .from("plate_api_calls")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", todayStart);
+    if (todayError) throw new Error(todayError.message);
+
+    const { count: monthCount, error: monthError } = await supabaseAdmin
+      .from("plate_api_calls")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", monthStart)
+      .lt("created_at", monthEnd);
+    if (monthError) throw new Error(monthError.message);
+
+    const { data: todayRows, error: todayRowsError } = await supabaseAdmin
+      .from("plate_api_calls")
+      .select("call_type")
+      .gte("created_at", todayStart);
+    if (todayRowsError) throw new Error(todayRowsError.message);
+
+    const todayByType = aggregateAiUsageByType(
+      (todayRows ?? []).map((r: { call_type: string }) => ({ event_type: r.call_type })),
+    );
+
+    return {
+      todayCount: todayCount ?? 0,
+      monthCount: monthCount ?? 0,
+      todayByType,
+    };
   });
 
 export const updateUserStatusFn = createServerFn({ method: "POST" })

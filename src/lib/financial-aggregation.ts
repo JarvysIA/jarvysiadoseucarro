@@ -34,3 +34,10 @@ export function nextMonthStart(competencia: string): string {
   const [y, m] = competencia.split("-").map(Number);
   return new Date(Date.UTC(y as number, m as number, 1)).toISOString().slice(0, 10);
 }
+
+export function todayStartUTC(): string {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  ).toISOString();
+}

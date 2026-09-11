@@ -623,6 +623,24 @@ export type Database = {
           },
         ]
       }
+      plate_api_calls: {
+        Row: {
+          call_type: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          call_type: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          call_type?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           asaas_customer_id: string | null
