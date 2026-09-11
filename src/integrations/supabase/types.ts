@@ -2168,6 +2168,16 @@ export type Database = {
       get_indicacao_dias_bloqueio: { Args: never; Returns: number }
       get_indicacao_saque_minimo: { Args: never; Returns: number }
       get_indicacao_valor_comissao: { Args: never; Returns: number }
+      get_operational_health: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobid: number
+          jobname: string
+          last_run: string
+          last_status: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

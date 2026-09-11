@@ -9,6 +9,10 @@ import {
   nextMonthStart,
   todayStartUTC,
 } from "@/lib/financial-aggregation";
+import {
+  aggregatePaymentsByStatus,
+  countStuckPendingPayments,
+} from "@/lib/operational-aggregation";
 import type { Json } from "@/integrations/supabase/types";
 
 export type AdminVehicle = {
@@ -316,6 +320,85 @@ export const getPlateApiUsageFn = createServerFn({ method: "GET" })
       todayCount: todayCount ?? 0,
       monthCount: monthCount ?? 0,
       todayByType,
+    };
+  });
+
+export type CronJobHealth = {
+  jobid: number;
+  jobname: string;
+  active: boolean;
+  lastStatus: string | null;
+  lastRun: string | null;
+};
+
+export type PaymentHealth = {
+  byStatus: { status: string; count: number }[];
+  stuckPendingCount: number;
+};
+
+export type OperationalHealth = {
+  crons: CronJobHealth[];
+  payments: PaymentHealth;
+  whatsappActivity: { queuedInbound: number; queuedOutbound: number; last24hMessages: number };
+};
+
+type CronHealthRpcRow = {
+  jobid: number;
+  jobname: string;
+  active: boolean;
+  last_status: string | null;
+  last_run: string | null;
+};
+
+export const getOperationalHealthFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<OperationalHealth> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: cronRows, error: cronError } = await supabaseAdmin.rpc("get_operational_health");
+    if (cronError) throw new Error(cronError.message);
+
+    const { data: payRows, error: payError } = await supabaseAdmin
+      .from("pagamentos_pix")
+      .select("status, created_at");
+    if (payError) throw new Error(payError.message);
+
+    const payments: { status: string; created_at: string }[] = (payRows ?? []).map(
+      (p: { status: string; created_at: string }) => ({ status: p.status, created_at: p.created_at }),
+    );
+
+    const { count: queuedInbound } = await supabaseAdmin
+      .from("whatsapp_processing_queue")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["queued", "running"]);
+    const { count: queuedOutbound } = await supabaseAdmin
+      .from("whatsapp_outbound_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "queued");
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: last24hMessages } = await supabaseAdmin
+      .from("whatsapp_messages")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", oneDayAgo);
+
+    return {
+      crons: (cronRows ?? []).map((r: CronHealthRpcRow) => ({
+        jobid: r.jobid,
+        jobname: r.jobname,
+        active: r.active,
+        lastStatus: r.last_status,
+        lastRun: r.last_run,
+      })),
+      payments: {
+        byStatus: aggregatePaymentsByStatus(payments),
+        stuckPendingCount: countStuckPendingPayments(payments),
+      },
+      whatsappActivity: {
+        queuedInbound: queuedInbound ?? 0,
+        queuedOutbound: queuedOutbound ?? 0,
+        last24hMessages: last24hMessages ?? 0,
+      },
     };
   });
 
