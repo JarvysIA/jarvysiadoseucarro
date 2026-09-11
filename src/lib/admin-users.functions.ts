@@ -2,6 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROFILE_STATUS_VALUES, type ProfileStatus } from "@/lib/profile-status";
 import { recordAuditEvent } from "@/lib/audit-log";
+import {
+  aggregateAiUsageByType,
+  aggregateRevenueByType,
+  currentMonthCompetencia,
+  nextMonthStart,
+} from "@/lib/financial-aggregation";
 import type { Json } from "@/integrations/supabase/types";
 
 export type AdminVehicle = {
@@ -137,6 +143,133 @@ export const listAuditLogFn = createServerFn({ method: "GET" })
     }));
 
     return { rows };
+  });
+
+export type ManualCostEntry = {
+  id: string;
+  category: string;
+  amount: number;
+  note: string | null;
+  createdAt: string;
+};
+
+export type FinancialSummary = {
+  competencia: string;
+  revenueByType: { tipo: string; valor: number }[];
+  totalRevenue: number;
+  costs: ManualCostEntry[];
+  totalCosts: number;
+  result: number;
+  aiUsageByType: { tipo: string; count: number }[];
+};
+
+export const getFinancialSummaryFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input?: { competencia?: string }) => input ?? {})
+  .handler(async ({ context, data }): Promise<FinancialSummary> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const competencia = data.competencia ?? currentMonthCompetencia();
+    const monthEnd = nextMonthStart(competencia);
+
+    const { data: pagamentos, error: pagError } = await supabaseAdmin
+      .from("pagamentos_pix")
+      .select("tipo_produto, valor")
+      .eq("status", "pago")
+      .gte("data_pagamento", competencia)
+      .lt("data_pagamento", monthEnd);
+    if (pagError) throw new Error(pagError.message);
+
+    const { data: costsRaw, error: costsError } = await supabaseAdmin
+      .from("manual_cost_entries")
+      .select("id, category, amount, note, created_at")
+      .eq("competencia", competencia)
+      .order("created_at", { ascending: false });
+    if (costsError) throw new Error(costsError.message);
+
+    const { data: aiEvents, error: aiError } = await supabaseAdmin
+      .from("ai_usage_events")
+      .select("event_type")
+      .gte("created_at", competencia)
+      .lt("created_at", monthEnd);
+    if (aiError) throw new Error(aiError.message);
+
+    const revenueByType = aggregateRevenueByType(
+      (pagamentos ?? []).map((p: { tipo_produto: string; valor: number }) => ({
+        tipo_produto: p.tipo_produto,
+        valor: p.valor,
+      })),
+    );
+    const totalRevenue = revenueByType.reduce((sum, r) => sum + r.valor, 0);
+
+    const costs: ManualCostEntry[] = (costsRaw ?? []).map(
+      (c: { id: string; category: string; amount: number; note: string | null; created_at: string }) => ({
+        id: c.id,
+        category: c.category,
+        amount: c.amount,
+        note: c.note,
+        createdAt: c.created_at,
+      }),
+    );
+    const totalCosts = costs.reduce((sum, c) => sum + c.amount, 0);
+
+    const aiUsageByType = aggregateAiUsageByType(
+      (aiEvents ?? []).map((e: { event_type: string }) => ({ event_type: e.event_type })),
+    );
+
+    return {
+      competencia,
+      revenueByType,
+      totalRevenue,
+      costs,
+      totalCosts,
+      result: totalRevenue - totalCosts,
+      aiUsageByType,
+    };
+  });
+
+export const createManualCostEntryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { category: string; amount: number; competencia: string; note?: string }) => {
+    if (!input?.category?.trim() || !input?.competencia || !(input?.amount > 0)) {
+      throw new Error("Parâmetros inválidos.");
+    }
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin.from("manual_cost_entries").insert({
+      category: data.category.trim(),
+      amount: data.amount,
+      competencia: data.competencia,
+      note: data.note?.trim() || null,
+      created_by: context.userId,
+    });
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
+export const deleteManualCostEntryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => {
+    if (!input?.id) throw new Error("Parâmetros inválidos.");
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("manual_cost_entries")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
   });
 
 export const updateUserStatusFn = createServerFn({ method: "POST" })

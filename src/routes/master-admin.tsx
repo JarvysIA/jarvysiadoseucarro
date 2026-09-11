@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Shield, Loader2, LogOut, Car } from "lucide-react";
+import { Search, Shield, Loader2, LogOut, Car, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,11 +19,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  createManualCostEntryFn,
+  deleteManualCostEntryFn,
+  getFinancialSummaryFn,
   listAdminUsersFn,
   listAuditLogFn,
   updateUserStatusFn,
   type AdminUserRow,
   type AuditLogRow,
+  type FinancialSummary,
   type PlanStatus,
 } from "@/lib/admin-users.functions";
 import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
@@ -50,6 +54,21 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   account_deactivated: "Conta desativada",
 };
 
+const REVENUE_TYPE_LABELS: Record<string, string> = {
+  ativacao: "Ativação de veículo",
+  historico: "Histórico FIPE",
+};
+
+const AI_USAGE_TYPE_LABELS: Record<string, string> = {
+  ocr_receipt: "OCR de nota",
+  dr_jarvys_chat: "Dr. Jarvys (chat)",
+  classify_expense_text: "Classificação de despesa",
+};
+
+function formatBRL(v: number): string {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function MasterAdminPage() {
   useEnforceAccountActive();
   const navigate = useNavigate();
@@ -58,14 +77,26 @@ function MasterAdminPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"usuarios" | "auditoria">("usuarios");
+  const [activeTab, setActiveTab] = useState<"usuarios" | "auditoria" | "financeiro">("usuarios");
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditLoaded, setAuditLoaded] = useState(false);
+  const [financial, setFinancial] = useState<FinancialSummary | null>(null);
+  const [financialLoading, setFinancialLoading] = useState(false);
+  const [financialLoaded, setFinancialLoaded] = useState(false);
+  const [newCostCategory, setNewCostCategory] = useState("");
+  const [newCostAmount, setNewCostAmount] = useState("");
+  const [newCostNote, setNewCostNote] = useState("");
+  const [addingCost, setAddingCost] = useState(false);
+  const [deletingCostId, setDeletingCostId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const listUsers = useServerFn(listAdminUsersFn);
   const updateStatus = useServerFn(updateUserStatusFn);
   const listAudit = useServerFn(listAuditLogFn);
+  const getFinancialSummary = useServerFn(getFinancialSummaryFn);
+  const createManualCostEntry = useServerFn(createManualCostEntryFn);
+  const deleteManualCostEntry = useServerFn(deleteManualCostEntryFn);
 
   useEffect(() => {
     (async () => {
@@ -122,6 +153,68 @@ function MasterAdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, auditLoaded]);
+
+  const refreshFinancial = async () => {
+    setFinancialLoading(true);
+    try {
+      const summary = await getFinancialSummary({ data: {} });
+      setFinancial(summary);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar dados financeiros.");
+    } finally {
+      setFinancialLoading(false);
+      setFinancialLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "financeiro" && !financialLoaded) {
+      void refreshFinancial();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, financialLoaded]);
+
+  const addCost = async () => {
+    const amount = Number(newCostAmount.replace(",", "."));
+    if (!newCostCategory.trim() || !(amount > 0) || !financial) {
+      toast.error("Preencha categoria e valor (maior que zero).");
+      return;
+    }
+    setAddingCost(true);
+    try {
+      await createManualCostEntry({
+        data: {
+          category: newCostCategory.trim(),
+          amount,
+          competencia: financial.competencia,
+          note: newCostNote.trim() || undefined,
+        },
+      });
+      setNewCostCategory("");
+      setNewCostAmount("");
+      setNewCostNote("");
+      toast.success("Custo adicionado.");
+      await refreshFinancial();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao adicionar custo.");
+    } finally {
+      setAddingCost(false);
+    }
+  };
+
+  const removeCost = async (id: string) => {
+    setDeletingCostId(id);
+    try {
+      await deleteManualCostEntry({ data: { id } });
+      setConfirmDeleteId(null);
+      toast.success("Custo removido.");
+      await refreshFinancial();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao remover custo.");
+    } finally {
+      setDeletingCostId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -219,9 +312,209 @@ function MasterAdminPage() {
         >
           Auditoria
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("financeiro")}
+          className={
+            activeTab === "financeiro"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Financeiro
+        </button>
       </div>
 
-      {activeTab === "auditoria" ? (
+      {activeTab === "financeiro" ? (
+        <div className="mt-4 space-y-5">
+          {financialLoading || !financial ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Receita do mês
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-lg font-bold text-foreground">
+                    {formatBRL(financial.totalRevenue)}
+                  </p>
+                  {financial.revenueByType.length === 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nenhuma receita registrada neste mês.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {financial.revenueByType.map((r) => (
+                        <li
+                          key={r.tipo}
+                          className="flex items-center justify-between text-xs text-muted-foreground"
+                        >
+                          <span>{REVENUE_TYPE_LABELS[r.tipo] ?? r.tipo}</span>
+                          <span className="text-foreground">{formatBRL(r.valor)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Custos do mês
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <p className="text-lg font-bold text-foreground">
+                    {formatBRL(financial.totalCosts)}
+                  </p>
+                  {financial.costs.length === 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Nenhum custo lançado neste mês.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 space-y-2">
+                      {financial.costs.map((c) => (
+                        <li
+                          key={c.id}
+                          className="rounded-xl border border-border/60 bg-background/40 px-3 py-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold text-foreground">
+                                {c.category}
+                              </p>
+                              {c.note && (
+                                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                  {c.note}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="text-xs font-semibold text-foreground">
+                                {formatBRL(c.amount)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(c.id)}
+                                className="text-muted-foreground hover:text-destructive"
+                                aria-label="Excluir custo"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {confirmDeleteId === c.id && (
+                            <div className="mt-2 flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+                              <p className="flex-1 text-[11px] text-foreground">Excluir este custo?</p>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                disabled={deletingCostId === c.id}
+                                className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeCost(c.id)}
+                                disabled={deletingCostId === c.id}
+                                className="flex items-center gap-1 rounded-lg bg-destructive px-2 py-1 text-[11px] font-semibold text-destructive-foreground disabled:opacity-60"
+                              >
+                                {deletingCostId === c.id && (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                )}
+                                Confirmar
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+                    <input
+                      type="text"
+                      value={newCostCategory}
+                      onChange={(e) => setNewCostCategory(e.target.value)}
+                      placeholder="Categoria (ex: Hostinger)"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                    />
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={newCostAmount}
+                      onChange={(e) => setNewCostAmount(e.target.value)}
+                      placeholder="Valor (R$)"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                    />
+                    <input
+                      type="text"
+                      value={newCostNote}
+                      onChange={(e) => setNewCostNote(e.target.value)}
+                      placeholder="Nota (opcional)"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={addCost}
+                      disabled={addingCost}
+                      className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {addingCost && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Resultado do mês
+                </p>
+                <div
+                  className={`rounded-2xl border p-4 text-lg font-bold ${
+                    financial.result >= 0
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
+                      : "border-destructive/40 bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  {formatBRL(financial.result)}
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Uso de IA este mês
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  {financial.aiUsageByType.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum uso de IA registrado neste mês.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {financial.aiUsageByType.map((u) => (
+                        <li
+                          key={u.tipo}
+                          className="flex items-center justify-between text-xs text-muted-foreground"
+                        >
+                          <span>{AI_USAGE_TYPE_LABELS[u.tipo] ?? u.tipo}</span>
+                          <span className="text-foreground">{u.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-3 text-[10px] text-muted-foreground">
+                    Contagem informativa — sem conversão para R$ (não há preço por chamada da
+                    Lovable AI Gateway).
+                  </p>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      ) : activeTab === "auditoria" ? (
         <div className="mt-4">
           {auditLoading ? (
             <div className="flex justify-center py-10">
