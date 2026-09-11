@@ -22,6 +22,7 @@ import {
   createManualCostEntryFn,
   deleteManualCostEntryFn,
   getFinancialSummaryFn,
+  getOperationalHealthFn,
   getPlateApiUsageFn,
   listAdminUsersFn,
   listAuditLogFn,
@@ -29,6 +30,7 @@ import {
   type AdminUserRow,
   type AuditLogRow,
   type FinancialSummary,
+  type OperationalHealth,
   type PlanStatus,
   type PlateApiUsage,
 } from "@/lib/admin-users.functions";
@@ -67,8 +69,28 @@ const AI_USAGE_TYPE_LABELS: Record<string, string> = {
   classify_expense_text: "Classificação de despesa",
 };
 
+const CRON_JOB_LABELS: Record<string, string> = {
+  "fipe-monthly-refresh": "Atualização FIPE mensal",
+  whatsapp_process_inbound_every_minute: "WhatsApp — recebimento",
+  whatsapp_send_outbound_every_minute: "WhatsApp — envio",
+  "verificar-pagamentos-pix-5min": "Verificação de pagamentos",
+  whatsapp_process_orchestrator_every_minute: "WhatsApp — orquestrador",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pago: "Pago",
+  expirado: "Expirado",
+  pendente: "Pendente",
+};
+
 function formatBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function cronStatusColor(job: { active: boolean; lastStatus: string | null }): string {
+  if (!job.active || job.lastStatus === "failed") return "text-destructive";
+  if (job.lastStatus === "succeeded") return "text-emerald-500";
+  return "text-muted-foreground";
 }
 
 function MasterAdminPage() {
@@ -79,7 +101,9 @@ function MasterAdminPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"usuarios" | "auditoria" | "financeiro">("usuarios");
+  const [activeTab, setActiveTab] = useState<
+    "usuarios" | "auditoria" | "financeiro" | "monitoramento"
+  >("usuarios");
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditLoaded, setAuditLoaded] = useState(false);
@@ -87,6 +111,9 @@ function MasterAdminPage() {
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialLoaded, setFinancialLoaded] = useState(false);
   const [plateUsage, setPlateUsage] = useState<PlateApiUsage | null>(null);
+  const [operational, setOperational] = useState<OperationalHealth | null>(null);
+  const [operationalLoading, setOperationalLoading] = useState(false);
+  const [operationalLoaded, setOperationalLoaded] = useState(false);
   const [newCostCategory, setNewCostCategory] = useState("");
   const [newCostAmount, setNewCostAmount] = useState("");
   const [newCostNote, setNewCostNote] = useState("");
@@ -101,6 +128,7 @@ function MasterAdminPage() {
   const createManualCostEntry = useServerFn(createManualCostEntryFn);
   const deleteManualCostEntry = useServerFn(deleteManualCostEntryFn);
   const getPlateApiUsage = useServerFn(getPlateApiUsageFn);
+  const getOperationalHealth = useServerFn(getOperationalHealthFn);
 
   useEffect(() => {
     (async () => {
@@ -181,6 +209,26 @@ function MasterAdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, financialLoaded]);
+
+  const refreshOperational = async () => {
+    setOperationalLoading(true);
+    try {
+      const health = await getOperationalHealth();
+      setOperational(health);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar monitoramento.");
+    } finally {
+      setOperationalLoading(false);
+      setOperationalLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "monitoramento" && !operationalLoaded) {
+      void refreshOperational();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, operationalLoaded]);
 
   const addCost = async () => {
     const amount = Number(newCostAmount.replace(",", "."));
@@ -331,9 +379,122 @@ function MasterAdminPage() {
         >
           Financeiro
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("monitoramento")}
+          className={
+            activeTab === "monitoramento"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Monitoramento
+        </button>
       </div>
 
-      {activeTab === "financeiro" ? (
+      {activeTab === "monitoramento" ? (
+        <div className="mt-4 space-y-5">
+          {operationalLoading || !operational ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Saúde dos crons
+                </p>
+                <ul className="space-y-2">
+                  {operational.crons.map((job) => (
+                    <li
+                      key={job.jobid}
+                      className="rounded-2xl border border-border bg-card p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-foreground">
+                          {CRON_JOB_LABELS[job.jobname] ?? job.jobname}
+                        </p>
+                        <span className={`shrink-0 text-xs font-semibold ${cronStatusColor(job)}`}>
+                          {!job.active
+                            ? "Inativo"
+                            : job.lastStatus === "succeeded"
+                              ? "OK"
+                              : job.lastStatus === "failed"
+                                ? "Falhou"
+                                : "Nunca rodou"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {job.lastRun
+                          ? `Última execução: ${new Date(job.lastRun).toLocaleString("pt-BR")}`
+                          : "Sem execuções registradas."}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Pagamentos
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  {operational.payments.byStatus.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum pagamento registrado.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {operational.payments.byStatus.map((s) => (
+                        <li
+                          key={s.status}
+                          className="flex items-center justify-between text-xs text-muted-foreground"
+                        >
+                          <span>{PAYMENT_STATUS_LABELS[s.status] ?? s.status}</span>
+                          <span className="text-foreground">{s.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {operational.payments.stuckPendingCount > 0 && (
+                    <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-2">
+                      <p className="text-[11px] text-destructive">
+                        {operational.payments.stuckPendingCount} pagamento
+                        {operational.payments.stuckPendingCount === 1 ? "" : "s"} pendente
+                        {operational.payments.stuckPendingCount === 1 ? "" : "s"} há mais de 1h —
+                        possível travamento no fluxo de confirmação.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Atividade WhatsApp
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <ul className="space-y-1">
+                    <li className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Fila de recebimento</span>
+                      <span className="text-foreground">{operational.whatsappActivity.queuedInbound}</span>
+                    </li>
+                    <li className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Fila de envio</span>
+                      <span className="text-foreground">{operational.whatsappActivity.queuedOutbound}</span>
+                    </li>
+                    <li className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Mensagens (últimas 24h)</span>
+                      <span className="text-foreground">{operational.whatsappActivity.last24hMessages}</span>
+                    </li>
+                  </ul>
+                  <p className="mt-3 text-[10px] text-muted-foreground">
+                    Sem atividade significativa até a instância Z-API ser conectada.
+                  </p>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      ) : activeTab === "financeiro" ? (
         <div className="mt-4 space-y-5">
           {financialLoading || !financial ? (
             <div className="flex justify-center py-10">
