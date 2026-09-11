@@ -356,6 +356,36 @@ export type Database = {
           },
         ]
       }
+      manual_cost_entries: {
+        Row: {
+          amount: number
+          category: string
+          competencia: string
+          created_at: string
+          created_by: string
+          id: string
+          note: string | null
+        }
+        Insert: {
+          amount: number
+          category: string
+          competencia: string
+          created_at?: string
+          created_by: string
+          id?: string
+          note?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          competencia?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          note?: string | null
+        }
+        Relationships: []
+      }
       movimentacoes_indicacao: {
         Row: {
           afilhado_id: string | null
