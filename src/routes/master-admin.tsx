@@ -22,6 +22,7 @@ import {
   createManualCostEntryFn,
   deleteManualCostEntryFn,
   getFinancialSummaryFn,
+  getPlateApiUsageFn,
   listAdminUsersFn,
   listAuditLogFn,
   updateUserStatusFn,
@@ -29,6 +30,7 @@ import {
   type AuditLogRow,
   type FinancialSummary,
   type PlanStatus,
+  type PlateApiUsage,
 } from "@/lib/admin-users.functions";
 import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
 
@@ -84,6 +86,7 @@ function MasterAdminPage() {
   const [financial, setFinancial] = useState<FinancialSummary | null>(null);
   const [financialLoading, setFinancialLoading] = useState(false);
   const [financialLoaded, setFinancialLoaded] = useState(false);
+  const [plateUsage, setPlateUsage] = useState<PlateApiUsage | null>(null);
   const [newCostCategory, setNewCostCategory] = useState("");
   const [newCostAmount, setNewCostAmount] = useState("");
   const [newCostNote, setNewCostNote] = useState("");
@@ -97,6 +100,7 @@ function MasterAdminPage() {
   const getFinancialSummary = useServerFn(getFinancialSummaryFn);
   const createManualCostEntry = useServerFn(createManualCostEntryFn);
   const deleteManualCostEntry = useServerFn(deleteManualCostEntryFn);
+  const getPlateApiUsage = useServerFn(getPlateApiUsageFn);
 
   useEffect(() => {
     (async () => {
@@ -157,8 +161,12 @@ function MasterAdminPage() {
   const refreshFinancial = async () => {
     setFinancialLoading(true);
     try {
-      const summary = await getFinancialSummary({ data: {} });
+      const [summary, usage] = await Promise.all([
+        getFinancialSummary({ data: {} }),
+        getPlateApiUsage(),
+      ]);
       setFinancial(summary);
+      setPlateUsage(usage);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao carregar dados financeiros.");
     } finally {
@@ -482,6 +490,38 @@ function MasterAdminPage() {
                   }`}
                 >
                   {formatBRL(financial.result)}
+                </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Consultas de Placa/FIPE
+                </p>
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  {plateUsage ? (
+                    <>
+                      <p
+                        className={`text-lg font-bold ${
+                          plateUsage.todayCount >= 45
+                            ? "text-destructive"
+                            : plateUsage.todayCount >= 35
+                              ? "text-amber-500"
+                              : "text-foreground"
+                        }`}
+                      >
+                        Hoje: {plateUsage.todayCount} / 50
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Este mês: {plateUsage.monthCount} consulta
+                        {plateUsage.monthCount === 1 ? "" : "s"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sem dados.</p>
+                  )}
+                  <p className="mt-3 text-[10px] text-muted-foreground">
+                    Sem conversão para R$ — o custo depende do plano contratado.
+                  </p>
                 </div>
               </section>
 

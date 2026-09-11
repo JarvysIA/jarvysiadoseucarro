@@ -3,6 +3,7 @@
 // Variáveis necessárias: PLACA_FIPE_TOKEN
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { recordPlateApiCall } from "../_shared/plate-api-tracking.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,6 +69,8 @@ Deno.serve(async (req) => {
     if (!res.ok) {
       return json({ ok: false, error: `HTTP ${res.status}`, raw: data ?? text }, 200);
     }
+
+    void recordPlateApiCall("consultar_placa");
 
     const fipe = Array.isArray(data?.fipe) ? data.fipe : [];
     const informacoes_veiculo = data?.informacoes_veiculo ?? data?.informacoesVeiculo ?? null;
