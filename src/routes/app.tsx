@@ -1353,8 +1353,8 @@ function VehicleStatusSection({
           setHistoryLocked(false);
           setHistoryReloadKey((k) => k + 1);
         }}
-        onSave={(payload) => {
-          if (openItemKey) handleSaveMaintenance(openItemKey, payload);
+        onSave={async (payload) => {
+          if (openItemKey) await handleSaveMaintenance(openItemKey, payload);
         }}
       />
     </>
