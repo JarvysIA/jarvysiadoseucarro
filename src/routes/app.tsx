@@ -48,7 +48,6 @@ import {
   buildMaintenanceItems,
   computeStatus,
   formatRemainingKm,
-  ITEM_TO_CATEGORIA,
   STATUS_LABEL_PT,
   type MaintItemKey,
   type MaintStatus,
@@ -1100,19 +1099,13 @@ function VehicleStatusSection({
       receiptPath = await uploadReceiptImage(userId, vehicleId, payload.file);
     }
 
-    // Sobrescreve a categoria de acordo com o item selecionado para que a
-    // trigger `atualizar_revisao_veiculo` no banco consiga identificar e
-    // atualizar a coluna km_ultima_troca_* correspondente.
-    const categoriaFinal =
-      (ITEM_TO_CATEGORIA[key] as typeof payload.categoria | undefined) ?? payload.categoria;
-
     // 2) Insere a despesa no banco
     const { error: insErr } = await supabase.from("despesas").insert({
       user_id: userId,
       vehicle_id: vehicleId,
       data: payload.data_servico,
       valor: payload.valor_total,
-      categoria: categoriaFinal,
+      categoria: payload.categoria,
       descricao: payload.descricao,
       km_registro: payload.km_registrada,
       receipt_image_url: receiptPath,
