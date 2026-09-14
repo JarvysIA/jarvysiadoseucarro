@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { trialActive } from "@/lib/plan-capabilities";
+import { enqueueWhatsappNotification } from "@/lib/whatsapp-notify";
+
+// Link genérico pro app — não existe hoje nenhum deep-link pra um veículo
+// específico (a seleção de veículo ativo é local/client-side via
+// active-vehicle.ts, não por query param de URL); confirmado no Passo 0.
+// Mesmo literal já usado em CONVERSATION_HANDOFF_ACTIVATION_LINK_BASE
+// (supabase/functions/_shared/whatsapp/conversation-handoff/entrypoint.ts)
+// — duplicado aqui, não importado, pelo mesmo motivo de cross-boundary
+// Deno/app já documentado em outros hooks desta sessão.
+const APP_LINK = "https://jarvys.com.br/app";
 
 
 /**
@@ -134,7 +144,7 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
         // Elegíveis: veiculo ativo + dono ativo/vip/enterprise/trial (trial só se ativo).
         const { data: veiculosRaw, error: vErr } = await supabaseAdmin
           .from("veiculos")
-          .select("id, user_id, placa, codigo_fipe, placafipe_hash, profiles!inner(status_usuario, trial_inicio)")
+          .select("id, user_id, marca, modelo, placa, codigo_fipe, placafipe_hash, profiles!inner(status_usuario, trial_inicio)")
           .eq("status", "ativo")
           .in("profiles.status_usuario", ["ativo", "vip", "enterprise", "trial"]);
 
@@ -245,6 +255,19 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
             }
 
             updated++;
+
+            // Este arquivo só processa veiculos.status='ativo' (query de
+            // elegíveis acima) — ou seja, é sempre atualização mensal de
+            // veículo JÁ existente, nunca cadastro novo (cadastro novo
+            // consulta o histórico FIPE diretamente via
+            // consultar-historico-fipe, não passa por este cron).
+            // Confirmado no Passo 0 — não há distinção adicional a fazer
+            // aqui.
+            void enqueueWhatsappNotification(
+              supabaseAdmin,
+              v.user_id,
+              `📈 A FIPE do seu ${String(v.marca ?? "").toUpperCase()} ${String(v.modelo ?? "").toUpperCase()} foi atualizada! Confira o novo valor no app: ${APP_LINK}`,
+            );
           } catch (e) {
             errors++;
             console.error("[fipe-monthly-refresh] exceção veiculo", v.id, e);

@@ -14,6 +14,7 @@ import {
   countStuckPendingPayments,
 } from "@/lib/operational-aggregation";
 import { processarSaquePadrinho, type SaquePadrinhoClient } from "@/lib/saque-padrinho";
+import type { WhatsappNotifyClient } from "@/lib/whatsapp-notify";
 import type { Json } from "@/integrations/supabase/types";
 
 export type AdminVehicle = {
@@ -596,7 +597,7 @@ export const processarSaquePendenteFn = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("ASAAS_API_KEY ausente.");
 
     const result = await processarSaquePadrinho(data.movimentacao_id, apiKey, asaasEnv, {
-      client: supabaseAdmin as unknown as SaquePadrinhoClient,
+      client: supabaseAdmin as unknown as SaquePadrinhoClient & WhatsappNotifyClient,
       fetchImpl: fetch,
     });
 

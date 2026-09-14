@@ -20,6 +20,7 @@
 // mock.module().
 
 import { detectPixKeyType } from "@/lib/pix-key-type";
+import { enqueueWhatsappNotification, type WhatsappNotifyClient } from "@/lib/whatsapp-notify";
 
 type MovimentacaoRow = {
   id: string;
@@ -72,8 +73,14 @@ export type SaquePadrinhoClient = {
   };
 };
 
+// Client estendido: o mesmo client admin usado nos passos 1-5 também
+// resolve o contato/instância WhatsApp e enfileira a notificação do passo
+// 4.1 — não vale a pena um segundo client só pra isso (supabaseAdmin real
+// já cobre todas essas tabelas). Composição via intersection, não
+// duplicação de assinaturas: SaquePadrinhoClient continua descrevendo só
+// as tabelas de saque, WhatsappNotifyClient as de notificação.
 export type ProcessarSaquePadrinhoDeps = {
-  client: SaquePadrinhoClient;
+  client: SaquePadrinhoClient & WhatsappNotifyClient;
   fetchImpl: typeof fetch;
 };
 
@@ -162,6 +169,16 @@ export async function processarSaquePadrinho(
   if (!updatedRows || updatedRows.length === 0) {
     return { ok: false, erro: "já processada por outro processo (corrida)" };
   }
+
+  // 4.1) Notifica o padrinho assim que o pagamento está confirmado e
+  // durável (status='pago' já commitado no passo 4) — não esperamos o
+  // passo 5 (decremento de saldo, só bookkeeping interno) pra avisar, já
+  // que o PIX real já foi enviado com sucesso pela Asaas no passo 3.
+  void enqueueWhatsappNotification(
+    client,
+    mov.padrinho_id,
+    `💰 Seu saque de R$ ${mov.valor.toFixed(2).replace(".", ",")} via PIX já foi enviado! Confira sua conta — pode levar alguns minutos para compensar.`,
+  );
 
   // 5) Decrementa saldo_reservado. Leitura-e-escrita (não atômico em SQL
   // puro) — aceitável no fluxo atual (clique manual único de admin, um de
