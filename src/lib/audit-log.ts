@@ -2,7 +2,10 @@
 // sistema. Nunca deve lançar nem bloquear o caminho principal — mesmo
 // espírito fire-and-forget de ai-usage-tracking.ts.
 
-export type AuditAction = "user_status_updated" | "account_deactivated";
+export type AuditAction =
+  | "user_status_updated"
+  | "account_deactivated"
+  | "saque_padrinho_processado";
 
 type AuditLogClient = {
   from: (table: "audit_log") => {

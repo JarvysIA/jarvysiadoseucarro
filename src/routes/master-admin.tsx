@@ -28,6 +28,8 @@ import {
   listAdminUsersFn,
   listAuditLogFn,
   listCuponsPromocionaisFn,
+  listSaquesPendentesFn,
+  processarSaquePendenteFn,
   toggleCupomPromocionalFn,
   updateUserStatusFn,
   type AdminUserRow,
@@ -37,7 +39,9 @@ import {
   type OperationalHealth,
   type PlanStatus,
   type PlateApiUsage,
+  type SaquePendente,
 } from "@/lib/admin-users.functions";
+import { detectPixKeyType } from "@/lib/pix-key-type";
 import { useEnforceAccountActive } from "@/lib/use-enforce-account-active";
 
 export const Route = createFileRoute("/master-admin")({
@@ -87,6 +91,14 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pendente: "Pendente",
 };
 
+const PIX_KEY_TYPE_LABELS: Record<string, string> = {
+  CPF: "cpf",
+  CNPJ: "cnpj",
+  EMAIL: "email",
+  PHONE: "telefone",
+  EVP: "aleatória",
+};
+
 function formatBRL(v: number): string {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -106,7 +118,7 @@ function MasterAdminPage() {
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "usuarios" | "auditoria" | "financeiro" | "monitoramento" | "cupons"
+    "usuarios" | "auditoria" | "financeiro" | "monitoramento" | "cupons" | "saques"
   >("usuarios");
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -127,6 +139,11 @@ function MasterAdminPage() {
   const [newCupomMaxUsos, setNewCupomMaxUsos] = useState("");
   const [newCupomExpiraEm, setNewCupomExpiraEm] = useState("");
   const [addingCupom, setAddingCupom] = useState(false);
+  const [saques, setSaques] = useState<SaquePendente[]>([]);
+  const [saquesLoading, setSaquesLoading] = useState(false);
+  const [saquesLoaded, setSaquesLoaded] = useState(false);
+  const [confirmPagarId, setConfirmPagarId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [newCostCategory, setNewCostCategory] = useState("");
   const [newCostAmount, setNewCostAmount] = useState("");
   const [newCostNote, setNewCostNote] = useState("");
@@ -145,6 +162,8 @@ function MasterAdminPage() {
   const listCupons = useServerFn(listCuponsPromocionaisFn);
   const createCupom = useServerFn(createCupomPromocionalFn);
   const toggleCupom = useServerFn(toggleCupomPromocionalFn);
+  const listSaques = useServerFn(listSaquesPendentesFn);
+  const processarSaque = useServerFn(processarSaquePendenteFn);
 
   useEffect(() => {
     (async () => {
@@ -305,6 +324,40 @@ function MasterAdminPage() {
       toast.error(err instanceof Error ? err.message : "Falha ao atualizar cupom.");
     } finally {
       setTogglingCupomId(null);
+    }
+  };
+
+  const refreshSaques = async () => {
+    setSaquesLoading(true);
+    try {
+      const { rows } = await listSaques();
+      setSaques(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar saques.");
+    } finally {
+      setSaquesLoading(false);
+      setSaquesLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "saques" && !saquesLoaded) {
+      void refreshSaques();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, saquesLoaded]);
+
+  const pagarSaque = async (saque: SaquePendente) => {
+    setPayingId(saque.id);
+    try {
+      await processarSaque({ data: { movimentacao_id: saque.id } });
+      setConfirmPagarId(null);
+      toast.success("Saque pago.");
+      await refreshSaques();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao pagar saque.");
+    } finally {
+      setPayingId(null);
     }
   };
 
@@ -479,9 +532,89 @@ function MasterAdminPage() {
         >
           Cupons
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("saques")}
+          className={
+            activeTab === "saques"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Saques
+        </button>
       </div>
 
-      {activeTab === "cupons" ? (
+      {activeTab === "saques" ? (
+        <div className="mt-4 space-y-2">
+          {saquesLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : saques.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+              Nenhum saque pendente.
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {saques.map((s) => {
+                const tipo = s.chavePix ? detectPixKeyType(s.chavePix) : null;
+                return (
+                  <li
+                    key={s.id}
+                    className="rounded-2xl border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-foreground">{s.padrinhoNome}</p>
+                      <p className="shrink-0 text-sm font-bold text-foreground">
+                        {formatBRL(s.valor)}
+                      </p>
+                    </div>
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      {s.chavePix
+                        ? `${PIX_KEY_TYPE_LABELS[tipo ?? ""] ?? tipo}: ${s.chavePix}`
+                        : "Sem chave PIX cadastrada"}
+                    </p>
+                    {confirmPagarId === s.id ? (
+                      <div className="mt-2 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 p-2">
+                        <p className="flex-1 text-[11px] text-foreground">
+                          Confirmar pagamento PIX de {formatBRL(s.valor)}?
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmPagarId(null)}
+                          disabled={payingId === s.id}
+                          className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => pagarSaque(s)}
+                          disabled={payingId === s.id}
+                          className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground disabled:opacity-60"
+                        >
+                          {payingId === s.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                          Confirmar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmPagarId(s.id)}
+                        disabled={!s.chavePix}
+                        className="mt-2 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
+                      >
+                        Pagar
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ) : activeTab === "cupons" ? (
         <div className="mt-4 space-y-4">
           {cuponsLoading ? (
             <div className="flex justify-center py-10">
