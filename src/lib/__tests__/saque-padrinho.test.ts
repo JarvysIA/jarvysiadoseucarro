@@ -6,6 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { processarSaquePadrinho, type SaquePadrinhoClient } from "../saque-padrinho";
+import type { WhatsappNotifyClient } from "../whatsapp-notify";
 
 function makeMockClient(opts: {
   movStatus?: string;
@@ -15,6 +16,7 @@ function makeMockClient(opts: {
   const calls = {
     movUpdate: [] as { status: string }[],
     carteiraUpdate: [] as { saldo_reservado: number }[],
+    whatsappInsert: [] as Record<string, unknown>[],
   };
   const movRow = {
     id: "mov-1",
@@ -83,9 +85,51 @@ function makeMockClient(opts: {
           },
         };
       }
+      if (table === "whatsapp_contacts") {
+        return {
+          select: (_cols: string) => {
+            const builder = {
+              eq: (_c: string, _v: unknown) => builder,
+              not: (_c: string, _op: string, _v: unknown) => builder,
+              maybeSingle: async () => ({
+                data: {
+                  id: "contact-1",
+                  user_id: movRow.padrinho_id,
+                  assigned_provider: "zapi",
+                  assigned_instance_id: "instance-1",
+                },
+                error: null,
+              }),
+            };
+            return builder;
+          },
+        };
+      }
+      if (table === "whatsapp_provider_instances") {
+        return {
+          select: (_cols: string) => {
+            const builder = {
+              eq: (_c: string, _v: unknown) => builder,
+              maybeSingle: async () => ({
+                data: { provider: "zapi", instance_id: "instance-1", status: "active" },
+                error: null,
+              }),
+            };
+            return builder;
+          },
+        };
+      }
+      if (table === "whatsapp_outbound_queue") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            calls.whatsappInsert.push(row);
+            return { error: null };
+          },
+        };
+      }
       throw new Error(`tabela inesperada no mock: ${table}`);
     },
-  } as unknown as SaquePadrinhoClient;
+  } as unknown as SaquePadrinhoClient & WhatsappNotifyClient;
 
   return { client, calls, movRow };
 }
@@ -122,6 +166,17 @@ describe("processarSaquePadrinho — sucesso", () => {
     expect(calls.movUpdate[0]?.status).toBe("pago");
     expect(calls.carteiraUpdate.length).toBe(1);
     expect(calls.carteiraUpdate[0]?.saldo_reservado).toBe(50);
+
+    // enqueueWhatsappNotification é fire-and-forget (void, sem await) —
+    // aguarda um macrotask pra dar tempo dos microtasks pendentes dela
+    // (select contato -> select instância -> insert) resolverem antes de
+    // checar o efeito colateral.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.whatsappInsert.length).toBe(1);
+    const notif = calls.whatsappInsert[0]!;
+    expect(notif.user_id).toBe("padrinho-1");
+    expect(notif.text_body).toContain("R$ 50,00");
+    expect(notif.purpose).toBe("notification");
   });
 });
 
