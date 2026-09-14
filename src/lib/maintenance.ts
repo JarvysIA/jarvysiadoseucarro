@@ -74,14 +74,6 @@ const OVERRIDE_KEY_MAP: Partial<Record<MaintItemKey, keyof VehicleMaintOverrides
   arrefecimento: "km_ultima_troca_arrefecimento",
 };
 
-/** Mapeia uma chave de item ao nome de categoria usado nas despesas. */
-export const ITEM_TO_CATEGORIA: Partial<Record<MaintItemKey, string>> = {
-  oleo: "Óleo",
-  filtros: "Filtros",
-  pastilhas: "Pastilhas",
-  arrefecimento: "Arrefecimento",
-};
-
 /**
  * Gera itens de manutenção para um veículo.
  * - Quando há `overrides` reais (colunas km_ultima_troca_* da tabela veiculos),
