@@ -148,6 +148,42 @@ export type Database = {
           },
         ]
       }
+      cupons_promocionais: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          criado_por: string
+          desconto_percentual: number
+          expira_em: string | null
+          id: string
+          max_usos: number | null
+          usos_atuais: number
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          criado_por: string
+          desconto_percentual: number
+          expira_em?: string | null
+          id?: string
+          max_usos?: number | null
+          usos_atuais?: number
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          criado_por?: string
+          desconto_percentual?: number
+          expira_em?: string | null
+          id?: string
+          max_usos?: number | null
+          usos_atuais?: number
+        }
+        Relationships: []
+      }
       despesas: {
         Row: {
           categoria: string
@@ -2289,6 +2325,13 @@ export type Database = {
         Returns: undefined
       }
       validar_cupom_indicacao: { Args: { _codigo: string }; Returns: string }
+      validar_e_reservar_cupom_promocional: {
+        Args: { p_codigo: string }
+        Returns: {
+          desconto_percentual: number
+          valido: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"

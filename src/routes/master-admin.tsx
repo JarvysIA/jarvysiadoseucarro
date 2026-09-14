@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  createCupomPromocionalFn,
   createManualCostEntryFn,
   deleteManualCostEntryFn,
   getFinancialSummaryFn,
@@ -26,9 +27,12 @@ import {
   getPlateApiUsageFn,
   listAdminUsersFn,
   listAuditLogFn,
+  listCuponsPromocionaisFn,
+  toggleCupomPromocionalFn,
   updateUserStatusFn,
   type AdminUserRow,
   type AuditLogRow,
+  type CupomPromocional,
   type FinancialSummary,
   type OperationalHealth,
   type PlanStatus,
@@ -102,7 +106,7 @@ function MasterAdminPage() {
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "usuarios" | "auditoria" | "financeiro" | "monitoramento"
+    "usuarios" | "auditoria" | "financeiro" | "monitoramento" | "cupons"
   >("usuarios");
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -114,6 +118,15 @@ function MasterAdminPage() {
   const [operational, setOperational] = useState<OperationalHealth | null>(null);
   const [operationalLoading, setOperationalLoading] = useState(false);
   const [operationalLoaded, setOperationalLoaded] = useState(false);
+  const [cupons, setCupons] = useState<CupomPromocional[]>([]);
+  const [cuponsLoading, setCuponsLoading] = useState(false);
+  const [cuponsLoaded, setCuponsLoaded] = useState(false);
+  const [togglingCupomId, setTogglingCupomId] = useState<string | null>(null);
+  const [newCupomCodigo, setNewCupomCodigo] = useState("");
+  const [newCupomDesconto, setNewCupomDesconto] = useState("");
+  const [newCupomMaxUsos, setNewCupomMaxUsos] = useState("");
+  const [newCupomExpiraEm, setNewCupomExpiraEm] = useState("");
+  const [addingCupom, setAddingCupom] = useState(false);
   const [newCostCategory, setNewCostCategory] = useState("");
   const [newCostAmount, setNewCostAmount] = useState("");
   const [newCostNote, setNewCostNote] = useState("");
@@ -129,6 +142,9 @@ function MasterAdminPage() {
   const deleteManualCostEntry = useServerFn(deleteManualCostEntryFn);
   const getPlateApiUsage = useServerFn(getPlateApiUsageFn);
   const getOperationalHealth = useServerFn(getOperationalHealthFn);
+  const listCupons = useServerFn(listCuponsPromocionaisFn);
+  const createCupom = useServerFn(createCupomPromocionalFn);
+  const toggleCupom = useServerFn(toggleCupomPromocionalFn);
 
   useEffect(() => {
     (async () => {
@@ -229,6 +245,68 @@ function MasterAdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, operationalLoaded]);
+
+  const refreshCupons = async () => {
+    setCuponsLoading(true);
+    try {
+      const { rows } = await listCupons();
+      setCupons(rows);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao carregar cupons.");
+    } finally {
+      setCuponsLoading(false);
+      setCuponsLoaded(true);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "cupons" && !cuponsLoaded) {
+      void refreshCupons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, cuponsLoaded]);
+
+  const addCupom = async () => {
+    const desconto = Number(newCupomDesconto);
+    const maxUsos = newCupomMaxUsos.trim() === "" ? 0 : Number(newCupomMaxUsos);
+    if (!newCupomCodigo.trim() || !(desconto >= 1 && desconto <= 100) || !(maxUsos >= 0)) {
+      toast.error("Preencha código e um desconto entre 1 e 100 (usos máximos: 0 = ilimitado).");
+      return;
+    }
+    setAddingCupom(true);
+    try {
+      await createCupom({
+        data: {
+          codigo: newCupomCodigo.trim(),
+          desconto_percentual: desconto,
+          max_usos: maxUsos,
+          expira_em: newCupomExpiraEm || undefined,
+        },
+      });
+      setNewCupomCodigo("");
+      setNewCupomDesconto("");
+      setNewCupomMaxUsos("");
+      setNewCupomExpiraEm("");
+      toast.success("Cupom criado.");
+      await refreshCupons();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao criar cupom.");
+    } finally {
+      setAddingCupom(false);
+    }
+  };
+
+  const toggleCupomHandler = async (cupom: CupomPromocional) => {
+    setTogglingCupomId(cupom.id);
+    try {
+      await toggleCupom({ data: { id: cupom.id, ativo: !cupom.ativo } });
+      await refreshCupons();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao atualizar cupom.");
+    } finally {
+      setTogglingCupomId(null);
+    }
+  };
 
   const addCost = async () => {
     const amount = Number(newCostAmount.replace(",", "."));
@@ -390,9 +468,130 @@ function MasterAdminPage() {
         >
           Monitoramento
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("cupons")}
+          className={
+            activeTab === "cupons"
+              ? "glow-neon flex-1 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+              : "flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-muted-foreground"
+          }
+        >
+          Cupons
+        </button>
       </div>
 
-      {activeTab === "monitoramento" ? (
+      {activeTab === "cupons" ? (
+        <div className="mt-4 space-y-4">
+          {cuponsLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              {cupons.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+                  Nenhum cupom promocional criado ainda.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {cupons.map((c) => (
+                    <li
+                      key={c.id}
+                      className="rounded-2xl border border-border bg-card p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-sm font-semibold text-foreground">
+                            {c.codigo}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {c.descontoPercentual}% de desconto
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                            c.ativo
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border text-muted-foreground"
+                          }`}
+                        >
+                          {c.ativo ? "Ativo" : "Inativo"}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Usos: {c.usosAtuais}/{c.maxUsos ?? "ilimitado"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {c.expiraEm
+                          ? `Expira em: ${new Date(c.expiraEm).toLocaleString("pt-BR")}`
+                          : "Sem validade"}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => toggleCupomHandler(c)}
+                        disabled={togglingCupomId === c.id}
+                        className="mt-2 flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground disabled:opacity-50"
+                      >
+                        {togglingCupomId === c.id && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        {c.ativo ? "Desativar" : "Ativar"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="mb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Novo cupom
+                </p>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={newCupomCodigo}
+                    onChange={(e) => setNewCupomCodigo(e.target.value)}
+                    placeholder="Código (ex: PROMO50)"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={newCupomDesconto}
+                    onChange={(e) => setNewCupomDesconto(e.target.value)}
+                    placeholder="Desconto % (1-100)"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={newCupomMaxUsos}
+                    onChange={(e) => setNewCupomMaxUsos(e.target.value)}
+                    placeholder="Usos máximos (0 = ilimitado)"
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={newCupomExpiraEm}
+                    onChange={(e) => setNewCupomExpiraEm(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCupom}
+                    disabled={addingCupom}
+                    className="glow-neon flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.7_0.18_250)] px-3 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                  >
+                    {addingCupom && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : activeTab === "monitoramento" ? (
         <div className="mt-4 space-y-5">
           {operationalLoading || !operational ? (
             <div className="flex justify-center py-10">

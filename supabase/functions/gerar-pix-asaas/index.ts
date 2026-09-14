@@ -14,6 +14,8 @@
 //          SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { confirmarPagamento } from "../_shared/pagamento-pipeline.ts";
+import { calcularValorComCupom } from "../_shared/cupom-promocional.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -214,12 +216,48 @@ Deno.serve(async (req) => {
     // 5) Preço server-side. `valor` do body é IGNORADO.
     let valor: number;
     let cupomAplicado: string | null = null;
+    let cupomPromocionalAplicado: string | null = null;
+    let ativarSemPagamento = false;
 
     if (tipo === "historico") {
       valor = PRECO_HISTORICO;
     } else {
       valor = PRECO_ATIVACAO;
+      let promoAplicado = false;
+
+      // Cupom promocional (admin, desconto percentual configurável) tem
+      // prioridade sobre o cupom de indicação — só cai no cupom de
+      // indicação se o promocional não existir/for inválido/esgotado.
       if (codigoCupomBruto) {
+        try {
+          const { data: promoRows, error: errPromo } = await supabase.rpc(
+            "validar_e_reservar_cupom_promocional",
+            { p_codigo: codigoCupomBruto },
+          );
+          if (errPromo) throw errPromo;
+          const promoResult = (Array.isArray(promoRows) ? promoRows[0] : promoRows) as
+            | { valido: boolean; desconto_percentual: number | null }
+            | null;
+          if (promoResult?.valido && promoResult.desconto_percentual != null) {
+            promoAplicado = true;
+            cupomPromocionalAplicado = codigoCupomBruto;
+            if (promoResult.desconto_percentual === 100) {
+              ativarSemPagamento = true;
+              valor = 0;
+            } else {
+              valor = calcularValorComCupom(PRECO_ATIVACAO, promoResult.desconto_percentual);
+            }
+          }
+        } catch (e) {
+          // Cupom promocional inválido não bloqueia — cai no cupom de indicação.
+          console.warn(
+            "[gerar-pix-asaas] cupom promocional inválido:",
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+      }
+
+      if (!promoAplicado && codigoCupomBruto) {
         try {
           const { data: padrinhoId, error: errRpc } = await supabase.rpc(
             "validar_cupom_indicacao",
@@ -236,6 +274,37 @@ Deno.serve(async (req) => {
           console.warn("[gerar-pix-asaas] cupom inválido:", e instanceof Error ? e.message : String(e));
         }
       }
+    }
+
+    // 5.1) Cupom promocional de 100%: ativa direto, sem passar pelo Asaas
+    // (não existe PIX a gerar quando o valor é 0).
+    if (ativarSemPagamento) {
+      const { data: inserted, error: insertError } = await supabase
+        .from("pagamentos_pix")
+        .insert({
+          user_id: authUserId,
+          veiculo_id,
+          valor: 0,
+          codigo_cupom: null,
+          tipo_produto: "ativacao",
+          produto_ref_id: null,
+          status: "pendente",
+          metadata: {
+            gateway: "cupom_promocional_100",
+            cupom_codigo: cupomPromocionalAplicado,
+          },
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+
+      await confirmarPagamento({ supabase, pagamento_id: inserted.id });
+
+      return json({
+        success: true,
+        ativado_sem_pagamento: true,
+        valor: 0,
+      });
     }
 
     const apiKey = Deno.env.get("ASAAS_API_KEY");
@@ -301,6 +370,7 @@ Deno.serve(async (req) => {
           asaas_payment_id,
           asaas_customer_id,
           preco_origem: "server_side_table_v1",
+          ...(cupomPromocionalAplicado ? { cupom_promocional: cupomPromocionalAplicado } : {}),
         },
       })
       .select("id")
