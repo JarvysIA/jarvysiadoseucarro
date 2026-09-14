@@ -402,6 +402,115 @@ export const getOperationalHealthFn = createServerFn({ method: "GET" })
     };
   });
 
+export type CupomPromocional = {
+  id: string;
+  codigo: string;
+  descontoPercentual: number;
+  maxUsos: number | null;
+  usosAtuais: number;
+  ativo: boolean;
+  expiraEm: string | null;
+  createdAt: string;
+};
+
+type CupomPromocionalDbRow = {
+  id: string;
+  codigo: string;
+  desconto_percentual: number;
+  max_usos: number | null;
+  usos_atuais: number;
+  ativo: boolean;
+  expira_em: string | null;
+  created_at: string;
+};
+
+function mapCupomRow(c: CupomPromocionalDbRow): CupomPromocional {
+  return {
+    id: c.id,
+    codigo: c.codigo,
+    descontoPercentual: c.desconto_percentual,
+    maxUsos: c.max_usos,
+    usosAtuais: c.usos_atuais,
+    ativo: c.ativo,
+    expiraEm: c.expira_em,
+    createdAt: c.created_at,
+  };
+}
+
+export const listCuponsPromocionaisFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ rows: CupomPromocional[] }> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data, error } = await supabaseAdmin
+      .from("cupons_promocionais")
+      .select("id, codigo, desconto_percentual, max_usos, usos_atuais, ativo, expira_em, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    return { rows: (data ?? []).map((c: CupomPromocionalDbRow) => mapCupomRow(c)) };
+  });
+
+export const createCupomPromocionalFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      codigo: string;
+      desconto_percentual: number;
+      max_usos: number;
+      expira_em?: string;
+    }) => {
+      if (
+        !input?.codigo?.trim() ||
+        !Number.isFinite(input?.desconto_percentual) ||
+        input.desconto_percentual < 1 ||
+        input.desconto_percentual > 100 ||
+        !Number.isFinite(input?.max_usos) ||
+        input.max_usos < 0
+      ) {
+        throw new Error("Parâmetros inválidos.");
+      }
+      return input;
+    },
+  )
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin.from("cupons_promocionais").insert({
+      codigo: data.codigo.trim().toUpperCase(),
+      desconto_percentual: data.desconto_percentual,
+      max_usos: data.max_usos === 0 ? null : data.max_usos,
+      expira_em: data.expira_em || null,
+      criado_por: context.userId,
+    });
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
+export const toggleCupomPromocionalFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string; ativo: boolean }) => {
+    if (!input?.id || typeof input?.ativo !== "boolean") {
+      throw new Error("Parâmetros inválidos.");
+    }
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("cupons_promocionais")
+      .update({ ativo: data.ativo })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 export const updateUserStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { userId: string; status: PlanStatus }) => {
