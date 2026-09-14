@@ -13,6 +13,7 @@ import {
   aggregatePaymentsByStatus,
   countStuckPendingPayments,
 } from "@/lib/operational-aggregation";
+import { processarSaquePadrinho, type SaquePadrinhoClient } from "@/lib/saque-padrinho";
 import type { Json } from "@/integrations/supabase/types";
 
 export type AdminVehicle = {
@@ -507,6 +508,108 @@ export const toggleCupomPromocionalFn = createServerFn({ method: "POST" })
       .update({ ativo: data.ativo })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
+export type SaquePendente = {
+  id: string;
+  padrinhoId: string;
+  padrinhoNome: string;
+  valor: number;
+  chavePix: string | null;
+  createdAt: string;
+};
+
+type SaqueMovimentacaoDbRow = {
+  id: string;
+  padrinho_id: string;
+  valor: number;
+  created_at: string;
+};
+
+type SaquePadrinhoProfileRow = {
+  id: string;
+  nome: string;
+  pix_recebimento: string | null;
+};
+
+export const listSaquesPendentesFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ rows: SaquePendente[] }> => {
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: movs, error: movsError } = await supabaseAdmin
+      .from("movimentacoes_indicacao")
+      .select("id, padrinho_id, valor, created_at")
+      .eq("status", "reservado")
+      .eq("tipo", "saque")
+      .order("created_at", { ascending: true });
+    if (movsError) throw new Error(movsError.message);
+
+    const padrinhoIds = Array.from(
+      new Set((movs ?? []).map((m: SaqueMovimentacaoDbRow) => m.padrinho_id)),
+    );
+    const { data: profs } = padrinhoIds.length
+      ? await supabaseAdmin
+          .from("profiles")
+          .select("id, nome, pix_recebimento")
+          .in("id", padrinhoIds)
+      : { data: [] as SaquePadrinhoProfileRow[] };
+    const byId = new Map<string, SaquePadrinhoProfileRow>(
+      (profs ?? []).map(
+        (p: SaquePadrinhoProfileRow): [string, SaquePadrinhoProfileRow] => [p.id, p],
+      ),
+    );
+
+    const rows: SaquePendente[] = (movs ?? []).map((m: SaqueMovimentacaoDbRow) => {
+      const prof = byId.get(m.padrinho_id);
+      return {
+        id: m.id,
+        padrinhoId: m.padrinho_id,
+        padrinhoNome: prof?.nome ?? "—",
+        valor: m.valor,
+        chavePix: prof?.pix_recebimento ?? null,
+        createdAt: m.created_at,
+      };
+    });
+
+    return { rows };
+  });
+
+export const processarSaquePendenteFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { movimentacao_id: string }) => {
+    if (!input?.movimentacao_id) throw new Error("Parâmetros inválidos.");
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    // Gate manual de hoje: só super admin pode acionar o pagamento de um
+    // saque. A lógica de verdade (processarSaquePadrinho) é independente
+    // disso — troca-se o gate, não a lógica, quando isso virar automação.
+    await assertSuperAdmin(context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const apiKey = process.env.ASAAS_API_KEY;
+    const asaasEnv = process.env.ASAAS_ENV ?? "production";
+    if (!apiKey) throw new Error("ASAAS_API_KEY ausente.");
+
+    const result = await processarSaquePadrinho(data.movimentacao_id, apiKey, asaasEnv, {
+      client: supabaseAdmin as unknown as SaquePadrinhoClient,
+      fetchImpl: fetch,
+    });
+
+    if (!result.ok) {
+      throw new Error(result.erro);
+    }
+
+    void recordAuditEvent(supabaseAdmin, {
+      actorId: context.userId,
+      action: "saque_padrinho_processado",
+      targetId: result.padrinhoId,
+      details: { movimentacao_id: data.movimentacao_id, valor: result.valor },
+    });
 
     return { ok: true };
   });
