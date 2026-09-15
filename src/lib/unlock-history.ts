@@ -7,17 +7,17 @@
 type VeiculoOwnerRow = { user_id: string };
 type VeiculoSelectBuilder = {
   eq(column: string, value: unknown): VeiculoSelectBuilder;
-  maybeSingle(): Promise<{ data: VeiculoOwnerRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: VeiculoOwnerRow | null; error: { message: string } | null }>;
 };
 type VeiculoUpdateBuilder = {
-  eq(column: string, value: unknown): Promise<{ error: { message: string } | null }>;
+  eq(column: string, value: unknown): PromiseLike<{ error: { message: string } | null }>;
 };
 
 type PagamentoRow = { id: string };
 type PagamentoSelectBuilder = {
   eq(column: string, value: unknown): PagamentoSelectBuilder;
   limit(n: number): PagamentoSelectBuilder;
-  maybeSingle(): Promise<{ data: PagamentoRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: PagamentoRow | null; error: { message: string } | null }>;
 };
 
 export type UnlockHistoryClient = {

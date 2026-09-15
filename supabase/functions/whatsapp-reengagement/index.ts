@@ -104,12 +104,12 @@ type MutationResult = { error: { message: string } | null };
 type ContactsFilterStep4 = {
   not(column: "last_inbound_at", operator: "is", value: null): {
     lte(column: "last_inbound_at", value: string): {
-      limit(n: number): Promise<ListResult<ReengagementContactRow>>;
+      limit(n: number): PromiseLike<ListResult<ReengagementContactRow>>;
     };
   };
   is(column: "last_inbound_at", value: null): {
     lte(column: "verified_at", value: string): {
-      limit(n: number): Promise<ListResult<ReengagementContactRow>>;
+      limit(n: number): PromiseLike<ListResult<ReengagementContactRow>>;
     };
   };
 };
@@ -124,14 +124,14 @@ type ContactsFilterStep1 = {
 };
 
 type ProviderInstancesChain = {
-  eq(column: "status", value: "active"): Promise<ListResult<ReengagementProviderInstanceRow>>;
+  eq(column: "status", value: "active"): PromiseLike<ListResult<ReengagementProviderInstanceRow>>;
 };
 
 type OutboundHistoryChain = {
   eq(column: "contact_id", value: string): {
     eq(column: "purpose", value: "commercial"): {
       order(column: "created_at", opts: { ascending: false }): {
-        limit(n: 1): Promise<ListResult<ReengagementHistoryRow>>;
+        limit(n: 1): PromiseLike<ListResult<ReengagementHistoryRow>>;
       };
     };
   };
@@ -142,7 +142,7 @@ export type ReengagementClient = {
   from(table: "whatsapp_provider_instances"): { select(columns: string): ProviderInstancesChain };
   from(table: "whatsapp_outbound_queue"): {
     select(columns: string): OutboundHistoryChain;
-    insert(row: Record<string, unknown>): Promise<MutationResult>;
+    insert(row: Record<string, unknown>): PromiseLike<MutationResult>;
   };
 };
 
