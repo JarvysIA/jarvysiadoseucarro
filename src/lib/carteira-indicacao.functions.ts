@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { enqueueWhatsappNotification } from "@/lib/whatsapp-notify";
+import { enqueueWhatsappNotification, type WhatsappNotifyClient } from "@/lib/whatsapp-notify";
 
 export type CarteiraResumo = {
   saldo_disponivel: number;
@@ -139,7 +139,7 @@ export const solicitarSaqueIndicacao = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     void enqueueWhatsappNotification(
-      supabaseAdmin,
+      supabaseAdmin as unknown as WhatsappNotifyClient,
       context.userId,
       `Oi! 👋 Recebemos sua solicitação de saque de R$ ${valor.toFixed(2).replace(".", ",")} via PIX. Em breve você recebe o pagamento — te avisamos assim que cair na sua conta! 🎉`,
     );

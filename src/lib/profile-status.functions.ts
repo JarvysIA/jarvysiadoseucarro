@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { recordAuditEvent } from "@/lib/audit-log";
+import { recordAuditEvent, type AuditLogClient } from "@/lib/audit-log";
 
 // Desativa a própria conta do usuário autenticado (context.userId vem do
 // token verificado pelo middleware — nunca de um id enviado pelo client).
@@ -26,7 +26,7 @@ export const deactivateAccountFn = createServerFn({ method: "POST" })
       .eq("id", context.userId);
     if (error) throw new Error(error.message);
 
-    void recordAuditEvent(supabaseAdmin, {
+    void recordAuditEvent(supabaseAdmin as unknown as AuditLogClient, {
       actorId: context.userId,
       action: "account_deactivated",
       targetId: context.userId,

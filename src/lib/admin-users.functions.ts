@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PROFILE_STATUS_VALUES, type ProfileStatus } from "@/lib/profile-status";
-import { recordAuditEvent } from "@/lib/audit-log";
+import { recordAuditEvent, type AuditLogClient } from "@/lib/audit-log";
 import {
   aggregateAiUsageByType,
   aggregateRevenueByType,
@@ -605,7 +605,7 @@ export const processarSaquePendenteFn = createServerFn({ method: "POST" })
       throw new Error(result.erro);
     }
 
-    void recordAuditEvent(supabaseAdmin, {
+    void recordAuditEvent(supabaseAdmin as unknown as AuditLogClient, {
       actorId: context.userId,
       action: "saque_padrinho_processado",
       targetId: result.padrinhoId,
@@ -640,7 +640,7 @@ export const updateUserStatusFn = createServerFn({ method: "POST" })
       .eq("id", data.userId);
     if (error) throw new Error(error.message);
 
-    void recordAuditEvent(supabaseAdmin, {
+    void recordAuditEvent(supabaseAdmin as unknown as AuditLogClient, {
       actorId: context.userId,
       action: "user_status_updated",
       targetId: data.userId,

@@ -18,7 +18,7 @@ type ContactRow = {
 type ContactSelectBuilder = {
   eq: (col: string, val: unknown) => ContactSelectBuilder;
   not: (col: string, op: string, val: unknown) => ContactSelectBuilder;
-  maybeSingle: () => Promise<{ data: ContactRow | null }>;
+  maybeSingle: () => PromiseLike<{ data: ContactRow | null }>;
 };
 
 // Estrutural, não o Database type completo — mesmo espírito de
@@ -31,14 +31,14 @@ export type AiUsageTrackingClient = {
   rpc: (
     fn: "record_ai_usage_and_check_alert",
     params: { p_event_type: string; p_user_id: string },
-  ) => Promise<{
+  ) => PromiseLike<{
     data: Array<{ daily_count: number; should_alert: boolean }> | null;
     error: { message: string } | null;
   }>;
   from: {
     (table: "whatsapp_contacts"): { select: (cols: string) => ContactSelectBuilder };
     (table: "whatsapp_outbound_queue"): {
-      insert: (row: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+      insert: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
     };
   };
 };

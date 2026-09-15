@@ -31,32 +31,32 @@ type MovimentacaoRow = {
 
 type MovSelectBuilder = {
   eq(column: string, value: unknown): MovSelectBuilder;
-  maybeSingle(): Promise<{ data: MovimentacaoRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: MovimentacaoRow | null; error: { message: string } | null }>;
 };
 
 type MovUpdateBuilder = {
   eq(column: string, value: unknown): MovUpdateBuilder;
   select(
     columns: string,
-  ): Promise<{ data: { id: string }[] | null; error: { message: string } | null }>;
+  ): PromiseLike<{ data: { id: string }[] | null; error: { message: string } | null }>;
 };
 
 type ProfileRow = { pix_recebimento: string | null };
 
 type ProfileSelectBuilder = {
   eq(column: string, value: unknown): ProfileSelectBuilder;
-  maybeSingle(): Promise<{ data: ProfileRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: ProfileRow | null; error: { message: string } | null }>;
 };
 
 type CarteiraRow = { saldo_reservado: number };
 
 type CarteiraSelectBuilder = {
   eq(column: string, value: unknown): CarteiraSelectBuilder;
-  maybeSingle(): Promise<{ data: CarteiraRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: CarteiraRow | null; error: { message: string } | null }>;
 };
 
 type CarteiraUpdateBuilder = {
-  eq(column: string, value: unknown): Promise<{ error: { message: string } | null }>;
+  eq(column: string, value: unknown): PromiseLike<{ error: { message: string } | null }>;
 };
 
 export type SaquePadrinhoClient = {

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sanitizePlate } from "@/lib/plate";
+import { unlockHistory, type UnlockHistoryClient } from "@/lib/unlock-history";
 
 export type ArchivedLookup = {
   found: false;
@@ -150,10 +151,6 @@ export const softDeleteVehicleFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/**
- * Destrava o histórico do veículo resgatado (Carfax Reverso paywall).
- * Para o MVP, apenas seta history_locked = false.
- */
 export const unlockHistoryFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { vehicleId: string }) => {
@@ -162,18 +159,12 @@ export const unlockHistoryFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
-      .from("veiculos")
-      .select("user_id")
-      .eq("id", data.vehicleId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!row || row.user_id !== context.userId) throw new Error("Acesso negado.");
-    const { error: upErr } = await supabaseAdmin
-      .from("veiculos")
-      .update({ history_locked: false })
-      .eq("id", data.vehicleId);
-    if (upErr) throw new Error(upErr.message);
+    const result = await unlockHistory(
+      data.vehicleId,
+      context.userId,
+      supabaseAdmin as unknown as UnlockHistoryClient,
+    );
+    if (!result.ok) throw new Error(result.erro);
     return { ok: true };
   });
 

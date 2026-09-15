@@ -52,7 +52,7 @@ function buildVehicleImageCachePath(key: NormalizedVehicleImageKey): string {
 
 type CacheSelectBuilder = {
   eq(column: string, value: unknown): CacheSelectBuilder;
-  maybeSingle(): Promise<{
+  maybeSingle(): PromiseLike<{
     data: { storage_path: string } | null;
     error: { message: string } | null;
   }>;
@@ -64,11 +64,11 @@ export type VehicleImageAdminClient = {
     upsert(
       row: NormalizedVehicleImageKey & { storage_path: string },
       opts: { onConflict: string; ignoreDuplicates: boolean },
-    ): Promise<{ error: { message: string } | null }>;
+    ): PromiseLike<{ error: { message: string } | null }>;
   };
   from(table: "veiculos"): {
     update(row: { foto_url: string }): {
-      eq(column: string, value: unknown): Promise<{ error: { message: string } | null }>;
+      eq(column: string, value: unknown): PromiseLike<{ error: { message: string } | null }>;
     };
   };
   storage: {
@@ -77,11 +77,11 @@ export type VehicleImageAdminClient = {
         path: string,
         bytes: Uint8Array,
         opts: { contentType: string; upsert: boolean },
-      ): Promise<{ error: { message: string } | null }>;
+      ): PromiseLike<{ error: { message: string } | null }>;
       createSignedUrl(
         path: string,
         expiresInSeconds: number,
-      ): Promise<{ data: { signedUrl: string } | null }>;
+      ): PromiseLike<{ data: { signedUrl: string } | null }>;
     };
   };
 };

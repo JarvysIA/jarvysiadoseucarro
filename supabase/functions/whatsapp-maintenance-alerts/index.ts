@@ -120,7 +120,7 @@ type RpcResult = { data: unknown; error: { message: string } | null };
 type VeiculosChain = {
   in(column: "status", values: string[]): {
     not(column: "km_atual", operator: "is", value: null): {
-      limit(n: number): Promise<ListResult<VehicleCandidateRow>>;
+      limit(n: number): PromiseLike<ListResult<VehicleCandidateRow>>;
     };
   };
 };
@@ -129,20 +129,20 @@ type WhatsappContactsChain = {
   in(column: "user_id", values: string[]): {
     not(column: "verified_at", operator: "is", value: null): {
       eq(column: "opt_out", value: false): {
-        eq(column: "is_primary", value: true): Promise<ListResult<WhatsappContactRow>>;
+        eq(column: "is_primary", value: true): PromiseLike<ListResult<WhatsappContactRow>>;
       };
     };
   };
 };
 
 type WhatsappProviderInstancesChain = {
-  eq(column: "status", value: "active"): Promise<ListResult<WhatsappProviderInstanceRow>>;
+  eq(column: "status", value: "active"): PromiseLike<ListResult<WhatsappProviderInstanceRow>>;
 };
 
 type MilestoneNoticeChain = {
   eq(column: "vehicle_id", value: string): {
     eq(column: "milestone_km", value: number): {
-      maybeSingle(): Promise<MaybeSingleResult<MilestoneNoticeRow>>;
+      maybeSingle(): PromiseLike<MaybeSingleResult<MilestoneNoticeRow>>;
     };
   };
 };
@@ -155,7 +155,7 @@ export type MaintenanceAlertsClient = {
   };
   from(table: "whatsapp_milestone_notices"): { select(columns: string): MilestoneNoticeChain };
   from(table: "whatsapp_outbound_queue"): {
-    insert(row: Record<string, unknown>): Promise<MutationResult>;
+    insert(row: Record<string, unknown>): PromiseLike<MutationResult>;
   };
   rpc(
     fn: "record_whatsapp_milestone_notice",
@@ -165,7 +165,7 @@ export type MaintenanceAlertsClient = {
       p_milestone_km: number;
       p_action: "notified";
     },
-  ): Promise<RpcResult>;
+  ): PromiseLike<RpcResult>;
 };
 
 // ------------------------------------------------------------

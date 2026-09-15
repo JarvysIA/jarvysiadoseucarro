@@ -141,11 +141,35 @@ describeIfDb("MJ2B-V F2 — rejected (vehicle_archived) + retry_needed", () => {
     const leaseToken = claim.rows[0]?.lease_token;
     expect(leaseToken).toBeTruthy();
 
-    // Arquivamento concorrente do veículo (fora da RPC).
+    // Arquivamento concorrente do veículo (fora da RPC) — simula uma ação
+    // privilegiada real (ex: softDeleteVehicleFn via service_role). Esta
+    // sessão de teste é um pg.Client direto em TEST_DATABASE_URL, que
+    // nunca passa pelo PostgREST — então auth.role() não tem como
+    // retornar 'service_role' sozinho (os GUCs request.jwt.claim.role/
+    // request.jwt.claims só existem quando o PostgREST os seta por
+    // request, a partir do JWT). Sem simular isso, o trigger novo
+    // proteger_colunas_privilegiadas_veiculo (Security-Audit-Fixes)
+    // reverte este UPDATE de status corretamente — é o comportamento
+    // certo do trigger, era o teste que precisava representar a ação
+    // certa (achado confirmado na investigação desta build).
+    //
+    // set_config(..., true) é local à transação: precisa do
+    // begin()/commit() explícito ao redor pra sobreviver até o UPDATE
+    // seguinte, já que fora disso cada session.query() aqui roda como
+    // transação implícita própria. NÃO dá pra combinar as duas queries
+    // numa única chamada com parâmetro posicionado ($1) — o driver pg usa
+    // o protocolo estendido (Parse/Bind/Execute) quando há parâmetros, e
+    // esse protocolo rejeita múltiplos comandos num único Parse
+    // ("cannot insert multiple commands into a prepared statement").
+    await session.begin();
+    await session.query(
+      `select set_config('request.jwt.claims', '{"role":"service_role"}', true)`,
+    );
     await session.query(
       `update public.veiculos set status = 'archived' where id = $1`,
       [SYNTH_VEHICLE_ID],
     );
+    await session.commit();
 
     const before = await fetchDespesaCount(session, SYNTH_VEHICLE_ID);
     expect(before).toBe(0);

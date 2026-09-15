@@ -21,14 +21,14 @@ type ContactRow = {
 type ContactSelectBuilder = {
   eq(column: string, value: unknown): ContactSelectBuilder;
   not(column: string, operator: string, value: unknown): ContactSelectBuilder;
-  maybeSingle(): Promise<{ data: ContactRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: ContactRow | null; error: { message: string } | null }>;
 };
 
 type InstanceRow = { provider: string; instance_id: string; status: string };
 
 type InstanceSelectBuilder = {
   eq(column: string, value: unknown): InstanceSelectBuilder;
-  maybeSingle(): Promise<{ data: InstanceRow | null; error: { message: string } | null }>;
+  maybeSingle(): PromiseLike<{ data: InstanceRow | null; error: { message: string } | null }>;
 };
 
 export type WhatsappNotifyClient = {
@@ -39,7 +39,7 @@ export type WhatsappNotifyClient = {
     select(columns: string): InstanceSelectBuilder;
   };
   from(table: "whatsapp_outbound_queue"): {
-    insert(row: Record<string, unknown>): Promise<{ error: { message: string } | null }>;
+    insert(row: Record<string, unknown>): PromiseLike<{ error: { message: string } | null }>;
   };
 };
 
