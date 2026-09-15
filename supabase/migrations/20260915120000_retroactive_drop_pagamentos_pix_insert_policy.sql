@@ -1,0 +1,15 @@
+-- Retroativo: esta correção já está ativa em produção desde a auditoria de
+-- segurança adversarial (achado C1), aplicada originalmente via SQL direto
+-- sem migration correspondente. Este arquivo só registra o estado já
+-- vigente, não aplica nada novo.
+--
+-- Achado original: a policy de INSERT em pagamentos_pix ("Users can insert
+-- own payments") permitia a qualquer usuário autenticado inserir uma linha
+-- diretamente via REST com status='pago', valor=0 — ativação grátis sem
+-- passar pela edge function gerar-pix-asaas. Confirmado explorável ao vivo
+-- antes do fix (exploit testado e revertido).
+--
+-- gerar-pix-asaas já usa service_role (supabase-js com a service role key)
+-- para todo INSERT em pagamentos_pix — não existe caso de uso legítimo para
+-- INSERT direto do cliente autenticado nessa tabela.
+DROP POLICY IF EXISTS "Users can insert own payments" ON public.pagamentos_pix;
