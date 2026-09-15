@@ -1392,7 +1392,7 @@ function VehicleImage({
       setState("fallback");
       return;
     }
-    generateVehicleImageFn({ data: { vehicleId, marca, modelo, ano, cor } })
+    generateVehicleImageFn({ data: { vehicleId } })
       .then(async (res) => {
         if (cancel) return;
         if (res.ok && res.url) {

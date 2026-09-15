@@ -18,36 +18,41 @@ import {
  * Build Vehicle-Image-Cache: antes de chamar a IA, reaproveita uma foto já
  * gerada pra mesma combinação marca+modelo+ano+cor (vehicle_image_cache) —
  * ver runGenerateVehicleImage em src/lib/vehicle-image-cache.ts.
+ *
+ * Fix-Vehicle-Image-Input-Validation (achado A1): marca/modelo/ano/cor
+ * vêm SEMPRE da própria linha de veiculos (mesma query de ownership), não
+ * mais do input do client — o único call-site real (VehicleImage em
+ * app.tsx) já renderiza a partir de um veículo lido do banco, então não
+ * existe caso legítimo de divergência. Evita prompt injection em "cor",
+ * poluição do vehicle_image_cache com combinações fabricadas e geração de
+ * imagem arbitrária às custas da conta de IA associada a um vehicleId real.
  */
 export const generateVehicleImageFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (data: {
-      vehicleId: string;
-      marca: string;
-      modelo: string;
-      ano: string;
-      cor: string;
-    }) => data,
-  )
+  .inputValidator((data: { vehicleId: string }) => data)
   .handler(async ({ data, context }) => {
-    const marca = (data.marca || "").trim();
-    const modelo = (data.modelo || "").trim();
-    const ano = (data.ano || "").trim();
-    const cor = (data.cor || "").trim();
     const vehicleId = data.vehicleId;
-
-    if (!vehicleId || (!marca && !modelo)) {
+    if (!vehicleId) {
       return { ok: false as const, url: null };
     }
 
-    // Ownership: só o dono pode gerar/sobrescrever a foto do veículo.
+    // Ownership + atributos reais: só o dono pode gerar/sobrescrever a
+    // foto do veículo, e marca/modelo/ano/cor vêm sempre do banco.
     const { data: veic, error: vErr } = await context.supabase
       .from("veiculos")
-      .select("id, user_id")
+      .select("id, user_id, marca, modelo, ano, cor")
       .eq("id", vehicleId)
       .maybeSingle();
     if (vErr || !veic || veic.user_id !== context.userId) {
+      return { ok: false as const, url: null };
+    }
+
+    const marca = (veic.marca || "").trim();
+    const modelo = (veic.modelo || "").trim();
+    const ano = (veic.ano || "").trim();
+    const cor = (veic.cor || "").trim();
+
+    if (!marca && !modelo) {
       return { ok: false as const, url: null };
     }
 
