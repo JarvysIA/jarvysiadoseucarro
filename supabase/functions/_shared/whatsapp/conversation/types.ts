@@ -175,6 +175,7 @@ export type ConversationResponseKey =
   | "vehicle_not_found"
   | "no_eligible_vehicle"
   | "vehicle_access_restricted"
+  | "ai_feature_requires_plan"
   | "fallback_first"
   | "fallback_second"
   | "fallback_reset"

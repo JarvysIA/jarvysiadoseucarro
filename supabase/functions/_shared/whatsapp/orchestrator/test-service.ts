@@ -144,6 +144,18 @@ export type TestCycleDeps = {
   // defensivo de sempre (malformed) — mesmo comportamento de antes desta
   // build para quem ainda não conectou a dependência real (WIRE-5).
   transcribeAudioMessage?: (messageId: string) => Promise<TranscribeAudioResult>;
+  // Fix-Voice-Transcription-Gate: gate de plano/trial ANTES de
+  // transcrever áudio — libera se item.userId tiver ao menos 1 veículo
+  // com access mode "full" (mesma regra de
+  // dr-jarvys-authorization.ts). Ausente, ou item.userId null, ou
+  // nenhum veículo full: nunca transcreve (fail-closed), mesmo espírito
+  // do fail-safe já usado pra transcribeAudioMessage ausente.
+  authorizeAudioTranscription?: (userId: string) => Promise<boolean>;
+  // Fire-and-forget: registra o evento de uso de IA depois de uma
+  // transcrição bem-sucedida. Nunca lança, nunca afeta o outcome do
+  // item — se ausente, simplesmente não registra (observabilidade, não
+  // é parte do fluxo de negócio).
+  recordAudioTranscriptionUsage?: (userId: string) => Promise<void>;
 };
 
 export type ItemOutcome =
@@ -492,6 +504,9 @@ async function processItem(
   const ctx1 = await runContext(item, deps, log, workerId);
   if (ctx1.kind !== "ok") return ctx1.outcome;
 
+  const gate1 = await runAudioAccessGate(item, ctx1.result, deps, render, log, workerId, 1);
+  if (gate1.kind !== "ok") return gate1.outcome;
+
   const text1 = await runMessageText(item, deps, log, workerId);
   if (text1.kind !== "ok") return text1.outcome;
 
@@ -556,6 +571,9 @@ async function processItem(
 
   const ctx2 = await runContext(item, deps, log, workerId);
   if (ctx2.kind !== "ok") return ctx2.outcome;
+
+  const gate2 = await runAudioAccessGate(item, ctx2.result, deps, render, log, workerId, 2);
+  if (gate2.kind !== "ok") return gate2.outcome;
 
   const text2 = await runMessageText(item, deps, log, workerId);
   if (text2.kind !== "ok") return text2.outcome;
@@ -661,6 +679,126 @@ async function finalizeRestrictedVehicleHandoff(
     deferToLegacyRouter: false,
     deferToLegacyOptOut: false,
     reasonCode: "vehicle_access_restricted",
+  };
+  const response = buildResponse(decision, render, log, workerId, item);
+  if (response.kind !== "ok") {
+    return await releaseAs(
+      item,
+      deps,
+      "cancelled",
+      "orchestrator_invariant",
+      "malformed",
+      log,
+      workerId,
+    );
+  }
+  const applied = await runApply(
+    item,
+    ctx.context.stateVersion,
+    decision,
+    response.payload,
+    deps,
+    log,
+    workerId,
+    attempt,
+  );
+  if (applied.kind === "conflict") {
+    return await releaseAs(
+      item,
+      deps,
+      "state_conflict",
+      "state_version_conflict",
+      "conflicted",
+      log,
+      workerId,
+    );
+  }
+  return applied.outcome;
+}
+
+type AudioGateOk = { kind: "ok" };
+type AudioGateFail = { kind: "fail"; outcome: ItemOutcome };
+
+// Fix-Voice-Transcription-Gate: gate de plano ANTES de transcrever
+// áudio. Só se aplica a item.messageType === "audio" — mensagens de
+// texto passam direto (kind: "ok"). Fail-closed: item.userId null,
+// deps.authorizeAudioTranscription ausente, ou a checagem devolvendo
+// false (ou lançando) => bloqueia e responde com
+// finalizeAudioTranscriptionDenied.
+async function runAudioAccessGate(
+  item: ClaimedItem,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  deps: TestCycleDeps,
+  render: typeof renderResponse,
+  log: TestServiceLogger,
+  workerId: string,
+  attempt: number,
+): Promise<AudioGateOk | AudioGateFail> {
+  if (item.messageType !== "audio") return { kind: "ok" };
+
+  let authorized = false;
+  if (item.userId !== null && deps.authorizeAudioTranscription) {
+    try {
+      authorized = await deps.authorizeAudioTranscription(item.userId);
+    } catch {
+      authorized = false;
+    }
+  }
+  if (authorized) return { kind: "ok" };
+
+  const outcome = await finalizeAudioTranscriptionDenied(
+    item,
+    ctx,
+    deps,
+    render,
+    log,
+    workerId,
+    attempt,
+  );
+  return { kind: "fail", outcome };
+}
+
+// Fix-Voice-Transcription-Gate: mesmo padrão de
+// finalizeRestrictedVehicleHandoff (constrói resposta "respond", volta
+// pro estado idle, aplica) — mas sem vehicleId, porque o gate roda ANTES
+// de saber a qual veículo a mensagem se refere (é isso que impede
+// reaproveitar canVehiclePerformFullAction direto). Nunca toca
+// activeVehicleId (não há vehicleId específico envolvido aqui).
+async function finalizeAudioTranscriptionDenied(
+  item: ClaimedItem,
+  ctx: Extract<LoadContextResult, { kind: "ok" }>,
+  deps: TestCycleDeps,
+  render: typeof renderResponse,
+  log: TestServiceLogger,
+  workerId: string,
+  attempt: number,
+): Promise<ItemOutcome> {
+  const decision: ConversationCoreDecision = {
+    eventKind: "confirm",
+    decisionKind: "respond",
+    previousState: ctx.context.state.state,
+    nextState: "idle",
+    outcome: "cancelled",
+    statePatch: {
+      state: "idle",
+      currentIntent: null,
+      awaitingField: null,
+      requestSource: null,
+      draftType: null,
+      draftId: null,
+      draftVersion: null,
+      draftPayload: null,
+      confirmedAt: null,
+      executedAt: null,
+      expiresAt: null,
+      lastMessageId: item.messageId,
+    },
+    responseKey: "ai_feature_requires_plan",
+    responseParams: {},
+    nextFallbackCount: 0,
+    deferToLegacyRouter: false,
+    deferToLegacyOptOut: false,
+    reasonCode: "ai_feature_requires_plan",
   };
   const response = buildResponse(decision, render, log, workerId, item);
   if (response.kind !== "ok") {
@@ -934,6 +1072,13 @@ async function runAudioTranscription(
   }
 
   if (result.kind === "ok") {
+    // Fix-Voice-Transcription-Gate: fire-and-forget, só depois de
+    // transcrição bem-sucedida. item.userId nunca é null aqui — o gate
+    // em processItem já exige userId não-nulo antes de chegar até
+    // deps.transcribeAudioMessage.
+    if (deps.recordAudioTranscriptionUsage && item.userId) {
+      void deps.recordAudioTranscriptionUsage(item.userId);
+    }
     return { kind: "ok", text: result.text };
   }
   if (result.kind === "transient_error") {

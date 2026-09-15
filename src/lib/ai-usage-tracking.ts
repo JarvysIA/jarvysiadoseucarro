@@ -7,7 +7,16 @@
 
 export const AI_USAGE_ALERT_ADMIN_USER_ID = "27d62a75-e90b-48a4-be43-c4342b075708"; // adm.fernando@yahoo.com
 
-export type AiUsageEventType = "ocr_receipt" | "dr_jarvys_chat" | "classify_expense_text";
+// "audio_transcription" é disparado só do lado Deno (Fix-Voice-
+// Transcription-Gate, supabase/functions/_shared/whatsapp/
+// ai-usage-tracking-deno.ts — transcrição de áudio via WhatsApp), nunca
+// pelo app — incluído aqui só pra manter os dois lados em sincronia,
+// já que os dois gravam na mesma tabela ai_usage_events via a mesma RPC.
+export type AiUsageEventType =
+  | "ocr_receipt"
+  | "dr_jarvys_chat"
+  | "classify_expense_text"
+  | "audio_transcription";
 
 type ContactRow = {
   id: string;

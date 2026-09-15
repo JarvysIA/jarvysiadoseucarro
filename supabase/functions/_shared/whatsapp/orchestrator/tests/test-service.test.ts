@@ -292,6 +292,12 @@ function baseDeps(
     orchestratorVersion: "test-svc.1",
     kmActionDeps: stubKmActionDeps,
     expenseActionDeps: stubExpenseActionDeps,
+    // Fix-Voice-Transcription-Gate: default "sempre autorizado" — os
+    // testes existentes de áudio (WIRE-4) focam no comportamento de
+    // transcribeAudioMessage, não no gate; sobrescreva via
+    // baseDeps(repo, { authorizeAudioTranscription: ... }) nos testes
+    // que exercitam o gate em si.
+    authorizeAudioTranscription: async () => true,
     ...over,
   };
 }
@@ -676,6 +682,173 @@ describe("audio (WIRE-4)", () => {
       }),
     );
     expect(loadTextCalls).toBe(0);
+  });
+});
+
+// ============================================================
+// AUDIO ACCESS GATE (Fix-Voice-Transcription-Gate)
+// ============================================================
+
+describe("audio access gate (Fix-Voice-Transcription-Gate)", () => {
+  test("authorizeAudioTranscription=false => bloqueia, responde ai_feature_requires_plan, nunca transcreve", async () => {
+    const it = makeItem({ messageType: "audio" });
+    let transcribeCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => false,
+        transcribeAudioMessage: async () => {
+          transcribeCalls++;
+          return { kind: "ok", text: "não deveria transcrever" };
+        },
+      }),
+    );
+    expect(transcribeCalls).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.release).toHaveLength(0);
+    expect(m.calls.apply).toHaveLength(1);
+    expect(m.calls.apply[0]!.response).toMatchObject({
+      responseKey: "ai_feature_requires_plan",
+    });
+    expect(m.calls.apply[0]!.resultSummary).toMatchObject({
+      decisionKind: "respond",
+      outcome: "cancelled",
+    });
+  });
+
+  test("item.userId null => bloqueia sem sequer chamar authorizeAudioTranscription", async () => {
+    const it = makeItem({ messageType: "audio", userId: null });
+    let authorizeCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => {
+          authorizeCalls++;
+          return true;
+        },
+      }),
+    );
+    expect(authorizeCalls).toBe(0);
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0]!.response).toMatchObject({
+      responseKey: "ai_feature_requires_plan",
+    });
+  });
+
+  test("authorizeAudioTranscription ausente => bloqueia (fail-closed), mesmo sem nenhuma dependência conectada", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, { authorizeAudioTranscription: undefined }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0]!.response).toMatchObject({
+      responseKey: "ai_feature_requires_plan",
+    });
+  });
+
+  test("authorizeAudioTranscription lança exceção => bloqueia (fail-closed), nunca propaga", async () => {
+    const it = makeItem({ messageType: "audio" });
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    const res = await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => {
+          throw new Error("boom");
+        },
+      }),
+    );
+    expect(res.counts.completed).toBe(1);
+    expect(m.calls.apply[0]!.response).toMatchObject({
+      responseKey: "ai_feature_requires_plan",
+    });
+  });
+
+  test("autorizado: transcrição bem-sucedida chama recordAudioTranscriptionUsage com o userId do item", async () => {
+    const it = makeItem({ messageType: "audio", userId: "u-audio-1" });
+    let recordedUserId: string | null = null;
+    let recordCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => true,
+        transcribeAudioMessage: async () => ({ kind: "ok", text: "gasolina 80 reais" }),
+        recordAudioTranscriptionUsage: async (userId: string) => {
+          recordCalls++;
+          recordedUserId = userId;
+        },
+      }),
+    );
+    // Fire-and-forget (void) — dá um tick pra microtask resolver antes de checar.
+    await Promise.resolve();
+    expect(recordCalls).toBe(1);
+    expect(recordedUserId).toBe("u-audio-1");
+  });
+
+  test("autorizado: transcrição com permanent_error NÃO chama recordAudioTranscriptionUsage", async () => {
+    const it = makeItem({ messageType: "audio" });
+    let recordCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      release: [{ ok: true, status: "cancelled", attempts: 1, willRetry: false }],
+    });
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => true,
+        transcribeAudioMessage: async () => ({ kind: "permanent_error", reason: "no_speech_detected" }),
+        recordAudioTranscriptionUsage: async () => {
+          recordCalls++;
+        },
+      }),
+    );
+    await Promise.resolve();
+    expect(recordCalls).toBe(0);
+  });
+
+  test("mensagem de texto nunca passa pelo gate de áudio (authorizeAudioTranscription não é chamado)", async () => {
+    const it = makeItem({ messageType: "text" });
+    let authorizeCalls = 0;
+    const m = mockRepo({
+      claim: [[it]],
+      loadContext: [okContext()],
+      apply: [{ ok: true, wasReplay: false, orchestratorResult: {} as never }],
+    });
+    await runWhatsappOrchestratorTestCycle(
+      { workerId: "w" },
+      baseDeps(m.repo, {
+        authorizeAudioTranscription: async () => {
+          authorizeCalls++;
+          return true;
+        },
+      }),
+    );
+    expect(authorizeCalls).toBe(0);
   });
 });
 
