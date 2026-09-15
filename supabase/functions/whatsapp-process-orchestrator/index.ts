@@ -37,6 +37,10 @@ import {
   type TestServiceLogger,
 } from "../_shared/whatsapp/orchestrator/test-service.ts";
 import { createTranscribeAudioMessage } from "../_shared/whatsapp/orchestrator/audio-transcription-deps.ts";
+import {
+  createAuthorizeAudioTranscription,
+  createRecordAudioTranscriptionUsage,
+} from "../_shared/whatsapp/orchestrator/ai-usage-deps.ts";
 import { createConfirmedKmUpdateDepsFromEnv } from "../_shared/whatsapp/actions/deps.ts";
 import { createConfirmedExpenseCreateDepsFromEnv } from "../_shared/whatsapp/actions/expense-deps.ts";
 import { executeConversationHandoffEntrypoint } from "../_shared/whatsapp/conversation-handoff/entrypoint.ts";
@@ -223,6 +227,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       kmActionDeps,
       expenseActionDeps,
       transcribeAudioMessage: createTranscribeAudioMessage(client),
+      authorizeAudioTranscription: createAuthorizeAudioTranscription(client),
+      recordAudioTranscriptionUsage: createRecordAudioTranscriptionUsage(client),
       conversationHandoffFallback: createConversationHandoffFallback(client),
       logger: createProductionLogger(),
     };

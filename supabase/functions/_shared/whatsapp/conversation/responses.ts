@@ -51,6 +51,8 @@ export function renderResponse(
       return "Você ainda não tem carro cadastrado no app.";
     case "vehicle_access_restricted":
       return "Essa ação não está disponível por aqui agora.";
+    case "ai_feature_requires_plan":
+      return "🔒 Pra transcrever áudios por aqui você precisa de plano ativo ou conta vinculada. Pode mandar em texto que eu ajudo do mesmo jeito!";
     case "fallback_first":
       return "Não entendi direito. Pode me explicar de outro jeito?";
     case "fallback_second":
