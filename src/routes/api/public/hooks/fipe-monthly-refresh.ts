@@ -263,11 +263,19 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
             // consultar-historico-fipe, não passa por este cron).
             // Confirmado no Passo 0 — não há distinção adicional a fazer
             // aqui.
-            void enqueueWhatsappNotification(
-              supabaseAdmin,
-              v.user_id,
-              `📈 A FIPE do seu ${String(v.marca ?? "").toUpperCase()} ${String(v.modelo ?? "").toUpperCase()} foi atualizada! Confira o novo valor no app: ${APP_LINK}`,
-            );
+            //
+            // user_id é nullable no schema (veículo arquivado/claim), mas
+            // um veículo com status='ativo' sempre tem dono — o guard
+            // abaixo é só pra satisfazer o tipo gerado (string | null) sem
+            // recorrer a non-null assertion; na prática nunca deveria
+            // pular esse envio.
+            if (v.user_id) {
+              void enqueueWhatsappNotification(
+                supabaseAdmin,
+                v.user_id,
+                `📈 A FIPE do seu ${String(v.marca ?? "").toUpperCase()} ${String(v.modelo ?? "").toUpperCase()} foi atualizada! Confira o novo valor no app: ${APP_LINK}`,
+              );
+            }
           } catch (e) {
             errors++;
             console.error("[fipe-monthly-refresh] exceção veiculo", v.id, e);

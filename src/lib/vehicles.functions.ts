@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sanitizePlate } from "@/lib/plate";
-import { unlockHistory } from "@/lib/unlock-history";
+import { unlockHistory, type UnlockHistoryClient } from "@/lib/unlock-history";
 
 export type ArchivedLookup = {
   found: false;
@@ -159,7 +159,11 @@ export const unlockHistoryFn = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const result = await unlockHistory(data.vehicleId, context.userId, supabaseAdmin);
+    const result = await unlockHistory(
+      data.vehicleId,
+      context.userId,
+      supabaseAdmin as unknown as UnlockHistoryClient,
+    );
     if (!result.ok) throw new Error(result.erro);
     return { ok: true };
   });
