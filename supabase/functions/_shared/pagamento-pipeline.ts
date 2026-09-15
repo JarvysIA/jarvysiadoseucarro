@@ -28,7 +28,7 @@ export async function confirmarPagamento(
   const { data: pag, error: errSel } = await supabase
     .from("pagamentos_pix")
     .select(
-      "id, user_id, veiculo_id, valor, codigo_cupom, tipo_produto, produto_ref_id, status, metadata",
+      "id, user_id, veiculo_id, valor, codigo_cupom, cupom_promocional_codigo, tipo_produto, produto_ref_id, status, metadata",
     )
     .eq("id", pagamento_id)
     .maybeSingle();
@@ -198,6 +198,44 @@ export async function confirmarPagamento(
           pagamento_id,
           codigo_cupom: pag.codigo_cupom ?? null,
           erro: errMessage.slice(0, 1000),
+        });
+      } catch (_) { /* swallow */ }
+    }
+  }
+
+  // 6) Cupom promocional (somente ativação). Reserva/incrementa usos_atuais
+  // só agora, na confirmação real do pagamento — nunca na geração do PIX
+  // (achado M2). Falha aqui NUNCA reverte ativação nem propaga erro: o
+  // pagamento já é real, o "fracasso" aqui é só não creditar de novo um
+  // resgate que porventura já existisse.
+  if (pag.cupom_promocional_codigo && pag.user_id) {
+    try {
+      const { data: confirmado, error: errConfirma } = await supabase.rpc(
+        "confirmar_uso_cupom_promocional",
+        {
+          p_codigo: pag.cupom_promocional_codigo,
+          p_user_id: pag.user_id,
+          p_pagamento_id: pag.id,
+        },
+      );
+      if (errConfirma) throw errConfirma;
+      if (confirmado !== true) {
+        console.warn(
+          "[pipeline] confirmar_uso_cupom_promocional devolveu false (não bloqueia ativação):",
+          pag.id,
+        );
+      }
+    } catch (e) {
+      const errMessage = e instanceof Error ? e.message : String(e);
+      console.error(
+        "[pipeline] cupom promocional falhou (não bloqueia ativação):",
+        errMessage,
+      );
+      try {
+        await supabase.from("logs_erro_bonificacao").insert({
+          pagamento_id,
+          codigo_cupom: pag.cupom_promocional_codigo ?? null,
+          erro: ("cupom_promocional: " + errMessage).slice(0, 1000),
         });
       } catch (_) { /* swallow */ }
     }

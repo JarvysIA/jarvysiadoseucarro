@@ -231,8 +231,8 @@ Deno.serve(async (req) => {
       if (codigoCupomBruto) {
         try {
           const { data: promoRows, error: errPromo } = await supabase.rpc(
-            "validar_e_reservar_cupom_promocional",
-            { p_codigo: codigoCupomBruto },
+            "validar_cupom_promocional",
+            { p_codigo: codigoCupomBruto, p_user_id: authUserId },
           );
           if (errPromo) throw errPromo;
           const promoResult = (Array.isArray(promoRows) ? promoRows[0] : promoRows) as
@@ -286,6 +286,7 @@ Deno.serve(async (req) => {
           veiculo_id,
           valor: 0,
           codigo_cupom: null,
+          cupom_promocional_codigo: cupomPromocionalAplicado,
           tipo_produto: "ativacao",
           produto_ref_id: null,
           status: "pendente",
@@ -360,6 +361,7 @@ Deno.serve(async (req) => {
         veiculo_id,
         valor,
         codigo_cupom: cupomAplicado,
+        cupom_promocional_codigo: cupomPromocionalAplicado,
         tipo_produto: tipo,
         produto_ref_id,
         status: "pendente",
