@@ -7,7 +7,7 @@ export type AuditAction =
   | "account_deactivated"
   | "saque_padrinho_processado";
 
-type AuditLogClient = {
+export type AuditLogClient = {
   from: (table: "audit_log") => {
     insert: (row: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
   };

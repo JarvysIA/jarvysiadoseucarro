@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { trialActive } from "@/lib/plan-capabilities";
-import { enqueueWhatsappNotification } from "@/lib/whatsapp-notify";
+import { enqueueWhatsappNotification, type WhatsappNotifyClient } from "@/lib/whatsapp-notify";
 
 // Link genérico pro app — não existe hoje nenhum deep-link pra um veículo
 // específico (a seleção de veículo ativo é local/client-side via
@@ -271,7 +271,7 @@ export const Route = createFileRoute("/api/public/hooks/fipe-monthly-refresh")({
             // pular esse envio.
             if (v.user_id) {
               void enqueueWhatsappNotification(
-                supabaseAdmin,
+                supabaseAdmin as unknown as WhatsappNotifyClient,
                 v.user_id,
                 `📈 A FIPE do seu ${String(v.marca ?? "").toUpperCase()} ${String(v.modelo ?? "").toUpperCase()} foi atualizada! Confira o novo valor no app: ${APP_LINK}`,
               );
