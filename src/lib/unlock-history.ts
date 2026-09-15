@@ -41,6 +41,32 @@ export type UnlockHistoryResult = { ok: true } | { ok: false; erro: string };
  * protegem essa coluna), só que pelo caminho HTTP em vez de REST direto.
  * Agora exige uma linha em pagamentos_pix com status='pago',
  * tipo_produto='historico' e veiculo_id = este veículo antes de destravar.
+ *
+ * Nota (investigação pós-build, antes de aprovar): unlockHistoryFn (o
+ * createServerFn que chama esta função) não tem NENHUM call-site no
+ * frontend hoje — busca em todo src/ não encontrou nenhum componente que
+ * o invoque. O desbloqueio real em produção acontece inteiramente no
+ * servidor, via confirmarPagamento() em
+ * supabase/functions/_shared/pagamento-pipeline.ts, chamado pelo webhook
+ * Asaas/verificar-pagamentos-asaas com service_role — que já resolve
+ * `pag.produto_ref_id ?? pag.veiculo_id` e não passa por esta função.
+ * unlockHistoryFn permanece como endpoint HTTP autenticado alcançável
+ * mesmo sem botão na UI (createServerFn expõe uma rota), então o fix
+ * continua válido como defesa em profundidade — só não é hoje o caminho
+ * que desbloqueia o Porta-Luvas Digital pra usuários reais.
+ *
+ * Por que checar só veiculo_id (sem produto_ref_id) aqui é suficiente:
+ * CheckoutPremiumModal.tsx é o ÚNICO lugar em todo o código (frontend ou
+ * edge functions) que cria um pagamento tipo_produto='historico' — e ele
+ * sempre envia veiculo_id e produto_ref_id com o MESMO valor (o
+ * vehicleId do checkout). gerar-pix-asaas ainda reforça isso com um
+ * fallback (`body.produto_ref_id ?? veiculo_id`) caso produto_ref_id
+ * venha ausente. Não existe nenhum outro criador de pagamento
+ * 'historico' com produto_ref_id divergente de veiculo_id — inclusive no
+ * "caminho antigo" (veículos com placas repetidas em linhas/ids
+ * diferentes, mencionado em hasPremiumHistoryAvailableFn), o desbloqueio
+ * sempre mira a linha ATUAL do usuário (mesmo id usado no checkout, no
+ * pagamento e neste check), nunca uma linha antiga de outro dono.
  */
 export async function unlockHistory(
   vehicleId: string,
