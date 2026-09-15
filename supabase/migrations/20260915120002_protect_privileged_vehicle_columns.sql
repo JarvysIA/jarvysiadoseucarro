@@ -23,7 +23,14 @@
 --     jarvys_technical_profile_source, jarvys_technical_profile_updated_at
 --     (escritas hoje só via supabaseAdmin em
 --     vehicle-technical-profile.functions.ts — service_role, nunca
---     cliente).
+--     cliente),
+--     marca, modelo, ano, cor, motorizacao, vehicle_signature,
+--     codigo_marca, codigo_modelo, cilindradas, ano_modelo,
+--     combustivel_fipe, modelo_fipe (confirmado na varredura do Passo 0:
+--     nenhum writer client-side pós-criação para estas colunas — só são
+--     setadas no INSERT inicial do veículo; congelar no UPDATE fecha o
+--     ambiguity flag levantado naquele relatório sem risco identificado de
+--     quebrar edição legítima).
 --     km_ultima_troca_oleo/filtros/pastilhas/arrefecimento — congeladas
 --     EXCETO quando pg_trigger_depth() > 1, i.e. quando a própria escrita
 --     vem de DENTRO do trigger trg_atualizar_revisao_veiculo (cascade
@@ -39,15 +46,6 @@
 --     codigo_fipe, placafipe_hash (refreshFipeFn, FipeCard.tsx, signup.tsx,
 --     AddVehicleModal.tsx — refreshFipeFn já tem seu próprio gate de
 --     entitlement por plano antes de escrever).
---
---   Fora do escopo desta migration (sem writer client-side confirmado, mas
---   também sem valor de exploit financeiro/paywall identificado — marca,
---   modelo, ano, cor, motorizacao, vehicle_signature, codigo_marca,
---   codigo_modelo, cilindradas, ano_modelo, combustivel_fipe, modelo_fipe):
---   deixadas de fora propositalmente. Congelar sem confirmação arrisca
---   travar uma edição legítima que não foi encontrada nesta varredura;
---   podem ser revisitadas numa migration futura se surgir evidência de
---   writer ou de exploit.
 CREATE OR REPLACE FUNCTION public.proteger_colunas_privilegiadas_veiculo()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -93,6 +91,18 @@ BEGIN
   NEW.jarvys_technical_profile_confidence := OLD.jarvys_technical_profile_confidence;
   NEW.jarvys_technical_profile_source := OLD.jarvys_technical_profile_source;
   NEW.jarvys_technical_profile_updated_at := OLD.jarvys_technical_profile_updated_at;
+  NEW.marca := OLD.marca;
+  NEW.modelo := OLD.modelo;
+  NEW.ano := OLD.ano;
+  NEW.cor := OLD.cor;
+  NEW.motorizacao := OLD.motorizacao;
+  NEW.vehicle_signature := OLD.vehicle_signature;
+  NEW.codigo_marca := OLD.codigo_marca;
+  NEW.codigo_modelo := OLD.codigo_modelo;
+  NEW.cilindradas := OLD.cilindradas;
+  NEW.ano_modelo := OLD.ano_modelo;
+  NEW.combustivel_fipe := OLD.combustivel_fipe;
+  NEW.modelo_fipe := OLD.modelo_fipe;
 
   -- km_ultima_troca_*: só o cascade de trg_atualizar_revisao_veiculo
   -- (rodando aninhado DENTRO deste mesmo UPDATE em veiculos —
